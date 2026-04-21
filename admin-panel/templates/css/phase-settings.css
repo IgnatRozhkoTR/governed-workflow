@@ -1,0 +1,77 @@
+/* ═══════════════════════════════════════════════ */
+/*  PHASE SETTINGS TOGGLE CARD                     */
+/* ═══════════════════════════════════════════════ */
+
+.phase-settings__empty {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  padding: 8px 0;
+}
+
+.phase-settings__desc {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  margin-bottom: 10px;
+}
+
+.phase-settings__loading {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.phase-settings__error {
+  color: var(--danger);
+  font-size: 0.82rem;
+}
+
+.phase-settings__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.phase-settings__checkbox {
+  flex-shrink: 0;
+}
+
+.phase-settings__label {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.phase-settings__label--disabled {
+  cursor: default;
+}
+
+.phase-settings__label--enabled {
+  cursor: pointer;
+}
+
+.phase-settings__id {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.phase-settings__badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
+.phase-settings__badge--always-on {
+  background: var(--text-muted);
+  color: var(--bg-base);
+}
+
+.phase-settings__badge--user-gate {
+  background: var(--accent);
+  color: var(--accent-text);
+}

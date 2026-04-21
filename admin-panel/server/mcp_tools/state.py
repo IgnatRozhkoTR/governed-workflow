@@ -2,13 +2,12 @@ import json
 
 from mcp_tools import mcp, with_mcp_workspace
 from core.db import ws_field
-from core.helpers import compute_phase_sequence
-from services.phase_resolver import resolve_enabled_phases
 from core.i18n import t
 from services import discussion_service
 from services import plan_service
 from services import progress_service
 from services import research_service
+from services.phase_sequencer import resolve_phase_sequence
 
 
 @mcp.tool()
@@ -28,9 +27,7 @@ def workspace_get_state(ws, project, db, locale) -> dict:
     Does NOT return gate_nonce (security: only available via admin panel UI)."""
     scope = plan_service.get_scope(ws)
     plan = plan_service.get_plan(ws)
-    all_phases = set(compute_phase_sequence(plan))
-    enabled = resolve_enabled_phases(db, ws["id"], ws["project_id"], all_phases)
-    phase_sequence = compute_phase_sequence(plan, enabled_phases=enabled)
+    _, phase_sequence = resolve_phase_sequence(db, ws, plan)
 
     context = {
         "ticket_id": ws["ticket_id"] or "",

@@ -1,30 +1,36 @@
 """DeclarativePhase -- a Phase driven by a YAML manifest + optional Python validator.
 
 Module-contributed phases use this class instead of subclassing Phase directly.
-Identity, gate behavior, and targets come from the manifest; validation delegates
-to an optional callable loaded from the module's phase_factory.py.
+Identity, gate behavior, targets, band, and position come from the manifest;
+validation delegates to an optional callable loaded from the module's
+phase_factory.py.
 """
 from advance.phases import Phase
+
+_DEFAULT_BAND = "preparation"
+_DEFAULT_POSITION = 1000
+
+
+def _coerce_position(value) -> int:
+    """Return the integer position, falling back to the default on bad input."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return _DEFAULT_POSITION
 
 
 class DeclarativePhase(Phase):
     """A Phase whose configuration is data-driven rather than code-driven."""
 
-    def __init__(
-        self,
-        manifest: dict,
-        validator_fn=None,
-        band: str = "preparation",
-        position: int = 1000,
-    ):
+    def __init__(self, manifest: dict, validator_fn=None):
         self._id = manifest["id"]
         self._name = manifest.get("name", self._id)
         self._is_user_gate = bool(manifest.get("is_user_gate", False))
         self._approve_target = manifest.get("approve_target")
         self._reject_target = manifest.get("reject_target")
         self._validator_fn = validator_fn
-        self.band = band
-        self.position = position
+        self.band = manifest.get("band", _DEFAULT_BAND)
+        self.position = _coerce_position(manifest.get("position", _DEFAULT_POSITION))
 
     @property
     def id(self):
@@ -52,11 +58,10 @@ class DeclarativePhase(Phase):
         return self._validator_fn(ws, body, project_path)
 
     def next_phase(self, ws):
-        # For declarative phases the "next" is determined by the spliced phase
-        # sequence in compute_phase_sequence. When no explicit approve/reject
-        # target is declared, return a sentinel ("") -- the orchestrator's
-        # _resolve_forward_target walks forward through the enabled sequence
-        # when the candidate is not in the enabled set, providing a graceful
-        # fallback. This is pragmatic; a future revision should derive "next"
-        # directly from the sequence rather than through the fallback path.
-        return self._approve_target or self._reject_target or ""
+        """Return the approve/reject target when declared, else the phase's own id.
+
+        Returning the phase's own id lets the orchestrator's forward resolver
+        walk onward through the spliced sequence, deriving "next" from the
+        sequence instead of a fragile empty-string sentinel.
+        """
+        return self._approve_target or self._reject_target or self._id

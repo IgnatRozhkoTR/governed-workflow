@@ -147,7 +147,7 @@ function renderSetupPage() {
     + '</div>'
 
     + '<div class="setup-section" id="phaseSettingsDeviceCard">'
-    + '<div class="setup-section-title">Phase Toggles</div>'
+    + '<div class="setup-section-title">' + t('cards.phaseSettings') + '</div>'
     + '<div id="setup-phase-settings-body"></div>'
     + '</div>'
 

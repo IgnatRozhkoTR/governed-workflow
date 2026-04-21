@@ -43,7 +43,7 @@ def load_module_phases(module_dirs: list[Path]) -> list:
 
         factory_module = _load_factory(mod_dir / "phase_factory.py")
 
-        for entry in manifest.get("phases", []) or []:
+        for entry in _iter_manifest_entries(mod_dir, manifest):
             phase = _build_phase(mod_dir, entry, factory_module, DeclarativePhase)
             if phase is not None:
                 phases.append(phase)
@@ -51,10 +51,35 @@ def load_module_phases(module_dirs: list[Path]) -> list:
     return phases
 
 
+def _iter_manifest_entries(mod_dir: Path, manifest: dict):
+    raw_entries = manifest.get("phases")
+    if raw_entries is None:
+        return
+    if not isinstance(raw_entries, list):
+        logger.warning(
+            "Module %s: manifest 'phases' must be a list, got %s; skipping.",
+            mod_dir.name, type(raw_entries).__name__,
+        )
+        return
+    for entry in raw_entries:
+        if not isinstance(entry, dict):
+            logger.warning(
+                "Module %s: manifest phase entry must be a mapping, got %s; skipping.",
+                mod_dir.name, type(entry).__name__,
+            )
+            continue
+        yield entry
+
+
 def _load_manifest(yaml_module, manifest_path: Path) -> dict | None:
     try:
-        data = yaml_module.safe_load(manifest_path.read_text()) or {}
-    except Exception as exc:
+        raw_text = manifest_path.read_text()
+    except OSError as exc:
+        logger.warning("Failed to read %s: %s", manifest_path, exc)
+        return None
+    try:
+        data = yaml_module.safe_load(raw_text) or {}
+    except yaml_module.YAMLError as exc:
         logger.warning("Failed to parse %s: %s", manifest_path, exc)
         return None
     if not isinstance(data, dict):
@@ -77,23 +102,19 @@ def _build_phase(mod_dir: Path, entry: dict, factory_module, declarative_cls):
         )
         return None
 
+    raw_position = entry.get("position")
+    if raw_position is not None:
+        try:
+            int(raw_position)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Module %s phase %s: invalid position %r; defaulting to 1000.",
+                mod_dir.name, phase_id, raw_position,
+            )
+
     validator_fn = _resolve_validator(mod_dir, entry.get("validator"), factory_module)
 
-    try:
-        position = int(entry.get("position", 1000))
-    except (TypeError, ValueError):
-        logger.warning(
-            "Module %s phase %s: invalid position %r; defaulting to 1000.",
-            mod_dir.name, phase_id, entry.get("position"),
-        )
-        position = 1000
-
-    return declarative_cls(
-        manifest=entry,
-        validator_fn=validator_fn,
-        band=band,
-        position=position,
-    )
+    return declarative_cls(manifest=entry, validator_fn=validator_fn)
 
 
 def _resolve_validator(mod_dir: Path, validator_name, factory_module):
@@ -123,10 +144,11 @@ def _load_factory(factory_path: Path):
             factory_path,
         )
         if spec is None or spec.loader is None:
+            logger.warning("Failed to load %s: invalid module spec.", factory_path)
             return None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
-    except Exception as exc:
+    except (ImportError, SyntaxError, OSError) as exc:
         logger.warning("Failed to load %s: %s", factory_path, exc)
         return None

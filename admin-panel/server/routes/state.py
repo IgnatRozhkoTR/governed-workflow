@@ -12,14 +12,13 @@ from core.db import get_db, get_db_ctx, ws_field
 from services import comment_service
 from services import discussion_service
 from core.decorators import with_workspace
-from core.helpers import compute_phase_sequence
-from services.phase_resolver import resolve_enabled_phases
 from core.i18n import t
 from core.terminal import notify_workspace
 from services import plan_service
 from services import progress_service
 from services import research_service
 from services import scope_service
+from services.phase_sequencer import resolve_phase_sequence
 
 def _group_comments(comments):
     """Group a flat list of comment dicts by 'scope:target' key."""
@@ -33,20 +32,28 @@ def _group_comments(comments):
 # Phases that have sub-phases — bare number normalizes to .0
 _PHASES_WITH_SUBS = {"1", "2", "3", "4"}
 
-# All valid phase patterns
-_VALID_PHASE_RE = re.compile(
+# Static phase ids that are always valid without consulting the registry.
+_STATIC_PHASE_RE = re.compile(
     r'^(0|1\.[0-4]|2\.[01]|3\.\d+\.[0-4]|4\.[0-2]|5)$'
 )
 
 
 def normalize_phase(phase):
-    """Normalize and validate a phase string. Returns normalized phase or None if invalid."""
+    """Normalize and validate a phase string. Returns the normalized phase or None.
+
+    Static workflow phases match the legacy regex. Module-contributed phases
+    (with non-numeric ids) are accepted when registered in PHASE_REGISTRY so
+    ``set_phase`` can move a workspace into a module phase by id.
+    """
     phase = phase.strip()
     if phase in _PHASES_WITH_SUBS:
         phase = phase + ".0"
-    if not _VALID_PHASE_RE.match(phase):
-        return None
-    return phase
+    if _STATIC_PHASE_RE.match(phase):
+        return phase
+    from advance.phases import PHASE_REGISTRY
+    if phase in PHASE_REGISTRY:
+        return phase
+    return None
 
 bp = Blueprint("state", __name__)
 
@@ -58,9 +65,7 @@ def get_workspace_state(db, ws, project):
 
     scope = plan_service.get_scope(ws)
     plan = plan_service.get_plan(ws)
-    all_phases = set(compute_phase_sequence(plan))
-    enabled = resolve_enabled_phases(db, ws["id"], ws["project_id"], all_phases)
-    phase_sequence = compute_phase_sequence(plan, enabled_phases=enabled)
+    _, phase_sequence = resolve_phase_sequence(db, ws, plan)
 
     history_rows = db.execute(
         "SELECT from_phase, to_phase, time FROM phase_history WHERE workspace_id = ? ORDER BY id",

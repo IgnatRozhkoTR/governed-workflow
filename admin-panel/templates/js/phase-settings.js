@@ -2,6 +2,8 @@
 //  PHASE SETTINGS — toggle cards
 // ═══════════════════════════════════════════════
 
+var _t = typeof t === 'function' ? t : function(k) { return k; };
+
 function _phaseEscape(str) {
   var el = document.createElement('span');
   el.textContent = String(str);
@@ -11,25 +13,25 @@ function _phaseEscape(str) {
 function _phaseLabel(phaseObj) {
   var id = _phaseEscape(phaseObj.id);
   var name = _phaseEscape(phaseObj.name || phaseObj.id);
-  return name + (name !== id ? ' <span style="color: var(--text-muted); font-size: 0.75rem;">(' + id + ')</span>' : '');
+  return name + (name !== id ? ' <span class="phase-settings__id">(' + id + ')</span>' : '');
 }
 
 function _phaseBadges(phaseObj) {
   var badges = '';
   if (phaseObj.always_on) {
-    badges += '<span class="badge" style="font-size: 0.65rem; padding: 1px 6px; background: var(--text-muted); color: var(--bg-base); border-radius: 3px; margin-left: 4px;">'
-      + (typeof t === 'function' ? t('labels.alwaysOn') : 'Always on') + '</span>';
+    badges += '<span class="badge phase-settings__badge phase-settings__badge--always-on">'
+      + _t('labels.alwaysOn') + '</span>';
   }
   if (phaseObj.is_user_gate) {
-    badges += '<span class="badge" style="font-size: 0.65rem; padding: 1px 6px; background: var(--accent); color: var(--accent-text); border-radius: 3px; margin-left: 4px;">'
-      + (typeof t === 'function' ? t('labels.userGate') : 'User gate') + '</span>';
+    badges += '<span class="badge phase-settings__badge phase-settings__badge--user-gate">'
+      + _t('labels.userGate') + '</span>';
   }
   return badges;
 }
 
 function _renderPhaseRows(phases, enabledMap, endpointBase, scope) {
   if (phases.length === 0) {
-    return '<div style="color: var(--text-muted); font-size: 0.82rem; padding: 8px 0;">No phases available.</div>';
+    return '<div class="phase-settings__empty">No phases available.</div>';
   }
 
   return phases.map(function(phase) {
@@ -38,17 +40,17 @@ function _renderPhaseRows(phases, enabledMap, endpointBase, scope) {
     var checkedAttr = isEnabled ? 'checked' : '';
     var disabledAttr = isAlwaysOn ? 'disabled' : '';
     var checkboxId = 'phase-toggle-' + scope + '-' + phase.id.replace(/\./g, '-');
+    var labelCursorClass = isAlwaysOn ? 'phase-settings__label--disabled' : 'phase-settings__label--enabled';
 
-    return '<div style="display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border);">'
-      + '<input type="checkbox" id="' + checkboxId + '"'
+    return '<div class="phase-settings__row">'
+      + '<input type="checkbox" class="phase-settings__checkbox" id="' + checkboxId + '"'
       + ' data-phase-id="' + _phaseEscape(phase.id) + '"'
       + ' data-scope="' + _phaseEscape(scope) + '"'
       + ' data-endpoint="' + _phaseEscape(endpointBase) + '"'
       + ' ' + checkedAttr
       + ' ' + disabledAttr
-      + ' onchange="_onPhaseToggleChange(this)"'
-      + ' style="flex-shrink: 0;">'
-      + '<label for="' + checkboxId + '" style="font-size: 0.82rem; color: var(--text-primary); cursor: ' + (isAlwaysOn ? 'default' : 'pointer') + '; flex: 1; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">'
+      + ' onchange="_onPhaseToggleChange(this)">'
+      + '<label for="' + checkboxId + '" class="phase-settings__label ' + labelCursorClass + '">'
       + _phaseLabel(phase)
       + _phaseBadges(phase)
       + '</label>'
@@ -83,8 +85,7 @@ async function _onPhaseToggleChange(checkbox) {
 async function renderPhaseToggleCard(container, scope, endpointBase) {
   if (!container) return;
 
-  container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.82rem;">'
-    + (typeof t === 'function' ? t('research.loading') : 'Loading...') + '</div>';
+  container.innerHTML = '<div class="phase-settings__loading">' + _t('research.loading') + '</div>';
 
   var phases = [];
   var enabledMap = {};
@@ -93,7 +94,7 @@ async function renderPhaseToggleCard(container, scope, endpointBase) {
     var availableData = await apiGet('/api/phases/available');
     phases = availableData.phases || [];
   } catch (e) {
-    container.innerHTML = '<div style="color: var(--danger); font-size: 0.82rem;">Failed to load phases: ' + _phaseEscape(e.message) + '</div>';
+    container.innerHTML = '<div class="phase-settings__error">Failed to load phases: ' + _phaseEscape(e.message) + '</div>';
     return;
   }
 
@@ -107,7 +108,6 @@ async function renderPhaseToggleCard(container, scope, endpointBase) {
     console.warn('Failed to load phase settings for ' + scope + ':', e.message);
   }
 
-  var desc = typeof t === 'function' ? t('config.phaseSettingsDesc') : 'Enable or disable phases for this scope. Always-on phases cannot be disabled.';
-  container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.78rem; margin-bottom: 10px;">' + _phaseEscape(desc) + '</div>'
+  container.innerHTML = '<div class="phase-settings__desc">' + _phaseEscape(_t('config.phaseSettingsDesc')) + '</div>'
     + _renderPhaseRows(phases, enabledMap, endpointBase, scope);
 }

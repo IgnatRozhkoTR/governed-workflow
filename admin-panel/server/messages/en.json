@@ -148,6 +148,7 @@
   "advance.error.awaitingUserApproval": "Awaiting user approval",
   "advance.error.noAdvancerForPhase": "No advancer for phase {phase}",
   "advance.error.phaseAlreadyChanged": "Phase already changed",
+  "advance.error.noEnabledSuccessor": "No enabled phase exists after candidate {candidate}. Enable additional phases before advancing.",
 
   "advance.success.planValidated": "Plan validated. {count} sub-phases. Awaiting user approval.",
   "advance.success.advanced": "Advanced to phase {phase}",
@@ -160,6 +161,7 @@
   "gate.error.pendingCriteria": "{count} acceptance criteria are not yet accepted. All criteria must be accepted or deleted before approving the plan.",
   "gate.error.unknownGate": "Unknown gate",
   "gate.error.phaseAlreadyChanged": "Phase already changed",
+  "gate.error.noEnabledSuccessor": "No enabled phase exists after candidate {candidate}. Enable additional phases before continuing.",
   "guard.review.unresolvedItems": "{count} review item(s) still unresolved. All review items must be resolved by the user before advancing.",
 
   "api.error.projectNotFound": "Project not found",

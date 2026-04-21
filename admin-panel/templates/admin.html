@@ -58,6 +58,7 @@
 <link rel="stylesheet" href="css/setup.css?v=11">
 <link rel="stylesheet" href="css/mobile.css?v=11">
 <link rel="stylesheet" href="css/workspace.css?v=11">
+<link rel="stylesheet" href="css/phase-settings.css?v=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -227,7 +228,7 @@
     <!-- Phase Settings (workspace) -->
     <div class="card collapsed" id="phaseSettingsWorkspaceCard">
       <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title">Phase Toggles</span>
+        <span class="card-title" data-i18n="cards.phaseSettings">Phase Toggles</span>
         <span class="card-collapse-chevron">&#9660;</span>
       </div>
       <div class="card-body" id="phaseSettingsWorkspaceBody"></div>

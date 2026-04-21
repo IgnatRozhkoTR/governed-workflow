@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mcp.server.fastmcp import FastMCP
 from core.db import get_db, init_db
-from core.helpers import VALID_CRITERIA_TYPES, compute_phase_sequence
+from core.helpers import VALID_CRITERIA_TYPES
 from core.i18n import t
 from services import comment_service
 from services import criteria_service

@@ -4,7 +4,6 @@ Replaces hardcoded phase string routing with Phase registry lookups.
 All business logic (gate nonce verification, guard evaluation, transitions,
 yolo auto-approve) is preserved exactly from advance/service.py.
 """
-import json
 import logging
 import secrets
 from datetime import datetime
@@ -12,31 +11,48 @@ from datetime import datetime
 from advance.guards import GUARD_ORCHESTRATOR
 from advance.phases import get_phase
 from core.db import get_db_ctx, ws_field
-from core.helpers import compute_phase_sequence
 from core.i18n import t
 from core.terminal import notify_workspace
-from services.phase_resolver import resolve_enabled_phases
+from services.phase_sequencer import full_phase_sequence, plan_from_workspace, resolve_phase_sequence
 
 logger = logging.getLogger(__name__)
 
 
-def _resolve_forward_target(ws, db, candidate: str) -> str:
-    """Walk forward through the workspace's phase sequence, skipping disabled phases."""
-    plan_json = ws["plan_json"] if "plan_json" in ws.keys() else None
-    plan = json.loads(plan_json) if plan_json else {}
-    all_phases = set(compute_phase_sequence(plan))
-    enabled = resolve_enabled_phases(db, ws["id"], ws["project_id"], all_phases)
-    if candidate in enabled:
+def _resolve_forward_target(ws, db, candidate: str) -> str | None:
+    """Resolve the next phase the workspace should advance into.
+
+    Returns the candidate unchanged when it is enabled AND differs from the
+    workspace's current phase. When the candidate equals the current phase
+    (module phases with no declared approve_target signal "walk onward") or
+    when the candidate is disabled, walks forward through the full spliced
+    sequence from the candidate's position and returns the first enabled
+    phase. Falls back to returning the candidate when it is not in the
+    sequence at all (e.g. an execution phase for an item that no longer
+    exists in the plan). Returns ``None`` when the candidate is explicitly
+    disabled and no enabled successor exists, so callers treat the
+    transition as a no-op instead of silently writing a disabled phase.
+    """
+    plan = plan_from_workspace(ws)
+    enabled, _ = resolve_phase_sequence(db, ws, plan)
+    current = ws["phase"]
+    if candidate != current and candidate in enabled:
         return candidate
-    sequence = compute_phase_sequence(plan, enabled_phases=enabled)
+
+    full = full_phase_sequence(plan)
     try:
-        cur_idx = sequence.index(ws["phase"])
-        for p in sequence[cur_idx + 1:]:
-            if p in enabled:
-                return p
+        start_idx = full.index(candidate)
     except ValueError:
-        pass
-    return candidate
+        return candidate
+
+    for phase_id in full[start_idx + 1:]:
+        if phase_id in enabled:
+            return phase_id
+
+    logger.warning(
+        "No enabled phase after candidate=%s (current=%s) for workspace %s; advance is a no-op.",
+        candidate, current, ws["id"],
+    )
+    return None
 
 
 def is_user_gate(phase_str: str) -> bool:
@@ -114,11 +130,18 @@ def approve_gate(ws, token, commit_message=None):
         if rejected:
             return {"error": rejected[0]["message"], "guard_errors": rejected, "status_code": 422}
 
-    new_phase = phase.approve_target
-    if not new_phase:
+    candidate = phase.approve_target
+    if not candidate:
         return {"error": t("gate.error.unknownGate", locale), "status_code": 400}
 
     with get_db_ctx() as db:
+        new_phase = _resolve_forward_target(ws, db, candidate)
+        if new_phase is None:
+            return {
+                "error": t("gate.error.noEnabledSuccessor", locale, candidate=candidate),
+                "status_code": 409,
+            }
+
         phase.on_approve(ws, {"commit_message": commit_message} if commit_message else {}, db)
 
         if not transition_phase(db, ws, new_phase, clear_nonce=True):
@@ -142,11 +165,18 @@ def reject_gate(ws, token, comments=""):
     if token != ws["gate_nonce"]:
         return {"error": t("gate.error.invalidNonce", locale), "status_code": 403}
 
-    new_phase = phase.reject_target
-    if not new_phase:
+    candidate = phase.reject_target
+    if not candidate:
         return {"error": t("gate.error.unknownGate", locale), "status_code": 400}
 
     with get_db_ctx() as db:
+        new_phase = _resolve_forward_target(ws, db, candidate)
+        if new_phase is None:
+            return {
+                "error": t("gate.error.noEnabledSuccessor", locale, candidate=candidate),
+                "status_code": 409,
+            }
+
         if not transition_phase(db, ws, new_phase, clear_nonce=True):
             return {"error": t("gate.error.phaseAlreadyChanged", locale), "status_code": 409}
 
@@ -206,10 +236,17 @@ def perform_advance(ws, project_path, body=None):
         if rejected:
             return {"phase": phase_str, "status": "blocked", "guard_errors": rejected}, 422
 
-    new_phase = phase.next_phase(ws)
+    candidate = phase.next_phase(ws)
 
     with get_db_ctx() as db:
-        new_phase = _resolve_forward_target(ws, db, new_phase)
+        new_phase = _resolve_forward_target(ws, db, candidate)
+        if new_phase is None:
+            return {
+                "phase": phase_str,
+                "status": "blocked",
+                "message": t("advance.error.noEnabledSuccessor", locale, candidate=candidate),
+            }, 409
+
         if not transition_phase(db, ws, new_phase, commit_hash=body.get("commit_hash")):
             return {"error": t("advance.error.phaseAlreadyChanged", locale)}, 409
 

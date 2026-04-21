@@ -148,6 +148,7 @@
   "advance.error.awaitingUserApproval": "Ожидается одобрение пользователя",
   "advance.error.noAdvancerForPhase": "Нет обработчика перехода для фазы {phase}",
   "advance.error.phaseAlreadyChanged": "Фаза уже изменена",
+  "advance.error.noEnabledSuccessor": "После целевой фазы {candidate} нет включённых фаз. Включите дополнительные фазы перед переходом.",
 
   "advance.success.planValidated": "План валидирован. {count} подфаз. Ожидается одобрение пользователя.",
   "advance.success.advanced": "Выполнен переход к фазе {phase}",
@@ -160,6 +161,7 @@
   "gate.error.pendingCriteria": "{count} критериев приёмки ещё не приняты. Все критерии должны быть приняты или удалены перед одобрением плана.",
   "gate.error.unknownGate": "Неизвестный шлюз",
   "gate.error.phaseAlreadyChanged": "Фаза уже изменена",
+  "gate.error.noEnabledSuccessor": "После целевой фазы {candidate} нет включённых фаз. Включите дополнительные фазы перед продолжением.",
   "guard.review.unresolvedItems": "{count} замечание(й) ревью ещё не закрыто. Все замечания ревью должны быть закрыты пользователем перед продвижением.",
 
   "api.error.projectNotFound": "Проект не найден",

@@ -8,6 +8,29 @@ from services.phase_settings import get_scope_settings, is_always_on, set_scope_
 
 bp = Blueprint("phase_settings", __name__)
 
+_SETTINGS_BODY_ERRORS = {
+    "not_dict": "settings must be a JSON object",
+    "non_string_key": "settings keys must be strings (phase IDs)",
+    "non_bool_value": "settings values must be booleans",
+}
+
+
+def _validate_settings_body(body: dict) -> tuple[dict | None, str | None]:
+    """Validate that *body* contains a well-formed ``settings`` mapping.
+
+    Returns ``(settings_dict, None)`` on success, or ``(None, error_message)``
+    when the shape is invalid.
+    """
+    settings = body.get("settings", {})
+    if not isinstance(settings, dict):
+        return None, _SETTINGS_BODY_ERRORS["not_dict"]
+    for key, value in settings.items():
+        if not isinstance(key, str):
+            return None, _SETTINGS_BODY_ERRORS["non_string_key"]
+        if not isinstance(value, bool):
+            return None, _SETTINGS_BODY_ERRORS["non_bool_value"]
+    return settings, None
+
 
 def _build_phases_list():
     from advance.phases import PHASE_REGISTRY
@@ -33,7 +56,9 @@ def get_device_settings():
 @bp.route("/api/phase-settings/device", methods=["PUT"])
 def set_device_settings():
     body = request.get_json(silent=True) or {}
-    settings = body.get("settings", {})
+    settings, err = _validate_settings_body(body)
+    if err:
+        return jsonify({"error": err}), 400
     try:
         with get_db_ctx() as db:
             set_scope_settings(db, "device", "", settings)
@@ -55,7 +80,9 @@ def get_project_settings(db, project):
 @with_project
 def set_project_settings(db, project):
     body = request.get_json(silent=True) or {}
-    settings = body.get("settings", {})
+    settings, err = _validate_settings_body(body)
+    if err:
+        return jsonify({"error": err}), 400
     try:
         set_scope_settings(db, "project", str(project["id"]), settings)
         db.commit()
@@ -76,7 +103,9 @@ def get_workspace_settings(db, ws, project):
 @with_workspace
 def set_workspace_settings(db, ws, project):
     body = request.get_json(silent=True) or {}
-    settings = body.get("settings", {})
+    settings, err = _validate_settings_body(body)
+    if err:
+        return jsonify({"error": err}), 400
     try:
         set_scope_settings(db, "workspace", str(ws["id"]), settings)
         db.commit()

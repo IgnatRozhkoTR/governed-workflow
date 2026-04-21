@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from flask import Flask, jsonify
+from advance.phases import register_module_phases_from_disk
 from core.db import init_db
 from core.paths import DEFAULT_TOOLS_DIR
 from routes import register_blueprints
@@ -17,6 +18,7 @@ os.environ.setdefault("GOVERNED_WORKFLOW_TOOLS_DIR", str(DEFAULT_TOOLS_DIR))
 def create_app():
     templates_dir = Path(__file__).resolve().parent.parent / "templates"
     app = Flask(__name__, static_folder=None, template_folder=str(templates_dir))
+    register_module_phases_from_disk()
     register_blueprints(app)
 
     @app.errorhandler(404)

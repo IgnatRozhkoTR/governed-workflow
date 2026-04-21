@@ -3,6 +3,7 @@
 All tool implementations live in mcp_tools/.
 Importing mcp_tools triggers @mcp.tool registration for all 32 tools.
 """
+from advance.phases import register_module_phases_from_disk
 from mcp_tools import mcp
 from mcp_tools.state import workspace_get_state
 from mcp_tools.advance import workspace_advance
@@ -49,4 +50,5 @@ from mcp_tools.verification import (
 )
 
 if __name__ == "__main__":
+    register_module_phases_from_disk()
     mcp.run(transport="stdio")

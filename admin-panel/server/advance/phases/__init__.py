@@ -156,21 +156,39 @@ for _phase in _prep_phases + _plan_phases + _final_phases:
     register_phase(_phase)
 
 
-# Module-contributed phases -- discovered from claude/modules/ and claude/modules-local/
-def _register_module_phases():
+# Module-contributed phase registration is explicit: app startup (or tests)
+# must invoke register_module_phases_from_disk(). Running at import time made
+# behavior depend on the module directories that happened to exist on disk
+# when PHASE_REGISTRY was first imported, leaking filesystem state into tests.
+_MODULE_PHASE_IDS: set[str] = set()
+
+
+def register_module_phases_from_disk() -> None:
+    """Discover and register DeclarativePhases from the on-disk modules roots.
+
+    Safe to call multiple times: phases already registered are left in place
+    and colliding ids are logged. Newly discovered module phases are tracked
+    so ``reset_module_phases`` can remove exactly the phases this function
+    introduced without touching the static registry entries.
+    """
     import logging
 
     from core.paths import DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR
     from services.module_phase_loader import load_module_phases
     from services.modules_discovery import iter_module_dirs
 
-    dirs = iter_module_dirs([DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR])
+    dirs = iter_module_dirs([DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR], required_file="phase.yaml")
     log = logging.getLogger(__name__)
     for phase in load_module_phases(dirs):
         if phase.id in PHASE_REGISTRY:
             log.warning("Module phase %s collides with existing phase; skipping", phase.id)
             continue
         register_phase(phase)
+        _MODULE_PHASE_IDS.add(phase.id)
 
 
-_register_module_phases()
+def reset_module_phases() -> None:
+    """Remove every phase previously registered by ``register_module_phases_from_disk``."""
+    for phase_id in list(_MODULE_PHASE_IDS):
+        PHASE_REGISTRY.pop(phase_id, None)
+    _MODULE_PHASE_IDS.clear()

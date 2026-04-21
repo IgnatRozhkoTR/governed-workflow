@@ -371,7 +371,7 @@ function _wsInitSelector() {
         </div>
 
         <div class="ws-section" id="phaseSettingsProjectCard" style="display: none;">
-          <div class="ws-section-title">Phase Toggles</div>
+          <div class="ws-section-title">${t('cards.phaseSettings')}</div>
           <div id="phaseSettingsProjectBody"></div>
         </div>
 

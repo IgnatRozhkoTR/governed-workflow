@@ -53,7 +53,17 @@ def test_gt():
     assert phase_key("3.1.4") > phase_key("2.1")
 
 
-def test_tuple_structure():
-    assert phase_key("3.1.4") == (3, 1, 4)
-    assert phase_key("1.0") == (1, 0)
-    assert phase_key("5") == (5,)
+def test_numeric_components_sort_by_integer_value():
+    assert phase_key("3.1.4") < phase_key("3.1.10")
+    assert phase_key("1.0") < phase_key("1.1")
+    assert phase_key("5") > phase_key("4.2")
+
+
+def test_module_phase_id_does_not_crash():
+    key = phase_key("mod.prep.x")
+    assert isinstance(key, tuple)
+    assert len(key) == 3
+
+
+def test_numeric_phase_sorts_before_module_phase():
+    assert phase_key("3.1.4") < phase_key("mod.prep.x")

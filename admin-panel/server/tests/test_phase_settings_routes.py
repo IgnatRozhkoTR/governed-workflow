@@ -125,3 +125,31 @@ def test_put_workspace_rejects_3_1_3_disable(client, workspace):
     response = client.put(f"/api/ws/{pid}/feature/test/phase-settings", json={"settings": {"3.1.3": False}})
     assert response.status_code == 400
     assert "error" in response.get_json()
+
+
+# ── Input shape validation (issue #767) ──────────────────────────────────────
+
+def test_put_device_invalid_settings_shape_returns_400(client):
+    response = client.put("/api/phase-settings/device", json={"settings": "not a dict"})
+    assert response.status_code == 400
+    data = response.get_json()
+    assert "error" in data
+    assert "object" in data["error"]
+
+
+def test_put_device_invalid_settings_key_returns_400(client):
+    # JSON forces string keys, so we test nested invalid shapes (non-bool value
+    # used as a proxy for a fuzz-invalid body where the value type is wrong).
+    response = client.put("/api/phase-settings/device", json={"settings": {"1.1": {"nested": True}}})
+    assert response.status_code == 400
+    data = response.get_json()
+    assert "error" in data
+    assert "bool" in data["error"]
+
+
+def test_put_device_invalid_settings_value_returns_400(client):
+    response = client.put("/api/phase-settings/device", json={"settings": {"1.1": "yes"}})
+    assert response.status_code == 400
+    data = response.get_json()
+    assert "error" in data
+    assert "bool" in data["error"]

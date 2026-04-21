@@ -3,8 +3,8 @@ import pytest
 
 from advance.phases import PHASE_REGISTRY, register_phase
 from advance.phases.declarative import DeclarativePhase
-from core.helpers import compute_phase_sequence
 from services.module_phase_loader import load_module_phases
+from services.phase_sequencer import full_phase_sequence
 
 
 # ── DeclarativePhase ─────────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ def test_declarative_phase_next_phase_returns_approve_target_first():
     p3 = DeclarativePhase({"id": "c", "name": "C"})
     assert p1.next_phase({}) == "2.0"
     assert p2.next_phase({}) == "1.1"
-    assert p3.next_phase({}) == ""
+    assert p3.next_phase({}) == "c"
 
 
 # ── load_module_phases ───────────────────────────────────────────────────────
@@ -147,19 +147,19 @@ def two_prep_phases():
 
 
 def test_compute_phase_sequence_includes_module_prep_phase(registered_prep_phase):
-    seq = compute_phase_sequence({})
+    seq = full_phase_sequence({})
     assert "mod.prep.x" in seq
     idx = seq.index("mod.prep.x")
     assert seq.index("2.1") < idx < seq.index("4.0")
 
 
 def test_compute_phase_sequence_includes_module_finalization_phase(registered_final_phase):
-    seq = compute_phase_sequence({})
+    seq = full_phase_sequence({})
     assert "mod.final.x" in seq
     idx = seq.index("mod.final.x")
     assert seq.index("2.1") < idx < seq.index("4.0")
 
 
 def test_compute_phase_sequence_respects_position_within_band(two_prep_phases):
-    seq = compute_phase_sequence({})
+    seq = full_phase_sequence({})
     assert seq.index("mod.prep.early") < seq.index("mod.prep.late")
