@@ -5,7 +5,8 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from core.db import get_db_ctx
-from core.paths import DEFAULT_MODULES_DIR
+from core.paths import DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR
+from services.modules_discovery import iter_module_dirs
 
 bp = Blueprint("modules", __name__)
 
@@ -55,12 +56,10 @@ def _load_module(directory):
 @bp.route("/api/modules", methods=["GET"])
 def list_modules():
     modules = []
-    if MODULES_DIR.is_dir():
-        for entry in sorted(MODULES_DIR.iterdir()):
-            if entry.is_dir():
-                module = _load_module(entry)
-                if module is not None:
-                    modules.append(module)
+    for directory in iter_module_dirs([DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR]):
+        module = _load_module(directory)
+        if module is not None:
+            modules.append(module)
     return jsonify({"modules": modules})
 
 

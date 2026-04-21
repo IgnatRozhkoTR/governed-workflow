@@ -1,6 +1,8 @@
 """Tests for setup-scoped device feature flags and skill path resolution."""
 from pathlib import Path
 
+import pytest
+
 
 def test_get_setup_features_default_off(client):
     response = client.get("/api/setup/features")
@@ -57,3 +59,28 @@ def test_setup_skill_path_does_not_reference_home_claude():
     assert str(expected_skill_path) in prompt, (
         f"setup prompt does not reference expected skill path {expected_skill_path}"
     )
+
+
+def test_setup_start_includes_local_modules_to_disable_list(tmp_path, monkeypatch):
+    # setup_start requires tmux so we test the underlying helper directly.
+    # Verify that iter_module_dirs with both roots (tracked + local) produces
+    # disjoint ids from each root so modules_to_disable covers both.
+    tracked = tmp_path / "tracked"
+    local = tmp_path / "local"
+    tracked.mkdir()
+    local.mkdir()
+    (tracked / "mod-tracked").mkdir()
+    (tracked / "mod-tracked" / "SKILL.md").write_text("")
+    (local / "mod-local").mkdir()
+    (local / "mod-local" / "SKILL.md").write_text("")
+
+    import routes.setup as setup_routes
+    monkeypatch.setattr(setup_routes, "_MODULES_DIR", tracked)
+    monkeypatch.setattr(setup_routes, "DEFAULT_MODULES_LOCAL_DIR", local)
+
+    from services.modules_discovery import iter_module_dirs
+    ids = [d.name for d in iter_module_dirs([tracked, local])]
+    assert "mod-tracked" in ids
+    assert "mod-local" in ids
+    modules_to_disable = [m for m in ids if m not in set()]
+    assert "mod-local" in modules_to_disable

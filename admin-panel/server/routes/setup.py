@@ -10,7 +10,8 @@ from flask_sock import Sock
 from core.terminal import session_exists, create_session, send_keys, kill_session, tmux_available, send_prompt_when_ready, run_pty_websocket, TMUX_NOT_INSTALLED
 from core.db import get_db_ctx
 from core.global_flags import is_codex_enabled, set_codex_enabled
-from core.paths import DEFAULT_MODULES_DIR, DEFAULT_SKILLS_DIR
+from core.paths import DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR, DEFAULT_SKILLS_DIR
+from services.modules_discovery import iter_module_dirs
 
 _MODULES_DIR = DEFAULT_MODULES_DIR
 
@@ -145,11 +146,9 @@ def setup_start():
 
     logger.info("setup_start: modules_to_enable=%s languages=%s custom_languages=%s", modules, languages, custom_languages)
 
-    available_module_ids = []
-    if _MODULES_DIR.is_dir():
-        for entry in sorted(_MODULES_DIR.iterdir()):
-            if entry.is_dir() and (entry / "SKILL.md").is_file():
-                available_module_ids.append(entry.name)
+    available_module_ids = [
+        d.name for d in iter_module_dirs([_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR])
+    ]
 
     selected_set = set(modules)
     modules_to_disable = [m for m in available_module_ids if m not in selected_set]

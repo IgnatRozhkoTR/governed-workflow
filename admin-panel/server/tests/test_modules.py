@@ -1,5 +1,87 @@
 """Tests for modules discovery and enabled-state endpoints."""
+from pathlib import Path
 
+import pytest
+
+
+# --- iter_module_dirs unit tests ---
+
+def test_iter_module_dirs_empty_roots_returns_empty():
+    from services.modules_discovery import iter_module_dirs
+    assert iter_module_dirs([]) == []
+
+
+def test_iter_module_dirs_single_root_filters_without_skill(tmp_path):
+    from services.modules_discovery import iter_module_dirs
+    (tmp_path / "valid").mkdir()
+    (tmp_path / "valid" / "SKILL.md").write_text("---\nname: Valid\n---")
+    (tmp_path / "invalid").mkdir()
+    result = iter_module_dirs([tmp_path])
+    assert result == [tmp_path / "valid"]
+
+
+def test_iter_module_dirs_multi_root_merges(tmp_path):
+    from services.modules_discovery import iter_module_dirs
+    root_a = tmp_path / "a"
+    root_b = tmp_path / "b"
+    root_a.mkdir()
+    root_b.mkdir()
+    (root_a / "alpha").mkdir()
+    (root_a / "alpha" / "SKILL.md").write_text("")
+    (root_b / "beta").mkdir()
+    (root_b / "beta" / "SKILL.md").write_text("")
+    result = iter_module_dirs([root_a, root_b])
+    assert [p.name for p in result] == ["alpha", "beta"]
+
+
+def test_iter_module_dirs_local_shadows_tracked(tmp_path):
+    from services.modules_discovery import iter_module_dirs
+    tracked = tmp_path / "tracked"
+    local = tmp_path / "local"
+    tracked.mkdir()
+    local.mkdir()
+    (tracked / "mymod").mkdir()
+    (tracked / "mymod" / "SKILL.md").write_text("")
+    (local / "mymod").mkdir()
+    (local / "mymod" / "SKILL.md").write_text("")
+    result = iter_module_dirs([tracked, local])
+    assert result == [local / "mymod"]
+
+
+def test_iter_module_dirs_nonexistent_root_skipped(tmp_path):
+    from services.modules_discovery import iter_module_dirs
+    existing = tmp_path / "existing"
+    existing.mkdir()
+    (existing / "mod").mkdir()
+    (existing / "mod" / "SKILL.md").write_text("")
+    result = iter_module_dirs([existing, tmp_path / "ghost"])
+    assert result == [existing / "mod"]
+
+
+# --- route test ---
+
+def test_list_modules_route_reads_both_roots(app, tmp_path, monkeypatch):
+    tracked = tmp_path / "tracked"
+    local = tmp_path / "local"
+    tracked.mkdir()
+    local.mkdir()
+    (tracked / "mod-a").mkdir()
+    (tracked / "mod-a" / "SKILL.md").write_text("---\nname: Mod A\n---")
+    (local / "mod-b").mkdir()
+    (local / "mod-b" / "SKILL.md").write_text("---\nname: Mod B\n---")
+
+    import routes.modules as mod_routes
+    monkeypatch.setattr(mod_routes, "DEFAULT_MODULES_DIR", tracked)
+    monkeypatch.setattr(mod_routes, "DEFAULT_MODULES_LOCAL_DIR", local)
+
+    response = app.test_client().get("/api/modules")
+    assert response.status_code == 200
+    ids = [m["id"] for m in response.get_json()["modules"]]
+    assert "mod-a" in ids
+    assert "mod-b" in ids
+
+
+# --- original tests ---
 
 def test_list_modules(client):
     """GET /api/modules returns list (may be empty or contain telegram)."""

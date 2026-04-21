@@ -30,6 +30,7 @@ DEFAULT_DEFAULTS_DIR = REPO_ROOT / "claude" / "defaults"
 DEFAULT_CODEX_DIR = REPO_ROOT / "codex"
 DEFAULT_TOOLS_DIR = REPO_ROOT / "claude" / "tools"
 DEFAULT_MODULES_DIR = REPO_ROOT / "claude" / "modules"
+DEFAULT_MODULES_LOCAL_DIR = REPO_ROOT / "claude" / "modules-local"
 DEFAULT_SKILLS_DIR = REPO_ROOT / "claude" / "skills"
 
 DEFAULT_FUNNEL_TEMPLATE = DEFAULT_DEFAULTS_DIR / ".mcp-funnel.json"

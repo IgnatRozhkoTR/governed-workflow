@@ -34,3 +34,4 @@ admin-panel/server/projects.json
 admin-panel/.reviews/
 admin-panel/server/sdkman*/
 claude/tools/
+claude/modules-local/
