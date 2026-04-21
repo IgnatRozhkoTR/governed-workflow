@@ -154,3 +154,23 @@ from advance.phases.finalization import PHASES as _final_phases  # noqa: E402
 
 for _phase in _prep_phases + _plan_phases + _final_phases:
     register_phase(_phase)
+
+
+# Module-contributed phases -- discovered from claude/modules/ and claude/modules-local/
+def _register_module_phases():
+    import logging
+
+    from core.paths import DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR
+    from services.module_phase_loader import load_module_phases
+    from services.modules_discovery import iter_module_dirs
+
+    dirs = iter_module_dirs([DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR])
+    log = logging.getLogger(__name__)
+    for phase in load_module_phases(dirs):
+        if phase.id in PHASE_REGISTRY:
+            log.warning("Module phase %s collides with existing phase; skipping", phase.id)
+            continue
+        register_phase(phase)
+
+
+_register_module_phases()
