@@ -17,11 +17,7 @@ var AppState = {
       working_dir: null,
       sessions: [],
       locale: null,
-      yolo_mode: false,
-      codex_globally_enabled: false,
-      codex_review_enabled: false,
-      codex_review_status: 'idle',
-      codex_review_last_error: ''
+      yolo_mode: false
     },
   plan: {
     description: "",
@@ -128,10 +124,6 @@ function applyStateData(stateData) {
   LOCK_DATA.prev_plan_status = stateData.prev_plan_status || null;
   LOCK_DATA.locale = stateData.locale || null;
   LOCK_DATA.yolo_mode = !!stateData.yolo_mode;
-  LOCK_DATA.codex_globally_enabled = !!stateData.codex_globally_enabled;
-  LOCK_DATA.codex_review_enabled = !!stateData.codex_review_enabled;
-  LOCK_DATA.codex_review_status = stateData.codex_review_status || 'idle';
-  LOCK_DATA.codex_review_last_error = stateData.codex_review_last_error || '';
 
   // Plan — single source is AppState.plan; keep LOCK_DATA.plan as alias
   if (stateData.plan) {
@@ -180,10 +172,6 @@ function resetAppState() {
   LOCK_DATA.sessions = [];
   LOCK_DATA.locale = null;
   LOCK_DATA.yolo_mode = false;
-  LOCK_DATA.codex_globally_enabled = false;
-  LOCK_DATA.codex_review_enabled = false;
-  LOCK_DATA.codex_review_status = 'idle';
-  LOCK_DATA.codex_review_last_error = '';
 
   // Reset plan
   PLAN_DATA.description = "";

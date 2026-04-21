@@ -222,6 +222,13 @@ async function openProject(projectId) {
   }
 
   await loadBranches(projectId);
+
+  var projectCard = document.getElementById('phaseSettingsProjectCard');
+  var projectBody = document.getElementById('phaseSettingsProjectBody');
+  if (projectCard && projectBody && typeof renderPhaseToggleCard === 'function') {
+    projectCard.style.display = '';
+    renderPhaseToggleCard(projectBody, 'project', '/api/projects/' + encodeURIComponent(projectId) + '/phase-settings');
+  }
 }
 
 async function loadBranches(projectId) {
@@ -361,6 +368,11 @@ function _wsInitSelector() {
           <div class="ws-section-title" id="ws-workspace-project-name"></div>
           <div id="ws-workspace-cards"></div>
           <div id="ws-workspace-error"></div>
+        </div>
+
+        <div class="ws-section" id="phaseSettingsProjectCard" style="display: none;">
+          <div class="ws-section-title">Phase Toggles</div>
+          <div id="phaseSettingsProjectBody"></div>
         </div>
 
         <div class="ws-section">

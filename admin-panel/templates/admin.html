@@ -186,16 +186,6 @@
 	          <button class="btn-dropdown-item" onclick="doStart('split')" data-i18n="actions.sidePanel">Side panel</button>
 	        </div>
 	      </div>
-	      <div id="codexPhase1Launch" style="display:none; align-items:center; gap:6px;">
-	        <span style="font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-left: 6px;" data-i18n="labels.codex">Codex</span>
-	        <div class="btn-dropdown" style="position: relative; display: inline-block;">
-	          <button class="btn btn-sm" id="codexPhase1StartBtn" onclick="showTerminalDropdown('codexPhase1Start', this)" data-i18n="buttons.startPhase1">Start Phase 1</button>
-	          <div class="btn-dropdown-menu" id="codexPhase1StartDropdown" style="display:none;">
-	            <button class="btn-dropdown-item" onclick="doCodexPhase1Start('fullscreen')" data-i18n="actions.fullscreen">Full screen</button>
-	            <button class="btn-dropdown-item" onclick="doCodexPhase1Start('split')" data-i18n="actions.sidePanel">Side panel</button>
-	          </div>
-	        </div>
-	      </div>
 	      <div id="sessionsHistoryBlock" style="display:none;">
 	        <button class="btn btn-sm" title="Browse session history" id="sessionsHistoryBtn" data-i18n="buttons.sessions">Sessions</button>
 	      </div>
@@ -234,24 +224,13 @@
       </div>
     </div>
 
-    <!-- Codex Settings -->
-    <div class="card collapsed" id="codexSettingsCard" style="display:none;">
+    <!-- Phase Settings (workspace) -->
+    <div class="card collapsed" id="phaseSettingsWorkspaceCard">
       <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.codexSettings">Codex</span>
+        <span class="card-title">Phase Toggles</span>
         <span class="card-collapse-chevron">&#9660;</span>
       </div>
-      <div class="card-body">
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <label class="ws-checkbox-label" style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="codexReviewCheck" onchange="toggleCodexReview(this.checked)" style="margin-top: 2px;">
-            <div>
-              <div data-i18n="config.codexReviewEnabled">Run Codex review during agentic review</div>
-              <div style="color: var(--text-muted); font-size: 0.78rem; margin-top: 2px;" data-i18n="config.codexReviewDescription">Starts a parallel headless Codex review automatically in phase 4.0 and blocks the phase until it completes.</div>
-            </div>
-          </label>
-          <div id="codexReviewStatusRow" style="display:none; font-size: 0.78rem; color: var(--text-muted);"></div>
-        </div>
-      </div>
+      <div class="card-body" id="phaseSettingsWorkspaceBody"></div>
     </div>
 
     <!-- Git Configuration -->
@@ -773,6 +752,7 @@
 <script src="js/preplanning.js?v=10"></script>
 <script src="js/verification.js?v=10"></script>
 <script src="js/setup.js?v=10"></script>
+<script src="js/phase-settings.js?v=10"></script>
 <script src="js/actions.js?v=10"></script>
 <script src="js/app.js?v=10"></script>
 <script src="js/workspace.js?v=10"></script>

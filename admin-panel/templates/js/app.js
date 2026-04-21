@@ -70,8 +70,6 @@ async function initApp() {
 
   var yoloCheck = document.getElementById('yoloCheck');
   if (yoloCheck) yoloCheck.checked = !!LOCK_DATA.yolo_mode;
-  if (typeof updateCodexPhase1ButtonVisibility === 'function') updateCodexPhase1ButtonVisibility();
-  if (typeof updateCodexWorkspaceSettings === 'function') updateCodexWorkspaceSettings();
 
   if (LOCK_DATA.session_id) {
     var sessionBlock = document.getElementById('sessionBlock');
@@ -104,6 +102,14 @@ async function initApp() {
   loadChannelsPreference();
   loadModulesCard();
   if (typeof renderLspShortcutsConfig === 'function') renderLspShortcutsConfig();
+  var wsBody = document.getElementById('phaseSettingsWorkspaceBody');
+  if (wsBody && typeof renderPhaseToggleCard === 'function') {
+    renderPhaseToggleCard(
+      wsBody,
+      'workspace',
+      '/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/phase-settings'
+    );
+  }
 
   // Restore diff toggle states from localStorage
   document.querySelectorAll('#viewModeToggle .toggle-opt').forEach(function(b) {
@@ -183,23 +189,6 @@ function doTerminalAction(endpoint, btnId, mode) {
 }
 
 var ACTIVE_TERMINAL_KIND = 'claude';
-var CODEX_PHASE1_VISIBLE_PHASES = {
-  '0': true,
-  '1.0': true,
-  '1.1': true,
-  '1.2': true,
-  '1.3': true
-};
-
-function canStartCodexPhase1() {
-  return !!LOCK_DATA.codex_globally_enabled && !!CODEX_PHASE1_VISIBLE_PHASES[LOCK_DATA.phase || '0'];
-}
-
-function updateCodexPhase1ButtonVisibility() {
-  var block = document.getElementById('codexPhase1Launch');
-  if (!block) return;
-  block.style.display = canStartCodexPhase1() ? 'flex' : 'none';
-}
 
 function doTerminalActionWithKind(endpoint, btnId, mode, sessionKind) {
   document.querySelectorAll('.btn-dropdown-menu').forEach(function(m) { m.style.display = 'none'; });
@@ -255,10 +244,6 @@ function doStart(mode) {
 
 function doResume(mode) {
   doTerminalActionWithKind('resume', 'resumeBtn', mode, 'claude');
-}
-
-function doCodexPhase1Start(mode) {
-  doTerminalActionWithKind('codex-phase1/start', 'codexPhase1StartBtn', mode, 'codex-phase1');
 }
 
 function doNotify(type) {
