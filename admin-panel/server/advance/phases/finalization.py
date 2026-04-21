@@ -1,7 +1,5 @@
 """Finalization workflow phases: 4.0 (agentic review) through 5 (done)."""
 from advance.phases import Phase
-from core.db import get_db_ctx, ws_field
-from core.global_flags import is_codex_enabled
 from core.i18n import t
 
 
@@ -13,19 +11,7 @@ class AgenticReviewPhase(Phase):
         return "4.0"
 
     def validate(self, ws, body, project_path):
-        if not ws_field(ws, "codex_review_enabled", 0):
-            return True, {}
-
-        with get_db_ctx() as db:
-            if not is_codex_enabled(db, default=False):
-                return True, {}
-
-        status = ws_field(ws, "codex_review_status", "idle")
-        if status == "completed":
-            return True, {}
-        if status == "failed":
-            return False, {"error": t("advance.error.codexReviewFailed", ws["locale"])}
-        return False, {"error": t("advance.error.codexReviewPending", ws["locale"])}
+        return True, {}
 
     def next_phase(self, ws):
         return "4.1"

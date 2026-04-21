@@ -7,11 +7,8 @@ from flask_sock import Sock
 
 from core.terminal import (
     SESSION_KIND_CLAUDE,
-    SESSION_KIND_CODEX_PHASE1,
-    SESSION_KIND_CODEX_REVIEW,
     TMUX_NOT_INSTALLED,
     build_claude_command,
-    build_codex_phase1_command,
     create_session,
     get_session_command,
     kill_session,
@@ -24,12 +21,10 @@ from core.terminal import (
     tmux_available,
 )
 from core.db import get_db_ctx, ws_field
-from core.global_flags import is_codex_enabled
 from core.helpers import find_workspace
 
 _SAFE_NOTIFY_RE = re.compile(r'[^a-zA-Z0-9 .,!?\-_\'\"():;/]')
 _MAX_NOTIFY_LENGTH = 300
-_CODEX_PHASE1_ALLOWED_PHASES = {'0', '1.0', '1.1', '1.2', '1.3'}
 
 bp = Blueprint('terminal', __name__)
 
@@ -37,10 +32,6 @@ bp = Blueprint('terminal', __name__)
 def _validate_session_kind(session_kind):
     if session_kind in (None, "", SESSION_KIND_CLAUDE):
         return SESSION_KIND_CLAUDE
-    if session_kind == SESSION_KIND_CODEX_PHASE1:
-        return SESSION_KIND_CODEX_PHASE1
-    if session_kind == SESSION_KIND_CODEX_REVIEW:
-        return SESSION_KIND_CODEX_REVIEW
     return None
 
 
@@ -126,39 +117,6 @@ def terminal_start(project, branch):
             'session': name,
             'attach_command': f'tmux attach -t {name}',
             'status': 'started'
-        })
-
-
-@bp.route('/api/ws/<project>/<path:branch>/terminal/codex-phase1/start', methods=['POST'])
-def terminal_start_codex_phase1(project, branch):
-    """Create tmux session and start the bounded Codex phase-1 runner."""
-    if not tmux_available():
-        return jsonify({'error': TMUX_NOT_INSTALLED}), 503
-
-    with get_db_ctx() as db:
-        ws = find_workspace(db, project, branch)
-        if not ws:
-            return jsonify({'error': 'Workspace not found'}), 404
-        if not is_codex_enabled(db, default=False):
-            return jsonify({'error': 'Codex is disabled in global setup'}), 409
-        if ws['phase'] not in _CODEX_PHASE1_ALLOWED_PHASES:
-            return jsonify({'error': 'Codex phase 1 can only run during preparation phases'}), 409
-
-        name = session_name(project, branch, kind=SESSION_KIND_CODEX_PHASE1)
-        working_dir = ws['working_dir']
-
-        if session_exists(name):
-            kill_session(name)
-
-        label = ws['sanitized_branch'] or branch
-        create_session(name, working_dir, env={'WORKSPACE': label})
-        send_keys(name, build_codex_phase1_command())
-
-        return jsonify({
-            'session': name,
-            'attach_command': f'tmux attach -t {name}',
-            'status': 'started',
-            'kind': SESSION_KIND_CODEX_PHASE1,
         })
 
 

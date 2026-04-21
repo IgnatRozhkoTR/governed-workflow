@@ -134,8 +134,6 @@
   "advance.error.noCriteria": "At least one acceptance criterion must be defined before advancing to plan review.",
   "advance.error.noPlanningProgress": "Call workspace_update_progress to record planning before approval.",
   "advance.error.noAgenticReviewProgress": "Call workspace_update_progress with phase '4.0' to record agentic review results before advancing.",
-  "advance.error.codexReviewPending": "Codex review is still running for phase 4.0. Wait for the completion notice before advancing.",
-  "advance.error.codexReviewFailed": "Codex review failed for phase 4.0. Check the Codex review session and rerun if needed before advancing.",
   "advance.error.noFixAddressingProgress": "Call workspace_update_progress to record fix addressing before completion.",
   "advance.error.openReviewIssues": "{count} review issue(s) still open. Resolve all issues with workspace_resolve_review_issue.",
   "advance.error.unvalidatedIssues": "{count} resolved issue(s) not yet validated. Deploy review-validator agent to verify all resolutions.",
