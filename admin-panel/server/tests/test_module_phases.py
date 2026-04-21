@@ -66,7 +66,7 @@ def test_load_module_phases_parses_single_phase(tmp_path):
     mod = tmp_path / "mod"
     mod.mkdir()
     (mod / "phase.yaml").write_text(
-        "id: mod.check\nname: Mod Check\nband: preparation\nposition: 500\n"
+        "phases:\n  - id: mod.check\n    name: Mod Check\n"
     )
     result = load_module_phases([mod])
     assert len(result) == 1
@@ -79,7 +79,7 @@ def test_load_module_phases_loads_validator_from_factory(tmp_path):
     mod = tmp_path / "mod2"
     mod.mkdir()
     (mod / "phase.yaml").write_text(
-        "id: mod.v\nname: V\nband: preparation\nposition: 500\nvalidator: my_validator\n"
+        "phases:\n  - id: mod.v\n    name: V\n    validator: my_validator\n"
     )
     (mod / "phase_factory.py").write_text(
         "def my_validator(ws, body, pp):\n    return (False, {'test': 1})\n"
@@ -87,16 +87,6 @@ def test_load_module_phases_loads_validator_from_factory(tmp_path):
     result = load_module_phases([mod])
     assert len(result) == 1
     assert result[0].validate({}, {}, "") == (False, {"test": 1})
-
-
-def test_load_module_phases_skips_unsupported_band(tmp_path):
-    pytest.importorskip("yaml")
-    mod = tmp_path / "mod3"
-    mod.mkdir()
-    (mod / "phase.yaml").write_text(
-        "id: mod.plan\nname: P\nband: planning\nposition: 500\n"
-    )
-    assert load_module_phases([mod]) == []
 
 
 def test_load_module_phases_handles_malformed_yaml(tmp_path):
@@ -113,53 +103,45 @@ def test_load_module_phases_handles_malformed_yaml(tmp_path):
 
 @pytest.fixture
 def registered_prep_phase():
-    phase = DeclarativePhase(
-        {"id": "mod.prep.x", "name": "Mod Prep", "band": "preparation", "position": 500}
-    )
+    phase = DeclarativePhase({"id": "1.5", "name": "Mod Prep"})
     register_phase(phase)
     yield phase
-    PHASE_REGISTRY.pop("mod.prep.x", None)
+    PHASE_REGISTRY.pop("1.5", None)
 
 
 @pytest.fixture
 def registered_final_phase():
-    phase = DeclarativePhase(
-        {"id": "mod.final.x", "name": "Mod Final", "band": "finalization", "position": 500}
-    )
+    phase = DeclarativePhase({"id": "4.5", "name": "Mod Final"})
     register_phase(phase)
     yield phase
-    PHASE_REGISTRY.pop("mod.final.x", None)
+    PHASE_REGISTRY.pop("4.5", None)
 
 
 @pytest.fixture
 def two_prep_phases():
-    p_early = DeclarativePhase(
-        {"id": "mod.prep.early", "name": "Early", "band": "preparation", "position": 200}
-    )
-    p_late = DeclarativePhase(
-        {"id": "mod.prep.late", "name": "Late", "band": "preparation", "position": 800}
-    )
+    p_early = DeclarativePhase({"id": "1.5", "name": "Early"})
+    p_late = DeclarativePhase({"id": "1.6", "name": "Late"})
     register_phase(p_early)
     register_phase(p_late)
     yield p_early, p_late
-    PHASE_REGISTRY.pop("mod.prep.early", None)
-    PHASE_REGISTRY.pop("mod.prep.late", None)
+    PHASE_REGISTRY.pop("1.5", None)
+    PHASE_REGISTRY.pop("1.6", None)
 
 
 def test_compute_phase_sequence_includes_module_prep_phase(registered_prep_phase):
     seq = full_phase_sequence({})
-    assert "mod.prep.x" in seq
-    idx = seq.index("mod.prep.x")
-    assert seq.index("2.1") < idx < seq.index("4.0")
+    assert "1.5" in seq
+    idx = seq.index("1.5")
+    assert seq.index("1.4") < idx < seq.index("2.0")
 
 
 def test_compute_phase_sequence_includes_module_finalization_phase(registered_final_phase):
     seq = full_phase_sequence({})
-    assert "mod.final.x" in seq
-    idx = seq.index("mod.final.x")
-    assert seq.index("2.1") < idx < seq.index("4.0")
+    assert "4.5" in seq
+    idx = seq.index("4.5")
+    assert seq.index("4.2") < idx < seq.index("5")
 
 
-def test_compute_phase_sequence_respects_position_within_band(two_prep_phases):
+def test_compute_phase_sequence_respects_phase_key_ordering(two_prep_phases):
     seq = full_phase_sequence({})
-    assert seq.index("mod.prep.early") < seq.index("mod.prep.late")
+    assert seq.index("1.5") < seq.index("1.6")

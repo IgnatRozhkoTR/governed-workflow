@@ -1,46 +1,26 @@
 """Compose the effective phase sequence for a workspace.
 
-Centralizes the three concerns that used to be scattered across routes,
-mcp_tools and the orchestrator:
-
-- Read module-contributed DeclarativePhases from ``advance.phases``.
-- Splice them into the static phase sequence via ``compute_phase_sequence``.
-- Resolve the enabled subset from per-level phase settings.
-
-This module depends on ``advance.phases``; ``core.helpers`` does not, so the
-leaf-ness of ``core`` is preserved.
+The sequencer is the integration point between the leaf-level
+``compute_phase_sequence`` and the advance-layer ``PHASE_REGISTRY``. It hands
+the registry's keys to core so the sequence is ordered consistently with
+``phase_key``, including any module-contributed phases and the expanded
+execution templates derived from the plan.
 """
 import json
 
 from advance.phases import PHASE_REGISTRY
-from advance.phases.declarative import DeclarativePhase
 from core.helpers import compute_phase_sequence
 from services.phase_resolver import resolve_enabled_phases
 
 
-def module_phases_by_band() -> tuple[list[str], list[str]]:
-    """Return (preparation_ids, finalization_ids) for module-contributed phases.
-
-    Each list is sorted by declared position. Phases registered with bands
-    other than ``preparation`` or ``finalization`` are filtered out upstream
-    by the module loader.
-    """
-    prep = sorted(
-        (p for p in PHASE_REGISTRY.values()
-         if isinstance(p, DeclarativePhase) and p.band == "preparation"),
-        key=lambda p: p.position,
-    )
-    final = sorted(
-        (p for p in PHASE_REGISTRY.values()
-         if isinstance(p, DeclarativePhase) and p.band == "finalization"),
-        key=lambda p: p.position,
-    )
-    return [p.id for p in prep], [p.id for p in final]
+def _registered_phase_ids() -> list[str]:
+    """Snapshot the current PHASE_REGISTRY ids for the sequencer."""
+    return list(PHASE_REGISTRY.keys())
 
 
 def full_phase_sequence(plan) -> list[str]:
-    """Build the complete phase sequence including module-contributed phases."""
-    return compute_phase_sequence(plan, module_phases_by_band=module_phases_by_band())
+    """Build the complete phase sequence for the plan, templates expanded."""
+    return compute_phase_sequence(plan, registered_phase_ids=_registered_phase_ids())
 
 
 def resolve_phase_sequence(db, ws, plan) -> tuple[set[str], list[str]]:

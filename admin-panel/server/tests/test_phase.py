@@ -1,5 +1,5 @@
 """Tests for phase_key comparison utility."""
-from core.phase import phase_key
+from core.phase import is_templated, phase_key
 
 
 def test_equality_same():
@@ -67,3 +67,25 @@ def test_module_phase_id_does_not_crash():
 
 def test_numeric_phase_sorts_before_module_phase():
     assert phase_key("3.1.4") < phase_key("mod.prep.x")
+
+
+def test_is_templated_detects_x_segments():
+    assert is_templated("3.x.0") is True
+    assert is_templated("3.x.3") is True
+    assert is_templated("x") is True
+
+
+def test_is_templated_rejects_concrete_ids():
+    assert is_templated("1.0") is False
+    assert is_templated("3.1.2") is False
+    assert is_templated("0") is False
+    assert is_templated("5") is False
+
+
+def test_is_templated_empty_string_is_not_templated():
+    assert is_templated("") is False
+
+
+def test_is_templated_ignores_x_as_substring():
+    assert is_templated("mod.prep.extra") is False
+    assert is_templated("3.11.0") is False

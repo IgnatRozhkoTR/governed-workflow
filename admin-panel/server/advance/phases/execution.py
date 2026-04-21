@@ -271,3 +271,59 @@ def get_execution_phase(n: int, k: int) -> Phase | None:
     }
     cls = classes.get(k)
     return cls(n) if cls else None
+
+
+_TEMPLATE_NAMES = {
+    0: "Implementation",
+    1: "Verification",
+    2: "Fix Review",
+    3: "Commit Approval",
+    4: "Commit",
+}
+
+_TEMPLATE_GATE_STEPS = frozenset({3})
+
+
+class _ExecutionTemplatePhase(Phase):
+    """Structural placeholder for an execution sub-step parameterized by item.
+
+    Template phases exist only so the registry can describe the execution
+    sub-step family. They are expanded into concrete ``3.N.K`` phases at
+    sequence time; any attempt to execute a template directly is a bug.
+    """
+
+    def __init__(self, k: int):
+        self._k = k
+
+    @property
+    def id(self) -> str:
+        return f"3.x.{self._k}"
+
+    @property
+    def name(self) -> str:
+        return _TEMPLATE_NAMES[self._k]
+
+    @property
+    def is_user_gate(self) -> bool:
+        return self._k in _TEMPLATE_GATE_STEPS
+
+    def validate(self, ws, body, project_path):
+        raise NotImplementedError(
+            "template phase; call get_execution_phase(N, K) to instantiate"
+        )
+
+    def next_phase(self, ws):
+        raise NotImplementedError(
+            "template phase; call get_execution_phase(N, K) to instantiate"
+        )
+
+
+def _register_execution_templates() -> None:
+    """Register the five execution-step templates into the shared registry."""
+    from advance.phases import register_phase
+
+    for k in _TEMPLATE_NAMES:
+        register_phase(_ExecutionTemplatePhase(k))
+
+
+_register_execution_templates()

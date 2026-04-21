@@ -33,3 +33,14 @@ def phase_key(phase_str: str) -> tuple[tuple[int, int, str], ...]:
     ((1, 0, 'mod'), (0, 0, ''), (1, 0, 'prep'), (1, 0, 'x'))
     """
     return tuple(_component_key(x) for x in phase_str.split('.'))
+
+
+def is_templated(phase_id: str) -> bool:
+    """Return True when any dotted segment of ``phase_id`` is the literal ``x``.
+
+    Templated ids describe a family of concrete phases parameterized by plan
+    data. The empty string has no segments and is not templated.
+    """
+    if not phase_id:
+        return False
+    return any(segment == "x" for segment in phase_id.split("."))

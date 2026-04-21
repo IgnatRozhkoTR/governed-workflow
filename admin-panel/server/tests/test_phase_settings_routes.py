@@ -118,6 +118,15 @@ def test_get_phases_available_sorted_by_phase_key(client):
     assert static_ids == sorted(static_ids, key=phase_key)
 
 
+def test_get_phases_available_excludes_templated_ids(client):
+    """Templates like ``3.x.K`` must not leak to the UI — they describe a family, not a phase."""
+    response = client.get("/api/phases/available")
+    ids = {p["id"] for p in response.get_json()["phases"]}
+    assert not any("x" in pid.split(".") for pid in ids), (
+        f"Templated ids should be excluded from /api/phases/available; got {ids}"
+    )
+
+
 # ── Commit-gate regex enforcement ─────────────────────────────────────────────
 
 def test_put_workspace_rejects_3_1_3_disable(client, workspace):

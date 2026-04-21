@@ -37,6 +37,11 @@ def test_is_always_on_commit_gate_pattern(phase_id):
     assert is_always_on(phase_id) is True
 
 
+def test_is_always_on_commit_gate_template():
+    """The template id 3.x.3 must also be always-on so the template cannot be disabled."""
+    assert is_always_on("3.x.3") is True
+
+
 @pytest.mark.parametrize("phase_id", ["1.1", "1.2", "1.3", "1.4", "4.0", "4.1", "3.1.0", "3.1.4"])
 def test_is_always_on_toggleable_phases(phase_id):
     assert is_always_on(phase_id) is False

@@ -133,7 +133,9 @@ def register_phase(phase: Phase):
 def get_phase(phase_str: str) -> Phase | None:
     """Look up a Phase by its dotted string ID.
 
-    For execution phases (3.N.K), creates a parameterized instance on demand.
+    For concrete execution phases (3.N.K) the parameterized instance is built
+    on demand; registered entries (including 3.x.K templates) are returned
+    verbatim so templates never masquerade as runnable phases.
     """
     if phase_str in PHASE_REGISTRY:
         return PHASE_REGISTRY[phase_str]
@@ -154,6 +156,10 @@ from advance.phases.finalization import PHASES as _final_phases  # noqa: E402
 
 for _phase in _prep_phases + _plan_phases + _final_phases:
     register_phase(_phase)
+
+# Importing ``execution`` has the side effect of registering the 3.x.K
+# template phases into ``PHASE_REGISTRY`` so the sequencer can expand them.
+import advance.phases.execution  # noqa: E402,F401
 
 
 # Module-contributed phase registration is explicit: app startup (or tests)

@@ -1,22 +1,13 @@
 """DeclarativePhase -- a Phase driven by a YAML manifest + optional Python validator.
 
 Module-contributed phases use this class instead of subclassing Phase directly.
-Identity, gate behavior, targets, band, and position come from the manifest;
+Identity, gate behavior, and approve/reject targets come from the manifest;
 validation delegates to an optional callable loaded from the module's
-phase_factory.py.
+phase_factory.py. Sequence position is derived from the phase id itself via
+``phase_key``, so authors position a phase by choosing an appropriate id (for
+example ``"1.5"`` sits between 1.4 and 2.0 automatically).
 """
 from advance.phases import Phase
-
-_DEFAULT_BAND = "preparation"
-_DEFAULT_POSITION = 1000
-
-
-def _coerce_position(value) -> int:
-    """Return the integer position, falling back to the default on bad input."""
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return _DEFAULT_POSITION
 
 
 class DeclarativePhase(Phase):
@@ -29,8 +20,6 @@ class DeclarativePhase(Phase):
         self._approve_target = manifest.get("approve_target")
         self._reject_target = manifest.get("reject_target")
         self._validator_fn = validator_fn
-        self.band = manifest.get("band", _DEFAULT_BAND)
-        self.position = _coerce_position(manifest.get("position", _DEFAULT_POSITION))
 
     @property
     def id(self):

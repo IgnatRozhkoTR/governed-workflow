@@ -739,3 +739,46 @@ def test_advance_unchanged_when_next_is_enabled(workspace, project):
     result, code = perform_advance(ws, project["path"])
     assert code == 200
     assert result["phase"] == "1.1"
+
+
+def test_perform_advance_rejects_templated_phase(workspace, project):
+    """A workspace pinned to a template id is a bug — fail loudly instead of crashing."""
+    set_phase(workspace["id"], "3.x.0")
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 400
+    assert "error" in result
+
+
+def test_get_phase_returns_template_for_wildcard_id():
+    """``get_phase('3.x.3')`` resolves to a registered template, not a concrete advancer."""
+    from advance.phases import get_phase
+
+    template = get_phase("3.x.3")
+    assert template is not None
+    assert template.id == "3.x.3"
+    assert template.is_user_gate is True
+
+
+def test_get_phase_template_validate_raises():
+    """Templates must never be executed directly."""
+    import pytest as _pytest
+
+    from advance.phases import get_phase
+
+    template = get_phase("3.x.0")
+    with _pytest.raises(NotImplementedError):
+        template.validate({}, {}, "")
+    with _pytest.raises(NotImplementedError):
+        template.next_phase({})
+
+
+def test_get_phase_concrete_execution_phase_unaffected_by_templates():
+    """Concrete ``3.N.K`` still resolves via the factory."""
+    from advance.phases import get_phase
+    from advance.phases.execution import ImplementationPhase
+
+    concrete = get_phase("3.5.0")
+    assert concrete is not None
+    assert isinstance(concrete, ImplementationPhase)
+    assert concrete.id == "3.5.0"

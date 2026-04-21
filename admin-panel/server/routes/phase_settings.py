@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, request
 
 from core.db import get_db, get_db_ctx
 from core.decorators import with_project, with_workspace
-from core.phase import phase_key
+from core.phase import is_templated, phase_key
 from services.phase_settings import get_scope_settings, is_always_on, set_scope_settings
 
 bp = Blueprint("phase_settings", __name__)
@@ -36,6 +36,8 @@ def _build_phases_list():
     from advance.phases import PHASE_REGISTRY
     phases = []
     for phase_id, phase in PHASE_REGISTRY.items():
+        if is_templated(phase_id):
+            continue
         phases.append({
             "id": phase_id,
             "name": phase.name,

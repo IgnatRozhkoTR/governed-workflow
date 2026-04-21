@@ -7,6 +7,10 @@ Each module directory (under claude/modules/ or claude/modules-local/) MAY conta
 Modules without phase.yaml contribute no phases. Invalid manifests are logged
 and skipped, never fatal. If PyYAML is unavailable the loader degrades to a
 no-op so the server can start without the optional dependency.
+
+A phase's sequence position is derived from its id via ``phase_key``; module
+authors place a phase by picking an id (e.g. ``"1.5"`` lands between ``"1.4"``
+and ``"2.0"`` automatically).
 """
 import importlib.util
 import logging
@@ -14,14 +18,12 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_SUPPORTED_BANDS = ("preparation", "finalization")
-
 
 def load_module_phases(module_dirs: list[Path]) -> list:
     """Scan each module dir for phase.yaml + optional phase_factory.py.
 
-    Returns a list of DeclarativePhase instances. Phases with unsupported
-    bands (execution, planning) are skipped with a warning.
+    Returns a list of DeclarativePhase instances. Malformed manifests and
+    missing ids are logged and skipped.
     """
     from advance.phases.declarative import DeclarativePhase
 
@@ -93,24 +95,6 @@ def _build_phase(mod_dir: Path, entry: dict, factory_module, declarative_cls):
     if not phase_id:
         logger.warning("Module %s: phase entry missing 'id'; skipping.", mod_dir.name)
         return None
-
-    band = entry.get("band", "preparation")
-    if band not in _SUPPORTED_BANDS:
-        logger.warning(
-            "Module %s phase %s: unsupported band %r (skipping)",
-            mod_dir.name, phase_id, band,
-        )
-        return None
-
-    raw_position = entry.get("position")
-    if raw_position is not None:
-        try:
-            int(raw_position)
-        except (TypeError, ValueError):
-            logger.warning(
-                "Module %s phase %s: invalid position %r; defaulting to 1000.",
-                mod_dir.name, phase_id, raw_position,
-            )
 
     validator_fn = _resolve_validator(mod_dir, entry.get("validator"), factory_module)
 

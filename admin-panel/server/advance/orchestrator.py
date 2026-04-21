@@ -12,6 +12,7 @@ from advance.guards import GUARD_ORCHESTRATOR
 from advance.phases import get_phase
 from core.db import get_db_ctx, ws_field
 from core.i18n import t
+from core.phase import is_templated
 from core.terminal import notify_workspace
 from services.phase_sequencer import full_phase_sequence, plan_from_workspace, resolve_phase_sequence
 
@@ -200,6 +201,9 @@ def perform_advance(ws, project_path, body=None):
     body = body or {}
     phase_str = ws["phase"]
     locale = ws["locale"]
+
+    if is_templated(phase_str):
+        return {"error": t("advance.error.noAdvancerForPhase", locale, phase=phase_str)}, 400
 
     phase = get_phase(phase_str)
     if not phase:
