@@ -4,6 +4,7 @@ from mcp_tools import mcp, with_mcp_workspace
 from core.db import ws_field
 from core.global_flags import is_codex_enabled
 from core.helpers import compute_phase_sequence
+from services.phase_resolver import resolve_enabled_phases
 from core.i18n import t
 from services import discussion_service
 from services import plan_service
@@ -28,7 +29,9 @@ def workspace_get_state(ws, project, db, locale) -> dict:
     Does NOT return gate_nonce (security: only available via admin panel UI)."""
     scope = plan_service.get_scope(ws)
     plan = plan_service.get_plan(ws)
-    phase_sequence = compute_phase_sequence(plan)
+    all_phases = set(compute_phase_sequence(plan))
+    enabled = resolve_enabled_phases(db, ws["id"], ws["project_id"], all_phases)
+    phase_sequence = compute_phase_sequence(plan, enabled_phases=enabled)
 
     context = {
         "ticket_id": ws["ticket_id"] or "",

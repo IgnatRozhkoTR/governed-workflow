@@ -15,6 +15,7 @@ from core.codex import maybe_start_codex_review_for_workspace, stop_codex_review
 from core.decorators import with_workspace
 from core.global_flags import is_codex_enabled
 from core.helpers import compute_phase_sequence
+from services.phase_resolver import resolve_enabled_phases
 from core.i18n import t
 from core.terminal import notify_workspace
 from services import plan_service
@@ -59,7 +60,9 @@ def get_workspace_state(db, ws, project):
 
     scope = plan_service.get_scope(ws)
     plan = plan_service.get_plan(ws)
-    phase_sequence = compute_phase_sequence(plan)
+    all_phases = set(compute_phase_sequence(plan))
+    enabled = resolve_enabled_phases(db, ws["id"], ws["project_id"], all_phases)
+    phase_sequence = compute_phase_sequence(plan, enabled_phases=enabled)
 
     history_rows = db.execute(
         "SELECT from_phase, to_phase, time FROM phase_history WHERE workspace_id = ? ORDER BY id",

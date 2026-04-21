@@ -726,3 +726,85 @@ def test_approve_gate_passes_with_resolved_review(client, workspace, project):
         json={"token": "test-nonce"}
     )
     assert r.status_code == 200
+
+
+# ── Forward-target resolver tests (phase 3.2) ──────────────────────────────────
+
+
+def _disable_phases(scope_type, scope_id, *phase_ids):
+    """Write phase_settings rows disabling the given phase IDs."""
+    from services.phase_settings import set_scope_settings
+    db = get_db()
+    settings = {p: False for p in phase_ids}
+    set_scope_settings(db, scope_type, scope_id, settings)
+    db.commit()
+    db.close()
+
+
+def _clean_phase_settings():
+    db = get_db()
+    db.execute("DELETE FROM phase_settings")
+    db.commit()
+    db.close()
+
+
+def test_advance_skips_disabled_next_phase(workspace, project):
+    """Advance from 1.0 skips disabled 1.1 and lands on 1.2."""
+    _disable_phases("device", "", "1.1")
+    try:
+        set_phase(workspace["id"], "1.0")
+        add_progress(workspace["id"], "1.0", "Assessment done")
+        add_discussion(workspace["id"], type="research")
+        ws = _get_ws_row(workspace["id"])
+        result, code = perform_advance(ws, project["path"])
+        assert code == 200
+        assert result["phase"] == "1.2"
+    finally:
+        _clean_phase_settings()
+
+
+def test_advance_through_multiple_disabled(workspace, project):
+    """Advance from 1.0 skips 1.1, 1.2, 1.3 and lands on 1.4."""
+    _disable_phases("workspace", str(workspace["id"]), "1.1", "1.2", "1.3")
+    try:
+        set_phase(workspace["id"], "1.0")
+        add_progress(workspace["id"], "1.0", "Assessment done")
+        add_discussion(workspace["id"], type="research")
+        ws = _get_ws_row(workspace["id"])
+        result, code = perform_advance(ws, project["path"])
+        assert code in (200, 202)
+        assert result["phase"] == "1.4"
+    finally:
+        _clean_phase_settings()
+
+
+def test_advance_keeps_always_on_enabled_even_if_disabled_row_exists(workspace, project):
+    """always-on phase 2.0 is reached even when a disabled DB row exists for it."""
+    from datetime import datetime as dt
+    db = get_db()
+    db.execute(
+        "INSERT INTO phase_settings (scope_type, scope_id, phase_id, enabled, updated_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        ("device", "", "2.0", 0, dt.now().isoformat()),
+    )
+    db.commit()
+    db.close()
+    try:
+        set_phase(workspace["id"], "1.4", gate_nonce="nonce-always-on")
+        r_approve = _get_ws_row(workspace["id"])
+        from advance.orchestrator import approve_gate
+        result = approve_gate(r_approve, "nonce-always-on")
+        assert result.get("phase") == "2.0"
+    finally:
+        _clean_phase_settings()
+
+
+def test_advance_unchanged_when_next_is_enabled(workspace, project):
+    """No disabled phases: advance from 1.0 reaches 1.1 as normal."""
+    set_phase(workspace["id"], "1.0")
+    add_progress(workspace["id"], "1.0", "Assessment done")
+    add_discussion(workspace["id"], type="research")
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 200
+    assert result["phase"] == "1.1"

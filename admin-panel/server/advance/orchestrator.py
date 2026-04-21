@@ -4,6 +4,7 @@ Replaces hardcoded phase string routing with Phase registry lookups.
 All business logic (gate nonce verification, guard evaluation, transitions,
 yolo auto-approve) is preserved exactly from advance/service.py.
 """
+import json
 import logging
 import secrets
 from datetime import datetime
@@ -12,10 +13,31 @@ from advance.guards import GUARD_ORCHESTRATOR
 from advance.phases import get_phase
 from core.codex import maybe_start_codex_review_for_workspace
 from core.db import get_db_ctx, ws_field
+from core.helpers import compute_phase_sequence
 from core.i18n import t
 from core.terminal import notify_workspace
+from services.phase_resolver import resolve_enabled_phases
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_forward_target(ws, db, candidate: str) -> str:
+    """Walk forward through the workspace's phase sequence, skipping disabled phases."""
+    plan_json = ws["plan_json"] if "plan_json" in ws.keys() else None
+    plan = json.loads(plan_json) if plan_json else {}
+    all_phases = set(compute_phase_sequence(plan))
+    enabled = resolve_enabled_phases(db, ws["id"], ws["project_id"], all_phases)
+    if candidate in enabled:
+        return candidate
+    sequence = compute_phase_sequence(plan, enabled_phases=enabled)
+    try:
+        cur_idx = sequence.index(ws["phase"])
+        for p in sequence[cur_idx + 1:]:
+            if p in enabled:
+                return p
+    except ValueError:
+        pass
+    return candidate
 
 
 def is_user_gate(phase_str: str) -> bool:
@@ -188,6 +210,7 @@ def perform_advance(ws, project_path, body=None):
     new_phase = phase.next_phase(ws)
 
     with get_db_ctx() as db:
+        new_phase = _resolve_forward_target(ws, db, new_phase)
         if not transition_phase(db, ws, new_phase, commit_hash=body.get("commit_hash")):
             return {"error": t("advance.error.phaseAlreadyChanged", locale)}, 409
 
