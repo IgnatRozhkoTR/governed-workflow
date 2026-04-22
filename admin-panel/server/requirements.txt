@@ -1,5 +1,6 @@
 flask
-pytest
-mcp[cli]
 jsonschema
+mcp[cli]
+pytest
+pyyaml>=6.0
 yoyo-migrations
