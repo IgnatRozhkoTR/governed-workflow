@@ -1,3 +1,19 @@
+---
+name: test-standards
+description: Test authoring rules — what to test, AAA structure, naming, Mockito / AssertJ / TestContainers / MockK patterns.
+paths:
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/*Test.java"
+  - "**/*Tests.java"
+  - "**/*Test.kt"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.test.js"
+  - "**/*_test.py"
+  - "**/test_*.py"
+---
+
 # Test Standards
 
 ## What to Test

@@ -6,12 +6,6 @@ model: sonnet
 color: gray
 ---
 
-<rules>
-Read these rule files before starting work.
-Global rules (always present):
-<rule path="~/.claude/rules/research-principles.md" />
-</rules>
-
 <approach>
 1. Analyze changes - git commands to examine commits, diffs, history
 2. Understand context - commit messages, related commits, code evolution

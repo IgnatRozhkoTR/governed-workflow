@@ -1,3 +1,10 @@
+---
+name: java-conventions
+description: Java-specific conventions — style, Jmix/Spring patterns, DI, transactions, validation.
+paths:
+  - "**/*.java"
+---
+
 # Java Conventions
 
 ## Style

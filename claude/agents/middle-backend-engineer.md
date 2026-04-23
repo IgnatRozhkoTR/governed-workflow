@@ -6,18 +6,6 @@ model: sonnet
 color: green
 ---
 
-<rules>
-Read these rule files before starting work.
-Global rules (always present):
-<rule path="~/.claude/rules/coding-standards.md" />
-<rule path="~/.claude/rules/java-conventions.md" />
-
-Project rules (read if present, skip if missing):
-<rule path=".claude/rules/project-context.md" />
-<rule path=".rules/coding-style.md" />
-<rule path=".rules/architecture.md" />
-</rules>
-
 <approach>
 1. Understand scope - identify all affected files
 2. Find patterns to follow

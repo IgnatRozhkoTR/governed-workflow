@@ -1,3 +1,16 @@
+---
+name: coding-standards
+description: SOLID + Clean Code expectations for production source code — SRP/OCP, naming, no comments, no placeholders.
+paths:
+  - "**/*.java"
+  - "**/*.kt"
+  - "**/*.py"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+---
+
 # Coding Standards
 
 ## SOLID

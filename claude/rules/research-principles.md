@@ -1,3 +1,10 @@
+---
+name: research-principles
+description: Evidence-based research guidance — verify, be thorough, and establish context. Applies broadly when reading or searching code.
+paths:
+  - "**/*"
+---
+
 # Research Principles
 
 ## Core Principles

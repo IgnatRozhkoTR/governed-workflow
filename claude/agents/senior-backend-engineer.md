@@ -6,17 +6,6 @@ model: opus
 color: purple
 ---
 
-<rules>
-Read these rule files before starting work.
-Global rules (always present):
-<rule path="~/.claude/rules/coding-standards.md" />
-<rule path="~/.claude/rules/java-conventions.md" />
-
-Project rules (read if present, skip if missing):
-<rule path=".rules/coding-style.md" />
-<rule path=".rules/architecture.md" />
-</rules>
-
 <when-called>
 - Vague requirements without clear spec
 - Unknown root causes requiring investigation

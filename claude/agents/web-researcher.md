@@ -6,12 +6,6 @@ model: sonnet
 color: yellow
 ---
 
-<rules>
-Read these rule files before starting work.
-Global rules (always present):
-<rule path="~/.claude/rules/research-principles.md" />
-</rules>
-
 <approach>
 1. Search broadly - multiple query variations for authoritative sources
 2. Prioritize - official docs > expert blogs > comparisons > examples

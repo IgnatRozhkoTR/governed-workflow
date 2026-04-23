@@ -6,16 +6,6 @@ model: opus
 color: orange
 ---
 
-<rules>
-Read these rule files before starting work.
-Global rules (always present):
-<rule path="~/.claude/rules/research-principles.md" />
-
-Project rules (read if present, skip if missing):
-<rule path=".claude/rules/project-context.md" />
-<rule path=".rules/architecture.md" />
-</rules>
-
 <role>
 Deep code investigation as a persistent teammate. Unlike the one-shot code-researcher, you can be asked follow-up questions and iteratively deepen your analysis.
 </role>

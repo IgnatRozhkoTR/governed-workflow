@@ -6,16 +6,6 @@ model: sonnet
 color: orange
 ---
 
-<rules>
-Read these rule files before starting work.
-Global rules (always present):
-<rule path="~/.claude/rules/research-principles.md" />
-
-Project rules (read if present, skip if missing):
-<rule path=".claude/rules/project-context.md" />
-<rule path=".rules/architecture.md" />
-</rules>
-
 <approach>
 1. Cast wide net - search multiple patterns (classes, methods, imports, annotations)
 2. Trace completely - follow every code path, dependency, reference

@@ -6,15 +6,6 @@ model: opus
 color: pink
 ---
 
-<rules>
-Read these rule files before starting work.
-Global rules (always present):
-<rule path="~/.claude/rules/test-standards.md" />
-
-Project rules (read if present, skip if missing):
-<rule path=".rules/testing.md" />
-</rules>
-
 <approach>
 1. Analyze thoroughly - behavior, edge cases, failure modes
 2. Design strategy - right mix of unit/integration for comprehensive coverage

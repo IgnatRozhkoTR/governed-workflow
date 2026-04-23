@@ -1,0 +1,18 @@
+# Rules directory gitignore
+#
+# Default rules shipped with the governed-workflow admin panel are
+# tracked; any rule file you create via rule_create (or by hand) is
+# git-ignored by default. To track a custom rule, add an explicit
+# negated entry below.
+
+*.md
+
+# Defaults:
+!coding-standards.md
+!java-conventions.md
+!research-principles.md
+!test-standards.md
+!validation-pipeline.md
+
+# Keep this gitignore itself tracked
+!.gitignore

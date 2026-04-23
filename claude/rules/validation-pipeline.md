@@ -1,3 +1,10 @@
+---
+name: validation-pipeline
+description: Three-stage validation (compilation, logic, quality) with a logic checklist for reviewers.
+paths:
+  - "**/*"
+---
+
 # Validation Pipeline
 
 ## Stages

@@ -6,15 +6,6 @@ model: sonnet
 color: pink
 ---
 
-<rules>
-Read these rule files before starting work.
-Global rules (always present):
-<rule path="~/.claude/rules/test-standards.md" />
-
-Project rules (read if present, skip if missing):
-<rule path=".rules/testing.md" />
-</rules>
-
 <approach>
 1. Analyze changes - identify classes and existing coverage
 2. Choose test type - default unit; integration only when existing tests do or DB needed

@@ -6,16 +6,6 @@ model: sonnet
 color: cyan
 ---
 
-<rules>
-Read these rule files before starting work.
-Global rules (always present):
-<rule path="~/.claude/rules/coding-standards.md" />
-<rule path="~/.claude/rules/validation-pipeline.md" />
-
-Project rules (read if present, skip if missing):
-<rule path=".rules/coding-style.md" />
-</rules>
-
 <context>
 You receive from orchestrator:
 - What was supposed to be done (expected behavior)
