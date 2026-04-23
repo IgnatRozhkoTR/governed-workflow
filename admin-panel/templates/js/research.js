@@ -7,14 +7,122 @@ function proofBadge(proven) {
   return { className: 'badge badge-warning', text: t('badges.pending') };
 }
 
+function _buildResearchFindingHtml(entry, finding, index) {
+  var summary = finding.summary || '';
+  var details = finding.details || '';
+  var proof = finding.proof || {};
+  var snippetId = 'snippet-' + entry.id + '-' + index;
+  var proofType = proof.type || 'code';
+
+  var proofHtml = '';
+  if (proofType === 'code' && proof.file) {
+    var lineRange = proof.line_start && proof.line_end ? proof.line_start + '-' + proof.line_end : '';
+    var label = proof.file + (lineRange ? ':' + lineRange : '');
+    proofHtml = '<span class="finding-ref clickable" title="' + escapeHtml(label) + '" onclick="showFilePreview(\'' +
+      proof.file.replace(/'/g, "\\'") + '\', ' +
+      (proof.line_start || 0) + ', ' + (proof.line_end || 0) +
+      ')">📄 ' + escapeHtml(label) + '</span>';
+    var hasSnippetRange = proof.snippet_start && proof.snippet_end;
+    var hasLegacySnippet = proof.snippet;
+    if (hasSnippetRange || hasLegacySnippet) {
+      proofHtml += '<span class="finding-quote-btn" data-snippet-id="' + snippetId + '"' +
+        (hasSnippetRange ? ' data-file="' + proof.file.replace(/"/g, '&quot;') + '"' +
+        ' data-start="' + proof.snippet_start + '" data-end="' + proof.snippet_end + '"' : '') +
+        ' onclick="toggleCodeSnippet(this)">' + t('research.showQuote') + '</span>';
+    }
+  } else if (proofType === 'web' && proof.url) {
+    proofHtml = '<a class="finding-ref clickable" href="' + escapeHtml(proof.url) +
+      '" target="_blank" rel="noopener">🌐 ' + escapeHtml(proof.title || proof.url) + '</a>';
+  } else if (proofType === 'diff' && proof.commit) {
+    var commitShort = proof.commit.substring(0, 7);
+    var diffLabel = commitShort + (proof.file ? ' — ' + proof.file : '');
+    proofHtml = '<span class="finding-ref">🔀 ' + escapeHtml(diffLabel) + '</span>';
+    if (proof.description) {
+      proofHtml += '<div class="finding-diff-desc">' + escapeHtml(proof.description) + '</div>';
+    }
+  } else if (proof.file) {
+    var legacyLineRange = proof.line_start && proof.line_end ? proof.line_start + '-' + proof.line_end : '';
+    var legacyLabel = proof.file + (legacyLineRange ? ':' + legacyLineRange : '');
+    proofHtml = '<span class="finding-ref clickable" title="' + escapeHtml(legacyLabel) + '" onclick="showFilePreview(\'' +
+      proof.file.replace(/'/g, "\\'") + '\', ' +
+      (proof.line_start || 0) + ', ' + (proof.line_end || 0) +
+      ')">📄 ' + escapeHtml(legacyLabel) + '</span>';
+    if (proof.snippet) {
+      proofHtml += '<span class="finding-quote-btn" onclick="toggleSnippet(\'' + snippetId + '\', this)">' + t('research.showQuote') + '</span>';
+    }
+  }
+
+  var commentTarget = 'Finding: ' + summary.substring(0, 60);
+
+  return '<div class="finding" data-finding-key="' + entry.id + '::' + index + '">' +
+    '<div class="finding-claim">' + escapeHtml(summary) + '</div>' +
+    (proofHtml ? '<div style="margin-top: 4px;">' + proofHtml + '</div>' : '') +
+    (proof.snippet ? '<div class="finding-snippet" id="' + snippetId + '"><code>' + escapeHtml(proof.snippet) + '</code></div>' :
+     (proof.snippet_start && proof.snippet_end ? '<div class="finding-snippet" id="' + snippetId + '"><code>' + t('research.loading') + '</code></div>' : '')) +
+    (proofType === 'web' && proof.quote ? '<div class="finding-snippet visible" style="border-left-color: var(--warning);"><code>' + escapeHtml(proof.quote) + '</code></div>' : '') +
+    (details ? '<div class="finding-evidence">' + escapeHtml(details) + '</div>' : '') +
+    '<div style="margin-top: 4px; text-align: right;">' + renderCommentIcon('research', commentTarget) + '</div>' +
+    '</div>';
+}
+
+function _buildResearchGroupHtml(entry) {
+  var topicName = entry.topic || t('research.untitledResearch');
+  var proven = entry.proven;
+  var badgeInfo = proofBadge(proven);
+  var badgeClass = badgeInfo.className;
+  var badgeText = badgeInfo.text;
+  var findings = entry.findings || [];
+  var groupId = 'research-group-' + entry.id;
+
+  var proveBtn = proven !== 1
+    ? '<button class="research-action-btn research-prove-btn" data-id="' + entry.id + '" onclick="toggleResearchProven(' + entry.id + ', true, this); event.stopPropagation();" title="' + t('research.titleMarkVerified') + '">✓</button>'
+    : '<button class="research-action-btn research-prove-btn active" disabled title="' + t('research.titleVerified') + '">✓</button>';
+  var rejectBtn = proven !== -1
+    ? '<button class="research-action-btn research-reject-btn" data-id="' + entry.id + '" onclick="toggleResearchProven(' + entry.id + ', false, this); event.stopPropagation();" title="' + t('research.titleMarkRejected') + '">✗</button>'
+    : '<button class="research-action-btn research-reject-btn active" disabled title="' + t('research.titleRejected') + '">✗</button>';
+  var deleteBtn = '<button class="research-action-btn research-delete-btn" onclick="deleteResearch(' + entry.id + '); event.stopPropagation();" title="' + t('research.titleDeleteEntry') + '">🗑</button>';
+
+  var discussionBadge = entry.discussion_id
+    ? '<span class="badge" style="font-size:0.6rem;background:var(--warning-dim);color:var(--warning);margin-left:4px;" title="' + t('research.linkedToDiscussion', {id: entry.discussion_id}) + '">D#' + entry.discussion_id + '</span>'
+    : '';
+
+  var discussionAttr = entry.discussion_id ? ' data-discussion-id="' + entry.discussion_id + '"' : '';
+
+  var headerHtml = '<div class="research-group-header" onclick="toggleResearchGroup(this)">' +
+    '<span class="research-group-title">' + escapeHtml(topicName) + '</span>' +
+    discussionBadge +
+    '<span class="research-group-count">' + t('research.findingCount', {count: findings.length}) + '</span>' +
+    '<span class="badge badge-' + badgeClass + '">' + badgeText + '</span>' +
+    '<span class="research-actions">' + proveBtn + rejectBtn + deleteBtn + '</span>' +
+    '</div>';
+
+  var bodyHtml = '<div class="research-group-body">';
+  if (entry.summary) {
+    bodyHtml += '<div class="research-group-summary">' + escapeHtml(entry.summary) + '</div>';
+  }
+  findings.forEach(function(f, i) {
+    bodyHtml += _buildResearchFindingHtml(entry, f, i);
+  });
+  bodyHtml += '</div>';
+
+  return '<div class="research-group collapsed" id="' + groupId + '"' + discussionAttr + '>' +
+    headerHtml + bodyHtml +
+    '</div>';
+}
+
+function toggleResearchGroup(headerEl) {
+  var group = headerEl && headerEl.parentElement;
+  if (group) group.classList.toggle('collapsed');
+}
+
 function renderResearch() {
   var container = document.getElementById('researchFindings');
-  container.innerHTML = '';
+  if (!container) return;
 
   var badge = document.getElementById('researchStatus');
 
   if (!RESEARCH_DATA || RESEARCH_DATA.length === 0) {
-    container.innerHTML = '<div class="no-items-msg">' + t('research.noEntries') + '</div>';
+    morphInnerHTML(container, '<div class="no-items-msg">' + t('research.noEntries') + '</div>');
     if (badge) { badge.textContent = ''; badge.className = 'badge'; }
     return;
   }
@@ -28,122 +136,9 @@ function renderResearch() {
     badge.className = 'badge ' + (pending > 0 ? 'badge-warning' : rejected > 0 ? 'badge-danger' : 'badge-success');
   }
 
-  RESEARCH_DATA.forEach(function(entry) {
-    var topicName = entry.topic || t('research.untitledResearch');
-    var proven = entry.proven;
-    var badge = proofBadge(proven);
-    var badgeClass = badge.className;
-    var badgeText = badge.text;
-    var findings = entry.findings || [];
+  var html = RESEARCH_DATA.map(_buildResearchGroupHtml).join('');
+  morphInnerHTML(container, html);
 
-    var group = document.createElement('div');
-    group.className = 'research-group collapsed';
-    if (entry.discussion_id) {
-      group.dataset.discussionId = entry.discussion_id;
-    }
-
-    var header = document.createElement('div');
-    header.className = 'research-group-header';
-    var proveBtn = proven !== 1
-      ? '<button class="research-action-btn research-prove-btn" data-id="' + entry.id + '" onclick="toggleResearchProven(' + entry.id + ', true, this); event.stopPropagation();" title="' + t('research.titleMarkVerified') + '">✓</button>'
-      : '<button class="research-action-btn research-prove-btn active" disabled title="' + t('research.titleVerified') + '">✓</button>';
-    var rejectBtn = proven !== -1
-      ? '<button class="research-action-btn research-reject-btn" data-id="' + entry.id + '" onclick="toggleResearchProven(' + entry.id + ', false, this); event.stopPropagation();" title="' + t('research.titleMarkRejected') + '">✗</button>'
-      : '<button class="research-action-btn research-reject-btn active" disabled title="' + t('research.titleRejected') + '">✗</button>';
-    var deleteBtn = '<button class="research-action-btn research-delete-btn" onclick="deleteResearch(' + entry.id + '); event.stopPropagation();" title="' + t('research.titleDeleteEntry') + '">🗑</button>';
-
-    var discussionBadge = entry.discussion_id
-      ? '<span class="badge" style="font-size:0.6rem;background:var(--warning-dim);color:var(--warning);margin-left:4px;" title="' + t('research.linkedToDiscussion', {id: entry.discussion_id}) + '">D#' + entry.discussion_id + '</span>'
-      : '';
-
-    header.innerHTML =
-      '<span class="research-group-title">' + escapeHtml(topicName) + '</span>' +
-      discussionBadge +
-      '<span class="research-group-count">' + t('research.findingCount', {count: findings.length}) + '</span>' +
-      '<span class="badge badge-' + badgeClass + '">' + badgeText + '</span>' +
-      '<span class="research-actions">' + proveBtn + rejectBtn + deleteBtn + '</span>';
-    header.onclick = function() { group.classList.toggle('collapsed'); };
-    group.appendChild(header);
-
-    var body = document.createElement('div');
-    body.className = 'research-group-body';
-
-    if (entry.summary) {
-      var entrySummaryEl = document.createElement('div');
-      entrySummaryEl.className = 'research-group-summary';
-      entrySummaryEl.textContent = entry.summary;
-      body.appendChild(entrySummaryEl);
-    }
-
-    findings.forEach(function(f, i) {
-      var div = document.createElement('div');
-      div.className = 'finding';
-
-      var summary = f.summary || '';
-      var details = f.details || '';
-      var proof = f.proof || {};
-
-      var proofHtml = '';
-      var snippetId = 'snippet-' + entry.id + '-' + i;
-      var proofType = proof.type || 'code'; // default to code for backwards compat
-
-      if (proofType === 'code' && proof.file) {
-        var lineRange = proof.line_start && proof.line_end ? proof.line_start + '-' + proof.line_end : '';
-        var label = proof.file + (lineRange ? ':' + lineRange : '');
-        proofHtml = '<span class="finding-ref clickable" title="' + escapeHtml(label) + '" onclick="showFilePreview(\'' +
-          proof.file.replace(/'/g, "\\'") + '\', ' +
-          (proof.line_start || 0) + ', ' + (proof.line_end || 0) +
-          ')">📄 ' + escapeHtml(label) + '</span>';
-        // For code proofs: load snippet dynamically from server
-        var hasSnippetRange = proof.snippet_start && proof.snippet_end;
-        var hasLegacySnippet = proof.snippet;
-        if (hasSnippetRange || hasLegacySnippet) {
-          proofHtml += '<span class="finding-quote-btn" data-snippet-id="' + snippetId + '"' +
-            (hasSnippetRange ? ' data-file="' + proof.file.replace(/"/g, '&quot;') + '"' +
-            ' data-start="' + proof.snippet_start + '" data-end="' + proof.snippet_end + '"' : '') +
-            ' onclick="toggleCodeSnippet(this)">' + t('research.showQuote') + '</span>';
-        }
-      } else if (proofType === 'web' && proof.url) {
-        proofHtml = '<a class="finding-ref clickable" href="' + escapeHtml(proof.url) +
-          '" target="_blank" rel="noopener">🌐 ' + escapeHtml(proof.title || proof.url) + '</a>';
-      } else if (proofType === 'diff' && proof.commit) {
-        var commitShort = proof.commit.substring(0, 7);
-        var diffLabel = commitShort + (proof.file ? ' — ' + proof.file : '');
-        proofHtml = '<span class="finding-ref">🔀 ' + escapeHtml(diffLabel) + '</span>';
-        if (proof.description) {
-          proofHtml += '<div class="finding-diff-desc">' + escapeHtml(proof.description) + '</div>';
-        }
-      } else if (proof.file) {
-        // Legacy fallback — old format without type field
-        var lineRange = proof.line_start && proof.line_end ? proof.line_start + '-' + proof.line_end : '';
-        var label = proof.file + (lineRange ? ':' + lineRange : '');
-        proofHtml = '<span class="finding-ref clickable" title="' + escapeHtml(label) + '" onclick="showFilePreview(\'' +
-          proof.file.replace(/'/g, "\\'") + '\', ' +
-          (proof.line_start || 0) + ', ' + (proof.line_end || 0) +
-          ')">📄 ' + escapeHtml(label) + '</span>';
-        if (proof.snippet) {
-          proofHtml += '<span class="finding-quote-btn" onclick="toggleSnippet(\'' + snippetId + '\', this)">' + t('research.showQuote') + '</span>';
-        }
-      }
-
-      var commentTarget = 'Finding: ' + summary.substring(0, 60);
-
-      div.innerHTML =
-        '<div class="finding-claim">' + escapeHtml(summary) + '</div>' +
-        (proofHtml ? '<div style="margin-top: 4px;">' + proofHtml + '</div>' : '') +
-        (proof.snippet ? '<div class="finding-snippet" id="' + snippetId + '"><code>' + escapeHtml(proof.snippet) + '</code></div>' :
-         (proof.snippet_start && proof.snippet_end ? '<div class="finding-snippet" id="' + snippetId + '"><code>' + t('research.loading') + '</code></div>' : '')) +
-        (proofType === 'web' && proof.quote ? '<div class="finding-snippet visible" style="border-left-color: var(--warning);"><code>' + escapeHtml(proof.quote) + '</code></div>' : '') +
-        (details ? '<div class="finding-evidence">' + escapeHtml(details) + '</div>' : '') +
-        '<div style="margin-top: 4px; text-align: right;">' + renderCommentIcon('research', commentTarget) + '</div>';
-      body.appendChild(div);
-    });
-
-    group.appendChild(body);
-    container.appendChild(group);
-  });
-
-  // Apply syntax highlighting to all snippets
   if (typeof hljs !== 'undefined') {
     container.querySelectorAll('.finding-snippet code').forEach(function(block) {
       hljs.highlightElement(block);

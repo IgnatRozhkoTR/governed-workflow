@@ -13,48 +13,48 @@ function renderPreplanning() {
 //  RESEARCH SUMMARIES
 // ═══════════════════════════════════════════════
 
+function navigateToResearchEntryById(entryId) {
+  if (!RESEARCH_DATA) return;
+  for (var i = 0; i < RESEARCH_DATA.length; i++) {
+    if (RESEARCH_DATA[i].id === entryId) {
+      navigateToResearchEntry(RESEARCH_DATA[i]);
+      return;
+    }
+  }
+}
+
 function renderPPResearchSummaries() {
   var container = document.getElementById('ppResearchList');
   if (!container) return;
-  container.innerHTML = '';
 
   if (!RESEARCH_DATA || RESEARCH_DATA.length === 0) {
-    container.innerHTML = '<div class="no-items-msg">' + t('preplanning.noResearch') + '</div>';
+    morphInnerHTML(container, '<div class="no-items-msg">' + t('preplanning.noResearch') + '</div>');
     return;
   }
 
-  RESEARCH_DATA.forEach(function(entry) {
+  var html = RESEARCH_DATA.map(function(entry) {
     var topicName = entry.topic || t('research.untitledResearch');
     var summary = entry.summary || '';
     var proven = entry.proven;
     var badgeClass = proven === 1 ? 'success' : proven === -1 ? 'danger' : 'warning';
     var badgeText = proven === 1 ? t('badges.verified') : proven === -1 ? t('badges.rejected') : t('badges.pending');
 
-    var card = document.createElement('div');
-    card.className = 'pp-research-card';
-    card.dataset.entryId = entry.id;
-
-    var bodyDiv = document.createElement('div');
-    bodyDiv.className = 'pp-research-card-body';
-    bodyDiv.innerHTML =
+    var bodyHtml = '<div class="pp-research-card-body" onclick="if(!event.target.closest(\'.pp-comment-btn,.pp-inline-comment-form\'))navigateToResearchEntryById(' + entry.id + ')">' +
       '<div class="pp-research-topic">' + escapeHtml(topicName) + '</div>' +
-      (summary ? '<div class="pp-research-summary">' + escapeHtml(summary) + '</div>' : '');
+      (summary ? '<div class="pp-research-summary">' + escapeHtml(summary) + '</div>' : '') +
+      '</div>';
 
-    bodyDiv.addEventListener('click', function(e) {
-      if (e.target.closest('.pp-comment-btn, .pp-inline-comment-form')) return;
-      navigateToResearchEntry(entry);
-    });
-
-    var actionsDiv = document.createElement('div');
-    actionsDiv.className = 'pp-research-actions';
-    actionsDiv.innerHTML =
+    var actionsHtml = '<div class="pp-research-actions">' +
       '<span class="badge badge-' + badgeClass + '">' + badgeText + '</span>' +
-      '<button class="pp-comment-btn" onclick="event.stopPropagation(); togglePPInlineComment(this, \'research\', ' + entry.id + ')" title="' + t('comments.addComment') + '">\u{1F4AC}</button>';
+      '<button class="pp-comment-btn" onclick="event.stopPropagation(); togglePPInlineComment(this, \'research\', ' + entry.id + ')" title="' + t('comments.addComment') + '">\u{1F4AC}</button>' +
+      '</div>';
 
-    card.appendChild(bodyDiv);
-    card.appendChild(actionsDiv);
-    container.appendChild(card);
-  });
+    return '<div class="pp-research-card" id="pp-research-card-' + entry.id + '" data-entry-id="' + entry.id + '">' +
+      bodyHtml + actionsHtml +
+      '</div>';
+  }).join('');
+
+  morphInnerHTML(container, html);
 }
 
 async function navigateToResearchEntry(entry) {
@@ -78,11 +78,10 @@ async function navigateToResearchEntry(entry) {
 function renderPPImpactAnalysis() {
   var container = document.getElementById('ppImpactContent');
   if (!container) return;
-  container.innerHTML = '';
 
   var data = AppState.impactAnalysis;
   if (!data) {
-    container.innerHTML = '<div class="pp-impact-empty">' + t('preplanning.noImpactAnalysis') + '</div>';
+    morphInnerHTML(container, '<div class="pp-impact-empty">' + t('preplanning.noImpactAnalysis') + '</div>');
     return;
   }
 
@@ -95,24 +94,27 @@ function renderPPImpactAnalysis() {
     { key: 'open_questions', label: t('impact.openQuestions') },
   ];
 
+  var parts = [];
   sections.forEach(function(s) {
     var text = data[s.key];
     if (!text) return;
-
-    var section = document.createElement('div');
-    section.className = 'pp-impact-section';
-    section.innerHTML =
-      '<div class="pp-impact-label" style="display: flex; justify-content: space-between; align-items: center;">' +
-        '<span>' + s.label + '</span>' +
-        '<button class="pp-comment-btn" onclick="togglePPInlineComment(this, \'impact\', \'' + s.key + '\')" title="' + t('comments.addComment') + '">\u{1F4AC}</button>' +
-      '</div>' +
-      '<div class="pp-impact-text">' + (typeof marked !== 'undefined' ? DOMPurify.sanitize(marked.parse(text)) : escapeHtml(text)) + '</div>';
-    container.appendChild(section);
+    parts.push(
+      '<div class="pp-impact-section" id="pp-impact-section-' + s.key + '" data-key="' + s.key + '">' +
+        '<div class="pp-impact-label" style="display: flex; justify-content: space-between; align-items: center;">' +
+          '<span>' + s.label + '</span>' +
+          '<button class="pp-comment-btn" onclick="togglePPInlineComment(this, \'impact\', \'' + s.key + '\')" title="' + t('comments.addComment') + '">\u{1F4AC}</button>' +
+        '</div>' +
+        '<div class="pp-impact-text">' + (typeof marked !== 'undefined' ? DOMPurify.sanitize(marked.parse(text)) : escapeHtml(text)) + '</div>' +
+      '</div>'
+    );
   });
 
-  if (container.children.length === 0) {
-    container.innerHTML = '<div class="pp-impact-empty">' + t('preplanning.noImpactAnalysis') + '</div>';
+  if (parts.length === 0) {
+    morphInnerHTML(container, '<div class="pp-impact-empty">' + t('preplanning.noImpactAnalysis') + '</div>');
+    return;
   }
+
+  morphInnerHTML(container, parts.join(''));
 }
 
 // ═══════════════════════════════════════════════
@@ -149,7 +151,6 @@ function isResearchProven(discussionId) {
 function renderPPDiscussions() {
   var container = document.getElementById('ppDiscussionsList');
   if (!container) return;
-  container.innerHTML = '';
 
   var discussions = CONTEXT_DATA.discussions || [];
 
@@ -172,7 +173,7 @@ function renderPPDiscussions() {
   }
 
   if (discussions.length === 0) {
-    container.innerHTML = '<div class="no-items-msg">' + t('discussions.noItems') + '</div>';
+    morphInnerHTML(container, '<div class="no-items-msg">' + t('discussions.noItems') + '</div>');
     return;
   }
 
@@ -182,6 +183,7 @@ function renderPPDiscussions() {
     return 0;
   });
 
+  var parts = [];
   sorted.forEach(function(d) {
     var isResearch = d.type === 'research';
     var isResolved = d.status === 'resolved';
@@ -189,9 +191,6 @@ function renderPPDiscussions() {
 
     if (isResearch && proven && !ppShowProven) return;
     if (!isResearch && isResolved && !ppShowResolved) return;
-
-    var div = document.createElement('div');
-    div.className = 'pp-discussion-item' + (isResolved || proven ? ' pp-resolved' : '');
 
     var author = d.author || 'user';
     var authorBadge = '<span class="qa-author qa-author-' + author + '">' + author + '</span>';
@@ -215,16 +214,9 @@ function renderPPDiscussions() {
       ? '<button class="btn btn-sm" style="font-size:0.65rem;padding:1px 6px" onclick="resolveDiscussion(' + d.id + ', true)">' + t('buttons.unresolve') + '</button>'
       : '<button class="btn btn-sm" style="font-size:0.65rem;padding:1px 6px" onclick="resolveDiscussion(' + d.id + ')">' + t('buttons.resolve') + '</button>';
 
-    div.innerHTML =
-      '<div class="pp-discussion-header">' +
-        '<span class="qa-id">#' + d.id + '</span>' +
-        authorBadge +
-        '<span class="pp-discussion-text">' + escapeHtml(d.text) + '</span>' +
-        '<div class="pp-discussion-meta">' + typeBadge + statusBadge + resolveBtn + '</div>' +
-      '</div>';
-
+    var repliesHtml = '';
     if (d.replies && d.replies.length > 0) {
-      var repliesHtml = '<div style="margin-top: 6px; padding-left: 16px; border-left: 2px solid var(--border);">';
+      repliesHtml = '<div style="margin-top: 6px; padding-left: 16px; border-left: 2px solid var(--border);">';
       d.replies.forEach(function(reply) {
         var replyAuthorBadge = reply.author === 'agent'
           ? '<span class="badge badge-accent" style="font-size: 10px;">' + t('author.agent') + '</span>'
@@ -232,19 +224,32 @@ function renderPPDiscussions() {
         repliesHtml += '<div style="padding: 4px 0; font-size: 13px;">' + replyAuthorBadge + ' ' + escapeHtml(reply.text) + '</div>';
       });
       repliesHtml += '</div>';
-      div.innerHTML += repliesHtml;
     }
 
+    var replyFormHtml = '';
     if (d.status !== 'resolved') {
-      div.innerHTML +=
+      replyFormHtml =
         '<div style="margin-top: 6px; display: flex; gap: 4px;">' +
           '<input type="text" class="context-input" id="ppReplyInput' + d.id + '" placeholder="' + t('placeholders.reply') + '" style="flex:1; font-size: 0.78rem; padding: 4px 8px;" onkeydown="if(event.key===\'Enter\'){event.preventDefault();ppReplyToDiscussion(' + d.id + ');}">' +
           '<button class="btn btn-sm" style="font-size:0.65rem;padding:2px 8px;" onclick="ppReplyToDiscussion(' + d.id + ')">' + t('buttons.reply') + '</button>' +
         '</div>';
     }
 
-    container.appendChild(div);
+    parts.push(
+      '<div class="pp-discussion-item' + (isResolved || proven ? ' pp-resolved' : '') + '" id="pp-discussion-' + d.id + '" data-discussion-id="' + d.id + '">' +
+        '<div class="pp-discussion-header">' +
+          '<span class="qa-id">#' + d.id + '</span>' +
+          authorBadge +
+          '<span class="pp-discussion-text">' + escapeHtml(d.text) + '</span>' +
+          '<div class="pp-discussion-meta">' + typeBadge + statusBadge + resolveBtn + '</div>' +
+        '</div>' +
+        repliesHtml +
+        replyFormHtml +
+      '</div>'
+    );
   });
+
+  morphInnerHTML(container, parts.join(''));
 }
 
 function addPPDiscussion() {

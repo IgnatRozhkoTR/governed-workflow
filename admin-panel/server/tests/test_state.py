@@ -25,6 +25,43 @@ def test_get_workspace_state(client, workspace):
     assert "progress" in data
 
 
+def test_get_workspace_state_returns_etag(client, workspace):
+    """State endpoint returns a stable ETag header for the JSON payload."""
+    response = client.get(_ws_url(workspace, "state"))
+    assert response.status_code == 200
+    etag = response.headers.get("ETag")
+    assert etag
+    # Same request → identical etag (payload bytes are canonical).
+    response2 = client.get(_ws_url(workspace, "state"))
+    assert response2.headers.get("ETag") == etag
+
+
+def test_get_workspace_state_304_on_matching_if_none_match(client, workspace):
+    """Matching If-None-Match → 304 with empty body and the same ETag."""
+    initial = client.get(_ws_url(workspace, "state"))
+    etag = initial.headers.get("ETag")
+    assert etag
+
+    revalidate = client.get(_ws_url(workspace, "state"), headers={"If-None-Match": etag})
+    assert revalidate.status_code == 304
+    assert revalidate.headers.get("ETag") == etag
+    assert revalidate.data == b""
+
+
+def test_get_workspace_state_etag_changes_on_mutation(client, workspace):
+    """Mutating state (changing phase) produces a different ETag and 200 response."""
+    first = client.get(_ws_url(workspace, "state"))
+    first_etag = first.headers.get("ETag")
+
+    client.put(_ws_url(workspace, "phase"), json={"phase": "1.0"})
+
+    second = client.get(_ws_url(workspace, "state"), headers={"If-None-Match": first_etag})
+    assert second.status_code == 200
+    second_etag = second.headers.get("ETag")
+    assert second_etag
+    assert second_etag != first_etag
+
+
 def test_get_workspace_state_not_found(client, project):
     url = f"/api/ws/{project['id']}/feature/nonexistent/state"
     response = client.get(url)

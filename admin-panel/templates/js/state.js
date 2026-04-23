@@ -201,6 +201,22 @@ function resetAppState() {
   document.dispatchEvent(new CustomEvent('workspace-reset'));
 }
 
+// ═══════════════════════════════════════════════
+//  DOM MORPH HELPER
+// ═══════════════════════════════════════════════
+// Replace container innerHTML while preserving live DOM nodes that have
+// stable ids or data-keys. Falls back to direct innerHTML assignment when
+// Idiomorph is unavailable. Used by render sites driven by the poll loop to
+// avoid wiping UI state (expand/collapse, input values, focus, scroll).
+function morphInnerHTML(container, newHtml) {
+  if (!container) return;
+  if (typeof Idiomorph !== 'undefined' && Idiomorph && typeof Idiomorph.morph === 'function') {
+    Idiomorph.morph(container, newHtml, { morphStyle: 'innerHTML' });
+    return;
+  }
+  container.innerHTML = newHtml;
+}
+
 function copyToClipboard(text, successMessage) {
   navigator.clipboard.writeText(text).then(function() {
     showToast(successMessage);

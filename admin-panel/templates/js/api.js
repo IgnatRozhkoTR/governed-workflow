@@ -43,6 +43,24 @@ async function apiGet(path) {
   return res.json();
 }
 
+// GET with ETag revalidation. Returns { notModified: true, etag } when the
+// server responds with 304, otherwise { data, etag, notModified: false }.
+async function apiGetWithEtag(path, lastEtag) {
+  const headers = {};
+  if (lastEtag) headers['If-None-Match'] = lastEtag;
+  const res = await fetch(API_BASE + path, { headers });
+
+  if (res.status === 304) {
+    return { notModified: true, etag: res.headers.get('ETag') || lastEtag || null, data: null };
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || err.details || res.statusText);
+  }
+  const data = await res.json();
+  return { notModified: false, etag: res.headers.get('ETag') || null, data };
+}
+
 async function apiPost(path, body) {
   const res = await fetch(API_BASE + path, {
     method: 'POST',
@@ -114,8 +132,11 @@ function apiArchiveWorkspace(projectId, branch) {
 
 // ─── Workspace state endpoints ───
 
-function apiGetState(projectId, branch) {
-  return apiGet('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/state');
+function apiGetState(projectId, branch, lastEtag) {
+  return apiGetWithEtag(
+    '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/state',
+    lastEtag
+  );
 }
 
 function apiSetScope(projectId, branch, scope) {

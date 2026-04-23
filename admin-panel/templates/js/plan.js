@@ -80,15 +80,35 @@ makePannable('diagramOverlayBody', { ignoreSelectors: ['.diagram-overlay-control
 //  SYSTEM DIAGRAM RENDER
 // ═══════════════════════════════════════════════
 
+var _lastSystemDiagramSignature = null;
+var _lastMermaidDiagramSignature = null;
+
+function _hashString(str) {
+  var hash = 0;
+  if (!str) return '0';
+  for (var i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return String(hash);
+}
+
 async function renderSystemDiagram() {
   var container = document.getElementById('systemDiagram');
   if (!container || typeof mermaid === 'undefined') return;
 
   var raw = PLAN_DATA.systemDiagram;
   if (!raw || (Array.isArray(raw) && raw.length === 0)) {
-    container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">' + t('plan.noSystemDiagram') + '</p>';
+    if (_lastSystemDiagramSignature !== 'empty') {
+      container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">' + t('plan.noSystemDiagram') + '</p>';
+      _lastSystemDiagramSignature = 'empty';
+    }
     return;
   }
+
+  var signature = _hashString(typeof raw === 'string' ? raw : JSON.stringify(raw));
+  if (signature === _lastSystemDiagramSignature) return;
+  _lastSystemDiagramSignature = signature;
 
   var diagrams;
   if (typeof raw === 'string') {
@@ -327,9 +347,16 @@ async function renderMermaidDiagram() {
 
   const definition = buildMermaidDiagram('LR');
   if (!definition) {
-    container.innerHTML = '';
+    if (_lastMermaidDiagramSignature !== 'empty') {
+      container.innerHTML = '';
+      _lastMermaidDiagramSignature = 'empty';
+    }
     return;
   }
+
+  var signature = _hashString(definition + '|' + (state.phase || ''));
+  if (signature === _lastMermaidDiagramSignature) return;
+  _lastMermaidDiagramSignature = signature;
 
   try {
     const { svg } = await mermaid.render('planMermaid', definition);
@@ -499,95 +526,96 @@ function _applyOverlayZoom() {
   if (label) label.textContent = _overlayZoom + '%';
 }
 
+function togglePlanTask(headerEl, e) {
+  if (e && e.target && e.target.closest && e.target.closest('.comment-icon')) return;
+  var taskDiv = headerEl && headerEl.parentElement;
+  if (taskDiv) taskDiv.classList.toggle('expanded');
+}
+
+function _buildPlanTaskHtml(item, itemIndex, task, taskIndex) {
+  var commentTarget = 'Task: ' + task.title;
+  var statusCls = (task.status || '').replace(/[^a-z0-9-]/gi, '');
+  var taskKey = (item.id || ('group' + itemIndex)) + '::' + taskIndex;
+
+  var headerHtml = '<div class="plan-task-header" onclick="togglePlanTask(this, event)">' +
+    '<span class="plan-task-dot ' + statusCls + '"></span>' +
+    '<span class="plan-task-title">' + escapeHtml(task.title) + '</span>' +
+    (task.agent ? ' <span class="badge badge-info" style="font-size: 0.65rem;">' + escapeHtml(task.agent) + '</span>' : '') +
+    renderCommentIcon('plan', commentTarget) +
+    '</div>';
+
+  var detailHtml = '<div class="plan-task-detail">';
+  if (task.description) detailHtml += '<div class="plan-task-description">' + escapeHtml(task.description) + '</div>';
+  if (task.files && task.files.length > 0) detailHtml += '<div class="plan-task-files">' + task.files.map(escapeHtml).join(', ') + '</div>';
+  detailHtml += '</div>';
+
+  return '<div class="plan-task" data-task-key="' + escapeHtml(taskKey) + '">' +
+    headerHtml + detailHtml +
+    '</div>';
+}
+
+function _buildPlanGroupHtml(item, itemIndex) {
+  var tasks = item.tasks || [];
+  var done = tasks.filter(function(task) { return task.status === 'done'; }).length;
+  var total = tasks.length;
+  var groupKey = item.id || ('group-' + itemIndex);
+
+  var headerHtml = '<div class="plan-group-header">';
+  if (item.id) {
+    var isCurrent = state.phase && state.phase.startsWith(item.id + '.');
+    headerHtml += '<span class="badge badge-' + (isCurrent ? 'warning' : 'info') + '">' + item.id + '</span> ';
+  }
+  headerHtml += '<span>' + escapeHtml(item.name || t('plan.group')) + '</span>';
+  if (item.mode) headerHtml += ' <span class="badge badge-info">' + escapeHtml(item.mode) + '</span>';
+  headerHtml += '<span class="plan-group-progress">' + t('plan.progress', {done: done, total: total}) + '</span>';
+  var subphaseComment = t('plan.subPhaseComment', {id: item.id || '', name: item.name || ''});
+  headerHtml += renderCommentIcon('plan', subphaseComment);
+  headerHtml += '</div>';
+
+  var itemScope = (LOCK_DATA.scope || {})[item.id];
+  if (itemScope) {
+    var scopeHtml = '<div style="padding: 4px 12px 8px; font-size: 0.75rem; color: var(--text-muted);">';
+    var must = itemScope.must || [];
+    var may = itemScope.may || [];
+    if (must.length) scopeHtml += must.map(function(s) { return '<span style="color: var(--danger);">◆</span> ' + escapeHtml(s); }).join(' &nbsp; ');
+    if (may.length) scopeHtml += (must.length ? ' &nbsp; ' : '') + may.map(function(s) { return '<span style="color: var(--text-muted);">◇</span> ' + escapeHtml(s); }).join(' &nbsp; ');
+    scopeHtml += '</div>';
+    headerHtml += scopeHtml;
+  }
+
+  var tasksHtml = tasks.map(function(task, idx) { return _buildPlanTaskHtml(item, itemIndex, task, idx); }).join('');
+
+  return '<div class="plan-group" data-group-key="' + escapeHtml(groupKey) + '">' + headerHtml + tasksHtml + '</div>';
+}
+
 function renderPlan() {
   const container = document.getElementById('planContent');
-  container.innerHTML = '';
+  if (!container) return;
 
   renderSystemDiagram();
   renderMermaidDiagram();
 
-  // Render plan description
+  var items = PLAN_DATA.execution || PLAN_DATA.groups || [];
+  var html = '';
+
   if (PLAN_DATA.description) {
-    var descDiv = document.createElement('div');
-    descDiv.className = 'plan-description';
-    descDiv.textContent = PLAN_DATA.description;
-    container.appendChild(descDiv);
+    html += '<div class="plan-description">' + escapeHtml(PLAN_DATA.description) + '</div>';
   }
 
-  var items = PLAN_DATA.execution || PLAN_DATA.groups || [];
-
-  // Plan-level comment icon
   if (items.length > 0) {
-    var planHeader = document.createElement('div');
-    planHeader.style.cssText = 'text-align: right; margin-bottom: 8px;';
-    planHeader.innerHTML = renderCommentIcon('plan', t('plan.entirePlan'));
-    container.appendChild(planHeader);
+    html += '<div style="text-align: right; margin-bottom: 8px;">' + renderCommentIcon('plan', t('plan.entirePlan')) + '</div>';
   }
 
   items.forEach(function(item, itemIndex) {
-    var tasks = item.tasks || [];
-    var done = tasks.filter(function(task) { return task.status === 'done'; }).length;
-    var total = tasks.length;
-
-    var groupDiv = document.createElement('div');
-    groupDiv.className = 'plan-group';
-
-    var headerHtml = '<div class="plan-group-header">';
-    if (item.id) {
-      var isCurrent = state.phase && state.phase.startsWith(item.id + '.');
-      headerHtml += '<span class="badge badge-' + (isCurrent ? 'warning' : 'info') + '">' + item.id + '</span> ';
-    }
-    headerHtml += '<span>' + escapeHtml(item.name || t('plan.group')) + '</span>';
-    if (item.mode) headerHtml += ' <span class="badge badge-info">' + escapeHtml(item.mode) + '</span>';
-    headerHtml += '<span class="plan-group-progress">' + t('plan.progress', {done: done, total: total}) + '</span>';
-    var subphaseComment = t('plan.subPhaseComment', {id: item.id || '', name: item.name || ''});
-    headerHtml += renderCommentIcon('plan', subphaseComment);
-    headerHtml += '</div>';
-
-    var itemScope = (LOCK_DATA.scope || {})[item.id];
-    if (itemScope) {
-      var scopeHtml = '<div style="padding: 4px 12px 8px; font-size: 0.75rem; color: var(--text-muted);">';
-      var must = itemScope.must || [];
-      var may = itemScope.may || [];
-      if (must.length) scopeHtml += must.map(function(s) { return '<span style="color: var(--danger);">◆</span> ' + escapeHtml(s); }).join(' &nbsp; ');
-      if (may.length) scopeHtml += (must.length ? ' &nbsp; ' : '') + may.map(function(s) { return '<span style="color: var(--text-muted);">◇</span> ' + escapeHtml(s); }).join(' &nbsp; ');
-      scopeHtml += '</div>';
-      headerHtml += scopeHtml;
-    }
-
-    groupDiv.innerHTML = headerHtml;
-
-    tasks.forEach(function(task) {
-      var taskDiv = document.createElement('div');
-      taskDiv.className = 'plan-task';
-
-      var commentTarget = 'Task: ' + task.title;
-
-      var headerLine = document.createElement('div');
-      headerLine.className = 'plan-task-header';
-      headerLine.innerHTML = '<span class="plan-task-dot ' + (task.status || '').replace(/[^a-z0-9-]/gi, '') + '"></span>' +
-        '<span class="plan-task-title">' + escapeHtml(task.title) + '</span>' +
-        (task.agent ? ' <span class="badge badge-info" style="font-size: 0.65rem;">' + escapeHtml(task.agent) + '</span>' : '') +
-        renderCommentIcon('plan', commentTarget);
-      headerLine.onclick = function(e) {
-        if (e.target.closest('.comment-icon')) return;
-        taskDiv.classList.toggle('expanded');
-      };
-      taskDiv.appendChild(headerLine);
-
-      var detail = document.createElement('div');
-      detail.className = 'plan-task-detail';
-      var detailHtml = '';
-      if (task.description) detailHtml += '<div class="plan-task-description">' + escapeHtml(task.description) + '</div>';
-      if (task.files && task.files.length > 0) detailHtml += '<div class="plan-task-files">' + task.files.map(escapeHtml).join(', ') + '</div>';
-      detail.innerHTML = detailHtml;
-      taskDiv.appendChild(detail);
-
-      groupDiv.appendChild(taskDiv);
-    });
-
-    container.appendChild(groupDiv);
+    html += _buildPlanGroupHtml(item, itemIndex);
   });
+
+  morphInnerHTML(container, html);
 }
 
 EventBus.on('state:refreshed', renderPlan);
+
+document.addEventListener('workspace-reset', function() {
+  _lastSystemDiagramSignature = null;
+  _lastMermaidDiagramSignature = null;
+});

@@ -1,10 +1,11 @@
 """Workspace state routes: phase, scope, plan, progress."""
+import hashlib
 import json
 import logging
 import re
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ def get_workspace_state(db, ws, project):
         except json.JSONDecodeError:
             pass
 
-    return jsonify({
+    payload = {
         "phase": ws["phase"],
         "status": ws["status"],
         "scope": scope,
@@ -120,7 +121,20 @@ def get_workspace_state(db, ws, project):
         "sessions": sessions,
         "impact_analysis": impact_analysis,
         "yolo_mode": bool(ws_field(ws, "yolo_mode", 0)),
-    })
+    }
+
+    body_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    etag = hashlib.md5(body_bytes).hexdigest()
+
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
+
+    return Response(
+        body_bytes,
+        status=200,
+        mimetype="application/json",
+        headers={"ETag": etag, "Cache-Control": "no-cache"},
+    )
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/locale", methods=["PUT"])

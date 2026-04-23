@@ -105,20 +105,20 @@ function renderScope() {
 
   const renderList = (list, elId, cls, scopeKey) => {
     const el = document.getElementById(elId);
-    el.innerHTML = '';
+    if (!el) return;
 
-    list.forEach((path, index) => {
+    var itemsHtml = list.map(function(path, index) {
       var commentTarget = scopeKey + ': ' + path;
-      const li = document.createElement('li');
-      li.className = `scope-item scope-${cls}`;
-      li.innerHTML = `
-        <span class="scope-icon">${cls === 'may' ? '◇' : '◆'}</span>
-        <span class="scope-path">${escapeHtml(path)}</span>
-        ${renderCommentIcon('scope', commentTarget)}
-        ${readOnly ? '' : '<button class="scope-remove" onclick="removeScopeEntry(\'' + scopeKey + '\', ' + index + ')" title="Remove">✕</button>'}
-      `;
-      el.appendChild(li);
-    });
+      var itemKey = scopeKey + '::' + path;
+      return '<li class="scope-item scope-' + cls + '" data-scope-key="' + escapeHtml(itemKey) + '">' +
+        '<span class="scope-icon">' + (cls === 'may' ? '◇' : '◆') + '</span>' +
+        '<span class="scope-path">' + escapeHtml(path) + '</span>' +
+        renderCommentIcon('scope', commentTarget) +
+        (readOnly ? '' : '<button class="scope-remove" onclick="removeScopeEntry(\'' + scopeKey + '\', ' + index + ')" title="Remove">✕</button>') +
+        '</li>';
+    }).join('');
+
+    morphInnerHTML(el, itemsHtml);
   };
   renderList(displayScope.must || [], 'scopeMust', 'must', 'must');
   renderList(displayScope.may || [], 'scopeMay', 'may', 'may');

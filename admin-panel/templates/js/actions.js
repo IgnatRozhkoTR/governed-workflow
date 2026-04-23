@@ -157,6 +157,14 @@ async function tryAutoAdvanceGate() {
   }
 }
 
+var _lastStateEtag = null;
+
+function resetStateEtag() {
+  _lastStateEtag = null;
+}
+
+document.addEventListener('workspace-reset', resetStateEtag);
+
 async function refreshState() {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
@@ -165,7 +173,15 @@ async function refreshState() {
   if (refreshBtn) refreshBtn.classList.add('refreshing');
 
   try {
-    var stateData = await apiGetState(ctx.projectId, ctx.branch);
+    var response = await apiGetState(ctx.projectId, ctx.branch, _lastStateEtag);
+
+    if (response.notModified) {
+      if (response.etag) _lastStateEtag = response.etag;
+      return;
+    }
+
+    var stateData = response.data;
+    if (response.etag) _lastStateEtag = response.etag;
 
     applyStateData(stateData);
 

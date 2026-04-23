@@ -673,6 +673,7 @@
     <div class="card card-primary">
       <div class="card-header">
         <span class="card-title" data-i18n="cards.phaseProgression">Phase Progression</span>
+        <button class="btn btn-sm" onclick="manualSetPhase()" data-i18n="buttons.setPhase">Set Phase</button>
       </div>
       <div class="card-body">
         <div class="phase-bar" id="phaseBarControl"></div>
@@ -724,6 +725,7 @@
   var I18N_MESSAGES = {{ i18n_default | safe }};
   var I18N_LOCALE = localStorage.getItem('admin-panel-locale') || 'en';
 </script>
+<script src="js/vendor/idiomorph.min.js?v=10"></script>
 <script src="js/event-bus.js?v=10"></script>
 <script src="js/i18n.js?v=10"></script>
 <script src="js/api.js?v=10"></script>
