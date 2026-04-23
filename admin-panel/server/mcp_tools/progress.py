@@ -4,7 +4,8 @@ from typing import Annotated, Optional
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from mcp_tools import mcp, with_mcp_workspace, mcp_error
+from mcp_tools import TRANSIENT_DB_EXCEPTIONS, mcp, with_mcp_workspace, mcp_error
+from core.i18n import t
 from services import progress_service
 
 
@@ -71,9 +72,9 @@ def workspace_update_progress(
           details={"files_changed": ["src/Service.java"], "outcome": "All tests green"})
     """
     if not phase or not phase.strip():
-        return mcp_error("validation", "phase must not be empty.", retryable=False)
+        return mcp_error("validation", t("mcp.error.phaseRequired", locale), retryable=False)
     if not summary or not summary.strip():
-        return mcp_error("validation", "summary must not be empty.", retryable=False)
+        return mcp_error("validation", t("mcp.error.summaryRequired", locale), retryable=False)
 
     details_json = json.dumps(details) if details else None
 
@@ -81,7 +82,7 @@ def workspace_update_progress(
         result = progress_service.update_progress(db, ws["id"], phase.strip(), summary.strip(), details_json)
         db.commit()
         return result
-    except Exception as exc:
+    except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
 
@@ -129,7 +130,7 @@ def workspace_get_progress(
     """
     try:
         return progress_service.get_progress(db, ws["id"], phase_key=phase or None)
-    except Exception as exc:
+    except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
 
@@ -212,5 +213,5 @@ def workspace_set_impact_analysis(
         progress_service.set_impact_analysis(db, ws["id"], analysis)
         db.commit()
         return {"ok": True}
-    except Exception as exc:
+    except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)

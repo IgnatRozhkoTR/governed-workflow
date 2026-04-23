@@ -9,6 +9,12 @@ from core.i18n import t
 from services import comment_service
 
 
+_RESOLVE_COMMENT_CATEGORIES = {
+    "review_scope_blocked": "business",
+    "not_found": "not_found",
+}
+
+
 @mcp.tool(annotations=ToolAnnotations(
     title="Get Comments",
     readOnlyHint=True,
@@ -169,7 +175,7 @@ def workspace_resolve_comment(
     if "ok" in result:
         db.commit()
     if "error" in result:
-        category = "business" if "review" in result["error"].lower() else "not_found"
+        category = _RESOLVE_COMMENT_CATEGORIES.get(result.get("error_key"), "not_found")
         return mcp_error(category, result["error"], retryable=False, details={"comment_id": comment_id})
     return result
 

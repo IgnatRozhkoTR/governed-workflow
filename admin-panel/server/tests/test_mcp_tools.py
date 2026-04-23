@@ -283,7 +283,7 @@ class TestResearch:
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_get_research
         result = workspace_get_research(ids=[])
-        assert result["error"] and result["errorCategory"] == "validation" and result["isRetryable"] is False
+        assert result == []
 
     def test_get_research_unknown_id(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
@@ -295,21 +295,21 @@ class TestResearch:
         rid = add_research(workspace["id"])
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_prove_research
-        result = workspace_prove_research(id=rid, is_proven=True, reason="Verified")
+        result = workspace_prove_research(id=rid, proven=True, notes="Verified")
         assert result["ok"]
         assert result["proven"] is True
 
     def test_prove_research_not_found(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_prove_research
-        result = workspace_prove_research(id=9999, is_proven=True)
+        result = workspace_prove_research(id=9999, proven=True)
         assert "error" in result
 
     def test_prove_research_rejected(self, workspace, monkeypatch):
         rid = add_research(workspace["id"])
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_prove_research
-        result = workspace_prove_research(id=rid, is_proven=False, reason="Could not verify")
+        result = workspace_prove_research(id=rid, proven=False, notes="Could not verify")
         assert result["ok"]
         assert result["proven"] is False
 
@@ -848,7 +848,6 @@ class TestExtendPlan:
                       "tasks": [{"title": "t2", "files": ["src/b.py"],
                                  "agent": "middle-backend-engineer"}]},
             scope={"must": ["src/b.py"], "may": []},
-            name="Added Phase",
         )
         assert result["ok"] is True
         plan = workspace_get_plan()
@@ -1101,6 +1100,98 @@ class TestSubmitValidation:
         )
         assert result["ok"] is True
 
+    def test_submit_validation_invalid_status_returns_validation_error(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_submit_validation
+        result = workspace_submit_validation(phase="3.1.1", status="bogus")
+        assert "error" in result
+        assert result["errorCategory"] == "validation"
+        assert result["isRetryable"] is False
+        assert result.get("allowed") == ["clean", "dirty"]
+
+    def test_submit_validation_workspace_not_found_uses_code(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from services.verification_service import VerificationServiceError
+        from mcp_server import workspace_submit_validation
+        from services import verification_service as vs
+
+        def fake_record_run(*args, **kwargs):
+            raise VerificationServiceError("workspace 999 not found", code="workspace_not_found")
+
+        monkeypatch.setattr(vs, "record_run", fake_record_run)
+        result = workspace_submit_validation(phase="3.1.1", status="clean")
+        assert "error" in result
+        assert result["errorCategory"] == "not_found"
+
+    def test_submit_validation_service_invalid_status_code_maps_to_validation(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from services.verification_service import VerificationServiceError
+        from mcp_server import workspace_submit_validation
+        from services import verification_service as vs
+
+        def fake_record_run(*args, **kwargs):
+            raise VerificationServiceError("bad status", code="invalid_status")
+
+        monkeypatch.setattr(vs, "record_run", fake_record_run)
+        result = workspace_submit_validation(phase="3.1.1", status="clean")
+        assert "error" in result
+        assert result["errorCategory"] == "validation"
+
+
+class TestGetVerificationResultsNotFound:
+    def test_get_results_with_unknown_run_id_returns_not_found(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_get_verification_results
+        result = workspace_get_verification_results(run_id=9999999)
+        assert "error" in result
+        assert result["errorCategory"] == "not_found"
+        assert result.get("run_id") == 9999999
+
+    def test_get_results_no_runs_returns_empty_not_error(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_get_verification_results
+        result = workspace_get_verification_results()
+        assert result == {"runs": [], "empty": True}
+
+
+class TestResolveCommentReviewScopeI18n:
+    def test_resolve_review_scope_returns_business_for_russian_locale(self, workspace, monkeypatch):
+        from core.db import get_db
+        cid = add_comment(workspace["id"], scope="review", text="Review finding", resolution="open")
+        db = get_db()
+        db.execute("UPDATE workspaces SET locale = 'ru' WHERE id = ?", (workspace["id"],))
+        db.commit()
+        db.close()
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_resolve_comment
+        result = workspace_resolve_comment(comment_id=cid)
+        assert "error" in result
+        assert result["errorCategory"] == "business"
+        assert "review" not in result["error"].lower()
+
+
+class TestI18nBlankChecks:
+    def test_create_profile_blank_name_message_is_i18n(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_create_verification_profile
+        from core.i18n import t
+        result = workspace_create_verification_profile(name="", language="go")
+        assert result["error"] == t("mcp.error.profileNameRequired")
+
+    def test_report_improvement_blank_title_message_is_i18n(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_report_improvement
+        from core.i18n import t
+        result = workspace_report_improvement(scope="workflow", title="", description="d")
+        assert result["error"] == t("mcp.error.titleRequired")
+
+    def test_update_progress_blank_summary_message_is_i18n(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_update_progress
+        from core.i18n import t
+        result = workspace_update_progress(phase="1.0", summary="   ")
+        assert result["error"] == t("mcp.error.summaryRequired", "en")
+
 
 class TestCreateVerificationProfile:
     def test_create_profile_returns_id(self, workspace, monkeypatch):
@@ -1180,10 +1271,10 @@ EXPECTED_ANNOTATIONS = {
     "workspace_get_state": (True, True, False),
     "workspace_advance": (False, False, False),
     "workspace_set_scope": (False, True, False),
-    "workspace_set_plan": (False, True, False),
+    "workspace_set_plan": (False, False, False),
     "workspace_get_plan": (True, True, False),
     "workspace_extend_plan": (False, False, False),
-    "workspace_restore_plan": (False, True, False),
+    "workspace_restore_plan": (False, False, False),
     "workspace_post_discussion": (False, False, False),
     "workspace_save_research": (False, False, False),
     "workspace_list_research": (True, True, False),
@@ -1297,11 +1388,6 @@ class TestErrorEnvelopeContract:
         assert "error" in r
 
     # -- validation envelopes with full structured shape
-    def test_get_research_empty_ids_envelope(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_get_research
-        self._assert_envelope(workspace_get_research(ids=[]))
-
     def test_update_progress_blank_summary(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_update_progress
@@ -1340,7 +1426,7 @@ class TestErrorEnvelopeContract:
     def test_prove_research_not_found(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_prove_research
-        self._assert_envelope(workspace_prove_research(id=777777, is_proven=True))
+        self._assert_envelope(workspace_prove_research(id=777777, proven=True))
 
     def test_delete_research_not_found(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
@@ -1451,9 +1537,27 @@ class TestMcpErrorHelper:
         assert e["error"] == "missing"
         assert e["errorCategory"] == "not_found"
 
-    def test_details_cannot_overwrite_error_key_unless_passed(self):
+    def test_details_cannot_overwrite_reserved_envelope_keys(self):
         from mcp_tools import mcp_error
-        # details CAN override because dict.update writes through — verify current behaviour
+        # Reserved keys must always reflect the structured arguments, never details.
+        e = mcp_error(
+            "validation",
+            "real",
+            retryable=True,
+            details={
+                "errorCategory": "spoofed",
+                "isRetryable": False,
+                "error": "fake",
+                "_invalid_category": "should_be_ignored",
+            },
+        )
+        assert e["errorCategory"] == "validation"
+        assert e["isRetryable"] is True
+        assert e["error"] == "real"
+        assert "_invalid_category" not in e
+
+    def test_details_non_reserved_keys_still_merge(self):
+        from mcp_tools import mcp_error
         e = mcp_error("business", "base", details={"extra": 1})
         assert e["error"] == "base"
         assert e["extra"] == 1
@@ -1462,3 +1566,197 @@ class TestMcpErrorHelper:
         from mcp_tools import mcp_error
         e = mcp_error("validation", "x")
         assert e["isRetryable"] is False
+
+
+class TestTranslateServiceError:
+    def test_known_key_uses_mapping(self):
+        from mcp_tools import translate_service_error
+        mapping = {"profile_not_found": ("not_found", False)}
+        envelope = translate_service_error({"error": "profile_not_found"}, mapping)
+        assert envelope["errorCategory"] == "not_found"
+        assert envelope["isRetryable"] is False
+        assert envelope["error"] == "profile_not_found"
+
+    def test_known_key_shorthand_category(self):
+        from mcp_tools import translate_service_error
+        mapping = {"some_rule": "validation"}
+        envelope = translate_service_error({"error": "some_rule"}, mapping)
+        assert envelope["errorCategory"] == "validation"
+        assert envelope["isRetryable"] is False
+        assert envelope["error"] == "some_rule"
+
+    def test_unknown_key_uses_default(self):
+        from mcp_tools import translate_service_error
+        envelope = translate_service_error(
+            {"error": "unexpected_state"},
+            {"known": ("not_found", False)},
+            default_category="business",
+            default_retryable=False,
+        )
+        assert envelope["errorCategory"] == "business"
+        assert envelope["isRetryable"] is False
+        assert envelope["error"] == "unexpected_state"
+
+    def test_preserves_message(self):
+        from mcp_tools import translate_service_error
+        mapping = {"no_fields_to_update": ("validation", False)}
+        envelope = translate_service_error({"error": "no_fields_to_update"}, mapping)
+        assert envelope["error"] == "no_fields_to_update"
+
+    def test_default_retryable_flag_respected(self):
+        from mcp_tools import translate_service_error
+        envelope = translate_service_error(
+            {"error": "some_unknown"},
+            {},
+            default_category="transient",
+            default_retryable=True,
+        )
+        assert envelope["errorCategory"] == "transient"
+        assert envelope["isRetryable"] is True
+
+
+class TestEnvelopeFromStatus:
+    def test_404_maps_to_not_found(self):
+        from mcp_tools import envelope_from_status
+        env = envelope_from_status({"error": "gone"}, 404)
+        assert env["errorCategory"] == "not_found"
+        assert env["isRetryable"] is False
+        assert env["statusCode"] == 404
+        assert env["error"] == "gone"
+
+    def test_409_maps_to_business(self):
+        from mcp_tools import envelope_from_status
+        env = envelope_from_status({"error": "conflict"}, 409)
+        assert env["errorCategory"] == "business"
+        assert env["isRetryable"] is False
+        assert env["statusCode"] == 409
+
+    def test_422_maps_to_validation(self):
+        from mcp_tools import envelope_from_status
+        env = envelope_from_status({"error": "unprocessable"}, 422)
+        assert env["errorCategory"] == "validation"
+        assert env["isRetryable"] is False
+
+    def test_400_maps_to_validation(self):
+        from mcp_tools import envelope_from_status
+        env = envelope_from_status({"error": "bad"}, 400)
+        assert env["errorCategory"] == "validation"
+        assert env["isRetryable"] is False
+
+    def test_503_maps_to_transient_retryable(self):
+        from mcp_tools import envelope_from_status
+        env = envelope_from_status({"error": "unavail"}, 503)
+        assert env["errorCategory"] == "transient"
+        assert env["isRetryable"] is True
+        assert env["statusCode"] == 503
+
+    def test_500_maps_to_transient_retryable(self):
+        from mcp_tools import envelope_from_status
+        env = envelope_from_status({"error": "oops"}, 500)
+        assert env["errorCategory"] == "transient"
+        assert env["isRetryable"] is True
+
+    def test_unknown_code_falls_back_to_business(self):
+        from mcp_tools import envelope_from_status
+        env = envelope_from_status({"error": "teapot"}, 418)
+        assert env["errorCategory"] == "business"
+        assert env["isRetryable"] is False
+        assert env["statusCode"] == 418
+
+    def test_missing_error_key_uses_synthetic_message(self):
+        from mcp_tools import envelope_from_status
+        env = envelope_from_status({}, 404)
+        assert env["error"] == "status_404"
+
+
+class TestWithGlobalDbNoAutoCommit:
+    def test_decorator_does_not_autocommit_success_result(self, workspace):
+        """with_global_db must NOT commit for the wrapped tool. If the tool omits
+        an explicit db.commit(), changes must not persist across connections."""
+        from mcp_tools import with_global_db
+        from core.db import get_db
+
+        @with_global_db
+        def insert_without_commit(db):
+            db.execute(
+                "INSERT INTO improvements (scope, title, description, context, status, created_at) "
+                "VALUES ('workflow', 'no-commit-test', 'desc', NULL, 'open', '2026-04-22T00:00:00')"
+            )
+            return {"ok": True}
+
+        result = insert_without_commit()
+        assert result == {"ok": True}
+
+        fresh = get_db()
+        row = fresh.execute(
+            "SELECT id FROM improvements WHERE title = 'no-commit-test'"
+        ).fetchone()
+        fresh.close()
+        assert row is None, "row must NOT be visible — the decorator must not auto-commit"
+
+    def test_decorator_commits_when_tool_calls_commit(self, workspace):
+        from mcp_tools import with_global_db
+        from core.db import get_db
+
+        @with_global_db
+        def insert_with_commit(db):
+            db.execute(
+                "INSERT INTO improvements (scope, title, description, context, status, created_at) "
+                "VALUES ('workflow', 'explicit-commit', 'desc', NULL, 'open', '2026-04-22T00:00:00')"
+            )
+            db.commit()
+            return {"ok": True}
+
+        result = insert_with_commit()
+        assert result["ok"] is True
+
+        fresh = get_db()
+        row = fresh.execute(
+            "SELECT id FROM improvements WHERE title = 'explicit-commit'"
+        ).fetchone()
+        fresh.close()
+        assert row is not None
+
+    def test_decorator_rolls_back_on_exception(self):
+        """Non-operational exceptions must bubble up; rollback is best-effort."""
+        from mcp_tools import with_global_db
+
+        @with_global_db
+        def raises_programming_error(db):
+            raise ValueError("deliberate failure")
+
+        import pytest
+        with pytest.raises(ValueError, match="deliberate failure"):
+            raises_programming_error()
+
+
+class TestNarrowExceptionPropagation:
+    def test_non_operational_exception_propagates_from_update_progress(self, workspace, monkeypatch):
+        """A non-transient exception inside a tool must propagate instead of being
+        wrapped into a transient envelope."""
+        monkeypatch.chdir(workspace["working_dir"])
+        from services import progress_service
+
+        def raise_type_error(*args, **kwargs):
+            raise TypeError("deliberate non-operational failure")
+
+        monkeypatch.setattr(progress_service, "update_progress", raise_type_error)
+        from mcp_server import workspace_update_progress
+
+        import pytest
+        with pytest.raises(TypeError, match="deliberate non-operational failure"):
+            workspace_update_progress(phase="1.0", summary="Non-operational raises.")
+
+    def test_operational_error_is_wrapped_as_transient(self, workspace, monkeypatch):
+        import sqlite3
+        monkeypatch.chdir(workspace["working_dir"])
+        from services import progress_service
+
+        def raise_op_error(*args, **kwargs):
+            raise sqlite3.OperationalError("database is locked")
+
+        monkeypatch.setattr(progress_service, "update_progress", raise_op_error)
+        from mcp_server import workspace_update_progress
+        result = workspace_update_progress(phase="1.0", summary="OpError path.")
+        assert result["errorCategory"] == "transient"
+        assert result["isRetryable"] is True

@@ -3,7 +3,7 @@ from typing import Annotated, Optional
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from mcp_tools import mcp, with_mcp_workspace, mcp_error
+from mcp_tools import mcp, with_mcp_workspace, envelope_from_status
 
 
 @mcp.tool(
@@ -89,17 +89,6 @@ def workspace_advance(
     result, code = perform_advance(ws, project["path"], body)
 
     if "error" in result:
-        if code == 404:
-            return mcp_error("not_found", result["error"], retryable=False, details={"statusCode": code})
-        if code == 409:
-            return mcp_error("business", result["error"], retryable=False, details={"statusCode": code})
-        if code == 422:
-            return mcp_error("validation", result["error"], retryable=False, details={"statusCode": code})
-        if code == 400:
-            return mcp_error("validation", result["error"], retryable=False, details={"statusCode": code})
-        if code >= 500:
-            return mcp_error("transient", result["error"], retryable=True, details={"statusCode": code})
-        # Fallback for any other error status
-        return mcp_error("business", result["error"], retryable=False, details={"statusCode": code})
+        return envelope_from_status(result, code)
 
     return {**result, "statusCode": code}

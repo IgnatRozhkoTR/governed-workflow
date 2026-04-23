@@ -4,6 +4,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from mcp_tools import mcp, with_global_db, mcp_error
+from core.i18n import t
 from services import improvement_service
 
 _VALID_SCOPES = ("workflow", "project", "skill", "tooling", "documentation")
@@ -53,13 +54,15 @@ def workspace_report_improvement(
         - transient    DB failure; caller should retry.
     """
     if not title.strip():
-        return mcp_error("validation", "Title must not be blank.", retryable=False)
+        return mcp_error("validation", t("mcp.error.titleRequired"), retryable=False)
     if not description.strip():
-        return mcp_error("validation", "Description must not be blank.", retryable=False)
+        return mcp_error("validation", t("mcp.error.descriptionRequired"), retryable=False)
 
-    return improvement_service.report_improvement(
+    result = improvement_service.report_improvement(
         db, scope, title, description, context=context or None
     )
+    db.commit()
+    return result
 
 
 @mcp.tool(

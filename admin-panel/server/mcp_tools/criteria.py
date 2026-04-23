@@ -12,6 +12,26 @@ _CRITERIA_TYPE = Literal["unit_test", "integration_test", "bdd_scenario", "custo
 _CRITERIA_STATUS = Literal["proposed", "accepted", "rejected"]
 
 
+def _criteria_update_error_mapping(criterion_id, locale):
+    return {
+        "criterion_not_found": (
+            "not_found",
+            False,
+            t("mcp.error.criterionNotFound", locale, criterion_id=criterion_id),
+        ),
+        "cannot_update_accepted": (
+            "business",
+            False,
+            t("mcp.error.cannotUpdateAcceptedCriteria", locale),
+        ),
+        "nothing_to_update": (
+            "validation",
+            False,
+            t("mcp.error.nothingToUpdate", locale),
+        ),
+    }
+
+
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Propose acceptance criterion",
@@ -198,24 +218,10 @@ def workspace_update_criteria(
     )
     if "error" in result:
         error_key = result["error"]
-        if error_key == "criterion_not_found":
-            return mcp_error(
-                "not_found",
-                t("mcp.error.criterionNotFound", locale, criterion_id=criterion_id),
-                retryable=False,
-            )
-        if error_key == "cannot_update_accepted":
-            return mcp_error(
-                "business",
-                t("mcp.error.cannotUpdateAcceptedCriteria", locale),
-                retryable=False,
-            )
-        if error_key == "nothing_to_update":
-            return mcp_error(
-                "validation",
-                t("mcp.error.nothingToUpdate", locale),
-                retryable=False,
-            )
+        localized_mapping = _criteria_update_error_mapping(criterion_id, locale)
+        if error_key in localized_mapping:
+            category, retryable, message = localized_mapping[error_key]
+            return mcp_error(category, message, retryable=retryable)
         return mcp_error(
             "business",
             error_key,

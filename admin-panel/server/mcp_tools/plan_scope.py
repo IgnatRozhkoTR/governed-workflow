@@ -33,7 +33,7 @@ def workspace_set_scope(
     return result
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True, destructiveHint=False))
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=False, destructiveHint=False))
 @with_mcp_workspace
 def workspace_set_plan(
     ws, project, db, locale,
@@ -88,7 +88,6 @@ def workspace_extend_plan(
     ws, project, db, locale,
     subphase: Annotated[dict, Field(description="New sub-phase spec: {name: str, tasks: list[dict], scope?: dict, diagrams?: list[dict]}. Appended at the end; ID is auto-assigned.")],
     scope: Annotated[dict, Field(description="Scope for this sub-phase with must/may patterns, e.g. {\"must\": [\"src/foo/\"], \"may\": [\"src/bar/\"]}.")],
-    name: Annotated[str, Field(description="Sub-phase display name.", min_length=1)] = "",
     diagrams: Annotated[Optional[list], Field(description="Optional diagrams to add, each {title: str, diagram: str}.")] = None,
     replace_diagrams: Annotated[bool, Field(description="If True, replace the plan's existing systemDiagram entirely. If False (default), append new diagrams from subphase.diagrams to existing ones.")] = False,
 ) -> dict:
@@ -112,16 +111,15 @@ def workspace_extend_plan(
     return result
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True, destructiveHint=False))
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=False, destructiveHint=False))
 @with_mcp_workspace
 def workspace_restore_plan(ws, project, db, locale) -> dict:
-    """Restore the previous plan version, swapping it with the current plan.
+    """Restore the most recently saved previous plan.
 
     Only works if current plan is NOT approved. Call this before the user approves
     if you need to revert an incorrectly set plan.
 
-    The previous plan's phase position is also restored. Restoring when already
-    on the previous plan (i.e., calling twice) ping-pongs back to the original."""
+    The previous plan's phase position is also restored."""
     if not ws["prev_plan_json"]:
         return mcp_error("not_found", t("mcp.error.noPreviousPlan", locale), retryable=False)
 

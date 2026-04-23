@@ -6,7 +6,17 @@ from pathlib import Path
 
 
 class VerificationServiceError(Exception):
-    """Raised when a service-layer precondition fails (e.g. unknown workspace)."""
+    """Raised when a service-layer precondition fails (e.g. unknown workspace).
+
+    Carries a stable ``code`` attribute so callers can categorize the error
+    without sniffing the translated message string. Known codes:
+      - ``workspace_not_found``  — workspace_id does not reference a workspace
+      - ``invalid_status``       — overall_status was not 'passed' or 'failed'
+    """
+
+    def __init__(self, message, code="unknown"):
+        super().__init__(message)
+        self.code = code
 
 
 def _load_profile_with_steps(db, profile):
@@ -364,10 +374,15 @@ def record_run(db, workspace_id, phase, overall_status, findings=None, notes=Non
     """
     workspace = db.execute("SELECT id FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
     if not workspace:
-        raise VerificationServiceError(f"workspace {workspace_id} not found")
+        raise VerificationServiceError(
+            f"workspace {workspace_id} not found", code="workspace_not_found"
+        )
 
     if overall_status not in ("passed", "failed"):
-        raise VerificationServiceError(f"overall_status must be 'passed' or 'failed', got {overall_status!r}")
+        raise VerificationServiceError(
+            f"overall_status must be 'passed' or 'failed', got {overall_status!r}",
+            code="invalid_status",
+        )
 
     now = datetime.now().isoformat()
     run_cursor = db.execute(

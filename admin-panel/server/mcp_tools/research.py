@@ -126,13 +126,7 @@ def workspace_get_research(
 
     Returns complete findings with proofs for each requested ID.
     Unknown IDs are silently omitted — check the returned list length if presence matters.
-
-    Errors
-      - validation: ids list is empty.
     """
-    if not ids:
-        return mcp_error("validation", "ids must contain at least one entry ID.", retryable=False)
-
     return research_service.get_research(db, ws["id"], ids)
 
 
@@ -141,8 +135,8 @@ def workspace_get_research(
 def workspace_prove_research(
     ws, project, db, locale,
     id: Annotated[int, Field(description="Research entry ID to prove or reject.")],
-    is_proven: Annotated[bool, Field(description="True = mark proven. False = mark rejected with reason.")],
-    reason: Annotated[str, Field(description="Why the entry was proven or rejected. Required when is_proven=False.")] = "",
+    proven: Annotated[bool, Field(description="True = mark proven. False = mark rejected with reason.")],
+    notes: Annotated[str, Field(description="Why the entry was proven or rejected. Required when proven=False.")] = "",
 ) -> dict:
     """Mark a research entry as proven or rejected. Called by the prover agent after verification.
 
@@ -154,7 +148,7 @@ def workspace_prove_research(
     Errors
       - not_found: research entry ID does not exist in this workspace.
     """
-    result = research_service.set_proven(db, id, ws["id"], is_proven, notes=reason)
+    result = research_service.set_proven(db, id, ws["id"], proven, notes=notes)
     if "error" in result:
         return mcp_error(
             "not_found",

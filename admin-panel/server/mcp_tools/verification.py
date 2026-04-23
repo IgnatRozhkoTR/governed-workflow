@@ -3,12 +3,39 @@ from typing import Annotated, Literal, Optional
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from mcp_tools import mcp, with_mcp_workspace, with_global_db, mcp_error
+from mcp_tools import (
+    TRANSIENT_DB_EXCEPTIONS,
+    mcp,
+    mcp_error,
+    translate_service_error,
+    with_global_db,
+    with_mcp_workspace,
+)
+from core.i18n import t
 from services import verification_service
 from services.verification_service import VerificationServiceError
 
 _FAIL_SEVERITY = Literal["blocking", "warning"]
 _SUBMIT_STATUS = Literal["clean", "dirty"]
+_VALID_SUBMIT_STATUSES = ("clean", "dirty")
+
+_VERIFICATION_ERROR_CATEGORIES = {
+    "workspace_not_found": ("not_found", False),
+    "invalid_status": ("validation", False),
+}
+
+_PROFILE_ERROR_MAPPING = {
+    "profile_not_found": ("not_found", False),
+    "no_fields_to_update": ("validation", False),
+}
+
+_STEP_ERROR_MAPPING = {
+    "profile_not_found": ("not_found", False),
+}
+
+_ASSIGN_ERROR_MAPPING = {
+    "profile_not_found": ("not_found", False),
+}
 
 
 @mcp.tool(
@@ -62,10 +89,17 @@ def workspace_get_verification_results(
         result = verification_service.get_verification_results(
             db, ws["id"], phase=phase or None, run_id=run_id if run_id else None
         )
-    except Exception as exc:
+    except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
     if result is None:
+        if run_id:
+            return mcp_error(
+                "not_found",
+                t("mcp.error.verificationRunNotFound", locale),
+                retryable=False,
+                details={"run_id": run_id},
+            )
         return {"runs": [], "empty": True}
     return result
 
@@ -99,7 +133,7 @@ def workspace_get_verification_profiles(db) -> list:
     """
     try:
         return verification_service.get_all_profiles(db)
-    except Exception as exc:
+    except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
 
@@ -169,9 +203,9 @@ def workspace_create_verification_profile(
       transient  — DB failure; caller should retry.
     """
     if not name.strip():
-        return mcp_error("validation", "name must not be blank.", retryable=False)
+        return mcp_error("validation", t("mcp.error.profileNameRequired"), retryable=False)
     if not language.strip():
-        return mcp_error("validation", "language must not be blank.", retryable=False)
+        return mcp_error("validation", t("mcp.error.profileLanguageRequired"), retryable=False)
 
     try:
         result = verification_service.create_profile(
@@ -182,8 +216,9 @@ def workspace_create_verification_profile(
             lsp_workspace_config=lsp_workspace_config or None,
             lsp_port=lsp_port if lsp_port else None,
         )
-    except Exception as exc:
+    except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
+    db.commit()
     return result
 
 
@@ -250,16 +285,12 @@ def workspace_update_verification_profile(
 
     try:
         result = verification_service.update_profile(db, profile_id, **kwargs)
-    except Exception as exc:
+    except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
     if "error" in result:
-        error_key = result["error"]
-        if error_key == "profile_not_found":
-            return mcp_error("not_found", "profile_not_found", retryable=False)
-        if error_key == "no_fields_to_update":
-            return mcp_error("validation", "no_fields_to_update", retryable=False)
-        return mcp_error("business", error_key, retryable=False)
+        return translate_service_error(result, _PROFILE_ERROR_MAPPING)
+    db.commit()
     return result
 
 
@@ -329,14 +360,12 @@ def workspace_add_verification_step(
             install_command=install_command or None,
             enabled=enabled, sort_order=sort_order, timeout=timeout, fail_severity=fail_severity,
         )
-    except Exception as exc:
+    except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
     if "error" in result:
-        error_key = result["error"]
-        if error_key == "profile_not_found":
-            return mcp_error("not_found", "profile_not_found", retryable=False)
-        return mcp_error("business", error_key, retryable=False)
+        return translate_service_error(result, _STEP_ERROR_MAPPING)
+    db.commit()
     return result
 
 
@@ -382,14 +411,11 @@ def workspace_assign_verification_profile(
     """
     try:
         result = verification_service.assign_profile(db, ws["project_id"], profile_id, subpath=subpath)
-    except Exception as exc:
+    except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
     if "error" in result:
-        error_key = result["error"]
-        if error_key == "profile_not_found":
-            return mcp_error("not_found", "profile_not_found", retryable=False)
-        return mcp_error("business", error_key, retryable=False)
+        return translate_service_error(result, _ASSIGN_ERROR_MAPPING)
     db.commit()
     return result
 
@@ -438,6 +464,14 @@ def workspace_submit_validation(
       not_found  — workspace referenced by this session no longer exists.
       transient  — DB failure; caller should retry.
     """
+    if status not in _VALID_SUBMIT_STATUSES:
+        return mcp_error(
+            "validation",
+            t("mcp.error.invalidValidationStatus", locale),
+            retryable=False,
+            details={"allowed": list(_VALID_SUBMIT_STATUSES)},
+        )
+
     overall_status = "passed" if status == "clean" else "failed"
 
     try:
@@ -445,9 +479,9 @@ def workspace_submit_validation(
             db, ws["id"], phase, overall_status, findings=findings or None
         )
     except VerificationServiceError as exc:
-        detail = str(exc)
-        if "not found" in detail:
-            return mcp_error("not_found", detail, retryable=False)
-        return mcp_error("business", detail, retryable=False)
-    except Exception as exc:
+        category, retryable = _VERIFICATION_ERROR_CATEGORIES.get(
+            getattr(exc, "code", "unknown"), ("business", False)
+        )
+        return mcp_error(category, str(exc), retryable=retryable)
+    except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)

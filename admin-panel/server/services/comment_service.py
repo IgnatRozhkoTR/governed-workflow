@@ -98,10 +98,16 @@ def resolve_comment(db, comment_id, workspace_id, resolved=True, block_review_sc
         (comment_id, workspace_id)
     ).fetchone()
     if not comment:
-        return {"error": t("mcp.error.commentNotFound", locale, comment_id=comment_id)}
+        return {
+            "error": t("mcp.error.commentNotFound", locale, comment_id=comment_id),
+            "error_key": "not_found",
+        }
 
     if block_review_scope and comment["scope"] == "review":
-        return {"error": t("mcp.error.reviewScopeResolveBlocked", locale)}
+        return {
+            "error": t("mcp.error.reviewScopeResolveBlocked", locale),
+            "error_key": "review_scope_blocked",
+        }
 
     if resolved:
         db.execute(
