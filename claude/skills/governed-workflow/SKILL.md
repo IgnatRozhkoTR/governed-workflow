@@ -40,13 +40,13 @@ Agents execute their task and return. The orchestrator continues them for follow
 
 | Role | When |
 |------|------|
-| **plan-advisor** | Phase 0 (background), messaged in phases 1, 3, 3.N.0 |
+| **plan-advisor** | Phase 0 (background), messaged in phases 1.0, 1.3, 2.0, 3.N.0 |
 | senior-backend-engineer | Complex sub-phases spanning 3.N.0 → 3.N.2 fix cycles. Continue via SendMessage. Production code ONLY — never tests. |
 | senior-backend-test-engineer | Complex test scenarios spanning write + fix cycles. Continue via SendMessage. Tests ONLY — always deployed AFTER engineer completes. |
 | senior-code-validator | Continue via SendMessage when re-validation after fixes is expected |
 | senior-code-researcher | Deep research spanning multiple rounds. Continue via SendMessage. |
-| researcher (middle) | Phase 2.0 (parallel, one per topic) |
-| research-prover | Phase 2.1 |
+| researcher (middle) | Phase 1.1 (parallel, one per topic) |
+| research-prover | Phase 1.2 |
 | engineer (middle) | Phases 3.N.0 (stage 1), 3.N.2, 3.N.4, 4.1. Production code ONLY — never tests. |
 | test engineer (middle) | Phase 3.N.0 (stage 2, after engineer). Tests ONLY. |
 | validator (middle) | Phase 3.N.1 |
@@ -58,48 +58,119 @@ Agents execute their task and return. The orchestrator continues them for follow
 
 ```
 0         Init — spawn plan-advisor
-1         Assessment (plan-advisor sub-agent)
-2.0       Research (researcher sub-agents, parallel)
-2.1       Research Proving (prover sub-agent)
-3.0       Planning (orchestrator + plan-advisor sub-agent)
-3.1       Plan Review                          USER GATE
+1.0       Assessment (plan-advisor sub-agent)
+1.1       Research (researcher sub-agents, parallel)
+1.2       Research Proving (prover sub-agent)
+1.3       Impact Analysis (orchestrator + plan-advisor)
+1.4       Preparation Review                   USER GATE
+2.0       Planning (orchestrator + plan-advisor sub-agent)
+2.1       Plan Review                          USER GATE
 3.N.0     Implementation                       code edits ON (in scope)
 3.N.1     Validation                           code edits OFF
 3.N.2     Fixes (skipped if clean)             code edits ON (in scope)
 3.N.3     Code Review                          USER GATE
 3.N.4     Commit
-4.0       Final Review                         code edits OFF
+4.0       Blind Code Review                    code edits OFF
 4.1       Address & Fix                        code edits ON, commits ON
 4.2       Final Approval                       USER GATE
 5         Done                                 push + MR allowed
 ```
 
-Phases stored as strings: `"0"`, `"2.1"`, `"3.2.3"`. N = 1, 2, 3... from the approved plan.
+Phases stored as strings: `"0"`, `"1.2"`, `"3.2.3"`. N = 1, 2, 3... from the approved plan.
 
 ---
 
 ## MCP Tools
 
+The admin panel exposes 38 MCP tools: 33 `workspace_*` plus 5 `rule_*`.
+
+### State & Advance
+
 | Tool | Description |
 |------|-------------|
 | `workspace_get_state` | Full state: phase, scope, plan, context, research, discussions, comments, previous_sessions |
-| `workspace_advance` | Request phase advancement (optional: commit_hash) |
+| `workspace_advance` | Request phase advancement (backend picks next phase; commit_hash for 3.N.4) |
+
+### Plan & Scope
+
+| Tool | Description |
+|------|-------------|
 | `workspace_set_scope` | Write scope (must/may) — planning phase only |
-| `workspace_set_plan` | Write execution plan — planning phase only |
+| `workspace_set_plan` | Write or replace execution plan — planning phase only |
+| `workspace_get_plan` | Read the full execution plan |
+| `workspace_extend_plan` | Append a new sub-phase to the plan without rewriting existing ones (auto-assigns ID, optional scope) |
+
+### Research & Discussion
+
+| Tool | Description |
+|------|-------------|
 | `workspace_post_discussion` | Raise an open discussion point (architectural decisions, research questions) |
-| `workspace_get_comments` | Read review comments (optionally filtered by scope) |
 | `workspace_save_research` | Save research findings — called by researcher sub-agents |
 | `workspace_list_research` | List all research entries (id, topic, count, proven status) |
 | `workspace_get_research` | Get full research entries by IDs (findings + proofs) |
 | `workspace_prove_research` | Mark a research entry proven or rejected — called by prover |
+| `workspace_delete_research` | Delete a research entry |
+
+### Progress & Impact
+
+| Tool | Description |
+|------|-------------|
 | `workspace_update_progress` | Document phase completion (required before certain advances) |
+| `workspace_get_progress` | Read progress entries (optionally filtered by phase) |
+| `workspace_set_impact_analysis` | Save structured impact analysis (affected flows, API changes, data flow, dependencies, ticket gaps, questions) — Phase 1.3 |
+
+### Acceptance Criteria
+
+| Tool | Description |
+|------|-------------|
 | `workspace_propose_criteria` | Propose acceptance criteria (unit_test, integration_test, bdd_scenario, custom) |
 | `workspace_update_criteria` | Update criteria description or details |
-| `workspace_get_criteria` | Get all acceptance criteria with their statuses |
-| `workspace_extend_plan` | Append a new sub-phase to the plan without rewriting existing ones (auto-assigns ID, optional scope) |
+| `workspace_get_criteria` | Get all acceptance criteria with statuses |
+
+### Comments
+
+| Tool | Description |
+|------|-------------|
+| `workspace_get_comments` | Read review comments (optionally filtered by scope) |
+| `workspace_post_comment` | Post a review comment on a file/line |
+| `workspace_resolve_comment` | Mark a review comment resolved |
+
+### Review Issues
+
+| Tool | Description |
+|------|-------------|
 | `workspace_submit_review_issue` | Submit a review finding with file/line location (critical/major only) |
 | `workspace_get_review_issues` | Get all review items, optionally filtered by resolution status |
-| `workspace_resolve_review_issue` | Set resolution on a review item (fixed, false_positive, out_of_scope) |
+| `workspace_resolve_review_issue` | Set resolution (fixed, false_positive, out_of_scope) |
+
+### Verification
+
+| Tool | Description |
+|------|-------------|
+| `workspace_get_verification_profiles` | List all available verification profiles |
+| `workspace_create_verification_profile` | Create a new verification profile |
+| `workspace_update_verification_profile` | Update a verification profile |
+| `workspace_add_verification_step` | Add a step to a verification profile |
+| `workspace_assign_verification_profile` | Assign a profile to the current workspace |
+| `workspace_get_verification_results` | Get verification run results for current/specific phase |
+| `workspace_submit_validation` | Submit validation results from a validator agent |
+
+### Improvements (global, not workspace-bound)
+
+| Tool | Description |
+|------|-------------|
+| `workspace_report_improvement` | Report a process improvement |
+| `workspace_get_improvements` | List improvements (optionally filtered by scope/status) |
+
+### Project Rules
+
+| Tool | Description |
+|------|-------------|
+| `rule_list` | List rule files for the current project |
+| `rule_get` | Get the Markdown body of a named rule |
+| `rule_create` | Create a new project-scoped rule file |
+| `rule_update` | Update an existing rule file |
+| `rule_delete` | Delete a rule file |
 
 ---
 
@@ -115,7 +186,7 @@ Phases stored as strings: `"0"`, `"2.1"`, `"3.2.3"`. N = 1, 2, 3... from the app
 **Recovery** (`phase > "0"` or `previous_sessions` is non-empty): the previous session ended (compaction, restart, or manual resume). **The plan-advisor from the previous session is gone — you MUST re-spawn it.**
 
 1. Read `progress` entries to reconstruct what happened
-2. **IMMEDIATELY re-spawn plan-advisor as a background sub-agent** (phase >= 1):
+2. **IMMEDIATELY re-spawn plan-advisor as a background sub-agent** (phase >= 1.0):
    ```
    Agent(
      name: "plan-advisor",
@@ -153,13 +224,13 @@ Agent(
 )
 ```
 
-2. Call `workspace_advance` to move to phase 1.
+2. Call `workspace_advance` to move to phase 1.0.
 
 **The plan-advisor is always reachable via `SendMessage(to: "plan-advisor", ...)`.**
 
 ---
 
-## Phase 1: Assessment
+## Phase 1.0: Assessment
 
 **Actor**: plan-advisor (messaged — NOT a new sub-agent)
 
@@ -171,21 +242,21 @@ Message the plan-advisor teammate:
 SendMessage(
   to: "plan-advisor",
   content: "Begin assessment. Read workspace_get_state for context (ticket, working_dir, context notes).
-            Identify affected areas of the codebase. Raise any open questions via workspace_post_discussion.
-            Report your findings in a structured summary."
+            Identify affected areas of the codebase. Raise research questions via
+            workspace_post_discussion (type='research'). Report findings in a structured summary."
 )
 ```
 
 When assessment is complete:
 1. Propose acceptance criteria via `workspace_propose_criteria` (unit tests, integration tests, BDD scenarios, custom checks). Users accept or reject them in the admin panel.
-2. Call `workspace_update_progress` for phase `"1"` with a non-empty summary
+2. Call `workspace_update_progress` for phase `"1.0"` with a non-empty summary
 3. Call `workspace_advance`
 
-**Advance 1 → 2.0** requires: progress entry `"1"` with non-empty summary.
+**Advance 1.0 → 1.1** requires: at least one open research discussion (`type='research'`).
 
 ---
 
-## Phase 2.0: Research
+## Phase 1.1: Research
 
 **Actors**: Researcher sub-agents (parallel, one-shot)
 
@@ -210,13 +281,15 @@ Deploy parallel researcher sub-agents — one per investigation topic identified
   - `file` — specific file in the commit (optional)
   - `description` — mandatory context explaining what the diff proves
 
-Call `workspace_advance` when all researchers complete.
+Every unresolved research discussion (raised in 1.0) MUST be linked to at least one research entry before advancing.
 
-**Advance 2.0 → 2.1** requires: at least 1 research entry saved, all entries valid.
+Call `workspace_advance(no_further_research_needed=true)` when all researchers complete.
+
+**Advance 1.1 → 1.2** requires: `no_further_research_needed=true`, every open research discussion has linked research, at least 1 research entry, all entries valid.
 
 ---
 
-## Phase 2.1: Research Proving
+## Phase 1.2: Research Proving
 
 **Actor**: Prover sub-agent (Opus, one-shot)
 
@@ -235,14 +308,56 @@ The prover ONLY verifies — it does NOT research. It calls `workspace_prove_res
 If any research is rejected: re-deploy the original researcher sub-agents for those topics (to fix their proofs), then re-deploy the prover.
 
 When all research is proven (prover confirms):
-1. Call `workspace_update_progress` for phase `"2"`
+1. Call `workspace_update_progress` for phase `"1"`
 2. Call `workspace_advance`
 
-**Advance 2.1 → 3.0** requires: all research entries proven + progress entry `"2"`.
+**Advance 1.2 → 1.3** requires: all research entries proven (none rejected, none unproven) + progress entry `"1"`.
 
 ---
 
-## Phase 3.0: Planning
+## Phase 1.3: Impact Analysis
+
+**Actors**: Orchestrator + plan-advisor
+
+Before planning, document the cross-cutting effects of this change. Message the plan-advisor:
+
+```
+SendMessage(
+  to: "plan-advisor",
+  content: "We are in Phase 1.3 (Impact Analysis). Using the proven research, help me
+            produce a structured impact analysis covering: affected flows, API changes,
+            data flow, dependencies, ticket gaps, outstanding questions."
+)
+```
+
+Save the result via `workspace_set_impact_analysis` with the six fields. The Pre-planning tab renders it alongside the research summaries so the user can review everything before the preparation gate.
+
+When complete:
+1. Call `workspace_update_progress` for phase `"1.3"`
+2. Call `workspace_advance`
+
+**Advance 1.3 → 1.4** requires: progress entry `"1.3"`. (Impact analysis should be populated — user will reject at 1.4 if it isn't.)
+
+---
+
+## Phase 1.4: Preparation Review (USER GATE)
+
+The user reviews the full preparation package in the Pre-planning tab: assessment summary, research findings, impact analysis, proposed acceptance criteria.
+
+- **Approve** → advances to `2.0`
+- **Reject** → back to `1.1` with comments
+
+Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+
+**After rejection**: the backend sets the phase to `1.1`. Do NOT call `workspace_advance` immediately. Instead:
+1. Call `workspace_get_state` to confirm you're at `1.1`
+2. Call `workspace_get_comments` to read the rejection feedback
+3. Deploy more researcher sub-agents (and update impact analysis later) to address the feedback
+4. Re-run Phase 1.2 and 1.3 before returning to the gate
+
+---
+
+## Phase 2.0: Planning
 
 **Actors**: Orchestrator + plan-advisor
 
@@ -251,10 +366,10 @@ Message the plan-advisor teammate to collaborate on the execution plan:
 ```
 SendMessage(
   to: "plan-advisor",
-  content: "We are in the planning phase. Review the research findings via workspace_get_state.
-            Help me design the execution plan. Consider whether this task needs multiple
-            sub-phases or a single one. Each sub-phase needs: id (3.1, 3.2, ...),
-            name, scope (must/may globs), and tasks."
+  content: "We are in the planning phase. Review the research findings and impact analysis
+            via workspace_get_state. Help me design the execution plan. Consider whether this
+            task needs multiple sub-phases or a single one. Each sub-phase needs: id (3.1,
+            3.2, ...), name, scope (must/may globs), and tasks."
 )
 ```
 
@@ -280,26 +395,26 @@ Here `impl` tasks run in parallel, then `test` tasks run in parallel after. With
 When plan is agreed:
 1. Call `workspace_set_scope` with must/may paths
 2. Call `workspace_set_plan` with the full plan JSON
-3. Call `workspace_update_progress` for phase `"3"`
+3. Call `workspace_update_progress` for phase `"2"`
 4. Call `workspace_advance`
 
 **Extending the plan later**: If during execution the user requests additional changes within the same ticket, or new work is discovered that warrants a new sub-phase, use `workspace_extend_plan` instead of rewriting the entire plan with `workspace_set_plan`. This appends a new sub-phase (auto-assigned ID, with scope) without touching existing sub-phases — fewer tokens, less risk of breaking the plan. The plan and scope statuses are set to 'pending' (user must re-approve).
 
-**Advance 3.0 → 3.1** requires: valid plan with ≥1 execution sub-phase + progress entry `"3"`.
+**Advance 2.0 → 2.1** requires: valid plan with ≥1 execution sub-phase, plan_status='approved', scope_status='approved', ≥1 acceptance criterion, no pending/rejected criteria, and progress entry `"2"`.
 
 ---
 
-## Phase 3.1: Plan Review (USER GATE)
+## Phase 2.1: Plan Review (USER GATE)
 
 User reviews the plan, scope, and system diagram in the admin panel.
 
 - **Approve** → advances to `3.1.0`
-- **Reject** → back to `3.0` with comments
+- **Reject** → back to `2.0` with comments
 
 Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
-**After rejection**: the backend sets the phase to `3.0`. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to confirm you're at `3.0`
+**After rejection**: the backend sets the phase to `2.0`. Do NOT call `workspace_advance` immediately. Instead:
+1. Call `workspace_get_state` to confirm you're at `2.0`
 2. Call `workspace_get_comments` to read the rejection feedback
 3. Message plan-advisor via `SendMessage(to: "plan-advisor", ...)` with the feedback to revise the plan
 4. Call `workspace_set_plan` and `workspace_set_scope` with the revised plan
@@ -326,7 +441,7 @@ When assigning tasks to agents, use this decision matrix:
 2. Deploy test engineer(s) for tests — AFTER the production code is written
 3. Both share the same sub-phase scope; test engineer reads the implementation to understand what to test
 
-When planning tasks in phase 3.0, structure each sub-phase with separate tasks for implementation and testing, assigned to the appropriate agent types. Never create a single task that asks an engineer to "implement + write tests".
+When planning tasks in phase 2.0, structure each sub-phase with separate tasks for implementation and testing, assigned to the appropriate agent types. Never create a single task that asks an engineer to "implement + write tests".
 
 ---
 
@@ -362,10 +477,10 @@ Call `workspace_advance` when both implementation and tests are complete.
 
 **Actors**: Validator sub-agents | **Code edits: OFF**
 
-Deploy validator sub-agents: compilation check + code quality review. Results stored in `workspace/validation/3.N.json`.
+Deploy validator sub-agents for compilation check + code quality review. Submit structured results via `workspace_submit_validation(phase="3.N.1", status="clean"|"dirty", findings=[...])`. Verification profiles assigned to the workspace also run automatically at this phase (configured via `workspace_assign_verification_profile`); blocking steps must pass.
 
 Call `workspace_advance`. Backend auto-routes:
-- Issues found → `3.N.2` (Fixes)
+- Issues found or verification failed → `3.N.2` (Fixes)
 - Clean → `3.N.3` (Code Review)
 
 ---
@@ -421,8 +536,6 @@ Do NOT brief reviewers with implementation context — they must review the code
 
 Reviewers submit findings via `workspace_submit_review_issue(file_path, line_start, line_end, severity, description)`. Only `critical` and `major` severity findings are accepted — lower severity is rejected by the server.
 
-If `workspace_get_state` shows Codex review enabled for the workspace, a parallel Codex review runs automatically in a separate tmux session when phase `4.0` starts. Do not wait for that session to start manually, but do wait for its completion notice before advancing out of `4.0`.
-
 Each submitted finding creates a review discussion with `resolution='open'`.
 
 Call `workspace_advance`.
@@ -477,7 +590,7 @@ Push and MR/PR creation allowed. Task complete.
 
 | Phase | Code Edits | Commits | Push/MR |
 |-------|-----------|---------|---------|
-| 0–1, 2.0–2.1, 3.0–3.1 | OFF | OFF | OFF |
+| 0, 1.0–1.4, 2.0–2.1 | OFF | OFF | OFF |
 | 3.N.1, 3.N.3 | OFF | OFF | OFF |
 | **3.N.0, 3.N.2** | **ON (in scope)** | OFF | OFF |
 | **3.N.4** | OFF | **ON** | OFF |
@@ -494,7 +607,8 @@ Push and MR/PR creation allowed. Task complete.
 
 | Gate | On reject, phase becomes | What to do |
 |------|--------------------------|------------|
-| 3.1 (Plan Review) | `3.0` | Read comments, revise plan, then advance |
+| 1.4 (Preparation Review) | `1.1` | Read comments, run more research, update impact analysis, re-prove, then advance |
+| 2.1 (Plan Review) | `2.0` | Read comments, revise plan, then advance |
 | 3.N.3 (Code Review) | `3.N.2` | Read comments, fix code, then advance |
 | 4.2 (Final Approval) | `4.1` | Read comments, fix code, then advance |
 
@@ -532,10 +646,12 @@ Required before certain advances. Use `workspace_update_progress`:
 
 | Advance | Requires progress for |
 |---------|----------------------|
-| 1 → 2.0 | `"1"` |
-| 2.1 → 3.0 | `"2"` |
-| 3.0 → 3.1 | `"3"` |
+| 1.0 → 1.1 | `"1.0"` |
+| 1.2 → 1.3 | `"1"` |
+| 1.3 → 1.4 | `"1.3"` |
+| 2.0 → 2.1 | `"2"` |
 | 3.N.4 → next | `"3.N"` |
+| 4.0 → 4.1 | `"4.0"` |
 | 4.1 → 4.2 | `"4"` |
 
 Progress is used for phase gate validation, session recovery after compaction, and retrospective review.

@@ -76,4 +76,4 @@ Before creating or updating a rule:
 
 ## Admin panel
 
-The Rules card lives in the Settings tab, directly below Git Rules. List view shows name, description, paths, and source badge. "New rule" opens a form. Defaults are visible but read-only.
+The Rules card lives in the Configuration tab, directly below Git Rules. List view shows name, description, paths, and source badge. "New rule" opens a form. Defaults are visible but read-only.

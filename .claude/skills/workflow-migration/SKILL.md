@@ -5,133 +5,11 @@ description: Install or update the governed workflow + admin panel on a device
 
 # Workflow Migration
 
-Sets up the governed multi-phase workflow on a new device.
+Installs or updates the governed-workflow hooks, agents, rules, and admin panel so a device (and every project registered in the admin panel) can use the orchestration system.
 
-The repository is called **governed-workflow** and can be cloned to any path on disk — `~/governed-workflow`, `/opt/governed-workflow`, or even `~/.claude` if you prefer. Examples below use `<repo>` as a placeholder for whatever path you chose.
+The repository is called **governed-workflow** and can be cloned to any path on disk — `~/governed-workflow`, `/opt/governed-workflow`, etc. Examples below use `<repo>` as a placeholder for whatever path you chose.
 
-**Platform support:** macOS (native), Linux (native), Windows (via WSL2). On Windows, the entire workflow runs inside WSL2 — the browser is the only thing that runs on the Windows side.
-
----
-
-## Upgrading from System-Level Install
-
-### What changed
-
-The repo no longer assumes `~/.claude` as its home. Assets moved out of the dot-prefixed system directory:
-
-| Old path | New path |
-|----------|----------|
-| `~/.claude/hooks/` | `<repo>/claude/hooks/` |
-| `~/.claude/agents/` | `<repo>/claude/agents/` |
-| `~/.claude/rules/` | `<repo>/claude/rules/` |
-| `~/.claude/defaults/` | `<repo>/claude/defaults/` |
-| `~/.claude/tools/` | `<repo>/claude/tools/` |
-| `~/.claude/admin-panel/` | `<repo>/admin-panel/` |
-| *(none)* | `<repo>/codex/` (new) |
-
-After migration, `~/.claude` should contain only Claude Code's own config (its own `settings.json`, `CLAUDE.md`, etc.) — no governed-workflow files.
-
----
-
-### Step 1: Clone fresh and copy the database
-
-```bash
-git clone https://github.com/IgnatRozhkoTR/governed-workflow.git ~/governed-workflow
-cp ~/.claude/admin-panel/server/admin-panel.db ~/governed-workflow/admin-panel/server/
-```
-
-This is safer than moving `~/.claude` because it leaves Claude Code's internal data untouched. The only file you need from the old install is the database.
-
----
-
-### Step 2: Run the migration script
-
-The script reads the admin-panel DB, finds all active workspaces, and updates their configuration automatically. Always do a dry-run first:
-
-```bash
-# Preview what would change:
-python3 ~/governed-workflow/.claude/skills/workflow-migration/migrate.py ~/governed-workflow --dry-run
-
-# Apply:
-python3 ~/governed-workflow/.claude/skills/workflow-migration/migrate.py ~/governed-workflow
-```
-
-Replace `~/governed-workflow` with wherever you placed the repo.
-
----
-
-### Step 3: Verify the repo's own hooks config
-
-The repo's `.claude/settings.json` uses `${CLAUDE_PROJECT_DIR}` — it should already be correct. Confirm:
-
-```bash
-grep CLAUDE_PROJECT_DIR ~/governed-workflow/.claude/settings.json
-```
-
-You should see paths like `${CLAUDE_PROJECT_DIR}/claude/hooks/pre-tool-hook.py`. If not, update them to use that form.
-
----
-
-### Step 4: Remove old hooks from global settings
-
-The global `~/.claude/settings.json` likely has hook entries pointing at `~/.claude/hooks/` (the old location) and may also have a `statusLine` entry referencing deleted scripts. Both must be removed or they'll break every session:
-
-```bash
-python3 -c "
-import json
-with open('$HOME/.claude/settings.json') as f: d = json.load(f)
-d.pop('hooks', None)
-d.pop('statusLine', None)
-with open('$HOME/.claude/settings.json', 'w') as f: json.dump(d, f, indent=2)
-print('Global hooks removed from ~/.claude/settings.json')
-"
-```
-
-Hooks now live at the **project level** (`<project>/.claude/settings.json`), not globally. The migration script (Step 2) already configures project-level hooks.
-
-Restart all Claude Code sessions after this step.
-
----
-
-### Step 5: Clean up `~/.claude`
-
-Remove old governed-workflow directories. Keep only Claude Code's own data:
-
-```bash
-rm -rf ~/.claude/admin-panel ~/.claude/hooks ~/.claude/tools \
-       ~/.claude/agents ~/.claude/defaults ~/.claude/modules \
-       ~/.claude/workspace ~/.claude/.github ~/.claude/.codex \
-       ~/.claude/AGENTS.md ~/.claude/README.md ~/.claude/.gitignore \
-       ~/.claude/.env ~/.claude/.mcp.json ~/.claude/statusline-command.sh
-```
-
-What should remain in `~/.claude/`:
-- `CLAUDE.md`, `rules/` — your global Claude Code config
-- `settings.json` — global settings (hooks removed in Step 4)
-- `projects/`, `sessions/`, `skills/`, `plugins/` — Claude Code internal data
-
-After cleanup, restart the admin panel pointing at the new location.
-
----
-
-### What the migration script does
-
-Before modifying any file, the script creates a `.pre-migration` backup (e.g., `settings.json.pre-migration`). Existing backups are never overwritten, making re-runs safe.
-
-For each active workspace the script performs these operations:
-
-1. **`settings.json`** — rewrites hook command paths from `~/.claude/hooks/<name>` to `<new-repo>/claude/hooks/<name>` (absolute path). If the `block-orchestrator-writes.py` PreToolUse hook is missing, it is added. Also renames legacy `.sh` hook references to `.py` (e.g., `session-start.sh` → `session-start.py`) and updates the runner from `bash` to `python3` — this fix applies in all modes, including in-place upgrades.
-2. **`.mcp.json`** — updates the `workspace` MCP server `args` to point at `<new-repo>/admin-panel/server/mcp_server.py`. Also replaces the `command` field if it references the old admin-panel venv, switching to module invocation (`python3 -m mcp_server`). Symlinked `.mcp.json` files (worktree mode) are resolved and deduplicated — the real file is only written once.
-3. **Hooks** — copies files from `<repo>/claude/hooks/` to `<workspace>/.claude/hooks/`, only when the repo's copy is newer (preserves user customisations).
-4. **Agents / rules / defaults** — copies missing files from `<repo>/claude/{agents,rules,defaults}/` into the workspace; never overwrites existing files (project wins). Skips `rules/` if the destination is a symlink.
-5. **`.codex`** — if `.codex` is a symlink, replaces it with a real directory populated from `<repo>/codex/`. Otherwise copies only missing files (project wins).
-
-After workspaces, the script also iterates projects directly:
-
-6. **Project `.mcp.json`** — updates `<project>/.mcp.json` if it has old admin-panel paths. This catches projects with no active workspaces.
-7. **DB** — updates `verification_steps.command` rows, replacing `~/.claude/tools/` with `${GOVERNED_WORKFLOW_TOOLS_DIR}/`.
-
-If the new repo path resolves to `~/.claude` (in-place upgrade), hook path replacements in `settings.json` are skipped since the absolute path is unchanged. Missing hooks are still added.
+**Platform support:** macOS (native), Linux (native), Windows (via WSL2). On Windows the entire workflow runs inside WSL2 — the browser is the only thing that runs on the Windows side.
 
 ---
 
@@ -149,11 +27,13 @@ python3 -c "import mcp; print('mcp ok')" 2>&1
 python3 -c "import flask_sock; print('flask_sock ok')" 2>&1
 ```
 
+Install anything missing before continuing.
+
 ---
 
 ## Windows Setup (WSL2)
 
-On Windows, the workflow runs entirely inside WSL2. The browser accesses the admin panel via `http://localhost:5111`.
+On Windows the workflow runs entirely inside WSL2. The browser accesses the admin panel via `http://localhost:5111`.
 
 **1. Install WSL2** — PowerShell as Administrator: `wsl --install`. Ubuntu installs by default; restart when prompted.
 
@@ -165,9 +45,9 @@ sudo apt update && sudo apt install -y python3 python3-pip git jq sqlite3 tmux c
 pip3 install flask mcp flask-sock --break-system-packages
 ```
 
-**4. Clone inside WSL filesystem** (NOT on `/mnt/c/` — too slow for git):
+**4. Clone inside the WSL filesystem** (NOT on `/mnt/c/` — too slow for git):
 ```bash
-git clone <your-repo-url> ~/governed-workflow
+git clone https://github.com/IgnatRozhkoTR/governed-workflow.git ~/governed-workflow
 ```
 
 **5. Configure `~/.bashrc` for non-interactive shells** — Claude Code's Bash tool runs non-interactively, so Ubuntu's default `.bashrc` exits early at the `case $-` guard. Put all exports **before** that guard:
@@ -177,7 +57,7 @@ export PATH="$JAVA_HOME/bin:$HOME/.local/bin:$PATH"
 export ANTHROPIC_BASE_URL=https://your-proxy-if-any
 ```
 
-**6. Install JDKs via SDKMAN:**
+**6. Install JDKs via SDKMAN** (optional, only if you work on JVM projects):
 ```bash
 curl -s "https://get.sdkman.io" | bash
 source ~/.sdkman/bin/sdkman-init.sh
@@ -200,22 +80,22 @@ bind -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "xclip -se
 EOF
 ```
 
-After WSL setup, continue with **Fresh Install — Setup Steps** below (all steps work identically inside WSL).
+After WSL setup, continue with the install steps below — they work identically inside WSL.
 
 ---
 
-## Fresh Install — Setup Steps
+## Install Steps
 
 ### 1. Clone the repo
 
 ```bash
-git clone <your-repo-url> ~/governed-workflow   # or any path you prefer
+git clone https://github.com/IgnatRozhkoTR/governed-workflow.git ~/governed-workflow   # or any path you prefer
 cd ~/governed-workflow
 ```
 
 ### 2. (Optional) Export repo path
 
-`core/paths.py` auto-detects the repo root when launched from `admin-panel/server/*`, so this is mostly a safety override:
+`core/paths.py` auto-detects the repo root when launched from `admin-panel/server/*`, so this is mostly a safety override for shells launched outside the repo:
 ```bash
 echo 'export GOVERNED_WORKFLOW_REPO=~/governed-workflow' >> ~/.bashrc
 ```
@@ -230,50 +110,55 @@ pip install flask mcp flask-sock
 ```
 Or without a venv: `pip3 install flask mcp flask-sock [--break-system-packages]`
 
-### 4. Generate `.claude/settings.json` for the repo's own Claude session
+### 4. Verify the repo's own `.claude/settings.json`
 
-Copy the template if it exists:
+The repo ships with its own `.claude/settings.json` used whenever Claude Code is opened on the repo itself. Hook commands use `${CLAUDE_PROJECT_DIR}` so they resolve regardless of where the repo is cloned. Confirm:
+
 ```bash
-cp <repo>/claude/defaults/settings.template.json <repo>/.claude/settings.json
+grep CLAUDE_PROJECT_DIR <repo>/.claude/settings.json
 ```
 
-If no template exists, create `<repo>/.claude/settings.json` with this content — hook commands must use the `${CLAUDE_PROJECT_DIR}` form so they resolve regardless of where the repo is cloned:
-```json
-{
-  "permissions": {
-    "defaultMode": "bypassPermissions"
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
-        "hooks": [{"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/block-orchestrator-writes.py"}]
-      },
-      {
-        "matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
-        "hooks": [{"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/pre-tool-hook.py"}]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [{"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/session-start.py"}]
-      }
-    ]
-  },
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0"
-  }
-}
+You should see paths like `${CLAUDE_PROJECT_DIR}/claude/hooks/pre-tool-hook.py`. If the file is missing or has been corrupted, restore it from git:
+
+```bash
+cd <repo> && git checkout HEAD -- .claude/settings.json
 ```
 
 ### 5. Initialize the database
 
+The server auto-applies migrations from `admin-panel/server/migrations/` on first start. If you prefer to initialize explicitly:
+
 ```bash
 cd <repo>/admin-panel/server
-python3 -c "from db import init_db; init_db(); print('DB initialized')"
+python3 -c "from core.db import init_db; init_db(); print('DB initialized')"
 ```
 
-### 6. Configure MCP server in each project
+### 6. Global hooks must NOT be configured
+
+Hooks live at the **project level** (`<project>/.claude/settings.json`), not globally. Make sure `~/.claude/settings.json` has no `hooks` or `statusLine` entries that would leak into every session:
+
+```bash
+python3 - <<'PY'
+import json, pathlib
+p = pathlib.Path.home() / ".claude/settings.json"
+if not p.exists():
+    print("OK — no global settings file")
+    raise SystemExit
+d = json.loads(p.read_text())
+changed = False
+for key in ("hooks", "statusLine"):
+    if key in d:
+        d.pop(key)
+        changed = True
+if changed:
+    p.write_text(json.dumps(d, indent=2))
+    print("Removed stale global entries; restart Claude Code sessions.")
+else:
+    print("OK — no stale global entries")
+PY
+```
+
+### 7. Configure MCP server in each project
 
 For every project that uses the governed workflow, create `.mcp.json` in the project root. Use the absolute expanded path — no `~` or `$HOME`:
 ```json
@@ -287,13 +172,13 @@ For every project that uses the governed workflow, create `.mcp.json` in the pro
   }
 }
 ```
-Add `.mcp.json` to your global gitignore:
+Add `.mcp.json` to your global gitignore so it never ends up in a project repo:
 ```bash
 echo '.mcp.json' >> ~/.gitignore_global
 git config --global core.excludesfile ~/.gitignore_global
 ```
 
-### 7. Start the admin panel
+### 8. Start the admin panel
 
 Use tmux so the server survives terminal closes:
 ```bash
@@ -315,11 +200,11 @@ ccadmin() {
 }
 ```
 
-### 8. Configure a project in the admin panel
+### 9. Configure a project in the admin panel
 
 Open `http://localhost:5111` and create a project pointing to your project directory.
 
-### 9. Create a workspace
+### 10. Create a workspace
 
 From the admin panel, create a workspace (branch). The server automatically merges the defaults from `<repo>/claude/defaults/` and `<repo>/codex/` with any project-local `.claude/` and `.codex/` overrides, then writes the merged result into the workspace's `.claude/` and `.codex/` directories.
 
@@ -328,6 +213,22 @@ Verify:
 ls <your-project>/.claude/workspaces/<branch>/
 # Should contain merged settings, rules, agents, etc.
 ```
+
+---
+
+## Updating an Existing Install
+
+To pick up changes after a `git pull` on the repo:
+
+1. Restart the admin panel so it reloads Python code, migrations, and module registrations:
+   ```bash
+   tmux kill-session -t admin-panel 2>/dev/null || true
+   tmux new-session -d -s admin-panel "cd <repo>/admin-panel/server && python3 app.py"
+   ```
+2. Restart any open Claude Code sessions — hooks are snapshotted at session start, so running sessions keep using the old versions until restarted.
+3. Newly-created workspaces automatically receive the latest agents, rules, defaults, and codex assets. Existing workspaces keep their current content — delete a file under `<project>/.claude/workspaces/<branch>/` if you want the next create/re-create to pick up the repo version.
+
+No database migration is needed beyond what the admin panel runs automatically on startup.
 
 ---
 
@@ -350,17 +251,19 @@ echo "exit: $?"  # Should be 0
 | Component | Path | Purpose |
 |-----------|------|---------|
 | Admin panel server | `<repo>/admin-panel/server/` | Flask app (port 5111) + SQLite DB |
-| MCP server | `<repo>/admin-panel/server/mcp_server.py` | 31 workspace tools via stdio |
-| Orchestrator block hook | `<repo>/claude/hooks/block-orchestrator-writes.py` | Prevents main agent from writing files in git repos |
+| MCP server | `<repo>/admin-panel/server/mcp_server.py` | 38 workspace tools via stdio |
+| Orchestrator block hook | `<repo>/claude/hooks/block-orchestrator-writes.py` | Prevents the main agent from writing files in git repos |
 | Phase gate hook | `<repo>/claude/hooks/pre-tool-hook.py` | Enforces edit/commit/push restrictions per phase |
 | Session start hook | `<repo>/claude/hooks/session-start.py` | Registers sessions, outputs recovery context |
 | Agent definitions | `<repo>/claude/agents/` | 16 agent types (researchers, engineers, validators, reviewers) |
+| Rules | `<repo>/claude/rules/*.md` | Coding standards, test standards, validation pipeline (YAML-frontmatter auto-load) |
 | Workflow skill | `<repo>/claude/skills/governed-workflow/SKILL.md` | Phase map, rules, MCP tool reference |
 | Plan-preparation skill | `<repo>/claude/skills/plan-preparation/SKILL.md` | Guides phases 1.0-1.4 |
 | Planning skill | `<repo>/claude/skills/planning/SKILL.md` | Guides phase 2.0 |
-| Terminal support | `<repo>/admin-panel/server/terminal.py` | tmux session management for built-in terminal |
-| Rules | `<repo>/claude/rules/*.md` | Coding standards, test standards, validation pipeline |
+| Setup skill | `<repo>/claude/skills/setup/SKILL.md` | Runs the admin-panel setup wizard |
+| Rules skill | `<repo>/claude/skills/rules/SKILL.md` | Author/edit rule files via MCP |
 | Default git rules | `<repo>/claude/defaults/git-rules.md` | Commit/MR format rules |
+| Modules | `<repo>/claude/modules/` | Self-contained feature packages (telegram, ...) |
 | Migration skill | `<repo>/.claude/skills/workflow-migration/` | This skill — repo-only, not shipped to workspaces |
 
 ---
@@ -372,12 +275,15 @@ echo "exit: $?"  # Should be 0
 | Pre-planning | Tab bar | Research summaries, impact analysis, discussions, phase 1.4 gate |
 | Planning | Tab bar | Execution plan, scope, system diagrams, acceptance criteria |
 | Research | Tab bar | Full research findings with proof references |
-| Phase Control | Tab bar | Phase progression, approval status |
+| Phase Control | Tab bar | Phase progression, approval status, per-workspace phase toggles |
 | Files | Sidebar | File browser |
 | Code Changes | Sidebar | Git diff viewer |
-| Configuration | Sidebar | Workspace settings, git config, Claude command |
+| Configuration | Sidebar | Workspace settings, Claude command |
+| Settings | Sidebar | Git Rules card, Rules card, other device/project settings |
 | Review | Sidebar | Code review issues |
+| Improvements | Sidebar | Reported process improvements |
 | Terminal | Sidebar | Built-in terminal (tmux-based) |
+| Setup | Project selector | Module and verification-profile wizard |
 
 ---
 
@@ -398,19 +304,19 @@ For remote session control via Telegram:
 2. Install Bun runtime: `curl -fsSL https://bun.sh/install | bash`
 3. Install the Claude Code Telegram plugin: `/plugin install telegram@claude-plugins-official`
 4. Configure the token: `/telegram:configure <token>`
-5. Enable the module via the admin panel Setup page, or run `/telegram install`
-6. Enable channels in admin panel: Configuration → Device Settings → toggle Channels on
+5. Enable the module via the admin panel Setup page, or run the `telegram` module's `enable` dispatch through the setup skill
+6. Enable channels in the admin panel: Configuration → Device Settings → toggle Channels on
 
 ---
 
 ## Troubleshooting
 
-- **MCP server not connecting**: Check `.mcp.json` path is absolute and file exists. Restart Claude Code after adding `.mcp.json`.
-- **Hook not firing**: Hooks are snapshotted at session start. Restart session after changing `settings.json`.
-- **DB errors**: Delete `<repo>/admin-panel/server/admin-panel.db` and re-run Step 5 to recreate.
+- **MCP server not connecting**: Check `.mcp.json` path is absolute and the file exists. Restart Claude Code after adding `.mcp.json`.
+- **Hook not firing**: Hooks are snapshotted at session start. Restart the session after changing `settings.json`.
+- **DB errors**: Stop the admin panel, delete `<repo>/admin-panel/server/admin-panel.db*` files, and restart — migrations will recreate the schema.
 - **Flask server not starting**: Check port 5111 is free (`lsof -i :5111`).
 - **`java`/`mvn` not found**: Exports are after the `.bashrc` interactive guard — move them above `# If not running interactively`.
 - **pip3 install fails**: Add `--break-system-packages` on Ubuntu 24.04+.
 - **SSH git push/fetch blocked**: Switch to HTTPS + `gh auth setup-git`.
 - **`localhost:5111` not accessible on Windows**: Run `ip addr show eth0` in WSL to find its IP.
-- **Slow git on Windows**: Ensure project is in WSL filesystem (`~/`), not `/mnt/c/`.
+- **Slow git on Windows**: Ensure the project is in the WSL filesystem (`~/`), not `/mnt/c/`.
