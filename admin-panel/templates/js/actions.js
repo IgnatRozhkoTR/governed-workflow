@@ -111,10 +111,6 @@ async function setScopeStatus(status) {
 }
 
 function updatePlanApprovalUI(status) {
-  var restoreBtn = document.getElementById('planRestoreBtn');
-  if (restoreBtn) {
-    restoreBtn.style.display = LOCK_DATA.has_prev_plan ? '' : 'none';
-  }
   _updateApprovalUI('planStatusBadge', 'planApproveBtn', 'planRejectBtn', setPlanStatus, status);
 }
 
@@ -201,15 +197,3 @@ async function refreshState() {
   }
 }
 
-async function restorePlan() {
-  var ctx = getWorkspaceContext();
-  if (!ctx) return;
-
-  try {
-    await apiPost('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/restore-plan', {});
-    showToast(t('messages.previousPlanRestored'));
-    await refreshState();
-  } catch (e) {
-    showToast(t('messages.restoreFailed', {error: e.message}));
-  }
-}

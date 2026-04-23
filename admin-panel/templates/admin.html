@@ -225,15 +225,6 @@
       </div>
     </div>
 
-    <!-- Phase Settings (workspace) -->
-    <div class="card collapsed" id="phaseSettingsWorkspaceCard">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.phaseSettings">Phase Toggles</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body" id="phaseSettingsWorkspaceBody"></div>
-    </div>
-
     <!-- Git Configuration -->
     <div class="card collapsed">
       <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
@@ -529,7 +520,6 @@
           <span id="planStatusBadge" class="badge badge-warning" data-i18n="badges.pending">Pending</span>
           <button class="btn btn-sm btn-primary" id="planApproveBtn" data-i18n="buttons.approve">Approve</button>
           <button class="btn btn-sm btn-danger-outline" id="planRejectBtn" data-i18n="buttons.reject">Reject</button>
-          <button class="btn btn-sm btn-outline" id="planRestoreBtn" onclick="restorePlan()" style="display: none;" title="Restore previous plan version" data-i18n="buttons.restore">↩ Restore</button>
         </div>
       </div>
       <div class="card-body" id="planContent"></div>
@@ -699,6 +689,13 @@
         <span class="card-title" data-i18n="cards.approvalStatus">Approval Status</span>
       </div>
       <div class="card-body" id="approvalStatusPanel"></div>
+    </div>
+    <div class="card collapsed" id="phaseSettingsWorkspaceCard">
+      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
+        <span class="card-title" data-i18n="cards.phaseSettings">Phase Toggles</span>
+        <span class="card-collapse-chevron">&#9660;</span>
+      </div>
+      <div class="card-body" id="phaseSettingsWorkspaceBody"></div>
     </div>
     <div class="card">
       <div class="card-header">

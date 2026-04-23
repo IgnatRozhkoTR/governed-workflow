@@ -1,11 +1,10 @@
-"""Plan domain logic: get, set, extend, restore operations on workspace plans.
+"""Plan domain logic: get, set, extend operations on workspace plans.
 
 All plan business logic lives here. MCP tools and route handlers are thin
 wrappers that delegate to this module.
 """
 import json
 import re
-from datetime import datetime
 
 from core.i18n import t
 from core.phase import phase_key
@@ -29,53 +28,8 @@ def get_scope(ws):
     return {}
 
 
-def save_prev_snapshot(db, ws_id):
-    """Save current plan/scope/phase/statuses into prev_ columns before overwriting."""
-    db.execute(
-        """UPDATE workspaces SET
-            prev_plan_json = plan_json,
-            prev_scope_json = scope_json,
-            prev_phase = phase,
-            prev_plan_status = plan_status,
-            prev_scope_status = scope_status
-        WHERE id = ?""",
-        (ws_id,)
-    )
-
-
-def restore_plan(db, ws):
-    """Swap current plan with saved previous plan. Records phase history if phase changed.
-
-    Returns the updated workspace row after the swap.
-    """
-    db.execute("""
-        UPDATE workspaces SET
-            plan_json = prev_plan_json,
-            scope_json = prev_scope_json,
-            phase = prev_phase,
-            plan_status = prev_plan_status,
-            scope_status = prev_scope_status,
-            prev_plan_json = plan_json,
-            prev_scope_json = scope_json,
-            prev_phase = phase,
-            prev_plan_status = plan_status,
-            prev_scope_status = scope_status
-        WHERE id = ?
-    """, (ws["id"],))
-
-    new_ws = db.execute("SELECT * FROM workspaces WHERE id = ?", (ws["id"],)).fetchone()
-
-    if new_ws["phase"] != ws["phase"]:
-        db.execute(
-            "INSERT INTO phase_history (workspace_id, from_phase, to_phase, time) VALUES (?, ?, ?, ?)",
-            (ws["id"], ws["phase"], new_ws["phase"], datetime.now().isoformat())
-        )
-
-    return new_ws
-
-
 def set_plan(db, ws, plan_data):
-    """Set execution plan on workspace. Saves previous, resets statuses, adjusts phase if needed.
+    """Set execution plan on workspace. Resets statuses and adjusts phase if needed.
 
     Returns a result dict with ok/error keys.
     """
@@ -84,8 +38,6 @@ def set_plan(db, ws, plan_data):
 
     if phase_key(phase) < phase_key("2.0"):
         return {"error": t("mcp.error.planPhase", locale)}
-
-    save_prev_snapshot(db, ws["id"])
 
     plan_json_str = json.dumps(plan_data)
     db.execute("UPDATE workspaces SET plan_json = ? WHERE id = ?", (plan_json_str, ws["id"]))
@@ -173,8 +125,6 @@ def extend_plan(db, ws, new_subphase, scope_entry, diagrams=None, replace_diagra
 
     if diagrams and isinstance(diagrams, list):
         _merge_diagrams(plan, diagrams, replace_diagrams)
-
-    save_prev_snapshot(db, ws["id"])
 
     db.execute("UPDATE workspaces SET plan_json = ? WHERE id = ?", (json.dumps(plan), ws["id"]))
 

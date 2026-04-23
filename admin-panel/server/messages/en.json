@@ -6,7 +6,7 @@
   "phase.guide.1_4": "Preparation Review (USER GATE). Research summaries, impact analysis, and discussions are ready for user review. Do NOT proceed — wait for the user to approve or reject in the admin panel. If rejected, the workflow returns to Research (1.1) for further investigation.",
   "phase.guide.2_0": "Planning. Resume your plan-advisor TEAMMATE. Create the execution plan with sub-phases. Use workspace_set_scope to define the phase-keyed scope map and workspace_set_plan for the plan. Call workspace_update_progress when done.",
   "phase.guide.2_1": "Plan Review (USER GATE). The plan is awaiting user approval in the admin panel. Do NOT proceed — wait for the user to approve or reject.",
-  "phase.guide.4_0": "Agentic Code Review. Deploy exactly 3 code-reviewer SUB-AGENTS in parallel, each reviewing from a different perspective (e.g. clean code & SOLID, architecture & data flow, edge cases & error handling). Do NOT brief them with implementation context — provide only the task description and branch. Reviewers call workspace_submit_review_issue for critical/major issues. If Codex review is enabled for this workspace, a parallel Codex review runs automatically in a separate session. Wait for the Codex completion notice before advancing. Call workspace_update_progress('4.0') when all 3 reviewers complete.",
+  "phase.guide.4_0": "Agentic Code Review. Deploy exactly 3 code-reviewer SUB-AGENTS in parallel, each reviewing from a different perspective (e.g. clean code & SOLID, architecture & data flow, edge cases & error handling). Do NOT brief them with implementation context — provide only the task description and branch. Reviewers call workspace_submit_review_issue for critical/major issues. Call workspace_update_progress('4.0') when all 3 reviewers complete.",
   "phase.guide.4_1": "Address Review Findings. Call workspace_get_review_issues to see all items. Deploy engineer SUB-AGENTS to fix legitimate issues — they call workspace_resolve_review_issue('fixed'). Mark false positives or out-of-scope items yourself. All review items must then be resolved by the user in the admin panel. Call workspace_update_progress('4') when done.",
   "phase.guide.4_2": "User Approval (USER GATE). All work complete. Awaiting user's final approval in admin panel. Do NOT proceed — wait for the user.",
   "phase.guide.5": "Done. Commit any remaining changes, then push and create MR/PR. Do this DIRECTLY — do NOT delegate git push or MR creation to a sub-agent.",
@@ -31,11 +31,9 @@
 
   "mcp.tool.setScope.desc": "Set workspace scope as a phase-keyed map. Allowed from phase 1 onwards.\n\n    Setting scope automatically revokes approval — the user must review and re-approve\n    the new scope in the admin panel before code edits are allowed.\n\n    Format: {\"3.1\": {\"must\": [\"src/models/\"], \"may\": [\"src/config/\"]}, \"3.2\": {\"must\": [...], \"may\": [...]}}\n    Each key is a sub-phase ID from the execution plan. 'must' directories MUST have changes for the phase to advance.\n    'may' directories are permitted but not required.",
 
-  "mcp.tool.setPlan.desc": "Set the execution plan. Editable during and after planning (phase >= 2.0).\n\n    The plan can be updated freely during planning. Once the user approves the plan\n    in the admin panel, approval is revoked each time the plan is updated — the user\n    must review and re-approve before the workflow can advance past planning.\n\n    The previous plan is saved automatically — call workspace_restore_plan to revert\n    if the new plan hasn't been approved yet.",
+  "mcp.tool.setPlan.desc": "Set the execution plan. Editable during and after planning (phase >= 2.0).\n\n    The plan can be updated freely during planning. Once the user approves the plan\n    in the admin panel, approval is revoked each time the plan is updated — the user\n    must review and re-approve before the workflow can advance past planning.",
 
   "mcp.tool.getPlan.desc": "Get the full execution plan including system diagram and all sub-phases with tasks.\n\n    Returns the complete plan JSON: description, systemDiagram, and execution array with\n    tasks per sub-phase. Use workspace_get_state to see the current scope map.",
-
-  "mcp.tool.restorePlan.desc": "Restore the previous plan version, swapping it with the current plan.\n\n    Only works if current plan is NOT approved. If you need to revert an incorrectly\n    set plan, call this before the user approves it.\n\n    The previous plan's phase position is also restored — you'll return to wherever\n    you were when that plan was active.",
 
   "mcp.tool.postDiscussion.desc": "Raise an open discussion point — architectural decisions, research questions, TBDs.\n\n    These are NOT chat messages. They are important topics that need research, discussion,\n    or decision from either the agent or the human. Examples:\n    - 'Should we use event-driven logging or centralized logger?'\n    - 'Hibernate Envers vs custom audit implementation'\n    - 'Async vs sync approach for trade operation logging'\n\n    Discussions are visible in the admin panel where either side can add context and resolve them.\n    Use parent_id to reply to an existing discussion (0 = new root discussion).\n    type: 'general' (default) or 'research'. Research discussions represent questions\n    that need investigation — they are tracked and must have linked research findings\n    before the workflow can advance past the research phase.",
 
@@ -51,7 +49,7 @@
 
   "mcp.tool.resolveComment.desc": "Mark a comment as resolved. Only works for non-review scoped comments — review items (scope='review') can only be resolved by the user in the admin panel. Use workspace_resolve_review_issue to set the resolution instead.\n\n    - comment_id: the ID of the comment\n    - Only resolves comments belonging to the current workspace",
 
-  "mcp.tool.submitReviewIssue.desc": "Submit a code review finding. Only critical and major issues are saved — minor/style issues are dropped.\n\n    - file_path: path relative to workspace root (e.g. 'src/main/kotlin/Service.kt')\n    - line_start: first line of the problematic code\n    - line_end: last line of the problematic code\n    - severity: 'critical' or 'major'\n    - description: what the issue is and why it matters\n    - reviewer_name: optional; use 'codex' for Codex-authored findings",
+  "mcp.tool.submitReviewIssue.desc": "Submit a code review finding. Only critical and major issues are saved — minor/style issues are dropped.\n\n    - file_path: path relative to workspace root (e.g. 'src/main/kotlin/Service.kt')\n    - line_start: first line of the problematic code\n    - line_end: last line of the problematic code\n    - severity: 'critical' or 'major'\n    - description: what the issue is and why it matters\n    - reviewer_name: optional reviewer identifier (defaults to 'reviewer')",
 
   "mcp.tool.getReviewIssues.desc": "Get all review items for the current workspace.\n\n    - status: filter by resolution ('open', 'fixed', 'false_positive', 'out_of_scope'). Empty = all.\n    Returns list with id, file_path, lines, description, resolution, author, resolved.",
 
@@ -87,15 +85,13 @@
   "mcp.error.workspaceNotFound": "Workspace not found",
   "mcp.error.scopePhase0": "Scope cannot be set at phase 0. Start assessment first (advance to phase 1).",
   "mcp.error.planPhase": "Plan can only be set from planning phase onwards (phase >= 2)",
-  "mcp.error.noPreviousPlan": "No previous plan to restore",
-  "mcp.error.planApproved": "Current plan is approved. Cannot restore — follow the approved plan.",
   "mcp.error.noFindings": "At least one finding is required",
   "mcp.error.parentDiscussionNotFound": "Parent discussion {id} not found",
   "mcp.error.researchEntryNotFound": "Research entry {id} not found",
   "mcp.error.commentNotFound": "Comment {comment_id} not found in this workspace",
   "mcp.error.reviewIssueNotFound": "Review issue {issue_id} not found",
   "mcp.error.invalidSeverity": "Only 'critical' and 'major' severity issues should be submitted",
-  "mcp.error.invalidReviewerName": "reviewer_name must be 'reviewer' or 'codex'",
+  "mcp.error.invalidReviewerName": "reviewer_name must be 'reviewer'",
   "mcp.error.fileNotFound": "File not found: {file_path}",
   "mcp.error.lineStartBeyondFile": "line_start {line_start} is beyond file length ({length} lines)",
   "mcp.error.lineStartBeyondLineEnd": "line_start must be <= line_end",
@@ -114,8 +110,6 @@
   "mcp.error.ruleDefaultImmutable": "Rule '{name}' is a default rule and cannot be modified or deleted",
   "mcp.error.ruleInvalidName": "Invalid rule name '{name}'. Use lowercase letters, digits, '-', '_' (starting with [a-z0-9], max 63 chars).",
   "mcp.error.ruleInvalidFrontmatter": "Rule '{name}' has invalid frontmatter: {details}",
-
-  "mcp.restorePlan.message": "Previous plan restored. Phase set to {phase}",
 
   "advance.error.noProgress": "Call workspace_update_progress to record {phase} findings before {next}.",
   "advance.error.noAssessmentProgress": "Call workspace_update_progress to record assessment findings before research.",
@@ -216,7 +210,6 @@
   "api.error.failedToListBranches": "Failed to list branches",
   "api.error.failedToListFiles": "Failed to list files",
   "api.error.alreadyArchived": "Already archived",
-  "api.error.noPreviousPlan": "No previous plan to restore",
   "api.error.provideDateParams": "Provide 'date' or 'from'/'to' parameters",
   "api.error.unsupportedLocale": "Unsupported locale",
 

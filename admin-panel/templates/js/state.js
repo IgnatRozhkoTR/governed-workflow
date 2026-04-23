@@ -10,8 +10,6 @@ var AppState = {
     scope: {},
     scope_status: "pending",
     plan_status: "pending",
-    has_prev_plan: false,
-    prev_plan_status: "pending",
     plan: null,
     session_id: null,
       working_dir: null,
@@ -120,8 +118,6 @@ function applyStateData(stateData) {
   LOCK_DATA.scope = stateData.scope || {};
   LOCK_DATA.scope_status = stateData.scope_status || "pending";
   LOCK_DATA.plan_status = stateData.plan_status || "pending";
-  LOCK_DATA.has_prev_plan = !!stateData.has_prev_plan;
-  LOCK_DATA.prev_plan_status = stateData.prev_plan_status || null;
   LOCK_DATA.locale = stateData.locale || null;
   LOCK_DATA.yolo_mode = !!stateData.yolo_mode;
 
@@ -164,8 +160,6 @@ function resetAppState() {
   LOCK_DATA.scope = {};
   LOCK_DATA.scope_status = "pending";
   LOCK_DATA.plan_status = "pending";
-  LOCK_DATA.has_prev_plan = false;
-  LOCK_DATA.prev_plan_status = null;
   LOCK_DATA.plan = null;
   LOCK_DATA.session_id = null;
   LOCK_DATA.working_dir = null;

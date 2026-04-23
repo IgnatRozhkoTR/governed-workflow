@@ -102,8 +102,6 @@ def get_workspace_state(db, ws, project):
         "scope_status": ws["scope_status"],
         "plan": plan,
         "plan_status": ws["plan_status"],
-        "prev_plan_status": ws["prev_plan_status"],
-        "has_prev_plan": ws["prev_plan_json"] is not None and ws["prev_plan_json"] != "",
         "phase_sequence": phase_sequence,
         "locale": ws["locale"],
         "session_id": ws["session_id"],
@@ -307,18 +305,6 @@ def query_progress():
         entries.append(entry)
 
     return jsonify({"entries": entries, "date_from": date_from, "date_to": date_to})
-
-
-@bp.route("/api/ws/<project_id>/<path:branch>/restore-plan", methods=["POST"])
-@with_workspace
-def restore_plan(db, ws, project):
-    """Restore previous plan version. User can always restore (no approval guard)."""
-    if not ws["prev_plan_json"]:
-        return jsonify({"error": t("api.error.noPreviousPlan")}), 404
-
-    new_ws = plan_service.restore_plan(db, ws)
-    db.commit()
-    return jsonify({"ok": True, "phase": new_ws["phase"]})
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/research/<int:research_id>/prove", methods=["POST"])

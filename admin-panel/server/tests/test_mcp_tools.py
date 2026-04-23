@@ -450,26 +450,6 @@ class TestReviewIssues:
         )
         assert result["ok"]
 
-    def test_submit_review_issue_with_codex_author(self, workspace, monkeypatch):
-        Path(workspace["working_dir"]).joinpath("src").mkdir(exist_ok=True)
-        Path(workspace["working_dir"]).joinpath("src/main.py").write_text(
-            "def main():\n    pass\n"
-        )
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_submit_review_issue, workspace_get_review_issues
-        result = workspace_submit_review_issue(
-            file_path="src/main.py",
-            line_start=1,
-            line_end=2,
-            severity="major",
-            description="Codex finding",
-            reviewer_name="codex",
-        )
-        assert result["ok"]
-
-        issues = workspace_get_review_issues()
-        assert issues[0]["author"] == "codex"
-
     def test_submit_issue_file_not_found(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_submit_review_issue
@@ -879,30 +859,6 @@ class TestExtendPlan:
         assert result["errorCategory"] == "validation"
 
 
-class TestRestorePlan:
-    def test_restore_plan_swaps_to_previous(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        set_phase(workspace["id"], "2.0")
-        from mcp_server import workspace_set_plan, workspace_restore_plan, workspace_get_plan
-        first = {"description": "first", "systemDiagram": [], "execution": []}
-        second = {"description": "second", "systemDiagram": [], "execution": []}
-        workspace_set_plan(plan=first)
-        workspace_set_plan(plan=second)
-        assert workspace_get_plan()["description"] == "second"
-        result = workspace_restore_plan()
-        assert result["ok"] is True
-        assert result["restored"] is True
-        assert workspace_get_plan()["description"] == "first"
-
-    def test_restore_plan_without_prior_returns_not_found(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_restore_plan
-        result = workspace_restore_plan()
-        assert "error" in result
-        assert result["errorCategory"] == "not_found"
-        assert result["isRetryable"] is False
-
-
 class TestDeleteResearch:
     def test_delete_research_removes_entry(self, workspace, monkeypatch):
         rid = add_research(workspace["id"], topic="ToDelete")
@@ -1274,7 +1230,6 @@ EXPECTED_ANNOTATIONS = {
     "workspace_set_plan": (False, False, False),
     "workspace_get_plan": (True, True, False),
     "workspace_extend_plan": (False, False, False),
-    "workspace_restore_plan": (False, False, False),
     "workspace_post_discussion": (False, False, False),
     "workspace_save_research": (False, False, False),
     "workspace_list_research": (True, True, False),
@@ -1318,7 +1273,7 @@ class TestMcpToolContracts:
     def test_all_tools_have_annotations(self):
         from mcp.types import ToolAnnotations
         tools = self._tools()
-        assert len(tools) == 39, f"expected 39 registered tools, got {len(tools)}"
+        assert len(tools) == 38, f"expected 38 registered tools, got {len(tools)}"
         for name, tool in tools.items():
             ann = tool.annotations
             assert ann is not None, f"{name} missing annotations"
@@ -1491,11 +1446,6 @@ class TestErrorEnvelopeContract:
         self._assert_envelope(workspace_create_verification_profile(
             name="", language="go"
         ))
-
-    def test_restore_plan_no_prior(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_restore_plan
-        self._assert_envelope(workspace_restore_plan())
 
     def test_set_scope_before_phase1(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])

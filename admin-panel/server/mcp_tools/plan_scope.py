@@ -41,8 +41,8 @@ def workspace_set_plan(
 ) -> dict:
     """Set the execution plan. Editable during and after planning (phase >= 2.0).
 
-    The previous plan is saved automatically — call workspace_restore_plan to revert
-    if the new plan has not been approved yet. Setting a plan revokes approval.
+    Setting a plan revokes approval — the user must review and re-approve before
+    the workflow can advance past planning.
 
     Expected format:
     {
@@ -109,30 +109,3 @@ def workspace_extend_plan(
         return mcp_error("validation", result["error"], retryable=False)
     db.commit()
     return result
-
-
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=False, destructiveHint=False))
-@with_mcp_workspace
-def workspace_restore_plan(ws, project, db, locale) -> dict:
-    """Restore the most recently saved previous plan.
-
-    Only works if current plan is NOT approved. Call this before the user approves
-    if you need to revert an incorrectly set plan.
-
-    The previous plan's phase position is also restored."""
-    if not ws["prev_plan_json"]:
-        return mcp_error("not_found", t("mcp.error.noPreviousPlan", locale), retryable=False)
-
-    if ws["plan_status"] == "approved":
-        return mcp_error("business", t("mcp.error.planApproved", locale), retryable=False)
-
-    new_ws = plan_service.restore_plan(db, ws)
-    db.commit()
-
-    return {
-        "ok": True,
-        "restored": True,
-        "phase": new_ws["phase"],
-        "plan_status": new_ws["plan_status"],
-        "message": t("mcp.restorePlan.message", locale, phase=new_ws["phase"]),
-    }
