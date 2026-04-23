@@ -124,7 +124,6 @@ The repo can be cloned to any path on disk (`~/governed-workflow`, `/opt/governe
 │   │   └── setup/        #     Setup wizard for modules and profiles
 │   ├── rules/            #   Coding standards, test standards, validation pipeline
 │   └── defaults/         #   Git rules template, settings template
-├── codex/                # Codex payload (agents, prompts, config)
 └── .claude/              # Repo's own Claude Code config (not shipped to workspaces)
     └── skills/workflow-migration/  # Install/migration skill for this repo
 ```

@@ -205,9 +205,8 @@ def workspace_submit_review_issue(
     description: Annotated[str, Field(description=(
         "What the issue is and why it matters. Must be non-empty."
     ))],
-    reviewer_name: Annotated[Literal["reviewer", "codex"], Field(description=(
-        "Identity of the reviewer submitting the finding. Use 'reviewer' for the "
-        "default review agent, 'codex' for Codex-authored findings."
+    reviewer_name: Annotated[Literal["reviewer"], Field(description=(
+        "Identity of the reviewer submitting the finding."
     ))] = "reviewer",
 ) -> dict:
     """Submit a code review finding (critical or major severity only).
@@ -224,7 +223,7 @@ def workspace_submit_review_issue(
         line_end: End of the problem range (>= line_start, validated here).
         severity: 'critical' or 'major'.
         description: Human-readable explanation of the defect.
-        reviewer_name: 'reviewer' or 'codex'.
+        reviewer_name: 'reviewer' (default).
 
     Returns:
         {"ok": True, "id": <new-issue-id>} on success.

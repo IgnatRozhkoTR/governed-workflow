@@ -13,13 +13,11 @@ from core.helpers import sanitize_branch, workspace_dir, run_git, DEFAULT_SOURCE
 from core.i18n import t
 from core.paths import (
     DEFAULT_AGENTS_DIR,
-    DEFAULT_CODEX_DIR,
     DEFAULT_DEFAULTS_DIR,
     DEFAULT_FUNNEL_TEMPLATE,
     DEFAULT_GIT_HOOKS_DIR,
     DEFAULT_HOOKS_DIR,
     DEFAULT_MCP_TEMPLATE,
-    DEFAULT_REPO_AGENTS_MD,
     DEFAULT_REPO_CLAUDE_MD,
     DEFAULT_RULES_DIR,
     hook_command,
@@ -204,9 +202,9 @@ _WORKSPACE_HOOKS = {
 
 _MCP_SERVER_PATH = str(Path(__file__).resolve().parent.parent / "mcp_server.py")
 
-_BACKUP_FILES = [".claude/settings.json", ".mcp.json", "CLAUDE.md", "AGENTS.md"]
+_BACKUP_FILES = [".claude/settings.json", ".mcp.json", "CLAUDE.md"]
 
-_BACKUP_DIRS = [".codex", ".claude/agents", ".claude/hooks"]
+_BACKUP_DIRS = [".claude/agents", ".claude/hooks"]
 
 _SYMLINK_TO_PROJECT = ["rules", "git-config.json"]
 
@@ -318,7 +316,6 @@ _REPO_DEFAULT_ASSET_DIRS = [
     (DEFAULT_HOOKS_DIR, Path(".claude") / "hooks"),
     (DEFAULT_RULES_DIR, Path(".claude") / "rules"),
     (DEFAULT_DEFAULTS_DIR, Path(".claude") / "defaults"),
-    (DEFAULT_CODEX_DIR, Path(".codex")),
 ]
 
 
@@ -365,15 +362,15 @@ def _fill_missing_repo_defaults(target_root: Path):
 
 
 def _merge_project_assets(project_path: str, workspace_path: Path):
-    """Populate workspace .claude/ and .codex/ via a two-pass merge.
+    """Populate workspace .claude/ via a two-pass merge.
 
     Pass 1 — repo defaults: for each file under the repo default asset dirs,
     copy it to the equivalent workspace destination ONLY when the destination
     is missing.  Existing destination files are never overwritten.
 
-    Pass 2 — project-local overrides: if the project has its own .claude/ or
-    .codex/, walk them and write their files over the workspace copies so the
-    project version always wins.
+    Pass 2 — project-local overrides: if the project has its own .claude/,
+    walk it and write its files over the workspace copies so the project
+    version always wins.
 
     .claude/worktrees/ is excluded from every pass to prevent recursive copies.
     """
@@ -385,7 +382,6 @@ def _merge_project_assets(project_path: str, workspace_path: Path):
     # Pass 2: project-local content overwrites workspace copies (project wins)
     for project_subdir, dst_rel in [
         (project / ".claude", workspace_path / ".claude"),
-        (project / ".codex", workspace_path / ".codex"),
     ]:
         if not project_subdir.exists():
             continue
@@ -525,12 +521,12 @@ def _setup_checkout_workspace(project_path, branch, source_ref):
 
 
 def _install_worktree_configs(project_path, wt_path):
-    """Populate the worktree with a merged .claude/ and .codex/ from repo defaults and project."""
+    """Populate the worktree with a merged .claude/ from repo defaults and project."""
     wt_path = Path(wt_path)
     dst_claude = wt_path / ".claude"
     src_claude = Path(project_path) / ".claude"
 
-    # a) Merge repo defaults + project-local content into .claude/ and .codex/
+    # a) Merge repo defaults + project-local content into .claude/
     _merge_project_assets(project_path, wt_path)
 
     # b) Re-establish rules/ and git-config.json as symlinks back to project root
@@ -548,13 +544,10 @@ def _install_worktree_configs(project_path, wt_path):
     # c) Merge governed hooks into workspace settings.json
     _write_workspace_settings(dst_claude / "settings.json")
 
-    # d) Write CLAUDE.md and AGENTS.md as real concatenated files in the worktree
+    # d) Write CLAUDE.md as a real concatenated file in the worktree
     _concatenate_md(DEFAULT_REPO_CLAUDE_MD, Path(project_path) / "CLAUDE.md", wt_path / "CLAUDE.md")
-    _concatenate_md(DEFAULT_REPO_AGENTS_MD, Path(project_path) / "AGENTS.md", wt_path / "AGENTS.md")
 
-    # e) .codex/ is already populated by _merge_project_assets — no symlink needed.
-
-    # f) Symlink .mcp.json to the project-level file (shared across all worktrees)
+    # e) Symlink .mcp.json to the project-level file (shared across all worktrees)
     _ensure_project_mcp(project_path)
     src_mcp = Path(project_path) / ".mcp.json"
     dst_mcp = wt_path / ".mcp.json"
@@ -563,7 +556,7 @@ def _install_worktree_configs(project_path, wt_path):
             dst_mcp.unlink()
         dst_mcp.symlink_to(src_mcp)
 
-    # g) Symlink .mcp-funnel.json to the project-level file so mcp-funnel
+    # f) Symlink .mcp-funnel.json to the project-level file so mcp-funnel
     #    can find its config when spawned with the worktree as CWD.
     src_funnel = Path(project_path) / ".mcp-funnel.json"
     dst_funnel = wt_path / ".mcp-funnel.json"
@@ -572,7 +565,7 @@ def _install_worktree_configs(project_path, wt_path):
             dst_funnel.unlink()
         dst_funnel.symlink_to(src_funnel)
 
-    # h) Install phase-gated git hooks into the worktree
+    # g) Install phase-gated git hooks into the worktree
     _install_git_hooks(dst_claude, str(wt_path))
 
 
@@ -582,7 +575,7 @@ def _install_checkout_configs(project_path):
     The project directory IS the user's permanent root, so this mode is
     conservative: it backs everything up first, then fills in only missing
     pieces from repo defaults without overwriting existing files.
-    CLAUDE.md and AGENTS.md are left alone if they already exist.
+    CLAUDE.md is left alone if it already exists.
     """
     _backup_project_files(project_path)
 
@@ -596,14 +589,10 @@ def _install_checkout_configs(project_path):
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     _write_workspace_settings(settings_path)
 
-    # CLAUDE.md / AGENTS.md: copy repo default only when the project has neither
-    for repo_default, rel_name in [
-        (DEFAULT_REPO_CLAUDE_MD, "CLAUDE.md"),
-        (DEFAULT_REPO_AGENTS_MD, "AGENTS.md"),
-    ]:
-        target = project / rel_name
-        if not target.exists() and repo_default.exists():
-            shutil.copy2(repo_default, target)
+    # CLAUDE.md: copy repo default only when the project has none
+    target = project / "CLAUDE.md"
+    if not target.exists() and DEFAULT_REPO_CLAUDE_MD.exists():
+        shutil.copy2(DEFAULT_REPO_CLAUDE_MD, target)
 
     _ensure_project_mcp(project_path)
 

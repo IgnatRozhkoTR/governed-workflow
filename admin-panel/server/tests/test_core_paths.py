@@ -26,7 +26,6 @@ def test_default_hooks_dir_exists():
 def test_payload_layout_directories_exist():
     from core.paths import REPO_ROOT
     assert (REPO_ROOT / "claude").is_dir(), f"REPO_ROOT/claude does not exist"
-    assert (REPO_ROOT / "codex").is_dir(), f"REPO_ROOT/codex does not exist"
 
 
 def test_hook_command_contains_no_home_claude():

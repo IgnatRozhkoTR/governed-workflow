@@ -11,7 +11,7 @@ Depth from this file to REPO_ROOT:
   parents[0] = core/
   parents[1] = server/
   parents[2] = admin-panel/
-  parents[3] = REPO_ROOT  (contains admin-panel/, claude/, codex/, …)
+  parents[3] = REPO_ROOT  (contains admin-panel/, claude/, …)
 """
 import os
 from pathlib import Path
@@ -27,7 +27,6 @@ DEFAULT_HOOKS_DIR = REPO_ROOT / "claude" / "hooks"
 DEFAULT_AGENTS_DIR = REPO_ROOT / "claude" / "agents"
 DEFAULT_RULES_DIR = REPO_ROOT / "claude" / "rules"
 DEFAULT_DEFAULTS_DIR = REPO_ROOT / "claude" / "defaults"
-DEFAULT_CODEX_DIR = REPO_ROOT / "codex"
 DEFAULT_TOOLS_DIR = REPO_ROOT / "claude" / "tools"
 DEFAULT_MODULES_DIR = REPO_ROOT / "claude" / "modules"
 DEFAULT_MODULES_LOCAL_DIR = REPO_ROOT / "claude" / "modules-local"
@@ -39,7 +38,6 @@ DEFAULT_GIT_RULES = DEFAULT_DEFAULTS_DIR / "git-rules.md"
 DEFAULT_GIT_HOOKS_DIR = DEFAULT_DEFAULTS_DIR / "git-hooks"
 
 DEFAULT_REPO_CLAUDE_MD = REPO_ROOT / "claude" / "CLAUDE.md"
-DEFAULT_REPO_AGENTS_MD = REPO_ROOT / "codex" / "AGENTS.md"
 
 STATE_DIR: Path = Path(
     os.environ.get("GOVERNED_WORKFLOW_STATE_DIR") or REPO_ROOT / ".local" / "state"

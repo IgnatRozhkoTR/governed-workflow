@@ -110,7 +110,7 @@ _MD_SEPARATOR = "\n\n---\n\n# Governed Workflow Defaults\n\n"
 
 @pytest.fixture
 def project_with_assets(git_repo):
-    """Git repo with project-level .claude/, .codex/, CLAUDE.md, AGENTS.md and .mcp.json."""
+    """Git repo with project-level .claude/, CLAUDE.md and .mcp.json."""
     repo = Path(git_repo)
 
     # Project-level .claude/agents and .claude/rules
@@ -119,13 +119,8 @@ def project_with_assets(git_repo):
     (repo / ".claude" / "rules").mkdir(parents=True, exist_ok=True)
     (repo / ".claude" / "rules" / "project.md").write_text("# Project Rule")
 
-    # Project-level .codex
-    (repo / ".codex" / "agents").mkdir(parents=True, exist_ok=True)
-    (repo / ".codex" / "agents" / "custom.md").write_text("# Custom Codex Agent")
-
-    # Project-level CLAUDE.md and AGENTS.md with unique markers
+    # Project-level CLAUDE.md with a unique marker
     (repo / "CLAUDE.md").write_text("PROJECT_CLAUDE_MD_MARKER")
-    (repo / "AGENTS.md").write_text("PROJECT_AGENTS_MD_MARKER")
 
     # Project-level .mcp.json with an extra server
     (repo / ".mcp.json").write_text(json.dumps({
@@ -179,26 +174,12 @@ class TestMergeLayer:
         assert repo_agents, "Repo must have at least one default agent file"
         assert (wt / ".claude" / "agents" / repo_agents[0].name).exists()
 
-    def test_codex_agent_preserved_in_worktree(self, project_with_assets, tmp_path):
-        wt = tmp_path / "wt"
-        wt.mkdir()
-        _call_install_worktree_configs(project_with_assets, wt)
-        assert (wt / ".codex" / "agents" / "custom.md").read_text() == "# Custom Codex Agent"
-
     def test_claude_md_concatenated_with_separator(self, project_with_assets, tmp_path):
         wt = tmp_path / "wt"
         wt.mkdir()
         _call_install_worktree_configs(project_with_assets, wt)
         content = (wt / "CLAUDE.md").read_text()
         assert "PROJECT_CLAUDE_MD_MARKER" in content
-        assert _MD_SEPARATOR in content
-
-    def test_agents_md_concatenated_with_separator(self, project_with_assets, tmp_path):
-        wt = tmp_path / "wt"
-        wt.mkdir()
-        _call_install_worktree_configs(project_with_assets, wt)
-        content = (wt / "AGENTS.md").read_text()
-        assert "PROJECT_AGENTS_MD_MARKER" in content
         assert _MD_SEPARATOR in content
 
     def test_claude_md_project_content_appears_first(self, project_with_assets, tmp_path):
@@ -332,39 +313,39 @@ class TestBackupRestoreDirectories:
 
     def test_backup_creates_directory_copy(self, tmp_path):
         project = tmp_path / "project"
-        (project / ".codex" / "agents").mkdir(parents=True, exist_ok=True)
-        (project / ".codex" / "agents" / "test.md").write_text("# Test")
+        (project / ".claude" / "agents").mkdir(parents=True, exist_ok=True)
+        (project / ".claude" / "agents" / "test.md").write_text("# Test")
         _WORKSPACES._backup_project_files(str(project))
-        backup_dir = project / ".codex.pre-workspace"
+        backup_dir = project / ".claude/agents.pre-workspace"
         assert backup_dir.is_dir()
-        assert (backup_dir / "agents" / "test.md").read_text() == "# Test"
+        assert (backup_dir / "test.md").read_text() == "# Test"
 
     def test_restore_recovers_directory(self, tmp_path):
         project = tmp_path / "project"
-        (project / ".codex" / "agents").mkdir(parents=True, exist_ok=True)
-        (project / ".codex" / "agents" / "test.md").write_text("# Original")
+        (project / ".claude" / "agents").mkdir(parents=True, exist_ok=True)
+        (project / ".claude" / "agents" / "test.md").write_text("# Original")
         _WORKSPACES._backup_project_files(str(project))
-        (project / ".codex" / "agents" / "test.md").write_text("# Modified")
+        (project / ".claude" / "agents" / "test.md").write_text("# Modified")
         _WORKSPACES._restore_project_files(str(project))
-        assert (project / ".codex" / "agents" / "test.md").read_text() == "# Original"
+        assert (project / ".claude" / "agents" / "test.md").read_text() == "# Original"
 
     def test_backup_idempotent(self, tmp_path):
         project = tmp_path / "project"
-        (project / ".codex").mkdir(parents=True)
-        (project / ".codex" / "x.md").write_text("v1")
+        (project / ".claude" / "agents").mkdir(parents=True)
+        (project / ".claude" / "agents" / "x.md").write_text("v1")
         _WORKSPACES._backup_project_files(str(project))
-        (project / ".codex" / "x.md").write_text("v2")
+        (project / ".claude" / "agents" / "x.md").write_text("v2")
         _WORKSPACES._backup_project_files(str(project))
-        backup = project / ".codex.pre-workspace" / "x.md"
+        backup = project / ".claude/agents.pre-workspace" / "x.md"
         assert backup.read_text() == "v1"
 
     def test_restore_removes_backup_dir(self, tmp_path):
         project = tmp_path / "project"
-        (project / ".codex").mkdir(parents=True)
-        (project / ".codex" / "x.md").write_text("data")
+        (project / ".claude" / "agents").mkdir(parents=True)
+        (project / ".claude" / "agents" / "x.md").write_text("data")
         _WORKSPACES._backup_project_files(str(project))
         _WORKSPACES._restore_project_files(str(project))
-        assert not (project / ".codex.pre-workspace").exists()
+        assert not (project / ".claude/agents.pre-workspace").exists()
 
 
 class TestHookScriptRepoResolution:
