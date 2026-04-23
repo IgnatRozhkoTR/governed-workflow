@@ -309,9 +309,7 @@ function startLspPolling() {
       });
 
       renderLspHeaderIndicator();
-    }).catch(function() {
-      // Silently ignore polling errors
-    });
+    }).catch(function(e) { console.warn('lsp-controls status polling failed:', e && e.message); });
   }, 10000);
 }
 

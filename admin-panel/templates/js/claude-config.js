@@ -19,7 +19,7 @@ function loadClaudeCommand() {
       var pathsInput = document.getElementById('allowedExternalPathsInput');
       if (pathsInput) pathsInput.value = data.allowed_external_paths || '/tmp/';
     })
-    .catch(function() {});
+    .catch(function(e) { console.warn('claude-config loadClaudeCommand failed:', e && e.message); });
 }
 
 function saveClaudeCommand() {

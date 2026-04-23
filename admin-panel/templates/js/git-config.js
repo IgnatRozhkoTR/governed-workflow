@@ -25,7 +25,7 @@ function loadGitConfig() {
       if (token) token.value = config.token || '';
       if (branch) branch.value = config.default_branch || 'develop';
       toggleGitLabFields();
-    }).catch(function() {});
+    }).catch(function(e) { console.warn('git-config loadGitConfig failed:', e && e.message); });
 }
 
 function saveGitConfig() {
@@ -57,7 +57,7 @@ function loadGitRules() {
         var labels = { 'system-default': t('gitRules.sourceSystemDefault'), 'project': t('gitRules.sourceProject'), 'not-configured': t('gitRules.sourceNotConfigured') };
         source.textContent = t('gitRules.source', {label: labels[data.source] || data.source});
       }
-    }).catch(function() {});
+    }).catch(function(e) { console.warn('git-config loadGitRules failed:', e && e.message); });
 }
 
 function saveGitRules() {

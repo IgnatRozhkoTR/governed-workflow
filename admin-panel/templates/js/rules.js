@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════
 var RULES_DATA = [];
 var RULE_NAME_REGEX = /^[a-z0-9][a-z0-9\-_]{0,62}$/;
+var _currentRuleName = null;
 
 function loadRules() {
   var ctx = getWorkspaceContext();
@@ -12,7 +13,7 @@ function loadRules() {
       RULES_DATA = Array.isArray(data) ? data : [];
       renderRules();
     })
-    .catch(function() {});
+    .catch(function(e) { console.warn('rules loadRules failed:', e && e.message); });
 }
 
 function renderRules() {
@@ -99,6 +100,12 @@ function ensureRuleModal() {
   '</div>';
   document.body.appendChild(modal);
   applyI18nToDOM();
+
+  var saveBtn = document.getElementById('ruleSaveButton');
+  if (saveBtn) {
+    saveBtn.onclick = function() { saveRuleFromModal(); };
+  }
+
   return modal;
 }
 
@@ -112,10 +119,10 @@ function openRuleModal(encodedName) {
   var pathsField = document.getElementById('ruleFieldPaths');
   var bodyField = document.getElementById('ruleFieldBody');
   var title = document.getElementById('ruleEditTitle');
-  var saveBtn = document.getElementById('ruleSaveButton');
 
   var isEdit = !!encodedName;
   var ruleName = encodedName ? decodeURIComponent(encodedName) : '';
+  _currentRuleName = isEdit ? ruleName : null;
 
   nameField.value = '';
   descField.value = '';
@@ -137,14 +144,16 @@ function openRuleModal(encodedName) {
     title.textContent = t('rules.createTitle');
   }
 
-  saveBtn.onclick = function() { saveRuleFromModal(isEdit, ruleName); };
   modal.classList.add('open');
   setTimeout(function() { (isEdit ? descField : nameField).focus(); }, 50);
 }
 
-function saveRuleFromModal(isEdit, originalName) {
+function saveRuleFromModal() {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
+
+  var isEdit = _currentRuleName !== null;
+  var originalName = _currentRuleName || '';
 
   var name = document.getElementById('ruleFieldName').value.trim();
   var description = document.getElementById('ruleFieldDescription').value.trim();

@@ -374,6 +374,14 @@ function _rejectAllPending(reason) {
 
 function _scheduleReconnect() {
   if (_lspReconnectTimer) return;
+  Object.keys(_lspPendingRequests).forEach(function(id) {
+    var entry = _lspPendingRequests[id];
+    if (entry) {
+      if (entry.timer) clearTimeout(entry.timer);
+      if (entry.reject) entry.reject(new Error('LSP connection lost'));
+    }
+    delete _lspPendingRequests[id];
+  });
   _lspReconnectTimer = setTimeout(function() {
     _lspReconnectTimer = null;
     connectLsp();

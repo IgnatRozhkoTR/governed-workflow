@@ -79,6 +79,15 @@ async function switchTab(tabId) {
     if (typeof renderPhaseActions === 'function') renderPhaseActions();
     if (typeof renderApprovalStatus === 'function') renderApprovalStatus();
     if (typeof loadVerificationResults === 'function') loadVerificationResults();
+    var wsBody = document.getElementById('phaseSettingsWorkspaceBody');
+    var ctx = getWorkspaceContext();
+    if (wsBody && ctx && typeof renderPhaseToggleCard === 'function') {
+      renderPhaseToggleCard(
+        wsBody,
+        'workspace',
+        '/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/phase-settings'
+      );
+    }
   } else if (tabId === 'changes') {
     if (typeof renderFileList === 'function') renderFileList();
   } else if (tabId === 'review') {
