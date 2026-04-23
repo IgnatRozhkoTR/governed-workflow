@@ -98,6 +98,7 @@ async function initApp() {
   loadCriteria();
   loadGitConfig();
   loadGitRules();
+  loadRules();
   loadClaudeCommand();
   loadChannelsPreference();
   loadModulesCard();

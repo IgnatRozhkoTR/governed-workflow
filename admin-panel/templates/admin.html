@@ -290,6 +290,20 @@
       </div>
     </div>
 
+    <!-- Rules -->
+    <div class="card collapsed">
+      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
+        <span class="card-title" data-i18n="cards.rules">Rules</span>
+        <span class="card-collapse-chevron">&#9660;</span>
+      </div>
+      <div class="card-body">
+        <div id="rulesList"></div>
+        <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+          <button class="btn btn-sm btn-primary" onclick="openRuleModal()" data-i18n="buttons.newRule">New rule</button>
+        </div>
+      </div>
+    </div>
+
     <!-- LSP Shortcuts -->
     <div class="card collapsed" id="lspShortcutsCard">
       <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
@@ -749,6 +763,7 @@
 <script src="js/lsp-controls.js?v=10"></script>
 <script src="js/file-explorer.js?v=10"></script>
 <script src="js/git-config.js?v=10"></script>
+<script src="js/rules.js?v=1"></script>
 <script src="js/claude-config.js?v=10"></script>
 <script src="js/context.js?v=10"></script>
 <script src="js/criteria.js?v=10"></script>
