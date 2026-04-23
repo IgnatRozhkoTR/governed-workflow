@@ -90,6 +90,7 @@
   "mcp.error.invalidReviewerName": "reviewer_name должен быть 'reviewer' или 'codex'",
   "mcp.error.fileNotFound": "Файл не найден: {file_path}",
   "mcp.error.lineStartBeyondFile": "line_start {line_start} выходит за пределы файла ({length} строк)",
+  "mcp.error.lineStartBeyondLineEnd": "line_start не может быть больше line_end",
   "mcp.error.failedToReadFile": "Не удалось прочитать файл: {error}",
   "mcp.error.invalidResolution": "Resolution должен быть 'fixed', 'false_positive' или 'out_of_scope'",
   "mcp.error.cannotValidateUnresolved": "Невозможно валидировать неразрешённую проблему. Сначала разрешите её.",

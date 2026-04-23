@@ -1,119 +1,138 @@
-from mcp_tools import mcp, with_mcp_workspace
+from typing import Annotated, Optional
+
+from mcp.types import ToolAnnotations
+from pydantic import Field
+
+from mcp_tools import mcp, mcp_error, with_mcp_workspace
 from core.i18n import t
 from services import plan_service
 from services import scope_service
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True, destructiveHint=False))
 @with_mcp_workspace
-def workspace_set_scope(ws, project, db, locale, scope: dict) -> dict:
+def workspace_set_scope(
+    ws, project, db, locale,
+    scope: Annotated[dict, Field(description="Phase-keyed map {phase_id: {must: [...], may: [...]}}.")]
+) -> dict:
     """Set workspace scope as a phase-keyed map. Allowed from phase 1 onwards.
 
     Setting scope automatically revokes approval — the user must review and re-approve
     the new scope in the admin panel before code edits are allowed.
 
-    Format: {"3.1": {"must": ["src/models/"], "may": ["src/config/"]}, "3.2": {"must": [...], "may": [...]}}
-    Each key is a sub-phase ID from the execution plan. 'must' directories MUST have changes for the phase to advance.
-    'may' directories are permitted but not required."""
+    Format: {"3.1": {"must": ["src/models/"], "may": ["src/config/"]}, "3.2": {...}}
+    Each key is a sub-phase ID from the execution plan.
+    'must' paths MUST have changes for the phase to advance.
+    'may' paths are permitted but not required.
+
+    Same scope set twice is a no-op on content but still revokes approval."""
     result = scope_service.set_scope(db, ws, scope)
-    if "error" not in result:
-        db.commit()
+    if "error" in result:
+        return mcp_error("validation", result["error"], retryable=False)
+    db.commit()
     return result
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True, destructiveHint=False))
 @with_mcp_workspace
-def workspace_set_plan(ws, project, db, locale, plan: dict) -> dict:
+def workspace_set_plan(
+    ws, project, db, locale,
+    plan: Annotated[dict, Field(description="Plan JSON — see docstring for schema.")]
+) -> dict:
     """Set the execution plan. Editable during and after planning (phase >= 2.0).
 
-    The plan can be updated freely during planning. Once the user approves the plan
-    in the admin panel, approval is revoked each time the plan is updated — the user
-    must review and re-approve before the workflow can advance past planning.
-
     The previous plan is saved automatically — call workspace_restore_plan to revert
-    if the new plan hasn't been approved yet.
+    if the new plan has not been approved yet. Setting a plan revokes approval.
 
     Expected format:
     {
         "description": "High-level plain text description of what this plan achieves",
-        "systemDiagram": "mermaid diagram string or array of {title, diagram}",
+        "systemDiagram": [{"title": "Class Diagram", "diagram": "classDiagram\\n..."},
+                          {"title": "Auth Flow", "diagram": "sequenceDiagram\\n..."}],
         "execution": [
             {
                 "id": "3.1",
                 "name": "Sub-phase name",
-                "tasks": [{"title": "...", "files": ["..."], "agent": "...", "status": "pending", "group": "optional group name"}]
+                "tasks": [{"title": "...", "files": ["..."], "agent": "...",
+                           "status": "pending", "group": "optional group"}]
             }
         ]
     }
 
-    Tasks with the same "group" name run in parallel (fork/join in the diagram).
-    Tasks without a group or with unique groups run sequentially.
-    Groups execute in order of first appearance within the sub-phase.
+    systemDiagram must be an array of {title: str, diagram: str} objects (Mermaid syntax).
+    Include at minimum one class/entity diagram and one sequence diagram.
 
-    systemDiagram must be an array of {title: str, diagram: str} objects:
-    - At minimum: one class/entity diagram + one sequence diagram
-    - Multiple sequence diagrams are encouraged for multi-flow features
-    - Example: [{"title": "Class Diagram", "diagram": "classDiagram\n..."}, {"title": "Auth Flow", "diagram": "sequenceDiagram\n..."}]
-
-    Scope is separate from the plan — use workspace_set_scope to define the phase-keyed scope map."""
+    Tasks with the same "group" name run in parallel. Tasks without a group run
+    sequentially. Scope is set separately via workspace_set_scope."""
     result = plan_service.set_plan(db, ws, plan)
-    if "ok" in result:
-        db.commit()
+    if "error" in result:
+        return mcp_error("business", result["error"], retryable=False)
+    db.commit()
     return result
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True, destructiveHint=False))
 @with_mcp_workspace
 def workspace_get_plan(ws, project, db, locale) -> dict:
     """Get the full execution plan including system diagram and all sub-phases with tasks.
 
-    Returns the complete plan JSON: description, systemDiagram, and execution array with
-    tasks per sub-phase. Use workspace_get_state to see the current scope map."""
+    Returns the complete plan JSON: description, systemDiagram array, and execution
+    array with tasks per sub-phase. Use workspace_get_state to see the current scope map
+    and approval status."""
     return plan_service.get_plan(ws)
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=False, destructiveHint=False))
 @with_mcp_workspace
-def workspace_extend_plan(ws, project, db, locale, subphase: dict, scope: dict, diagrams: list = None, replace_diagrams: bool = False) -> dict:
+def workspace_extend_plan(
+    ws, project, db, locale,
+    subphase: Annotated[dict, Field(description="New sub-phase spec: {name: str, tasks: list[dict], scope?: dict, diagrams?: list[dict]}. Appended at the end; ID is auto-assigned.")],
+    scope: Annotated[dict, Field(description="Scope for this sub-phase with must/may patterns, e.g. {\"must\": [\"src/foo/\"], \"may\": [\"src/bar/\"]}.")],
+    name: Annotated[str, Field(description="Sub-phase display name.", min_length=1)] = "",
+    diagrams: Annotated[Optional[list], Field(description="Optional diagrams to add, each {title: str, diagram: str}.")] = None,
+    replace_diagrams: Annotated[bool, Field(description="If True, replace the plan's existing systemDiagram entirely. If False (default), append new diagrams from subphase.diagrams to existing ones.")] = False,
+) -> dict:
     """Append a new sub-phase to the execution plan without rewriting existing sub-phases.
 
-    - subphase: a single execution item with 'name' (string) and 'tasks' (list of task objects).
-      The 'id' is auto-assigned as 3.(max_n+1). Each task needs: title (string), files (list), agent (string).
-      Optional task fields: group (string), status (string, default 'pending').
-    - scope: scope entry for the new sub-phase with must and may patterns, e.g. {"must": ["src/foo/"], "may": ["src/bar/"]}
-    - diagrams: optional list of system diagrams to add, each with 'title' (string) and 'diagram' (string, Mermaid syntax).
-      By default, diagrams are appended to the existing list. Set replace_diagrams=true to replace the entire list.
-    - replace_diagrams: if true, replace all existing diagrams with the provided list. If false (default), append.
+    The sub-phase 'id' is auto-assigned as 3.(max_n+1). Each call appends a new entry
+    (not idempotent — calling twice creates two sub-phases).
 
-    The plan_status and scope_status are set to 'pending' (approval revoked).
-    Existing sub-phases and their data are not modified."""
+    subphase: dict with 'name' (string) and 'tasks' (list). Each task needs:
+      title (string), files (list), agent (string).
+      Optional task fields: group (string), status (string, default 'pending').
+    scope: must/may scope entry for the new sub-phase.
+    diagrams: optional list of {title, diagram} objects to add. Appended by default;
+      set replace_diagrams=True to replace the entire diagram list instead.
+
+    plan_status and scope_status are set to 'pending'. Existing sub-phases are unchanged."""
     result = plan_service.extend_plan(db, ws, subphase, scope, diagrams, replace_diagrams)
-    if "ok" in result:
-        db.commit()
+    if "error" in result:
+        return mcp_error("validation", result["error"], retryable=False)
+    db.commit()
     return result
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True, destructiveHint=False))
 @with_mcp_workspace
 def workspace_restore_plan(ws, project, db, locale) -> dict:
     """Restore the previous plan version, swapping it with the current plan.
 
-    Only works if current plan is NOT approved. If you need to revert an incorrectly
-    set plan, call this before the user approves it.
+    Only works if current plan is NOT approved. Call this before the user approves
+    if you need to revert an incorrectly set plan.
 
-    The previous plan's phase position is also restored — you'll return to wherever
-    you were when that plan was active.
-    """
+    The previous plan's phase position is also restored. Restoring when already
+    on the previous plan (i.e., calling twice) ping-pongs back to the original."""
     if not ws["prev_plan_json"]:
-        return {"error": t("mcp.error.noPreviousPlan", locale)}
+        return mcp_error("not_found", t("mcp.error.noPreviousPlan", locale), retryable=False)
 
     if ws["plan_status"] == "approved":
-        return {"error": t("mcp.error.planApproved", locale)}
+        return mcp_error("business", t("mcp.error.planApproved", locale), retryable=False)
 
     new_ws = plan_service.restore_plan(db, ws)
     db.commit()
 
     return {
+        "ok": True,
         "restored": True,
         "phase": new_ws["phase"],
         "plan_status": new_ws["plan_status"],

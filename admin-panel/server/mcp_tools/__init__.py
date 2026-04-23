@@ -10,6 +10,7 @@ import sys
 logger = logging.getLogger(__name__)
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 # Add server/ to path for shared imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -27,6 +28,89 @@ from services import progress_service
 from services import research_service
 from services import scope_service
 from services import verification_service
+
+# Error categories: transient=retry OK, validation=bad input, business=domain rule,
+# permission=unauthorized, not_found=entity missing.
+ERROR_CATEGORY = Literal["transient", "validation", "business", "permission", "not_found"]
+
+_VALID_ERROR_CATEGORIES = {"transient", "validation", "business", "permission", "not_found"}
+
+
+def mcp_error(category: ERROR_CATEGORY, message: str, retryable: bool = False, details: dict | None = None) -> dict:
+    """Build an additive error envelope for MCP tool returns.
+
+    Preserves the legacy 'error' key (load-bearing: 30+ tests and the frontend
+    read it directly) and adds structured fields required by the Claude Certified
+    Architect guide (errorCategory, isRetryable, optional details).
+
+    Use this helper at every known-error return site in MCP tool functions.
+    Unexpected exceptions should still bubble up — FastMCP converts them to
+    protocol-level isError=True on the CallToolResult.
+
+    Parameters:
+        category: One of transient|validation|business|permission|not_found.
+            transient   — caller should retry (DB timeout, temporary network).
+            validation  — caller input was malformed; retry unchanged is pointless.
+            business    — domain rule prevented action (plan not approved, etc.).
+            permission  — caller lacks authority.
+            not_found   — a referenced entity does not exist.
+        message: Human-readable message, already translated if the module uses t().
+        retryable: Whether the caller should retry the call as-is. Defaults False.
+        details: Optional extra context dict merged into the envelope.
+
+    Returns:
+        Dict with keys: error (message), errorCategory, isRetryable, and any details.
+    """
+    if category not in _VALID_ERROR_CATEGORIES:
+        envelope = {
+            "error": message,
+            "errorCategory": "business",
+            "isRetryable": retryable,
+            "_invalid_category": category,
+        }
+    else:
+        envelope = {
+            "error": message,
+            "errorCategory": category,
+            "isRetryable": retryable,
+        }
+    if details:
+        envelope.update(details)
+    return envelope
+
+
+def with_global_db(func):
+    """Inject a SQLAlchemy session into a tool function that doesn't need a workspace.
+
+    Replaces the 10-times-duplicated `db = get_db(); try: ... finally: db.close()`
+    block across improvement/profile/etc. tools. Mirrors with_mcp_workspace's contract:
+    function signature must accept `db` as its first parameter AFTER the MCP-visible
+    params; the decorator strips it from the outer-facing schema via inspect.signature.
+
+    On exception: rollback + close, then re-raise so FastMCP sets isError=True.
+    On success: commit if the returned dict does NOT have 'error' key; close.
+    """
+    sig = inspect.signature(func)
+    exposed_params = [p for name, p in sig.parameters.items() if name != "db"]
+    exposed_sig = sig.replace(parameters=exposed_params)
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        db = get_db()
+        try:
+            result = func(db, *args, **kwargs)
+            if isinstance(result, dict) and "error" not in result:
+                db.commit()
+            return result
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    wrapper.__signature__ = exposed_sig
+    return wrapper
+
 
 # Initialize DB on import
 init_db()
@@ -81,7 +165,7 @@ def with_mcp_workspace(fn):
     def wrapper(*args, **kwargs):
         ws, project = _detect_workspace()
         if not ws:
-            error = {"error": t("mcp.error.noWorkspace")}
+            error = mcp_error("not_found", t("mcp.error.noWorkspace"), retryable=False, details={"reason": "no_workspace_for_path"})
             return [error] if returns_list else error
 
         locale = ws["locale"] or "en"

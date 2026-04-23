@@ -1,5 +1,7 @@
 import json
 
+from mcp.types import ToolAnnotations
+
 from mcp_tools import mcp, with_mcp_workspace
 from core.db import ws_field
 from core.i18n import t
@@ -10,21 +12,41 @@ from services import research_service
 from services.phase_sequencer import resolve_phase_sequence
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(
+    title="Get workspace state",
+    readOnlyHint=True,
+    idempotentHint=True,
+    destructiveHint=False,
+))
 @with_mcp_workspace
 def workspace_get_state(ws, project, db, locale) -> dict:
-    """Get compact workspace state overview. Returns core state (phase, scope, context, discussions) inline,
-    with summaries and counts for large sections.
+    """Return a compact overview of the current workspace state.
 
-    For full details, use dedicated tools:
-    - Plan: workspace_get_plan
-    - Progress details: workspace_get_progress
-    - Research: workspace_list_research / workspace_get_research
-    - Comments: workspace_get_comments
-    - Review issues: workspace_get_review_issues
-    - Criteria: workspace_get_criteria
+    Purpose:
+        Single call to get phase, scope, context, open discussions, and
+        summary counts for all major sections. Prefer this as the first
+        call in any orchestrator turn; use the dedicated tools listed below
+        only when full detail is needed.
 
-    Does NOT return gate_nonce (security: only available via admin panel UI)."""
+    Parameters:
+        No parameters. Workspace is auto-detected from the working directory.
+
+    Returns:
+        Dict with keys: phase, status, scope, scope_status, phase_sequence,
+        context, discussions, plan_summary, progress_summary,
+        research_summary, unresolved_comments_count, review_issues_summary,
+        criteria_summary, previous_sessions_count, locale, branch,
+        working_dir, _detail_tools.
+        gate_nonce is NOT returned (security: only available via admin panel UI).
+
+    Errors:
+        not_found  — no workspace matched the current working directory.
+
+    Detail tools for full payloads:
+        workspace_get_plan, workspace_get_progress,
+        workspace_list_research / workspace_get_research,
+        workspace_get_comments, workspace_get_review_issues,
+        workspace_get_criteria."""
     scope = plan_service.get_scope(ws)
     plan = plan_service.get_plan(ws)
     _, phase_sequence = resolve_phase_sequence(db, ws, plan)
