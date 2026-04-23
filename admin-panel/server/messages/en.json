@@ -109,6 +109,11 @@
   "mcp.error.nothingToUpdate": "Nothing to update. Provide description and/or details_json.",
   "mcp.error.scopeNoteRevoked": "Scope approval revoked. User must re-approve in admin panel.",
   "mcp.error.planNoteRevoked": "Plan and scope approval revoked. User must re-approve both in admin panel.",
+  "mcp.error.ruleNotFound": "Rule '{name}' not found",
+  "mcp.error.ruleAlreadyExists": "Rule '{name}' already exists",
+  "mcp.error.ruleDefaultImmutable": "Rule '{name}' is a default rule and cannot be modified or deleted",
+  "mcp.error.ruleInvalidName": "Invalid rule name '{name}'. Use lowercase letters, digits, '-', '_' (starting with [a-z0-9], max 63 chars).",
+  "mcp.error.ruleInvalidFrontmatter": "Rule '{name}' has invalid frontmatter: {details}",
 
   "mcp.restorePlan.message": "Previous plan restored. Phase set to {phase}",
 

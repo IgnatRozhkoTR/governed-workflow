@@ -10,6 +10,7 @@ from .context import bp as context_bp
 from .criteria import bp as criteria_bp
 from .static import bp as static_bp
 from .git_config import bp as git_config_bp
+from .rules import bp as rules_bp
 from .advance import bp as advance_bp
 from .terminal_routes import bp as terminal_bp, register_terminal_ws
 from .improvements import bp as improvements_bp
@@ -22,7 +23,7 @@ from .phase_settings import bp as phase_settings_bp
 
 
 def register_blueprints(app):
-    for bp_module in [projects_bp, workspaces_bp, state_bp, comments_bp, files_bp, hooks_bp, hook_api_bp, context_bp, criteria_bp, static_bp, git_config_bp, advance_bp, terminal_bp, improvements_bp, verification_bp, modules_bp, setup_bp, lsp_bp, history_bp, phase_settings_bp]:
+    for bp_module in [projects_bp, workspaces_bp, state_bp, comments_bp, files_bp, hooks_bp, hook_api_bp, context_bp, criteria_bp, static_bp, git_config_bp, rules_bp, advance_bp, terminal_bp, improvements_bp, verification_bp, modules_bp, setup_bp, lsp_bp, history_bp, phase_settings_bp]:
         app.register_blueprint(bp_module)
     register_terminal_ws(app)
     register_setup_ws(app)

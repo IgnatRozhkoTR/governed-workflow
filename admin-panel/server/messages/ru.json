@@ -109,6 +109,11 @@
   "mcp.error.nothingToUpdate": "Нечего обновлять. Укажите description и/или details_json.",
   "mcp.error.scopeNoteRevoked": "Одобрение области отозвано. Пользователь должен повторно одобрить в панели администратора.",
   "mcp.error.planNoteRevoked": "Одобрение плана и области отозвано. Пользователь должен повторно одобрить оба в панели администратора.",
+  "mcp.error.ruleNotFound": "Правило '{name}' не найдено",
+  "mcp.error.ruleAlreadyExists": "Правило '{name}' уже существует",
+  "mcp.error.ruleDefaultImmutable": "Правило '{name}' является стандартным и не может быть изменено или удалено",
+  "mcp.error.ruleInvalidName": "Недопустимое имя правила '{name}'. Используйте строчные буквы, цифры, '-', '_' (начинается с [a-z0-9], макс. 63 символа).",
+  "mcp.error.ruleInvalidFrontmatter": "Правило '{name}' содержит некорректный фронтматтер: {details}",
 
   "mcp.restorePlan.message": "Предыдущий план восстановлен. Фаза установлена на {phase}",
 
