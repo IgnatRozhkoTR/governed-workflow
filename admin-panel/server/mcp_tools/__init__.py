@@ -204,7 +204,7 @@ def _detect_workspace():
     db = get_db()
     try:
         ws = db.execute(
-            "SELECT * FROM workspaces WHERE working_dir = ? ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, id DESC",
+            "SELECT * FROM workspaces WHERE working_dir = ? ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, LENGTH(working_dir) DESC, id DESC",
             (cwd,)
         ).fetchone()
         if ws:
@@ -212,7 +212,7 @@ def _detect_workspace():
 
         for parent in Path(cwd).parents:
             ws = db.execute(
-                "SELECT * FROM workspaces WHERE working_dir = ? ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, id DESC",
+                "SELECT * FROM workspaces WHERE working_dir = ? ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, LENGTH(working_dir) DESC, id DESC",
                 (str(parent),)
             ).fetchone()
             if ws:

@@ -379,6 +379,7 @@ def start_lsp_server(db, project_id, profile_id, workspace_path):
         "WHERE project_id = ? AND profile_id = ?",
         (process.pid, now, project_id, profile_id)
     )
+    db.commit()
 
     logger.info("LSP server started: pid=%d (project=%s, profile=%s)", process.pid, project_id, profile_id)
     return {"ok": True, "status": "running", "pid": process.pid}
@@ -395,6 +396,7 @@ def stop_lsp_server(db, project_id, profile_id):
             "WHERE project_id = ? AND profile_id = ?",
             (project_id, profile_id)
         )
+        db.commit()
         return {"ok": True, "status": "stopped", "note": "no_tracked_process"}
 
     process = entry["process"]
@@ -418,6 +420,7 @@ def stop_lsp_server(db, project_id, profile_id):
         "WHERE project_id = ? AND profile_id = ?",
         (project_id, profile_id)
     )
+    db.commit()
 
     logger.info("LSP server stopped (project=%s, profile=%s)", project_id, profile_id)
     return {"ok": True, "status": "stopped"}
@@ -436,14 +439,18 @@ def start_all_lsp_servers(db, project_id, workspace_path):
         "WHERE pp.project_id = ? AND pp.lsp_enabled = 1 AND vp.lsp_command IS NOT NULL",
         (project_id,)
     ).fetchall()
+    snapshot = [(row["profile_id"], row["name"]) for row in profiles]
 
     results = []
-    for p in profiles:
-        result = start_lsp_server(db, project_id, p["profile_id"], workspace_path)
-        result["profile_id"] = p["profile_id"]
-        result["profile_name"] = p["name"]
+    for profile_id, profile_name in snapshot:
+        try:
+            result = start_lsp_server(db, project_id, profile_id, workspace_path)
+        except Exception as e:
+            logger.exception("start_all_lsp_servers failed for id=%s", profile_id)
+            result = {"error": str(e)}
+        result["profile_id"] = profile_id
+        result["profile_name"] = profile_name
         results.append(result)
-    db.commit()
     return results
 
 
@@ -453,13 +460,17 @@ def stop_all_lsp_servers(db, project_id):
         "SELECT profile_id FROM lsp_instances WHERE project_id = ? AND status = 'running'",
         (project_id,)
     ).fetchall()
+    snapshot = [row["profile_id"] for row in instances]
 
     results = []
-    for inst in instances:
-        result = stop_lsp_server(db, project_id, inst["profile_id"])
-        result["profile_id"] = inst["profile_id"]
+    for profile_id in snapshot:
+        try:
+            result = stop_lsp_server(db, project_id, profile_id)
+        except Exception as e:
+            logger.exception("stop_all_lsp_servers failed for id=%s", profile_id)
+            result = {"error": str(e)}
+        result["profile_id"] = profile_id
         results.append(result)
-    db.commit()
     return results
 
 

@@ -312,7 +312,7 @@ def run_verification(db, workspace_id, phase, working_dir):
                 output += f"Timed out after {step['timeout']}s"
                 if step["fail_severity"] == "blocking":
                     all_passed = False
-            except Exception as e:
+            except (OSError, subprocess.CalledProcessError) as e:
                 status = "failed" if step["fail_severity"] == "blocking" else "warning"
                 output += f"Error: {str(e)}"
                 if step["fail_severity"] == "blocking":
