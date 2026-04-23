@@ -563,7 +563,16 @@ def _install_worktree_configs(project_path, wt_path):
             dst_mcp.unlink()
         dst_mcp.symlink_to(src_mcp)
 
-    # g) Install phase-gated git hooks into the worktree
+    # g) Symlink .mcp-funnel.json to the project-level file so mcp-funnel
+    #    can find its config when spawned with the worktree as CWD.
+    src_funnel = Path(project_path) / ".mcp-funnel.json"
+    dst_funnel = wt_path / ".mcp-funnel.json"
+    if src_funnel.exists():
+        if dst_funnel.exists() or dst_funnel.is_symlink():
+            dst_funnel.unlink()
+        dst_funnel.symlink_to(src_funnel)
+
+    # h) Install phase-gated git hooks into the worktree
     _install_git_hooks(dst_claude, str(wt_path))
 
 
