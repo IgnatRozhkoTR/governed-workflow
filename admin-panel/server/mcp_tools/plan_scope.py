@@ -9,7 +9,7 @@ from services import plan_service
 from services import scope_service
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True, destructiveHint=False))
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=False, destructiveHint=False))
 @with_mcp_workspace
 def workspace_set_scope(
     ws, project, db, locale,

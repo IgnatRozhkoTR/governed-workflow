@@ -1270,7 +1270,7 @@ class TestAssignVerificationProfile:
 EXPECTED_ANNOTATIONS = {
     "workspace_get_state": (True, True, False),
     "workspace_advance": (False, False, False),
-    "workspace_set_scope": (False, True, False),
+    "workspace_set_scope": (False, False, False),
     "workspace_set_plan": (False, False, False),
     "workspace_get_plan": (True, True, False),
     "workspace_extend_plan": (False, False, False),
