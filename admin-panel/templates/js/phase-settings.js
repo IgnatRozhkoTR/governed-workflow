@@ -36,7 +36,7 @@ function _renderPhaseRows(phases, enabledMap, endpointBase, scope) {
 
   return phases.map(function(phase) {
     var isAlwaysOn = !!phase.always_on;
-    var isEnabled = isAlwaysOn ? true : !!enabledMap[phase.id];
+    var isEnabled = isAlwaysOn ? true : (phase.id in enabledMap ? !!enabledMap[phase.id] : true);
     var checkedAttr = isEnabled ? 'checked' : '';
     var disabledAttr = isAlwaysOn ? 'disabled' : '';
     var checkboxId = 'phase-toggle-' + scope + '-' + phase.id.replace(/\./g, '-');
