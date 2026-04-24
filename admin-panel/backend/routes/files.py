@@ -1,4 +1,5 @@
 """File read and diff routes."""
+import logging
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
@@ -6,6 +7,8 @@ from flask import Blueprint, jsonify, request
 from core.decorators import with_workspace
 from core.helpers import run_git, DEFAULT_SOURCE_BRANCH
 from core.i18n import t
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint("files", __name__)
 
@@ -349,23 +352,36 @@ def get_diff(db, ws, project):
     if mode not in ("branch", "uncommitted", "commit"):
         return jsonify({"error": f"unknown mode '{mode}', expected: branch, uncommitted, commit"}), 400
 
-    if mode == "commit":
-        sha = request.args.get("commit", "").strip()
-        result = _diff_for_commit(working_dir, sha)
-        if isinstance(result, tuple):
-            return result
-        return jsonify({"files": result, "mode": "commit", "commit": sha})
+    if not Path(working_dir).is_dir():
+        return jsonify({
+            "error": "working_dir_unavailable",
+            "details": f"workspace directory does not exist: {working_dir}",
+        }), 400
 
-    if mode == "branch":
-        diff_output = _diff_for_branch(working_dir, source_branch)
-    else:
-        ok, diff_output, _ = run_git(working_dir, "diff", "HEAD")
-        if not ok:
-            diff_output = ""
+    try:
+        if mode == "commit":
+            sha = request.args.get("commit", "").strip()
+            result = _diff_for_commit(working_dir, sha)
+            if isinstance(result, tuple):
+                return result
+            return jsonify({"files": result, "mode": "commit", "commit": sha})
 
-    files = _parse_diff(diff_output)
-    files.extend(_untracked_files_diff(working_dir, mode, {f["path"] for f in files}))
-    return jsonify({"files": files, "mode": mode})
+        if mode == "branch":
+            diff_output = _diff_for_branch(working_dir, source_branch)
+        else:
+            ok, diff_output, _ = run_git(working_dir, "diff", "HEAD")
+            if not ok:
+                diff_output = ""
+
+        files = _parse_diff(diff_output)
+        files.extend(_untracked_files_diff(working_dir, mode, {f["path"] for f in files}))
+        return jsonify({"files": files, "mode": mode})
+    except Exception as exc:
+        logger.exception(
+            "diff handler failed for %s/%s mode=%s",
+            project["id"], ws["branch"], mode,
+        )
+        return jsonify({"error": "diff_failed", "details": str(exc)}), 500
 
 
 def _parse_diff(diff_output):

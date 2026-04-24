@@ -101,13 +101,28 @@ def write_json(path, data):
 
 
 def run_git(cwd, *args):
-    result = subprocess.run(
-        ["git"] + list(args),
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        timeout=30
-    )
+    """Invoke ``git`` in ``cwd`` and return ``(ok, stdout, stderr)``.
+
+    ``errors="replace"`` keeps non-utf8 diff bytes (latin-1 text files, stray
+    bytes in a file) from crashing the caller — they become U+FFFD markers in
+    the returned string instead of raising ``UnicodeDecodeError``.
+
+    A missing or non-directory ``cwd`` (stale worktree) surfaces as
+    ``FileNotFoundError`` / ``NotADirectoryError`` from ``subprocess.run``; we
+    map those to ``(False, "", <message>)`` so every caller treats them like
+    any other git failure instead of propagating an unhandled exception.
+    """
+    try:
+        result = subprocess.run(
+            ["git"] + list(args),
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            errors="replace",
+        )
+    except (FileNotFoundError, NotADirectoryError) as exc:
+        return False, "", f"working directory unavailable: {exc}"
     return result.returncode == 0, result.stdout, result.stderr
 
 

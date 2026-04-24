@@ -2,25 +2,32 @@
 //  AUTH SCREEN
 // ═══════════════════════════════════════════════
 
-var AUTH_TOKEN_COMMAND = 'python3 backend/app.py auth-token';
+var _fallbackSetupCommand = 'python3 backend/app.py auth-token';
 
 var _authScreenWired = false;
 var _authConfiguredCache = null;
+var _setupCommand = _fallbackSetupCommand;
 
 async function _fetchAuthConfigured() {
   if (_authConfiguredCache !== null) return _authConfiguredCache;
   try {
     var status = await apiAuthStatus();
     _authConfiguredCache = !!(status && status.configured);
+    if (status && typeof status.setup_command === 'string' && status.setup_command) {
+      _setupCommand = status.setup_command;
+    } else {
+      _setupCommand = _fallbackSetupCommand;
+    }
   } catch (e) {
     _authConfiguredCache = false;
+    _setupCommand = _fallbackSetupCommand;
   }
   return _authConfiguredCache;
 }
 
 function _renderAuthScreen(configured) {
   var subtitleKey = configured ? 'auth.subtitleConfigured' : 'auth.subtitleUnconfigured';
-  var cmd = escapeHtml(AUTH_TOKEN_COMMAND);
+  var cmd = escapeHtml(_setupCommand);
   return (
     '<div class="selector-container">' +
       '<div class="selector-title">' + t('auth.title') + '</div>' +
@@ -77,7 +84,7 @@ async function showAuthScreen() {
   var copyBtn = document.getElementById('auth-copy-btn');
   if (copyBtn) {
     copyBtn.addEventListener('click', function() {
-      safeCopyToClipboard(AUTH_TOKEN_COMMAND).then(function() {
+      safeCopyToClipboard(_setupCommand).then(function() {
         flashButton(copyBtn, t('auth.copied'));
       });
     });

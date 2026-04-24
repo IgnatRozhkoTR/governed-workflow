@@ -21,6 +21,7 @@ from core.device_settings import (
     set_bind_host,
     verify_token,
 )
+from core.paths import admin_token_setup_command
 
 logger = logging.getLogger(__name__)
 
@@ -65,12 +66,16 @@ def auth_status():
     """Return whether an admin token has been configured. Unauthenticated.
 
     Used by the login screen to pick between "no token yet — generate one"
-    and "paste your existing token" subtitles.
+    and "paste your existing token" subtitles. Also returns the absolute
+    ``auth-token`` command so the UI renders a copy-paste-ready invocation
+    that works from any working directory.
     """
     with get_db_ctx() as db:
-        return jsonify({
-            "configured": get_admin_token_hash(db) is not None,
-        })
+        configured = get_admin_token_hash(db) is not None
+    return jsonify({
+        "configured": configured,
+        "setup_command": admin_token_setup_command(),
+    })
 
 
 @bp.route("/api/auth/check", methods=["POST"])

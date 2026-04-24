@@ -61,3 +61,15 @@ def hook_command(name: str, interpreter: str = "python3") -> str:
         Contains no ``~/.claude`` literals.
     """
     return f"{interpreter} {DEFAULT_HOOKS_DIR / name}"
+
+
+def admin_token_setup_command() -> str:
+    """Return the absolute ``auth-token`` CLI command for the current install.
+
+    Using an absolute path lets the user paste the command into any shell
+    without needing to ``cd`` into ``admin-panel/`` first. The command is
+    surfaced both as a server startup hint and in the ``/api/auth/status``
+    response so the login screen can render the exact invocation.
+    """
+    app_py = REPO_ROOT / "admin-panel" / "backend" / "app.py"
+    return f"python3 {app_py} auth-token"

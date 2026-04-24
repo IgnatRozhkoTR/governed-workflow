@@ -270,6 +270,31 @@ def test_get_diff_branch_mode_explicit(client, workspace):
     assert isinstance(r.json["files"], list)
 
 
+def test_get_diff_returns_400_when_working_dir_missing(client, workspace, tmp_path):
+    """A workspace whose worktree was removed must fail gracefully with a
+    structured 400 instead of a 500 from the route handler."""
+    import shutil
+    from core.db import get_db
+
+    missing_dir = tmp_path / "vanished"
+    db = get_db()
+    try:
+        db.execute(
+            "UPDATE workspaces SET working_dir = ? WHERE id = ?",
+            (str(missing_dir), workspace["id"]),
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    r = client.get("/api/ws/test-project/feature/test/diff?mode=uncommitted")
+
+    assert r.status_code == 400
+    body = r.get_json()
+    assert body["error"] == "working_dir_unavailable"
+    assert "vanished" in body["details"]
+
+
 # ---------------------------------------------------------------------------
 # History endpoint tests
 # ---------------------------------------------------------------------------

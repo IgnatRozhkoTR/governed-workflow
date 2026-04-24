@@ -85,15 +85,26 @@ function _buildApiErrorMessage(err, fallback) {
   return main;
 }
 
+function _apiError(res, payload) {
+  const message = payload && typeof payload === 'object'
+    ? _buildApiErrorMessage(payload, res.statusText)
+    : res.statusText;
+  const err = new Error(message);
+  err.status = res.status;
+  return err;
+}
+
 async function apiGet(path) {
   const res = await fetch(API_BASE + path, { headers: _authHeaders() });
   if (res.status === 401) {
     await _handleAuthFailure();
-    throw new Error('Unauthorized');
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    throw err;
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(_buildApiErrorMessage(err, res.statusText));
+    const payload = await res.json().catch(() => ({ error: res.statusText }));
+    throw _apiError(res, payload);
   }
   return res.json();
 }
@@ -110,11 +121,13 @@ async function apiGetWithEtag(path, lastEtag) {
   }
   if (res.status === 401) {
     await _handleAuthFailure();
-    throw new Error('Unauthorized');
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    throw err;
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(_buildApiErrorMessage(err, res.statusText));
+    const payload = await res.json().catch(() => ({ error: res.statusText }));
+    throw _apiError(res, payload);
   }
   const data = await res.json();
   return { notModified: false, etag: res.headers.get('ETag') || null, data };
@@ -128,11 +141,13 @@ async function apiPost(path, body) {
   });
   if (res.status === 401) {
     await _handleAuthFailure();
-    throw new Error('Unauthorized');
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    throw err;
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(_buildApiErrorMessage(err, res.statusText));
+    const payload = await res.json().catch(() => ({ error: res.statusText }));
+    throw _apiError(res, payload);
   }
   return res.json();
 }
@@ -145,11 +160,13 @@ async function apiPut(path, body) {
   });
   if (res.status === 401) {
     await _handleAuthFailure();
-    throw new Error('Unauthorized');
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    throw err;
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(_buildApiErrorMessage(err, res.statusText));
+    const payload = await res.json().catch(() => ({ error: res.statusText }));
+    throw _apiError(res, payload);
   }
   return res.json();
 }
@@ -158,11 +175,13 @@ async function apiDelete(path) {
   const res = await fetch(API_BASE + path, { method: 'DELETE', headers: _authHeaders() });
   if (res.status === 401) {
     await _handleAuthFailure();
-    throw new Error('Unauthorized');
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    throw err;
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(_buildApiErrorMessage(err, res.statusText));
+    const payload = await res.json().catch(() => ({ error: res.statusText }));
+    throw _apiError(res, payload);
   }
   return res.json();
 }
@@ -276,8 +295,10 @@ async function apiAuthCheck(token) {
     body: JSON.stringify({ token: token })
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || err.details || res.statusText);
+    const payload = await res.json().catch(() => ({ error: res.statusText }));
+    const err = new Error(payload.error || payload.details || res.statusText);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }

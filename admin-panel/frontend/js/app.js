@@ -8,10 +8,24 @@ async function initApp() {
     showAuthScreen();
     return;
   }
+
+  let authOk = false;
   try {
     const res = await apiAuthCheck(stored);
-    if (!res || !res.ok) throw new Error('check failed');
+    authOk = !!(res && res.ok);
   } catch (e) {
+    if (e && e.status === 401) {
+      clearAuthToken();
+      showAuthScreen();
+      return;
+    }
+    // Transient failure (network, 5xx): keep the stored token and let the
+    // app boot. Any subsequent real 401 from api.js will still trigger
+    // auth:required via _handleAuthFailure.
+    authOk = true;
+  }
+
+  if (!authOk) {
     clearAuthToken();
     showAuthScreen();
     return;

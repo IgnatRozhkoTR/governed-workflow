@@ -85,14 +85,35 @@ def test_auth_status_accessible_without_token_when_configured(client, configured
     response = client.get("/api/auth/status")
 
     assert response.status_code == 200
-    assert response.get_json() == {"configured": True}
+    body = response.get_json()
+    assert body["configured"] is True
+    assert _is_setup_command(body.get("setup_command"))
 
 
 def test_auth_status_returns_unconfigured_when_no_token_set(client):
     response = client.get("/api/auth/status")
 
     assert response.status_code == 200
-    assert response.get_json() == {"configured": False}
+    body = response.get_json()
+    assert body["configured"] is False
+    assert _is_setup_command(body.get("setup_command"))
+
+
+def test_auth_status_setup_command_is_absolute_path(client):
+    response = client.get("/api/auth/status")
+
+    body = response.get_json()
+    cmd = body["setup_command"]
+    assert cmd.startswith("python3 /")
+    assert cmd.endswith("admin-panel/backend/app.py auth-token")
+
+
+def _is_setup_command(value) -> bool:
+    return (
+        isinstance(value, str)
+        and value.startswith("python3 /")
+        and value.endswith("admin-panel/backend/app.py auth-token")
+    )
 
 
 def test_auth_check_validates_supplied_token(client, configured_token):

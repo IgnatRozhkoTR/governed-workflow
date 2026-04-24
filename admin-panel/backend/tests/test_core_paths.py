@@ -77,6 +77,14 @@ def test_governed_workflow_repo_env_override(monkeypatch, tmp_path):
         import core.paths  # noqa: F401 — re-import original
 
 
+def test_admin_token_setup_command_is_absolute():
+    from core.paths import admin_token_setup_command, REPO_ROOT
+    cmd = admin_token_setup_command()
+    assert cmd.startswith("python3 /")
+    assert cmd.endswith("admin-panel/backend/app.py auth-token")
+    assert str(REPO_ROOT) in cmd
+
+
 def test_telegram_state_dir_env_override(monkeypatch, tmp_path):
     """GOVERNED_WORKFLOW_TELEGRAM_STATE env var overrides TELEGRAM_STATE_DIR."""
     fake_tg = tmp_path / "tg-state"
