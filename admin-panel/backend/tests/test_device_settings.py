@@ -6,10 +6,8 @@ from core.device_settings import (
     ADMIN_TOKEN_HASH_KEY,
     BIND_HOST_KEY,
     DEFAULT_BIND_HOST,
-    DISABLE_AUTH_ENV_VAR,
     NETWORK_BIND_HOST,
     TOKEN_PREFIX,
-    auth_disabled_by_env,
     clear_admin_token,
     delete_setting,
     generate_token,
@@ -126,20 +124,6 @@ def test_verify_token_returns_false_when_presented_token_empty(db):
     set_admin_token(db, generate_token())
 
     assert verify_token(db, "") is False
-
-
-def test_auth_disabled_by_env_reads_env_var(monkeypatch):
-    monkeypatch.delenv(DISABLE_AUTH_ENV_VAR, raising=False)
-    assert auth_disabled_by_env() is False
-
-    monkeypatch.setenv(DISABLE_AUTH_ENV_VAR, "1")
-    assert auth_disabled_by_env() is True
-
-    monkeypatch.setenv(DISABLE_AUTH_ENV_VAR, "true")
-    assert auth_disabled_by_env() is False
-
-    monkeypatch.setenv(DISABLE_AUTH_ENV_VAR, "0")
-    assert auth_disabled_by_env() is False
 
 
 def test_get_bind_host_defaults_to_localhost(db):

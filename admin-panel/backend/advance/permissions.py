@@ -44,6 +44,52 @@ _CLAUDE_PATH_RE = re.compile(r'(^|/)\.claude/')
 _WORKTREES_SEGMENT_RE = re.compile(r'(^|/)\.claude/worktrees/')
 
 _ADMIN_PANEL_DIR = str(REPO_ROOT / "admin-panel")
+_GOVERNED_WORKFLOW_ROOT = str(REPO_ROOT)
+
+GOVERNED_WORKFLOW_DENIAL_REASON = (
+    "Modifications to the governed-workflow installation are blocked from user "
+    "workspaces. The admin panel, SQLite database, hooks, and shipped rules live "
+    "under this tree and must only be edited from a workspace that has the "
+    "governed-workflow repo itself as its project root."
+)
+
+
+def check_governed_workflow_install_block(ws, tool_name, tool_input, cwd):
+    """Deny a tool invocation when it targets the governed-workflow install.
+
+    Runs before the yolo-mode bypass in the hook API so the admin panel tree,
+    its SQLite DB, the shipped hooks, and the default rules/agents are
+    protected even when an agent flips yolo on. Self-editing workspaces (those
+    whose ``working_dir`` lives inside ``REPO_ROOT``) are exempt so maintainers
+    can still develop the admin panel from inside the governed-workflow repo.
+
+    Returns a denial dict (same shape as ``check_tool_permission``) when the
+    tool must be blocked, or ``None`` when the invocation should continue
+    through the normal permission flow.
+    """
+    if _workspace_is_governed_workflow_self(ws):
+        return None
+
+    phase = ws["phase"]
+    denial = {"governed": True, "phase": phase, "allowed": False,
+              "reason": GOVERNED_WORKFLOW_DENIAL_REASON}
+
+    if tool_name in _EDIT_TOOLS:
+        file_path = tool_input.get("file_path", "") or ""
+        if not file_path:
+            return None
+        canon = _canonicalize_path(file_path, cwd)
+        if _is_governed_workflow_install_path(canon):
+            return denial
+        return None
+
+    if tool_name == "Bash":
+        command = tool_input.get("command", "") or ""
+        if command and _GOVERNED_WORKFLOW_ROOT in command:
+            return denial
+        return None
+
+    return None
 
 
 def check_tool_permission(ws, tool_name, tool_input, project_path):
@@ -96,6 +142,38 @@ def _is_edit_phase(phase):
 
 def _is_commit_phase(phase):
     return bool(_COMMIT_PHASE_RE.match(phase))
+
+
+def _is_governed_workflow_install_path(abs_path: str) -> bool:
+    """True when ``abs_path`` lives inside the governed-workflow installation."""
+    if not abs_path:
+        return False
+    normalized = os.path.abspath(abs_path)
+    return normalized == _GOVERNED_WORKFLOW_ROOT or normalized.startswith(
+        _GOVERNED_WORKFLOW_ROOT + os.sep
+    )
+
+
+def _workspace_is_governed_workflow_self(ws) -> bool:
+    """True when the current workspace is editing the governed-workflow repo itself.
+
+    Identified by the workspace ``working_dir`` living under ``REPO_ROOT``. A
+    normal user workspace lives under some other project's tree (e.g.
+    ``/Users/ig/Projects/backend/.claude/worktrees/MP-95``) and returns False,
+    so the path-block applies. The governed-workflow's own development workspace
+    (``<repo>/.claude/worktrees/<branch>``) returns True so maintainers can still
+    edit their own source tree.
+    """
+    try:
+        working_dir = ws["working_dir"]
+    except (KeyError, TypeError):
+        return False
+    if not working_dir:
+        return False
+    abs_wd = os.path.abspath(working_dir)
+    return abs_wd == _GOVERNED_WORKFLOW_ROOT or abs_wd.startswith(
+        _GOVERNED_WORKFLOW_ROOT + os.sep
+    )
 
 
 def _is_claude_metadata(file_path):
@@ -215,6 +293,10 @@ def _check_edit_tool(ws, file_path, cwd):
     """Check permission for Edit/Write/MultiEdit/NotebookEdit tools."""
     canon = _canonicalize_path(file_path, cwd)
 
+    if _is_governed_workflow_install_path(canon) and not _workspace_is_governed_workflow_self(ws):
+        return {"governed": True, "phase": ws["phase"], "allowed": False,
+                "reason": GOVERNED_WORKFLOW_DENIAL_REASON}
+
     if _is_claude_metadata(canon):
         return {"governed": True, "phase": ws["phase"], "allowed": True,
                 "reason": "Workspace metadata is always writable"}
@@ -250,6 +332,11 @@ def _check_bash(ws, command, cwd):
     """Check permission for Bash tool commands."""
     phase = ws["phase"]
     result = {"governed": True, "phase": phase}
+
+    if _GOVERNED_WORKFLOW_ROOT in command and not _workspace_is_governed_workflow_self(ws):
+        result["allowed"] = False
+        result["reason"] = GOVERNED_WORKFLOW_DENIAL_REASON
+        return result
 
     if _DOCKER_RE.search(command):
         result["allowed"] = True

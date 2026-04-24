@@ -326,11 +326,7 @@ def test_undo_rejects_initial_commit(client, tmp_path, clean_db):
     db.commit()
     db.close()
 
-    from app import create_app
-    app = create_app()
-    app.config["TESTING"] = True
-    with app.test_client() as c:
-        r = c.post(f"/api/ws/{project_id}/main/history/undo")
+    r = client.post(f"/api/ws/{project_id}/main/history/undo")
     assert r.status_code == 400
     assert "initial" in r.get_json()["error"].lower()
 
@@ -522,14 +518,10 @@ def test_squash_rejects_when_no_origin_ref(client, tmp_path, clean_db):
     db.commit()
     db.close()
 
-    from app import create_app
-    app = create_app()
-    app.config["TESTING"] = True
-    with app.test_client() as c:
-        r = c.post(
-            f"/api/ws/{project_id}/feature/history/rename",
-            json={"message": "should be blocked"},
-        )
+    r = client.post(
+        f"/api/ws/{project_id}/feature/history/rename",
+        json={"message": "should be blocked"},
+    )
     assert r.status_code == 400
     assert "pushed" in r.get_json()["error"].lower()
 

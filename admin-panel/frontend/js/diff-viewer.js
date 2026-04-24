@@ -438,7 +438,7 @@ async function loadCommitHistory() {
   state.historyError = null;
   renderHistoryPanel();
   try {
-    var ref = state.activeBranch || ctx.branch;
+    var ref = (state.activeBranch && state.activeBranch !== ctx.branch) ? state.activeBranch : null;
     var data = await apiGetCommitHistory(ctx.projectId, ctx.branch, ref);
     state.historyCommits = data.commits || [];
     state.historySourceBranch = state.activeBranch || ctx.branch;
@@ -493,7 +493,8 @@ async function selectHistoryBranch(ref, displayName) {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
   try {
-    var data = await apiGetCommitHistory(ctx.projectId, ctx.branch, ref);
+    var refParam = (ref && ref !== ctx.branch) ? ref : null;
+    var data = await apiGetCommitHistory(ctx.projectId, ctx.branch, refParam);
     state.historyCommits = data.commits || [];
     var label = document.getElementById('diffHistoryBranchLabel');
     if (label) label.textContent = displayName;

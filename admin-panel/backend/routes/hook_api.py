@@ -47,13 +47,23 @@ def check_permission():
         if not ws:
             return jsonify({"governed": False, "allowed": True})
 
-        if ws_field(ws, "yolo_mode", 0):
-            return jsonify({"governed": True, "allowed": True})
-
         tool_input = {
             "file_path": body.get("file_path", ""),
             "command": body.get("command", ""),
         }
+
+        # The governed-workflow install path block runs BEFORE the yolo-mode
+        # bypass so agents cannot use yolo to overwrite the admin panel, its
+        # SQLite DB, or the shipped hooks/rules.
+        gw_block = permission_service.check_governed_workflow_install_block(
+            ws, tool_name, tool_input, cwd
+        )
+        if gw_block is not None:
+            return jsonify(gw_block)
+
+        if ws_field(ws, "yolo_mode", 0):
+            return jsonify({"governed": True, "allowed": True})
+
         return jsonify(permission_service.check_tool_permission(ws, tool_name, tool_input, cwd))
     finally:
         db.close()

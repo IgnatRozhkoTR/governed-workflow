@@ -5,6 +5,10 @@ Applies a ``before_request`` guard that requires ``Authorization: Bearer <token>
 when no admin token has been configured on this device, every non-whitelist
 route returns 401 so the frontend can show the CLI instructions.
 
+There is no runtime flag or environment variable that can disable this guard.
+The pytest suite reaches protected routes through a fixture-based test client
+wrapper that injects a real token; see ``backend/tests/conftest.py``.
+
 The whitelist is kept intentionally small: static assets needed to render the
 token-entry screen, the auth status/check endpoints, and WebSocket upgrades
 (which authenticate differently via a query param because browsers cannot set
@@ -14,7 +18,6 @@ from flask import g, jsonify, request
 
 from core.db import get_db
 from core.device_settings import (
-    auth_disabled_by_env,
     get_admin_token_hash,
     verify_token,
 )
@@ -75,10 +78,6 @@ def register_auth_guard(app):
         if request.method == "OPTIONS":
             return None
 
-        if auth_disabled_by_env():
-            g.admin_authenticated = True
-            return None
-
         if _should_bypass(path):
             return None
 
@@ -106,9 +105,6 @@ def register_auth_guard(app):
 def websocket_auth_ok(db, token: str) -> bool:
     """Check whether a websocket should be allowed based on a supplied token.
 
-    The test-only env bypass short-circuits to True. Otherwise the presented
-    token must verify against the stored admin token hash.
+    The presented token must verify against the stored admin token hash.
     """
-    if auth_disabled_by_env():
-        return True
     return verify_token(db, token or "")

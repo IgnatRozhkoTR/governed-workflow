@@ -13,11 +13,13 @@ async function refreshTabData() {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
   try {
-    var stateData = await apiGetState(ctx.projectId, ctx.branch);
+    var response = await apiGetState(ctx.projectId, ctx.branch);
+    var stateData = response.data;
     applyStateData(stateData);
     LOCK_DATA.session_id = stateData.session_id || null;
     LOCK_DATA.working_dir = stateData.working_dir || null;
     LOCK_DATA.sessions = stateData.sessions || [];
+    EventBus.emit('state:refreshed', stateData);
   } catch(e) { console.warn('Refresh state failed:', e.message); }
   try {
     var diffData = await apiGetDiff(ctx.projectId, ctx.branch, state.diffSource);

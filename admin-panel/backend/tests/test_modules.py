@@ -60,7 +60,7 @@ def test_iter_module_dirs_nonexistent_root_skipped(tmp_path):
 
 # --- route test ---
 
-def test_list_modules_route_reads_both_roots(app, tmp_path, monkeypatch):
+def test_list_modules_route_reads_both_roots(client, tmp_path, monkeypatch):
     tracked = tmp_path / "tracked"
     local = tmp_path / "local"
     tracked.mkdir()
@@ -74,7 +74,7 @@ def test_list_modules_route_reads_both_roots(app, tmp_path, monkeypatch):
     monkeypatch.setattr(mod_routes, "DEFAULT_MODULES_DIR", tracked)
     monkeypatch.setattr(mod_routes, "DEFAULT_MODULES_LOCAL_DIR", local)
 
-    response = app.test_client().get("/api/modules")
+    response = client.get("/api/modules")
     assert response.status_code == 200
     ids = [m["id"] for m in response.get_json()["modules"]]
     assert "mod-a" in ids

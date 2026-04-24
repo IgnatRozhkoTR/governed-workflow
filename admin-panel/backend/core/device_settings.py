@@ -7,11 +7,10 @@ toggle.
 
 Auth is always on. Every protected HTTP route requires a valid admin token.
 The only way to mint a token is ``python3 backend/app.py auth-token`` run in a
-shell on the host — there is no API or web-facing endpoint that creates one.
-
-The environment variable ``GOVERNED_WORKFLOW_DISABLE_AUTH=1`` is a test-only
-escape hatch used by the pytest suite to bypass the middleware uniformly. It
-must not be relied on in production.
+shell on the host — there is no API or web-facing endpoint that creates one,
+and there is no environment variable or runtime flag that can disable the
+middleware. The pytest suite authenticates via a fixture-based test client
+wrapper that injects a real token minted against this same table.
 
 Known keys
 ----------
@@ -23,7 +22,6 @@ Known keys
 """
 import hashlib
 import hmac
-import os
 import secrets
 from datetime import datetime
 
@@ -34,8 +32,6 @@ DEFAULT_BIND_HOST = "127.0.0.1"
 NETWORK_BIND_HOST = "0.0.0.0"
 
 TOKEN_PREFIX = "gwf_"
-
-DISABLE_AUTH_ENV_VAR = "GOVERNED_WORKFLOW_DISABLE_AUTH"
 
 
 def get_setting(db, key: str, default: str | None = None) -> str | None:
@@ -93,15 +89,6 @@ def clear_admin_token(db) -> None:
 
 def get_admin_token_hash(db) -> str | None:
     return get_setting(db, ADMIN_TOKEN_HASH_KEY)
-
-
-def auth_disabled_by_env() -> bool:
-    """Return True when the test-only bypass env var is set to ``"1"``.
-
-    This exists so the pytest suite can run without threading a token through
-    every request. Production must never set this.
-    """
-    return os.environ.get(DISABLE_AUTH_ENV_VAR) == "1"
 
 
 def verify_token(db, presented_token: str) -> bool:

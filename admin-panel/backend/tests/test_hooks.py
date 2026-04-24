@@ -132,3 +132,91 @@ def test_scope_enforced_when_yolo_disabled(client, workspace):
     assert r.status_code == 200
     assert r.json["governed"] is True
     assert r.json["allowed"] is False
+
+
+def test_edit_tool_blocked_from_governed_workflow_install(client, workspace):
+    """Edit/Write targeting any file inside the governed-workflow install tree
+    is denied from a user workspace, even with yolo mode enabled."""
+    set_phase(workspace["id"], "3.1.0", yolo_mode=1, scope_status="pending")
+
+    from core.paths import REPO_ROOT
+    evil_target = str(REPO_ROOT / "admin-panel" / "backend" / "admin-panel.db")
+
+    r = client.post(
+        "/api/hook/check-permission",
+        json={
+            "cwd": workspace["working_dir"],
+            "tool_name": "Write",
+            "file_path": evil_target,
+        },
+    )
+    assert r.status_code == 200
+    assert r.json["governed"] is True
+    assert r.json["allowed"] is False
+    assert "governed-workflow installation" in r.json["reason"]
+
+
+def test_bash_command_blocked_when_referencing_governed_workflow_path(client, workspace):
+    """Bash commands that reference a governed-workflow path (even via cat or
+    python) are denied from a user workspace."""
+    set_phase(workspace["id"], "3.1.0", yolo_mode=1, scope_status="pending")
+
+    from core.paths import REPO_ROOT
+    command = f"cat {REPO_ROOT}/admin-panel/backend/admin-panel.db"
+
+    r = client.post(
+        "/api/hook/check-permission",
+        json={
+            "cwd": workspace["working_dir"],
+            "tool_name": "Bash",
+            "command": command,
+        },
+    )
+    assert r.status_code == 200
+    assert r.json["governed"] is True
+    assert r.json["allowed"] is False
+
+
+def test_edit_tool_allowed_inside_governed_workflow_self_workspace(
+    client, project, git_repo, tmp_path, monkeypatch
+):
+    """A workspace whose working_dir sits inside the governed-workflow install
+    IS allowed to modify governed-workflow files — that's the self-edit path
+    for people developing the admin panel itself."""
+    from core.db import get_db
+    from core.paths import REPO_ROOT
+
+    # Simulate a workspace whose working_dir is inside REPO_ROOT (a hypothetical
+    # .claude/worktrees subdirectory of the governed-workflow repo itself).
+    self_wd = str(REPO_ROOT / ".claude" / "worktrees" / "test-self")
+
+    db = get_db()
+    from datetime import datetime
+    now = datetime.now().isoformat()
+    cursor = db.execute(
+        "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
+        "created, status, phase, scope_json, plan_json, source_branch, yolo_mode) "
+        "VALUES (?, ?, ?, ?, ?, 'active', '3.1.0', ?, ?, ?, 1)",
+        (
+            project["id"], "self-edit", "self-edit", self_wd, now,
+            '{"must":[],"may":[]}',
+            '{"description":"","systemDiagram":"","execution":[]}', "main"
+        )
+    )
+    ws_id = cursor.lastrowid
+    db.commit()
+    db.close()
+
+    target = str(REPO_ROOT / "admin-panel" / "backend" / "app.py")
+    r = client.post(
+        "/api/hook/check-permission",
+        json={
+            "cwd": self_wd,
+            "tool_name": "Write",
+            "file_path": target,
+        },
+    )
+    # Under yolo the check early-returns as allowed; the point is it is NOT
+    # blocked by the new governed-workflow path guard.
+    assert r.status_code == 200
+    assert r.json["allowed"] is True

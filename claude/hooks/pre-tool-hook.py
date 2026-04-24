@@ -187,6 +187,49 @@ tool_name = data.get("tool_name", "")
 tool_input = data.get("tool_input", {})
 cwd = data.get("cwd", ".")
 
+_GOVERNED_WORKFLOW_ROOT_STR = str(GOVERNED_REPO_ROOT)
+
+
+def _cwd_is_inside_governed_workflow(current_dir):
+    """True when the agent's cwd lives under the governed-workflow install tree.
+
+    Used as a local fail-closed proxy for "is the current workspace the
+    governed-workflow repo itself?". Without this escape hatch a maintainer
+    working on the admin-panel source would be locked out of their own tree.
+    """
+    try:
+        resolved = Path(current_dir).resolve()
+    except (OSError, ValueError):
+        return False
+    root = Path(_GOVERNED_WORKFLOW_ROOT_STR)
+    try:
+        resolved.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def _path_is_inside_governed_workflow(abs_path):
+    if not abs_path:
+        return False
+    try:
+        resolved = Path(abs_path).resolve()
+    except (OSError, ValueError):
+        resolved = Path(os.path.normpath(abs_path))
+    root = Path(_GOVERNED_WORKFLOW_ROOT_STR)
+    try:
+        resolved.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+GOVERNED_WORKFLOW_DENIAL_REASON = (
+    "Modifications to the governed-workflow installation are blocked from user "
+    "workspaces. Edit governed-workflow source only from a workspace rooted in "
+    "the governed-workflow repo itself."
+)
+
 # ─── LOCAL SECURITY CHECKS (must stay in hook, not API) ───
 
 if tool_name == "Bash":
@@ -200,9 +243,27 @@ if tool_name == "Bash":
     if re.search(r'sqlite3.*admin-panel', command) or 'gate_nonce' in command:
         deny("Direct database access is blocked.")
 
+    # Block any reference to the admin-panel SQLite DB even via cat/python/etc.
+    if re.search(r'admin-panel\.db', command):
+        deny("Direct access to the admin-panel database file is blocked.")
+
     # Block curl to approve/reject endpoints
     if re.search(r'curl.*(approve|reject)', command):
         deny("Direct API calls to approve/reject are blocked. Use the admin panel UI.")
+
+    # Block any bash command referencing paths inside the governed-workflow
+    # installation — unless the current workspace is the governed-workflow
+    # repo itself (self-edit exception for maintainers).
+    if _GOVERNED_WORKFLOW_ROOT_STR in command and not _cwd_is_inside_governed_workflow(cwd):
+        deny(GOVERNED_WORKFLOW_DENIAL_REASON)
+
+if tool_name in ("Edit", "Write", "NotebookEdit", "MultiEdit"):
+    file_path_for_block = tool_input.get("file_path", "")
+    if file_path_for_block and not os.path.isabs(file_path_for_block):
+        file_path_for_block = os.path.join(cwd, file_path_for_block)
+    if file_path_for_block and _path_is_inside_governed_workflow(file_path_for_block) \
+            and not _cwd_is_inside_governed_workflow(cwd):
+        deny(GOVERNED_WORKFLOW_DENIAL_REASON)
 
 # ─── ALLOW ORCHESTRATOR METADATA WRITES ───
 

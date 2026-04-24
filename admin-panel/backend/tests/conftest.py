@@ -1,8 +1,4 @@
 """Shared fixtures for admin panel integration tests."""
-import os
-
-os.environ.setdefault("GOVERNED_WORKFLOW_DISABLE_AUTH", "1")
-
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -33,12 +29,33 @@ def setup_db(tmp_path_factory):
     yield db_file
 
 
+@pytest.fixture(scope="session")
+def admin_token(setup_db):
+    """Mint a real admin token for the session and persist its hash.
+
+    Protected routes require a valid token, so the wrapped ``client`` fixture
+    injects this value on every request. ``clean_db`` re-inserts the hash after
+    truncating ``device_settings`` so the wrapper keeps working across tests.
+    """
+    from core.db import get_db
+    from core.device_settings import generate_token, set_admin_token
+    token = generate_token()
+    db = get_db()
+    try:
+        set_admin_token(db, token)
+        db.commit()
+    finally:
+        db.close()
+    return token
+
+
 @pytest.fixture(autouse=True)
-def clean_db(setup_db):
+def clean_db(setup_db, admin_token):
     """Truncate all tables between tests for isolation."""
     yield  # let the test run first
     # Clean up AFTER the test
     from core.db import get_db
+    from core.device_settings import set_admin_token
     import sqlite3
     tables = [
         "acceptance_criteria", "review_issues", "discussions",
@@ -58,6 +75,8 @@ def clean_db(setup_db):
         db.execute("DELETE FROM verification_steps WHERE profile_id IN "
                    "(SELECT id FROM verification_profiles WHERE origin = 'user')")
         db.execute("DELETE FROM verification_profiles WHERE origin = 'user'")
+        # Restore the session admin token so the next test's wrapped client still works.
+        set_admin_token(db, admin_token)
         db.commit()
         db.close()
 
@@ -79,9 +98,90 @@ def app(setup_db):
     return app
 
 
+class AuthedClient:
+    """Flask test client wrapper that injects the admin bearer token.
+
+    Forwards every HTTP verb (``get``, ``post``, ``put``, ``delete``, ``patch``,
+    ``head``, ``options``) to the underlying ``test_client``, auto-populating
+    ``Authorization: Bearer <token>`` when the caller did not already set one.
+    Any other attribute access (e.g. ``session_transaction``) falls through to
+    the wrapped client so tests can still reach native test-client APIs.
+    """
+
+    _VERBS = ("get", "post", "put", "delete", "patch", "head", "options")
+
+    def __init__(self, client, token):
+        self._client = client
+        self._token = token
+
+    def _with_auth(self, kwargs):
+        headers = kwargs.get("headers")
+        if headers is None:
+            kwargs["headers"] = {"Authorization": f"Bearer {self._token}"}
+            return kwargs
+        # Support both dict-like and Werkzeug Headers objects.
+        has_auth = False
+        try:
+            has_auth = "Authorization" in headers
+        except TypeError:
+            has_auth = any(
+                (isinstance(item, tuple) and len(item) >= 1 and item[0] == "Authorization")
+                for item in headers
+            )
+        if has_auth:
+            return kwargs
+        if isinstance(headers, dict):
+            new_headers = dict(headers)
+            new_headers["Authorization"] = f"Bearer {self._token}"
+            kwargs["headers"] = new_headers
+        else:
+            # Copy into a dict so we don't mutate the caller's object.
+            new_headers = {}
+            for item in headers:
+                if isinstance(item, tuple) and len(item) >= 2:
+                    new_headers[item[0]] = item[1]
+            new_headers["Authorization"] = f"Bearer {self._token}"
+            kwargs["headers"] = new_headers
+        return kwargs
+
+    def _verb(self, name, *args, **kwargs):
+        kwargs = self._with_auth(kwargs)
+        return getattr(self._client, name)(*args, **kwargs)
+
+    def get(self, *args, **kwargs):
+        return self._verb("get", *args, **kwargs)
+
+    def post(self, *args, **kwargs):
+        return self._verb("post", *args, **kwargs)
+
+    def put(self, *args, **kwargs):
+        return self._verb("put", *args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        return self._verb("delete", *args, **kwargs)
+
+    def patch(self, *args, **kwargs):
+        return self._verb("patch", *args, **kwargs)
+
+    def head(self, *args, **kwargs):
+        return self._verb("head", *args, **kwargs)
+
+    def options(self, *args, **kwargs):
+        return self._verb("options", *args, **kwargs)
+
+    def __getattr__(self, item):
+        return getattr(self._client, item)
+
+
 @pytest.fixture(scope="session")
-def client(app):
-    """Flask test client."""
+def client(app, admin_token):
+    """Flask test client with auto-injected admin token."""
+    return AuthedClient(app.test_client(), admin_token)
+
+
+@pytest.fixture(scope="session")
+def raw_client(app):
+    """Unwrapped Flask test client for tests exercising the real middleware."""
     return app.test_client()
 
 

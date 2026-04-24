@@ -30,6 +30,22 @@ def get_db_ctx():
         db.close()
 
 
+def _restrict_db_file_mode():
+    """Best-effort: set 0600 on the SQLite DB and its WAL/SHM sidecars.
+
+    Same-UID processes (including agents running in the user's shell) can still
+    read the DB — OS permissions do not defend against that. This just denies
+    OTHER local users on the machine, and is a cheap defensive default.
+    """
+    for path in (DB_PATH, DB_PATH.with_name(DB_PATH.name + "-wal"),
+                 DB_PATH.with_name(DB_PATH.name + "-shm")):
+        if path.exists():
+            try:
+                path.chmod(0o600)
+            except (OSError, NotImplementedError):
+                pass
+
+
 def init_db():
     """Apply any pending database migrations."""
     from yoyo import read_migrations, get_backend
@@ -41,3 +57,5 @@ def init_db():
 
     with backend.lock():
         backend.apply_migrations(backend.to_apply(migrations))
+
+    _restrict_db_file_mode()

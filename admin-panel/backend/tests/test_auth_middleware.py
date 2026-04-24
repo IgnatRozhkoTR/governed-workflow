@@ -1,43 +1,32 @@
 """Tests for the Flask before_request auth guard in ``core.auth``.
 
-This suite exercises the REAL middleware, so the test-only env bypass is
-explicitly removed for every test in the module. A single test at the bottom
-re-enables the bypass to document the escape hatch used by the rest of the
-pytest suite.
+Every test here uses ``raw_client`` so the real middleware runs — the wrapped
+``client`` fixture auto-injects a valid bearer token and would mask the 401
+paths we need to verify.
 """
 import pytest
 
 from core.db import get_db
-from core.device_settings import (
-    DISABLE_AUTH_ENV_VAR,
-    clear_admin_token,
-    generate_token,
-    set_admin_token,
-)
-
-
-@pytest.fixture(autouse=True)
-def _real_auth(monkeypatch):
-    monkeypatch.delenv(DISABLE_AUTH_ENV_VAR, raising=False)
+from core.device_settings import clear_admin_token
 
 
 @pytest.fixture
-def configured_token():
-    """Configure an admin token for the duration of the test."""
-    token = generate_token()
+def no_admin_token():
+    """Clear the session-wide admin token hash so protected routes 401.
+
+    ``clean_db`` re-installs the token after the test, so subsequent tests
+    using the wrapped client keep working.
+    """
     db = get_db()
     try:
-        set_admin_token(db, token)
-        db.commit()
-        yield token
-    finally:
         clear_admin_token(db)
         db.commit()
+    finally:
         db.close()
 
 
-def test_protected_route_returns_401_when_no_token_configured(client):
-    response = client.get("/api/projects")
+def test_protected_route_returns_401_when_no_token_configured(raw_client, no_admin_token):
+    response = raw_client.get("/api/projects")
 
     assert response.status_code == 401
     body = response.get_json()
@@ -45,8 +34,8 @@ def test_protected_route_returns_401_when_no_token_configured(client):
     assert body["configured"] is False
 
 
-def test_protected_route_returns_401_when_no_token_presented(client, configured_token):
-    response = client.get("/api/projects")
+def test_protected_route_returns_401_when_no_token_presented(raw_client, admin_token):
+    response = raw_client.get("/api/projects")
 
     assert response.status_code == 401
     body = response.get_json()
@@ -54,8 +43,8 @@ def test_protected_route_returns_401_when_no_token_presented(client, configured_
     assert body["configured"] is True
 
 
-def test_protected_route_returns_401_when_token_invalid(client, configured_token):
-    response = client.get(
+def test_protected_route_returns_401_when_token_invalid(raw_client, admin_token):
+    response = raw_client.get(
         "/api/projects",
         headers={"Authorization": "Bearer gwf_not_the_right_token"},
     )
@@ -66,23 +55,23 @@ def test_protected_route_returns_401_when_token_invalid(client, configured_token
     assert body["configured"] is True
 
 
-def test_protected_route_accessible_with_valid_bearer_token(client, configured_token):
-    response = client.get(
+def test_protected_route_accessible_with_valid_bearer_token(raw_client, admin_token):
+    response = raw_client.get(
         "/api/projects",
-        headers={"Authorization": f"Bearer {configured_token}"},
+        headers={"Authorization": f"Bearer {admin_token}"},
     )
 
     assert response.status_code == 200
 
 
-def test_protected_route_accessible_with_valid_query_token(client, configured_token):
-    response = client.get(f"/api/projects?token={configured_token}")
+def test_protected_route_accessible_with_valid_query_token(raw_client, admin_token):
+    response = raw_client.get(f"/api/projects?token={admin_token}")
 
     assert response.status_code == 200
 
 
-def test_auth_status_accessible_without_token_when_configured(client, configured_token):
-    response = client.get("/api/auth/status")
+def test_auth_status_accessible_without_token_when_configured(raw_client, admin_token):
+    response = raw_client.get("/api/auth/status")
 
     assert response.status_code == 200
     body = response.get_json()
@@ -90,8 +79,8 @@ def test_auth_status_accessible_without_token_when_configured(client, configured
     assert _is_setup_command(body.get("setup_command"))
 
 
-def test_auth_status_returns_unconfigured_when_no_token_set(client):
-    response = client.get("/api/auth/status")
+def test_auth_status_returns_unconfigured_when_no_token_set(raw_client, no_admin_token):
+    response = raw_client.get("/api/auth/status")
 
     assert response.status_code == 200
     body = response.get_json()
@@ -99,8 +88,8 @@ def test_auth_status_returns_unconfigured_when_no_token_set(client):
     assert _is_setup_command(body.get("setup_command"))
 
 
-def test_auth_status_setup_command_is_absolute_path(client):
-    response = client.get("/api/auth/status")
+def test_auth_status_setup_command_is_absolute_path(raw_client):
+    response = raw_client.get("/api/auth/status")
 
     body = response.get_json()
     cmd = body["setup_command"]
@@ -116,8 +105,8 @@ def _is_setup_command(value) -> bool:
     )
 
 
-def test_auth_check_validates_supplied_token(client, configured_token):
-    response = client.post("/api/auth/check", json={"token": configured_token})
+def test_auth_check_validates_supplied_token(raw_client, admin_token):
+    response = raw_client.post("/api/auth/check", json={"token": admin_token})
 
     assert response.status_code == 200
     body = response.get_json()
@@ -125,8 +114,8 @@ def test_auth_check_validates_supplied_token(client, configured_token):
     assert body["configured"] is True
 
 
-def test_auth_check_rejects_wrong_token(client, configured_token):
-    response = client.post("/api/auth/check", json={"token": "gwf_wrong"})
+def test_auth_check_rejects_wrong_token(raw_client, admin_token):
+    response = raw_client.post("/api/auth/check", json={"token": "gwf_wrong"})
 
     assert response.status_code == 401
     body = response.get_json()
@@ -134,8 +123,8 @@ def test_auth_check_rejects_wrong_token(client, configured_token):
     assert body["configured"] is True
 
 
-def test_auth_check_reports_no_token_configured(client):
-    response = client.post("/api/auth/check", json={"token": ""})
+def test_auth_check_reports_no_token_configured(raw_client, no_admin_token):
+    response = raw_client.post("/api/auth/check", json={"token": ""})
 
     assert response.status_code == 401
     body = response.get_json()
@@ -143,34 +132,40 @@ def test_auth_check_reports_no_token_configured(client):
     assert body["configured"] is False
 
 
-def test_static_css_path_bypasses_auth(client, configured_token):
-    response = client.get("/css/app.css")
+def test_static_css_path_bypasses_auth(raw_client):
+    response = raw_client.get("/css/app.css")
 
     assert response.status_code != 401
 
 
-def test_static_js_path_bypasses_auth(client, configured_token):
-    response = client.get("/js/app.js")
+def test_static_js_path_bypasses_auth(raw_client):
+    response = raw_client.get("/js/app.js")
 
     assert response.status_code != 401
 
 
-def test_static_i18n_path_bypasses_auth(client, configured_token):
-    response = client.get("/i18n/en.json")
+def test_static_i18n_path_bypasses_auth(raw_client):
+    response = raw_client.get("/i18n/en.json")
 
     assert response.status_code != 401
 
 
-def test_index_path_bypasses_auth(client, configured_token):
-    response = client.get("/")
+def test_static_img_path_bypasses_auth(raw_client):
+    response = raw_client.get("/img/logo.png")
 
     assert response.status_code != 401
 
 
-def test_websocket_upgrade_bypasses_auth_at_http_layer(client, configured_token):
+def test_index_path_bypasses_auth(raw_client):
+    response = raw_client.get("/")
+
+    assert response.status_code != 401
+
+
+def test_websocket_upgrade_bypasses_auth_at_http_layer(raw_client):
     """The HTTP layer must not 401 a websocket upgrade — the WS handler enforces
     auth itself because browsers cannot attach custom headers to the handshake."""
-    response = client.get(
+    response = raw_client.get(
         "/ws/terminal/foo/bar",
         headers={
             "Upgrade": "websocket",
@@ -181,11 +176,3 @@ def test_websocket_upgrade_bypasses_auth_at_http_layer(client, configured_token)
     )
 
     assert response.status_code != 401
-
-
-def test_env_var_bypass_allows_all_protected_routes(client, monkeypatch):
-    monkeypatch.setenv(DISABLE_AUTH_ENV_VAR, "1")
-
-    response = client.get("/api/projects")
-
-    assert response.status_code == 200

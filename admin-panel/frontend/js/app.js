@@ -45,7 +45,8 @@ async function initApp() {
   ACTIVE_TERMINAL_KIND = 'claude';
 
   try {
-    const stateData = await apiGetState(ctx.projectId, ctx.branch);
+    const response = await apiGetState(ctx.projectId, ctx.branch);
+    const stateData = response.data;
 
     LOCK_DATA.branch = ctx.branch;
     LOCK_DATA.session_id = stateData.session_id || null;
