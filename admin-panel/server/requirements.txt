@@ -1,4 +1,6 @@
+beautifulsoup4
 flask
+flask-sock
 jsonschema
 mcp[cli]
 pytest

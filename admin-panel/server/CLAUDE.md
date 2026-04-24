@@ -1,17 +1,22 @@
-# Server
+# server
 
-Flask + MCP backend for the governed workflow admin panel.
+Flask + MCP backend. Both entry points (`app.py` for HTTP, `mcp_server.py` for MCP stdio) delegate to the same services.
 
-## Package layout
+## Layer Map
 
-- `core/` — infrastructure: database, i18n, utilities, terminal management
-- `advance/` — phase definitions, advancement orchestration, guards, tool permissions
-- `services/` — domain CRUD services (comments, criteria, plan, scope, progress, research, etc.)
-- `mcp_tools/` — MCP tool implementations (split from mcp_server.py)
-- `routes/` — Flask HTTP route handlers (one Blueprint per domain)
-- `migrations/` — Yoyo SQL migration scripts applied on startup via `core/db.py`
-- `messages/` — i18n message catalogs (en, ru)
-- `app.py` — Flask entry point
-- `mcp_server.py` — MCP entry point (thin bootstrap, tools live in mcp_tools/)
+- `core/` — infrastructure (db, paths, helpers, phase key, i18n, terminal, decorators). No business logic.
+- `services/` — domain CRUD, one file per domain.
+- `routes/` — Flask Blueprints, one per domain.
+- `mcp_tools/` — MCP tool implementations.
+- `advance/` — phase definitions, phase-gate orchestration, guards, permissions.
+- `migrations/` — Yoyo SQL migrations applied on startup.
+- `messages/` — i18n catalogs (en, ru).
+- `tests/` — pytest suite.
 
-Both entry points delegate to the same services — they are thin wrappers.
+## Key Patterns
+
+- `get_db()` returns a sqlite3 connection with Row factory and foreign keys ON. Always close in `finally`.
+- State lives entirely in SQLite (`admin-panel.db`). No lock files.
+- `find_workspace(db, project_id, branch)` handles branch sanitization automatically.
+
+See `advance/CLAUDE.md` and `mcp_tools/CLAUDE.md` for the complex subsystems.

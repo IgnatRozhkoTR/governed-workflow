@@ -1,24 +1,12 @@
-# Global Claude Configuration
+# governed-workflow
 
-## Core Instructions
-- Do what's asked; nothing more, nothing less
-- ALWAYS prefer editing existing files over creating new ones
-- NEVER proactively create documentation (*.md) or README files unless the project already has comprehensive documentation that requires updating or extending
-- NEVER commit, push, or create merge requests unless explicitly asked. When asked, follow the git rules in `.claude/rules/git-rules.md`.
-- NEVER include `Co-Authored-By` or any trailer lines in commits or MR descriptions.
+Zero-trust orchestration layer for Claude Code — server-side phase gates, scope locking, and human approval. See `README.md` for the full workflow diagram.
 
+## Repo Split
 
----
+- `admin-panel/` — Flask web app + MCP server that holds workspace state and enforces phase transitions. See `admin-panel/CLAUDE.md`.
+- `claude/` — Payload shipped into user workspaces (agents, skills, rules, hooks, modules). See `claude/CLAUDE.md`.
 
-# Governed Workflow Defaults
+## Core Rule
 
-# Governed Workflow Instructions
-
-This workspace is managed by the governed-workflow orchestration system.
-
-## Core Instructions
-- Do what's asked; nothing more, nothing less
-- Follow the phase, scope, and plan defined in the admin panel
-- Use MCP workspace tools to read state; never call the admin API directly
-- NEVER commit, push, or create merge requests unless explicitly asked
-- NEVER include `Co-Authored-By` or any trailer lines in commits or MR descriptions
+NEVER commit, push, or create merge requests unless explicitly asked. See subfolder `CLAUDE.md` files for folder-specific instructions.

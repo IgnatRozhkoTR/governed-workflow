@@ -6,7 +6,7 @@ The admin panel and MCP server for the [governed workflow](../README.md). Flask 
 
 | Layer | Details |
 |-------|---------|
-| Backend | Flask with Blueprints (20 route modules) |
+| Backend | Flask with Blueprints (22 route modules) |
 | Frontend | Vanilla HTML/CSS/JS (36 JS modules, 21 CSS modules) |
 | Storage | SQLite (`server/admin-panel.db`) |
 | Agent Interface | MCP server over stdio (`server/mcp_server.py`, 38 tools) |
@@ -71,8 +71,6 @@ admin-panel/
   CLAUDE.md                     # Project instructions for Claude Code
   README.md                     # This file
   start.sh                      # Launch script (background server + browser)
-  scripts/
-    update-proof-snippets.py    # Maintenance utility
   server/
     app.py                      # Flask app factory, entry point
     mcp_server.py               # MCP stdio entry point (thin bootstrap)
