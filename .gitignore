@@ -20,8 +20,8 @@ claude/skills/code-review/
 claude/skills/evy-sync/
 claude/skills/pack-sessions-skill/
 claude/skills/postman-collection/
-!.claude/skills/workflow-migration/
-!.claude/skills/workflow-migration/**
+!.claude/
+!.claude/**
 
 # Re-exclude unwanted files within included dirs
 **/__pycache__/

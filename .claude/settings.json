@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
+        "hooks": [{"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/block-orchestrator-writes.py"}]
+      },
+      {
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash|mcp__.*gitlab.*",
+        "hooks": [{"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/pre-tool-hook.py"}]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [{"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/session-start.py"}]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{"type": "command", "command": "bash ${CLAUDE_PROJECT_DIR}/claude/hooks/user-prompt-submit.sh"}]
+      }
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0"
+  }
+}
