@@ -100,35 +100,7 @@ Hexagonal nodes are **user gates** — the workflow pauses until a human approve
 
 **Setup wizard.** Accessible from the project selector page in the admin panel. Configures modules and verification profiles in one go. Launches Claude Code in an embedded terminal and follows the setup skill to install selected modules, verify required tools, and create or assign verification profiles.
 
-## Repository Structure
-
-The repo can be cloned to any path on disk (`~/governed-workflow`, `/opt/governed-workflow`, etc.). The payload directories are:
-
-```
-├── admin-panel/          # Flask web app + MCP server (see admin-panel/README.md)
-│   ├── backend/          #   Backend: routes, advance logic, MCP tools, tests
-│   └── frontend/         #   Frontend: HTML, CSS, JS (vanilla SPA)
-├── claude/               # Claude Code payload (shipped to workspaces)
-│   ├── agents/           #   Agent role definitions (16 specialized roles)
-│   ├── hooks/            #   Claude Code hook scripts
-│   │   ├── pre-tool-hook.py  #   Scope/phase enforcement via Flask API
-│   │   ├── session-start.py  #   Session registration + context banner via Flask API
-│   │   ├── block-orchestrator-writes.py  # Prevents orchestrator from direct file edits
-│   │   └── user-prompt-submit.sh  # Orchestrator role enforcement
-│   ├── modules/          #   Self-contained feature packages
-│   │   └── telegram/     #     Remote session control via Telegram bot
-│   ├── skills/           #   Claude Code slash-command skills
-│   │   ├── governed-workflow/ #   Full orchestrated workflow (/governed-workflow)
-│   │   ├── plan-preparation/ #   Pre-planning phases 1.0-1.4 (/plan-preparation)
-│   │   ├── planning/     #     Planning phase 2.0 (/planning)
-│   │   └── setup/        #     Setup wizard for modules and profiles
-│   ├── rules/            #   Coding standards, test standards, validation pipeline
-│   └── defaults/         #   Git rules template, settings template
-└── .claude/              # Repo's own Claude Code config (not shipped to workspaces)
-    └── skills/workflow-migration/  # Install/migration skill for this repo
-```
-
 ## Getting Started
 
-Clone the repo to any directory, then see [admin-panel/README.md](admin-panel/README.md) for installation, API reference, and MCP tool documentation. For a full step-by-step install including Windows/WSL, use the `/workflow-migration` skill.
+Clone the repo, then see [admin-panel/README.md](admin-panel/README.md) for installation and full API/MCP tool reference. For a step-by-step install including Windows/WSL, use the `/workflow-migration` skill.
 

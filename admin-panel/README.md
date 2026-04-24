@@ -6,12 +6,12 @@ The admin panel and MCP server for the [governed workflow](../README.md). Flask 
 
 | Layer | Details |
 |-------|---------|
-| Backend | Flask with Blueprints (22 route modules) |
-| Frontend | Vanilla HTML/CSS/JS (36 JS modules, 21 CSS modules) |
+| Backend | Flask with Blueprints |
+| Frontend | Vanilla HTML/CSS/JS |
 | Storage | SQLite (`backend/admin-panel.db`) |
-| Agent Interface | MCP server over stdio (`backend/mcp_server.py`, 38 tools) |
+| Agent Interface | MCP server over stdio (`backend/mcp_server.py`) |
 | i18n | JSON message bundles (`backend/messages/`) |
-| Tests | pytest suite (`backend/tests/`, 27 test modules) |
+| Tests | pytest suite (`backend/tests/`) |
 
 ## Getting Started
 
@@ -62,101 +62,6 @@ Add to your `.mcp.json` (use absolute expanded paths — no `~` or `$HOME`):
     }
   }
 }
-```
-
-## File Structure
-
-```
-admin-panel/
-  CLAUDE.md                     # Project instructions for Claude Code
-  README.md                     # This file
-  start.sh                      # Launch script (background server + browser)
-  backend/
-    app.py                      # Flask app factory, entry point
-    mcp_server.py               # MCP stdio entry point (thin bootstrap)
-    requirements.txt            # Python dependencies
-    admin-panel.db              # SQLite database (created on first run)
-    core/                       # Infrastructure layer
-      db.py                     # SQLite connection, migrations bootstrap
-      paths.py                  # Filesystem roots, workspace paths
-      helpers.py                # Shared utilities: workspace_dir(), run_git(), match_scope_pattern()
-      phase.py                  # Phase key parsing and comparison
-      i18n.py                   # Message catalog loader
-      decorators.py             # Request decorators (locale, DB binding)
-      global_flags.py           # Global feature flags
-      terminal.py               # tmux session helpers (create, attach, send-keys)
-    advance/                    # Phase gate subsystem
-      orchestrator.py           # perform_advance, approve_gate, reject_gate, transition_phase
-      guards.py                 # Cross-cutting AdvanceGuard classes (scope, criteria, review)
-      permissions.py            # Tool permission enforcement per phase
-      validators.py             # Acceptance-criteria validators
-      phases/
-        __init__.py             # Phase ABC, PHASE_REGISTRY, module phase loader
-        preparation.py          # 0 Init, 1.0 Assessment, 1.1 Research, 1.2 Proving, 1.3 Impact, 1.4 Preparation Review gate
-        planning.py             # 2.0 Planning
-        execution.py            # 3.N.0 Implementation → 3.N.4 Commit (parameterized by N)
-        finalization.py         # 4.0 Blind Review, 4.1 Address Fix, 4.2 Final Approval gate, 5 Done
-        declarative.py          # Module-contributed phases (e.g. 2.1 Plan Review gate)
-    services/                   # Domain CRUD services
-      comment_service.py        # Review comments and replies
-      criteria_service.py       # Acceptance criteria
-      discussion_service.py     # Unified discussions (research/scope/review)
-      improvement_service.py    # Global improvement tracking
-      lsp_service.py            # Language-server profiles and lifecycle
-      module_phase_loader.py    # Loads DeclarativePhases from modules/
-      modules_discovery.py      # Discovers module directories on disk
-      phase_resolver.py         # Resolves next/previous enabled phases
-      phase_sequencer.py        # Builds the concrete phase sequence per workspace
-      phase_settings.py         # Device + project + workspace phase toggles
-      plan_service.py           # Execution plan CRUD, extend
-      progress_service.py       # Progress entries per phase
-      research_service.py       # Research entries with typed proofs
-      rule_service.py           # Project-scoped rule files (Markdown CRUD)
-      scope_service.py          # Scope map, must/may pattern resolution
-      verification_service.py   # Verification profiles, step execution, result tracking
-    mcp_tools/                  # MCP tool implementations (one file per domain)
-      __init__.py               # Tool decorators, error envelope, workspace binding
-      advance.py                # workspace_advance
-      comments.py               # workspace_get_comments, post_comment, resolve_comment, submit_review_issue, get_review_issues, resolve_review_issue
-      criteria.py               # workspace_propose_criteria, get_criteria, update_criteria
-      improvements.py           # workspace_report_improvement, get_improvements
-      plan_scope.py             # workspace_set_scope, set_plan, get_plan, extend_plan
-      progress.py               # workspace_update_progress, get_progress, set_impact_analysis
-      research.py               # workspace_post_discussion, save_research, list_research, get_research, prove_research, delete_research
-      rules.py                  # rule_list, rule_get, rule_create, rule_update, rule_delete
-      state.py                  # workspace_get_state
-      verification.py           # workspace_get_verification_results, get_verification_profiles, create_verification_profile, update_verification_profile, add_verification_step, assign_verification_profile, submit_validation
-    routes/                     # Flask HTTP blueprints (one per domain)
-      advance.py                # Approve/reject user gates
-      comments.py               # Comment + discussion CRUD, resolve, reply, hide
-      context.py                # Workspace context, discussions, file references
-      criteria.py               # Acceptance criteria CRUD + validation
-      files.py                  # File read, directory listing, git diff
-      git_config.py             # Git config management
-      history.py                # Phase history rename, undo, squash
-      hook_api.py               # Pre-tool hook API (check-permission, session-context)
-      hooks.py                  # Session-start hook
-      improvements.py           # Global improvement CRUD
-      lsp.py                    # Language-server profiles + lifecycle + WebSocket
-      modules.py                # Module discovery and enablement
-      phase_settings.py         # Device/project/workspace phase toggles
-      projects.py               # Project CRUD
-      rules.py                  # Project-scoped Markdown rule files (CRUD)
-      setup.py                  # Workspace setup skill launcher + WebSocket
-      state.py                  # Phase, scope, plan, progress, research proving
-      static.py                 # Serves frontend/ (HTML, CSS, JS, i18n)
-      terminal_routes.py        # Embedded terminal (tmux + xterm.js + WebSocket)
-      verification.py           # Verification profiles, steps, assignment, results
-      workspaces.py             # Workspace + branch management, worktree creation
-    migrations/                 # Yoyo-style SQLite migrations applied on startup
-    messages/                   # i18n JSON bundles (en, ru)
-    tests/                      # pytest suite (27 test modules)
-  frontend/
-    admin.html                  # Single-page admin UI
-    css/                        # 21 modular stylesheets
-    js/                         # 36 vanilla JS modules
-    i18n/                       # Frontend translations
-    img/                        # Static images
 ```
 
 ## Admin Panel Tabs
