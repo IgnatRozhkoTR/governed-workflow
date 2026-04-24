@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, request
 from core.decorators import with_project
 from core.helpers import read_json, write_json
 from core.paths import DEFAULT_GIT_RULES
+from services.git_rules_service import git_rules_path, migrate_legacy_git_rules
 
 bp = Blueprint("git_config", __name__)
 
@@ -62,7 +63,8 @@ def save_git_config(db, project):
 @bp.route("/api/projects/<project_id>/git-rules", methods=["GET"])
 @with_project
 def get_git_rules(db, project):
-    rules_path = Path(project["path"]) / ".claude" / "rules" / "git-rules.md"
+    migrate_legacy_git_rules(project["path"])
+    rules_path = git_rules_path(project["path"])
 
     if os.path.islink(rules_path):
         resolved = Path(os.readlink(rules_path)).expanduser()
@@ -81,7 +83,8 @@ def get_git_rules(db, project):
 @bp.route("/api/projects/<project_id>/git-rules", methods=["PUT"])
 @with_project
 def save_git_rules(db, project):
-    rules_path = Path(project["path"]) / ".claude" / "rules" / "git-rules.md"
+    migrate_legacy_git_rules(project["path"])
+    rules_path = git_rules_path(project["path"])
 
     if os.path.islink(rules_path):
         os.remove(rules_path)

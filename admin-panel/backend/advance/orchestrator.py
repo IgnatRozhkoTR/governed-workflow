@@ -1,22 +1,26 @@
 """Phase advancement orchestrator using Phase objects.
 
-Replaces hardcoded phase string routing with Phase registry lookups.
-All business logic (gate nonce verification, guard evaluation, transitions,
-yolo auto-approve) is preserved exactly from advance/service.py.
+Replaces hardcoded phase string routing with Phase registry lookups. Admin
+token middleware enforces caller identity upstream of approve/reject, so no
+per-request nonce is consulted here.
 """
 import logging
-import secrets
+import re
 from datetime import datetime
 
 from advance.guards import GUARD_ORCHESTRATOR
 from advance.phases import get_phase
 from core.db import get_db_ctx, ws_field
+from core.helpers import run_git
 from core.i18n import t
 from core.phase import is_templated
 from core.terminal import notify_workspace
 from services.phase_sequencer import full_phase_sequence, plan_from_workspace, resolve_phase_sequence
 
 logger = logging.getLogger(__name__)
+
+_COMMIT_PHASE_RE = re.compile(r'^3\.\d+\.4$')
+_EXECUTION_START_RE = re.compile(r'^3\.\d+\.0$')
 
 
 def _resolve_forward_target(ws, db, candidate: str) -> str | None:
@@ -72,11 +76,46 @@ def check_progress(workspace_id, phase_key):
         return bool(row and row["summary"].strip())
 
 
-def transition_phase(db, ws, new_phase, clear_nonce=False, commit_hash=None):
-    """Shared phase transition: update phase, record history, manage nonce.
+def _lazy_init_execution_checkpoint(db, ws, new_phase: str) -> None:
+    """When entering a fresh execution start (3.N.0), set the commit checkpoint.
+
+    Only fires when the workspace has no ``last_confirmed_commit`` yet. The
+    checkpoint is the current HEAD of ``ws["working_dir"]`` — that is the
+    base from which the next commit must descend.
+    """
+    if not _EXECUTION_START_RE.match(new_phase):
+        return
+    if ws_field(ws, "last_confirmed_commit", None):
+        return
+
+    ok, stdout, _ = run_git(ws["working_dir"], "rev-parse", "HEAD")
+    if not ok:
+        return
+    head = stdout.strip()
+    if not head:
+        return
+
+    db.execute(
+        "UPDATE workspaces SET last_confirmed_commit = ? WHERE id = ?",
+        (head, ws["id"])
+    )
+
+
+def transition_phase(db, ws, new_phase, commit_hash=None):
+    """Shared phase transition: update phase and record history.
 
     Returns True if the transition succeeded, False if the phase was already changed
     by a concurrent request (optimistic lock via WHERE phase = current).
+
+    When the FROM phase is a commit phase (``3.N.4``) and a ``commit_hash`` is
+    provided, ``workspaces.last_confirmed_commit`` is advanced to that hash so
+    subsequent progression-guard checks compare against the newest confirmed
+    checkpoint.
+
+    When the TO phase is a fresh execution start (``3.N.0``) and
+    ``last_confirmed_commit`` is still NULL, the current HEAD is recorded as
+    the checkpoint so the first commit submitted in the execution can be
+    validated against a concrete base.
     """
     rows = db.execute(
         "UPDATE workspaces SET phase = ? WHERE id = ? AND phase = ?",
@@ -90,11 +129,13 @@ def transition_phase(db, ws, new_phase, clear_nonce=False, commit_hash=None):
         (ws["id"], ws["phase"], new_phase, datetime.now().isoformat(), commit_hash)
     )
 
-    if clear_nonce:
-        db.execute("UPDATE workspaces SET gate_nonce = NULL WHERE id = ?", (ws["id"],))
-    elif is_user_gate(new_phase):
-        nonce = secrets.token_urlsafe(32)
-        db.execute("UPDATE workspaces SET gate_nonce = ? WHERE id = ?", (nonce, ws["id"]))
+    if commit_hash and _COMMIT_PHASE_RE.match(ws["phase"]):
+        db.execute(
+            "UPDATE workspaces SET last_confirmed_commit = ? WHERE id = ?",
+            (commit_hash, ws["id"])
+        )
+
+    _lazy_init_execution_checkpoint(db, ws, new_phase)
 
     return True
 
@@ -110,19 +151,17 @@ def _notify_yolo_approve(ws, phase):
         logger.warning("Failed to send YOLO auto-approve notification", exc_info=True)
 
 
-def approve_gate(ws, token, commit_message=None):
-    """Approve a user gate. Returns a result dict with an embedded status_code key."""
+def approve_gate(ws, commit_message=None):
+    """Approve a user gate. Returns a result dict with an embedded status_code key.
+
+    Admin-token middleware enforces caller identity upstream of this function.
+    """
     locale = ws["locale"]
     phase_str = ws["phase"]
 
     phase = get_phase(phase_str)
     if not phase or not phase.is_user_gate:
         return {"error": t("gate.error.notAtUserGate", locale), "status_code": 400}
-
-    if not token:
-        return {"error": t("gate.error.nonceRequired", locale), "status_code": 400}
-    if token != ws["gate_nonce"]:
-        return {"error": t("gate.error.invalidNonce", locale), "status_code": 403}
 
     yolo_mode = ws_field(ws, "yolo_mode", 0)
     if not yolo_mode:
@@ -145,26 +184,24 @@ def approve_gate(ws, token, commit_message=None):
 
         phase.on_approve(ws, {"commit_message": commit_message} if commit_message else {}, db)
 
-        if not transition_phase(db, ws, new_phase, clear_nonce=True):
+        if not transition_phase(db, ws, new_phase):
             return {"error": t("gate.error.phaseAlreadyChanged", locale), "status_code": 409}
 
         db.commit()
         return {"phase": new_phase, "previous_phase": phase_str, "status": "ok", "status_code": 200}
 
 
-def reject_gate(ws, token, comments=""):
-    """Reject a user gate. Returns a result dict with an embedded status_code key."""
+def reject_gate(ws, comments=""):
+    """Reject a user gate. Returns a result dict with an embedded status_code key.
+
+    Admin-token middleware enforces caller identity upstream of this function.
+    """
     locale = ws["locale"]
     phase_str = ws["phase"]
 
     phase = get_phase(phase_str)
     if not phase or not phase.is_user_gate:
         return {"error": t("gate.error.notAtUserGate", locale), "status_code": 400}
-
-    if not token:
-        return {"error": t("gate.error.nonceRequired", locale), "status_code": 400}
-    if token != ws["gate_nonce"]:
-        return {"error": t("gate.error.invalidNonce", locale), "status_code": 403}
 
     candidate = phase.reject_target
     if not candidate:
@@ -178,7 +215,7 @@ def reject_gate(ws, token, comments=""):
                 "status_code": 409,
             }
 
-        if not transition_phase(db, ws, new_phase, clear_nonce=True):
+        if not transition_phase(db, ws, new_phase):
             return {"error": t("gate.error.phaseAlreadyChanged", locale), "status_code": 409}
 
         if comments:
@@ -212,13 +249,11 @@ def perform_advance(ws, project_path, body=None):
     if phase.is_user_gate:
         yolo = ws_field(ws, "yolo_mode", 0)
         if yolo:
-            nonce = ws["gate_nonce"]
-            if nonce:
-                result = approve_gate(ws, nonce)
-                status_code = result.pop("status_code", 200)
-                if status_code == 200:
-                    _notify_yolo_approve(ws, phase_str)
-                    return result, status_code
+            approve_result = approve_gate(ws)
+            status_code = approve_result.pop("status_code", 200)
+            if status_code == 200:
+                _notify_yolo_approve(ws, phase_str)
+                return approve_result, status_code
         return {"error": t("advance.error.awaitingUserApproval", locale), "phase": phase_str}, 409
 
     yolo_mode = ws_field(ws, "yolo_mode", 0)
@@ -262,9 +297,8 @@ def perform_advance(ws, project_path, body=None):
                 "SELECT * FROM workspaces WHERE project_id = ? AND sanitized_branch = ?",
                 (ws["project_id"], ws["sanitized_branch"])
             ).fetchone()
-            nonce = ws_fresh["gate_nonce"] if ws_fresh else None
-            if nonce:
-                approve_result = approve_gate(ws_fresh, nonce)
+            if ws_fresh:
+                approve_result = approve_gate(ws_fresh)
                 approve_status = approve_result.pop("status_code", 200)
                 if approve_status == 200:
                     _notify_yolo_approve(ws_fresh, new_phase)

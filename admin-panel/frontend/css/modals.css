@@ -192,7 +192,7 @@
   z-index: 9999;
   background: var(--bg-base);
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
   overflow-y: auto;
 }

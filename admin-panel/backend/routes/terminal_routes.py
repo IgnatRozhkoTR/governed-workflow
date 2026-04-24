@@ -5,6 +5,7 @@ import re
 from flask import Blueprint, request, jsonify
 from flask_sock import Sock
 
+from core.auth import websocket_auth_ok
 from core.terminal import (
     SESSION_KIND_CLAUDE,
     TMUX_NOT_INSTALLED,
@@ -47,6 +48,11 @@ def register_terminal_ws(app):
     sock = Sock(app)
 
     def _attach_terminal_ws(ws, project, branch, session_kind):
+        with get_db_ctx() as db:
+            if not websocket_auth_ok(db, request.args.get('token', '')):
+                ws.send(json.dumps({'error': 'authentication_required'}))
+                return
+
         if not tmux_available():
             ws.send(json.dumps({'error': TMUX_NOT_INSTALLED}))
             return

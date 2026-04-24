@@ -4,6 +4,7 @@ let _wsSelectedProjectName = null;
 let _wsShowArchived = false;
 
 function showProjectSelector() {
+  resetUrlToSelector();
   document.getElementById('project-selector').style.display = 'flex';
   document.getElementById('app-content').style.display = 'none';
   _wsSwitchView('project-list');
@@ -272,28 +273,41 @@ async function createWorkspace(projectId) {
     return;
   }
 
+  let result;
   try {
-    const result = await apiCreateWorkspace(projectId, branch, source, worktree);
+    result = await apiCreateWorkspace(projectId, branch, source, worktree);
+  } catch (err) {
+    resultEl.innerHTML = '';
+    _wsShowError('ws-create-error', err.message);
+    return;
+  }
 
-    let resultHtml = '<div class="ws-create-result-card">';
-    if (result.working_dir) {
-      resultHtml += `<div class="ws-result-row">
-        <span class="ws-result-label">${t('labels.workingDirectory')}</span>
-        <span class="ws-result-value">${_wsEscape(result.working_dir)}</span>
-      </div>`;
-    }
-    resultHtml += `<button class="btn btn-primary" style="margin-top: 12px; width: 100%; justify-content: center;" onclick="openWorkspace('${_wsEscape(projectId)}', '${_wsEscape(branch)}')">${t('buttons.openWorkspace')}</button>`;
-    resultHtml += '</div>';
+  if (!result || !result.workspace) {
+    resultEl.innerHTML = '';
+    _wsShowError('ws-create-error', t('errors.workspaceCreationFailed'));
+    return;
+  }
 
-    resultEl.innerHTML = resultHtml;
-    branchInput.value = '';
+  let resultHtml = '<div class="ws-create-result-card">';
+  if (result.working_dir) {
+    resultHtml += `<div class="ws-result-row">
+      <span class="ws-result-label">${t('labels.workingDirectory')}</span>
+      <span class="ws-result-value">${_wsEscape(result.working_dir)}</span>
+    </div>`;
+  }
+  resultHtml += `<button class="btn btn-primary" style="margin-top: 12px; width: 100%; justify-content: center;" onclick="openWorkspace('${_wsEscape(projectId)}', '${_wsEscape(branch)}')">${t('buttons.openWorkspace')}</button>`;
+  resultHtml += '</div>';
 
+  resultEl.innerHTML = resultHtml;
+  branchInput.value = '';
+
+  try {
     const workspaceListEl = document.getElementById('ws-workspace-cards');
     const wsData2 = await apiListWorkspaces(projectId);
     const workspaces = wsData2.workspaces || [];
     workspaceListEl.innerHTML = _wsRenderWorkspaceCards(projectId, workspaces);
   } catch (err) {
-    _wsShowError('ws-create-error', err.message);
+    _wsShowError('ws-workspace-error', err.message);
   }
 }
 

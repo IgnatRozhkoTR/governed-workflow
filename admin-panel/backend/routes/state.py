@@ -228,22 +228,8 @@ def set_phase(db, ws, project):
         (ws["id"], old_phase, new_phase, datetime.now().isoformat())
     )
 
-    from advance.orchestrator import is_user_gate
-
-    if is_user_gate(new_phase):
-        import secrets
-        nonce = secrets.token_urlsafe(32)
-        db.execute("UPDATE workspaces SET gate_nonce = ? WHERE id = ?", (nonce, ws["id"]))
-
     db.commit()
     return jsonify({"phase": new_phase, "previous_phase": old_phase})
-
-
-@bp.route("/api/ws/<project_id>/<path:branch>/gate-nonce", methods=["GET"])
-@with_workspace
-def get_gate_nonce(db, ws, project):
-    nonce = ws["gate_nonce"] if ws["gate_nonce"] else None
-    return jsonify({"nonce": nonce})
 
 
 @bp.route("/api/progress", methods=["GET"])

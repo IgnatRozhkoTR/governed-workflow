@@ -37,7 +37,6 @@ def workspace_get_state(ws, project, db, locale) -> dict:
         research_summary, unresolved_comments_count, review_issues_summary,
         criteria_summary, previous_sessions_count, locale, branch,
         working_dir, _detail_tools.
-        gate_nonce is NOT returned (security: only available via admin panel UI).
 
     Errors:
         not_found  — no workspace matched the current working directory.

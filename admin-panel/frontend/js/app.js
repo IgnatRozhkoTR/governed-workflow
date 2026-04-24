@@ -3,6 +3,27 @@
 // ═══════════════════════════════════════════════
 
 async function initApp() {
+  try {
+    const authStatus = await apiAuthStatus();
+    if (authStatus.auth_enabled) {
+      const stored = getAuthToken();
+      if (!stored) {
+        showAuthScreen();
+        return;
+      }
+      try {
+        const check = await apiAuthCheck(stored);
+        if (!check || !check.ok) throw new Error('invalid');
+      } catch (e) {
+        clearAuthToken();
+        showAuthScreen();
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('Auth status check failed:', e.message);
+  }
+
   const ctx = getWorkspaceContext();
 
   if (!ctx) {
@@ -102,6 +123,7 @@ async function initApp() {
   loadClaudeCommand();
   loadChannelsPreference();
   loadModulesCard();
+  if (typeof renderNetworkMode === 'function') renderNetworkMode();
   if (typeof renderLspShortcutsConfig === 'function') renderLspShortcutsConfig();
   var wsBody = document.getElementById('phaseSettingsWorkspaceBody');
   if (wsBody && typeof renderPhaseToggleCard === 'function') {

@@ -13,6 +13,7 @@
 !research-principles.md
 !test-standards.md
 !validation-pipeline.md
+!workflow-hardening.md
 
 # Keep this gitignore itself tracked
 !.gitignore

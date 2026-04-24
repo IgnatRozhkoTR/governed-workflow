@@ -187,6 +187,7 @@
   "errors.failedToLoad": "Ошибка загрузки файла: {error}",
   "errors.failedToLoadSnippet": "Ошибка загрузки: {error}",
   "errors.noWorkspaceContextAvailable": "Контекст рабочего пространства недоступен",
+  "errors.workspaceCreationFailed": "Не удалось создать рабочее пространство.",
 
   "scope.mustModify": "Обязательно изменить",
   "scope.mayModify": "Можно изменить",
@@ -486,5 +487,26 @@
   "history.dialogs.squashMessage": "Объединённое сообщение:",
   "history.errors.renameFailed": "Ошибка переименования: {error}",
   "history.errors.undoFailed": "Ошибка отмены: {error}",
-  "history.errors.squashFailed": "Ошибка сжатия: {error}"
+  "history.errors.squashFailed": "Ошибка сжатия: {error}",
+
+  "auth.title": "Требуется токен администратора",
+  "auth.subtitle": "Вставьте токен, который вывела команда auth-token",
+  "auth.placeholder": "gwf_…",
+  "auth.submit": "Войти",
+  "auth.hint": "Сгенерируйте новый токен командой python3 backend/app.py auth-token в терминале.",
+  "auth.invalid": "Неверный токен. Попробуйте ещё раз.",
+
+  "networkMode.title": "Сетевой режим",
+  "networkMode.allowAccess": "Разрешить доступ с других устройств в локальной сети",
+  "networkMode.explain": "Админ-панель станет доступна в локальной сети. Используйте только в доверенной сети или через защищённый туннель. Не открывайте панель напрямую в интернет.",
+  "networkMode.reach": "Панель доступна по адресам:",
+  "networkMode.noLan": "Адрес в локальной сети не обнаружен",
+  "networkMode.confirmEnable": "Включить доступ по сети?\n\nАдмин-панель станет доступна в локальной сети. Используйте только в доверенной сети или через защищённый туннель. Не открывайте порт 5111 в публичный интернет.\n\nПриложение перезапустится и откроется по адресу http://0.0.0.0:5111, чтобы вы могли убедиться, что сетевой режим активен. Продолжить?",
+  "networkMode.confirmDisable": "Отключить доступ по сети?\n\nПриложение перезапустится и откроется по адресу http://127.0.0.1:5111. Продолжить?",
+  "networkMode.restarting": "Перезапуск админ-панели…",
+  "networkMode.restartingNetwork": "После перезапуска откроется http://0.0.0.0:5111. Некоторые браузеры отображают этот адрес как localhost — это нормально.",
+  "networkMode.restartingLocal": "После перезапуска откроется http://127.0.0.1:5111.",
+  "networkMode.timeoutManual": "Перезапуск занимает больше обычного. Перезагрузите страницу вручную.",
+  "networkMode.unavailable": "Настройки сетевого режима недоступны.",
+  "networkMode.saveFailed": "Не удалось сохранить: {error}"
 }

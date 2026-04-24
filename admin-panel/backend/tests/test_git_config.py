@@ -105,8 +105,8 @@ def test_get_git_rules_returnsNotConfigured_whenNoRulesFile(client, project):
     assert data["content"] == ""
 
 
-def test_get_git_rules_returnsContent_whenProjectFileExists(client, project):
-    rules_path = Path(project["path"]) / ".claude" / "rules" / "git-rules.md"
+def test_get_git_rules_returnsContent_whenProjectFileExistsAtNewLocation(client, project):
+    rules_path = Path(project["path"]) / ".claude" / "git-rules.md"
     rules_path.parent.mkdir(parents=True, exist_ok=True)
     rules_content = "# Git Rules\n\n- Always rebase\n- No force push"
     rules_path.write_text(rules_content)
@@ -118,10 +118,29 @@ def test_get_git_rules_returnsContent_whenProjectFileExists(client, project):
     assert data["content"] == rules_content
 
 
+def test_get_git_rules_migratesContent_fromLegacyLocation(client, project):
+    legacy_path = Path(project["path"]) / ".claude" / "rules" / "git-rules.md"
+    legacy_path.parent.mkdir(parents=True, exist_ok=True)
+    legacy_content = "# Legacy Git Rules\n\n- Use conventional commits"
+    legacy_path.write_text(legacy_content)
+
+    response = client.get(f"/api/projects/{project['id']}/git-rules")
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["source"] == "project"
+    assert data["content"] == legacy_content
+
+    new_path = Path(project["path"]) / ".claude" / "git-rules.md"
+    assert new_path.exists()
+    assert not legacy_path.exists()
+    assert new_path.read_text() == legacy_content
+
+
 def test_get_git_rules_returnsSystemSource_whenSymlinkToSystemDefault(client, project):
-    rules_dir = Path(project["path"]) / ".claude" / "rules"
-    rules_dir.mkdir(parents=True, exist_ok=True)
-    rules_path = rules_dir / "git-rules.md"
+    claude_dir = Path(project["path"]) / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    rules_path = claude_dir / "git-rules.md"
 
     system_path = DEFAULT_GIT_RULES
     if not system_path.exists():
@@ -154,16 +173,16 @@ def test_save_git_rules_shouldWriteFile(client, project):
     assert data["status"] == "saved"
     assert data["source"] == "project"
 
-    rules_path = Path(project["path"]) / ".claude" / "rules" / "git-rules.md"
+    rules_path = Path(project["path"]) / ".claude" / "git-rules.md"
     assert rules_path.exists()
     assert not os.path.islink(rules_path)
     assert rules_path.read_text() == rules_content
 
 
 def test_save_git_rules_shouldReplaceSymlink_whenSymlinkExists(client, project):
-    rules_dir = Path(project["path"]) / ".claude" / "rules"
-    rules_dir.mkdir(parents=True, exist_ok=True)
-    rules_path = rules_dir / "git-rules.md"
+    claude_dir = Path(project["path"]) / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    rules_path = claude_dir / "git-rules.md"
 
     system_path = DEFAULT_GIT_RULES
     if not system_path.exists():
@@ -180,3 +199,18 @@ def test_save_git_rules_shouldReplaceSymlink_whenSymlinkExists(client, project):
     assert not os.path.islink(rules_path)
     assert rules_path.exists()
     assert rules_path.read_text() == new_content
+
+
+def test_save_git_rules_migratesLegacyFile_beforeWriting(client, project):
+    legacy_path = Path(project["path"]) / ".claude" / "rules" / "git-rules.md"
+    legacy_path.parent.mkdir(parents=True, exist_ok=True)
+    legacy_path.write_text("legacy content")
+
+    new_content = "# Replacement Rules\n"
+    response = client.put(f"/api/projects/{project['id']}/git-rules", json={"content": new_content})
+    assert response.status_code == 200
+
+    new_path = Path(project["path"]) / ".claude" / "git-rules.md"
+    assert new_path.exists()
+    assert not legacy_path.exists()
+    assert new_path.read_text() == new_content

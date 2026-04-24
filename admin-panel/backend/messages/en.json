@@ -19,7 +19,7 @@
 
   "mcp.instructions": "Workspace state management for orchestrator workflow.",
 
-  "mcp.tool.getState.desc": "Get compact workspace state overview. Returns core state (phase, scope, context, discussions) inline,\n    with summaries and counts for large sections.\n\n    For full details, use dedicated tools:\n    - Plan: workspace_get_plan\n    - Progress details: workspace_get_progress\n    - Research: workspace_list_research / workspace_get_research\n    - Comments: workspace_get_comments\n    - Review issues: workspace_get_review_issues\n    - Criteria: workspace_get_criteria\n\n    Does NOT return gate_nonce (security: only available via admin panel UI).",
+  "mcp.tool.getState.desc": "Get compact workspace state overview. Returns core state (phase, scope, context, discussions) inline,\n    with summaries and counts for large sections.\n\n    For full details, use dedicated tools:\n    - Plan: workspace_get_plan\n    - Progress details: workspace_get_progress\n    - Research: workspace_list_research / workspace_get_research\n    - Comments: workspace_get_comments\n    - Review issues: workspace_get_review_issues\n    - Criteria: workspace_get_criteria",
   "mcp.tool.getState.detail.plan": "workspace_get_plan — full plan with sub-phase tasks, scope, and system diagram",
   "mcp.tool.getState.detail.progress": "workspace_get_progress(phase?) — full progress entries with structured details",
   "mcp.tool.getState.detail.research": "workspace_get_research(ids=[...]) — full findings with typed proofs",
@@ -151,6 +151,10 @@
   "advance.error.commitHashRequired": "commit_hash is required.",
   "advance.error.commitNotFound": "Commit {commit_hash} not found in repository.",
   "advance.error.commitAlreadyUsed": "Commit {commit_hash} was already used in a previous sub-phase. Provide a new commit.",
+  "advance.error.commitNotHead": "Commit {commit_hash} is not the current HEAD ({head}). Submit the commit that is currently checked out.",
+  "advance.error.commitNoForwardProgress": "No forward progress: checkpoint already at this commit.",
+  "advance.error.commitNotDescendant": "Commit is not a descendant of the last confirmed checkpoint. History was rewritten or an old commit was resubmitted.",
+  "advance.error.commitDiffOutsideScope": "Commit diff includes files outside the approved sub-phase scope:\n{files}\nAllowed patterns:\n{patterns}",
   "advance.error.noSubPhaseProgress": "Call workspace_update_progress to record sub-phase completion.",
   "advance.error.acceptanceCriteriaNotMet": "Acceptance criteria not met:\n{messages}\nFix the issues and try advancing again.",
   "advance.error.awaitingUserApproval": "Awaiting user approval",
@@ -163,8 +167,6 @@
   "advance.success.advancedWithGuide": "Phase {phase}: {guide}",
 
   "gate.error.notAtUserGate": "Not at a user gate",
-  "gate.error.nonceRequired": "Nonce token required",
-  "gate.error.invalidNonce": "Invalid nonce token",
   "gate.error.noExecutionPlan": "No execution plan",
   "gate.error.pendingCriteria": "{count} acceptance criteria are not yet accepted. All criteria must be accepted or deleted before approving the plan.",
   "gate.error.unknownGate": "Unknown gate",
@@ -206,6 +208,7 @@
   "api.error.workspaceAlreadyExists": "Workspace already exists for branch '{branch}'",
   "api.error.cannotCreateWorktreeCheckedOut": "Cannot create worktree: branch '{branch}' is currently checked out. Use non-worktree mode or choose a different branch.",
   "api.error.gitWorktreeAddFailed": "git worktree add failed",
+  "api.error.worktreeTargetPathExists": "Cannot create worktree: target path '{path}' already exists. Archive the existing workspace or remove the directory and retry.",
   "api.error.gitCheckoutFailed": "git checkout failed",
   "api.error.failedToListBranches": "Failed to list branches",
   "api.error.failedToListFiles": "Failed to list files",

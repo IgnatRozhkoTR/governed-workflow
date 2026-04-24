@@ -15,7 +15,8 @@ function _buildTerminalWsUrl(projectId, branch) {
   var base = protocol + '//' + window.location.host + '/ws/terminal/' +
              encodeURIComponent(projectId) + '/' + encodeURIComponent(branch);
   var kind = _getActiveTerminalKind();
-  return kind && kind !== 'claude' ? base + '/' + encodeURIComponent(kind) : base;
+  var withKind = kind && kind !== 'claude' ? base + '/' + encodeURIComponent(kind) : base;
+  return _appendTokenToWsUrl(withKind);
 }
 
 var TERMINAL_THEMES = {

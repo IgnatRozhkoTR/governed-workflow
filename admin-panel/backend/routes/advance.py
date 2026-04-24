@@ -35,8 +35,12 @@ def _build_gate_message(phase, phase_messages, fallback_sub_approved, fallback_g
 @bp.route("/api/ws/<project_id>/<path:branch>/approve", methods=["POST"])
 @with_workspace
 def approve(db, ws, project):
+    """Approve the current user gate.
+
+    Admin-token auth middleware is the real identity check.
+    """
     body = request.get_json(silent=True) or {}
-    result = approve_gate(ws, body.get("token", ""), body.get("commit_message"))
+    result = approve_gate(ws, body.get("commit_message"))
     if result.get("status_code", 200) == 200:
         msg = _build_gate_message(
             ws['phase'], _APPROVE_MESSAGES,
@@ -50,8 +54,12 @@ def approve(db, ws, project):
 @bp.route("/api/ws/<project_id>/<path:branch>/reject", methods=["POST"])
 @with_workspace
 def reject(db, ws, project):
+    """Reject the current user gate.
+
+    Admin-token auth middleware is the real identity check.
+    """
     body = request.get_json(silent=True) or {}
-    result = reject_gate(ws, body.get("token", ""), body.get("comments", ""))
+    result = reject_gate(ws, body.get("comments", ""))
     if result.get("status_code", 200) == 200:
         msg = _build_gate_message(
             ws['phase'], _REJECT_MESSAGES,

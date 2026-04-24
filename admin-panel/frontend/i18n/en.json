@@ -187,6 +187,7 @@
   "errors.failedToLoad": "Failed to load file: {error}",
   "errors.failedToLoadSnippet": "Failed to load: {error}",
   "errors.noWorkspaceContextAvailable": "No workspace context available",
+  "errors.workspaceCreationFailed": "Workspace creation failed.",
 
   "scope.mustModify": "Must Modify",
   "scope.mayModify": "May Modify",
@@ -486,5 +487,26 @@
   "history.dialogs.squashMessage": "Combined commit message:",
   "history.errors.renameFailed": "Rename failed: {error}",
   "history.errors.undoFailed": "Undo failed: {error}",
-  "history.errors.squashFailed": "Squash failed: {error}"
+  "history.errors.squashFailed": "Squash failed: {error}",
+
+  "auth.title": "Admin token required",
+  "auth.subtitle": "Paste the token printed by auth-token",
+  "auth.placeholder": "gwf_…",
+  "auth.submit": "Unlock",
+  "auth.hint": "Run python3 backend/app.py auth-token in your terminal to generate a new token.",
+  "auth.invalid": "Token invalid. Try again.",
+
+  "networkMode.title": "Network Mode",
+  "networkMode.allowAccess": "Allow access from other devices on this network",
+  "networkMode.explain": "This exposes the admin panel to your local network. Use only on trusted LAN or behind a secure tunnel. Do not expose it directly to the public internet.",
+  "networkMode.reach": "The panel is reachable at:",
+  "networkMode.noLan": "No LAN address detected",
+  "networkMode.confirmEnable": "Enable network access?\n\nThis exposes the admin panel to your local network. Use only on trusted LANs or behind a secure tunnel. Do not expose port 5111 to the public internet.\n\nThe app will restart and open http://0.0.0.0:5111 so you can verify network mode is active. Continue?",
+  "networkMode.confirmDisable": "Disable network access?\n\nThe app will restart and open http://127.0.0.1:5111. Continue?",
+  "networkMode.restarting": "Restarting admin panel…",
+  "networkMode.restartingNetwork": "Opening http://0.0.0.0:5111 after restart. Some browsers display this as localhost — that's expected.",
+  "networkMode.restartingLocal": "Opening http://127.0.0.1:5111 after restart.",
+  "networkMode.timeoutManual": "Restart is taking longer than expected. Reload manually.",
+  "networkMode.unavailable": "Network mode configuration unavailable.",
+  "networkMode.saveFailed": "Failed to save: {error}"
 }

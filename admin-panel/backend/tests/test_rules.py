@@ -51,6 +51,34 @@ class TestRuleServiceList:
         result = rule_service.list_rules(project["path"])
         assert any(r["name"] == "broken" and r.get("error") == "invalid_frontmatter" for r in result)
 
+    def test_list_rules_excludes_git_rules_file(self, project):
+        claude_dir = Path(project["path"]) / ".claude"
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        (claude_dir / "git-rules.md").write_text(
+            "Commit often. Push without fear.\n", encoding="utf-8"
+        )
+        rule_service.create_rule(project["path"], "my-rule", "d", ["**/*.py"], "body")
+
+        result = rule_service.list_rules(project["path"])
+
+        names = {r["name"] for r in result}
+        assert "git-rules" not in names
+        assert "my-rule" in names
+
+    def test_list_rules_excludes_project_context_file(self, project):
+        claude_dir = Path(project["path"]) / ".claude"
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        (claude_dir / "project-context.md").write_text(
+            "Some task context notes.\n", encoding="utf-8"
+        )
+        rule_service.create_rule(project["path"], "my-rule", "d", ["**/*.py"], "body")
+
+        result = rule_service.list_rules(project["path"])
+
+        names = {r["name"] for r in result}
+        assert "project-context" not in names
+        assert "my-rule" in names
+
 
 class TestRuleServiceCreate:
     def test_create_succeeds_andMarksSourceUser(self, project):

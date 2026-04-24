@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, request
 from flask_sock import Sock
 
 from services import lsp_service
+from core.auth import websocket_auth_ok
 from core.decorators import with_workspace
 from core.db import get_db_ctx
 
@@ -133,6 +134,9 @@ def register_lsp_ws(app):
     @sock.route("/ws/lsp/<project_id>/<path:branch>")
     def lsp_ws(ws, project_id, branch):
         with get_db_ctx() as db:
+            if not websocket_auth_ok(db, request.args.get("token", "")):
+                ws.send(json.dumps({"error": "authentication_required"}))
+                return
             project = db.execute(
                 "SELECT * FROM projects WHERE id = ?", (project_id,)
             ).fetchone()

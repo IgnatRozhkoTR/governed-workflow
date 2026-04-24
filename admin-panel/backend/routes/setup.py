@@ -7,6 +7,7 @@ from pathlib import Path
 from flask import Blueprint, request, jsonify
 from flask_sock import Sock
 
+from core.auth import websocket_auth_ok
 from core.terminal import session_exists, create_session, send_keys, kill_session, tmux_available, send_prompt_when_ready, run_pty_websocket, TMUX_NOT_INSTALLED
 from core.db import get_db_ctx
 from core.paths import DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR, DEFAULT_SKILLS_DIR
@@ -97,6 +98,11 @@ def register_setup_ws(app):
 
     @sock.route('/ws/setup-terminal')
     def setup_terminal_ws(ws):
+        with get_db_ctx() as db:
+            if not websocket_auth_ok(db, request.args.get('token', '')):
+                ws.send(json.dumps({'error': 'authentication_required'}))
+                return
+
         if not tmux_available():
             ws.send(json.dumps({'error': TMUX_NOT_INSTALLED}))
             return

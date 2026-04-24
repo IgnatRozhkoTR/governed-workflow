@@ -19,7 +19,7 @@
 
   "mcp.instructions": "Управление состоянием рабочего пространства для рабочего процесса оркестратора.",
 
-  "mcp.tool.getState.desc": "Получить краткий обзор состояния рабочего пространства. Возвращает основное состояние (фаза, область, контекст, обсуждения) в строчном виде,\n    с резюме и счётчиками для больших разделов.\n\n    Для полных деталей используйте специализированные инструменты:\n    - План: workspace_get_plan\n    - Детали прогресса: workspace_get_progress\n    - Исследования: workspace_list_research / workspace_get_research\n    - Комментарии: workspace_get_comments\n    - Проблемы ревью: workspace_get_review_issues\n    - Критерии: workspace_get_criteria\n\n    НЕ возвращает gate_nonce (безопасность: доступно только через UI панели администратора).",
+  "mcp.tool.getState.desc": "Получить краткий обзор состояния рабочего пространства. Возвращает основное состояние (фаза, область, контекст, обсуждения) в строчном виде,\n    с резюме и счётчиками для больших разделов.\n\n    Для полных деталей используйте специализированные инструменты:\n    - План: workspace_get_plan\n    - Детали прогресса: workspace_get_progress\n    - Исследования: workspace_list_research / workspace_get_research\n    - Комментарии: workspace_get_comments\n    - Проблемы ревью: workspace_get_review_issues\n    - Критерии: workspace_get_criteria",
   "mcp.tool.getState.detail.plan": "workspace_get_plan — полный план с задачами подфаз, областью и системной диаграммой",
   "mcp.tool.getState.detail.progress": "workspace_get_progress(phase?) — полные записи прогресса со структурированными деталями",
   "mcp.tool.getState.detail.research": "workspace_get_research(ids=[...]) — полные результаты с типизированными доказательствами",
@@ -151,6 +151,10 @@
   "advance.error.commitHashRequired": "commit_hash обязателен.",
   "advance.error.commitNotFound": "Коммит {commit_hash} не найден в репозитории.",
   "advance.error.commitAlreadyUsed": "Коммит {commit_hash} уже использовался в предыдущем подэтапе. Укажите новый коммит.",
+  "advance.error.commitNotHead": "Коммит {commit_hash} не является текущим HEAD ({head}). Отправьте коммит, который сейчас checked out.",
+  "advance.error.commitNoForwardProgress": "Нет продвижения вперёд: контрольная точка уже на этом коммите.",
+  "advance.error.commitNotDescendant": "Коммит не является потомком последней подтверждённой контрольной точки. История была переписана или был повторно отправлен старый коммит.",
+  "advance.error.commitDiffOutsideScope": "Diff коммита включает файлы вне утверждённой области подфазы:\n{files}\nРазрешённые шаблоны:\n{patterns}",
   "advance.error.noSubPhaseProgress": "Вызовите workspace_update_progress для записи завершения подфазы.",
   "advance.error.acceptanceCriteriaNotMet": "Критерии приёмки не выполнены:\n{messages}\nИсправьте проблемы и попробуйте продвинуться снова.",
   "advance.error.awaitingUserApproval": "Ожидается одобрение пользователя",
@@ -163,8 +167,6 @@
   "advance.success.advancedWithGuide": "Фаза {phase}: {guide}",
 
   "gate.error.notAtUserGate": "Не на пользовательском шлюзе",
-  "gate.error.nonceRequired": "Требуется токен nonce",
-  "gate.error.invalidNonce": "Недопустимый токен nonce",
   "gate.error.noExecutionPlan": "Нет плана выполнения",
   "gate.error.pendingCriteria": "{count} критериев приёмки ещё не приняты. Все критерии должны быть приняты или удалены перед одобрением плана.",
   "gate.error.unknownGate": "Неизвестный шлюз",
@@ -206,6 +208,7 @@
   "api.error.workspaceAlreadyExists": "Рабочее пространство для ветки '{branch}' уже существует",
   "api.error.cannotCreateWorktreeCheckedOut": "Невозможно создать worktree: ветка '{branch}' в данный момент извлечена. Используйте режим без worktree или выберите другую ветку.",
   "api.error.gitWorktreeAddFailed": "git worktree add завершился с ошибкой",
+  "api.error.worktreeTargetPathExists": "Невозможно создать worktree: целевой путь '{path}' уже существует. Архивируйте существующее рабочее пространство или удалите каталог и повторите попытку.",
   "api.error.gitCheckoutFailed": "git checkout завершился с ошибкой",
   "api.error.failedToListBranches": "Не удалось получить список веток",
   "api.error.failedToListFiles": "Не удалось получить список файлов",

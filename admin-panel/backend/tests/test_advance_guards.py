@@ -277,14 +277,8 @@ def test_advance_blocked_by_review_guard_at_gate(workspace, project):
     set_phase(workspace["id"], "4.2", scope_status="approved", plan_status="approved")
     add_research(workspace["id"], topic="Good", proven=1)
     ws = _get_ws_row(workspace["id"])
+
     from advance.orchestrator import approve_gate
-    nonce_row = _get_ws_row(workspace["id"])
-    from core.db import get_db
-    db = get_db()
-    db.execute("UPDATE workspaces SET gate_nonce = 'test-nonce' WHERE id = ?", (workspace["id"],))
-    db.commit()
-    db.close()
-    ws = _get_ws_row(workspace["id"])
-    result = approve_gate(ws, "test-nonce")
+    result = approve_gate(ws)
     assert "error" in result
     assert "guard_errors" in result

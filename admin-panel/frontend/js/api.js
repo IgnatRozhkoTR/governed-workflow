@@ -3,6 +3,42 @@
 // ═══════════════════════════════════════════════
 
 const API_BASE = '';  // Same origin
+const AUTH_TOKEN_KEY = 'admin-panel-auth-token';
+
+// ─── Auth token helpers ───
+
+function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+}
+
+function setAuthToken(token) {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+function clearAuthToken() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+function _authHeaders(base) {
+  const headers = base ? Object.assign({}, base) : {};
+  const token = getAuthToken();
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  return headers;
+}
+
+async function _handleAuthFailure() {
+  clearAuthToken();
+  if (typeof EventBus !== 'undefined' && EventBus && typeof EventBus.emit === 'function') {
+    EventBus.emit('auth:required');
+  }
+}
+
+function _appendTokenToWsUrl(url) {
+  const token = getAuthToken();
+  if (!token) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return url + sep + 'token=' + encodeURIComponent(token);
+}
 
 // ─── URL-based workspace context ───
 
@@ -32,13 +68,32 @@ function clearWorkspaceContext() {
   window.history.pushState({}, '', url);
 }
 
+// Reset URL to the canonical project-selector state: path "/", no query,
+// no hash. Used when the user clicks "Switch" in the header so that a
+// refresh on the selector doesn't auto-redirect back into the workspace.
+function resetUrlToSelector() {
+  window.history.pushState({}, '', '/');
+}
+
 // ─── Generic fetch helpers ───
 
+function _buildApiErrorMessage(err, fallback) {
+  const main = err.error || err.details || fallback;
+  if (err.error && err.details && err.details !== err.error) {
+    return main + ' — ' + err.details;
+  }
+  return main;
+}
+
 async function apiGet(path) {
-  const res = await fetch(API_BASE + path);
+  const res = await fetch(API_BASE + path, { headers: _authHeaders() });
+  if (res.status === 401) {
+    await _handleAuthFailure();
+    throw new Error('Unauthorized');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || err.details || res.statusText);
+    throw new Error(_buildApiErrorMessage(err, res.statusText));
   }
   return res.json();
 }
@@ -48,14 +103,18 @@ async function apiGet(path) {
 async function apiGetWithEtag(path, lastEtag) {
   const headers = {};
   if (lastEtag) headers['If-None-Match'] = lastEtag;
-  const res = await fetch(API_BASE + path, { headers });
+  const res = await fetch(API_BASE + path, { headers: _authHeaders(headers) });
 
   if (res.status === 304) {
     return { notModified: true, etag: res.headers.get('ETag') || lastEtag || null, data: null };
   }
+  if (res.status === 401) {
+    await _handleAuthFailure();
+    throw new Error('Unauthorized');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || err.details || res.statusText);
+    throw new Error(_buildApiErrorMessage(err, res.statusText));
   }
   const data = await res.json();
   return { notModified: false, etag: res.headers.get('ETag') || null, data };
@@ -64,12 +123,16 @@ async function apiGetWithEtag(path, lastEtag) {
 async function apiPost(path, body) {
   const res = await fetch(API_BASE + path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: _authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body)
   });
+  if (res.status === 401) {
+    await _handleAuthFailure();
+    throw new Error('Unauthorized');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || err.details || res.statusText);
+    throw new Error(_buildApiErrorMessage(err, res.statusText));
   }
   return res.json();
 }
@@ -77,21 +140,29 @@ async function apiPost(path, body) {
 async function apiPut(path, body) {
   const res = await fetch(API_BASE + path, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: _authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body)
   });
+  if (res.status === 401) {
+    await _handleAuthFailure();
+    throw new Error('Unauthorized');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || err.details || res.statusText);
+    throw new Error(_buildApiErrorMessage(err, res.statusText));
   }
   return res.json();
 }
 
 async function apiDelete(path) {
-  const res = await fetch(API_BASE + path, { method: 'DELETE' });
+  const res = await fetch(API_BASE + path, { method: 'DELETE', headers: _authHeaders() });
+  if (res.status === 401) {
+    await _handleAuthFailure();
+    throw new Error('Unauthorized');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || err.details || res.statusText);
+    throw new Error(_buildApiErrorMessage(err, res.statusText));
   }
   return res.json();
 }
@@ -177,18 +248,52 @@ function apiAdvance(projectId, branch, body) {
   return apiPost('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/advance', body || {});
 }
 
-function apiGetGateNonce(projectId, branch) {
-  return apiGet('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/gate-nonce');
-}
-
-function apiApprove(projectId, branch, token, commitMessage) {
-  var body = { token: token };
+function apiApprove(projectId, branch, commitMessage) {
+  var body = {};
   if (commitMessage) body.commit_message = commitMessage;
   return apiPost('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/approve', body);
 }
 
-function apiReject(projectId, branch, token, comments) {
-  return apiPost('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/reject', { token: token, comments: comments });
+function apiReject(projectId, branch, comments) {
+  return apiPost('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/reject', { comments: comments });
+}
+
+// ─── Auth endpoints ───
+
+async function apiAuthStatus() {
+  const res = await fetch(API_BASE + '/api/auth/status', { cache: 'no-store' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || err.details || res.statusText);
+  }
+  return res.json();
+}
+
+async function apiAuthCheck(token) {
+  const res = await fetch(API_BASE + '/api/auth/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || err.details || res.statusText);
+  }
+  return res.json();
+}
+
+// ─── Network mode + restart ───
+
+function apiGetNetworkMode() {
+  return apiGet('/api/network-mode');
+}
+
+function apiSetNetworkMode(enabled) {
+  return apiPut('/api/network-mode', { enabled: !!enabled });
+}
+
+function apiRestartBackend() {
+  return apiPost('/api/restart', {});
 }
 
 // ─── File & diff endpoints ───

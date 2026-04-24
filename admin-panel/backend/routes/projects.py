@@ -130,7 +130,7 @@ def _extract_host(remote_url):
 
 
 def _ensure_git_rules_symlink(project_path):
-    rules_path = Path(project_path) / ".claude" / "rules" / "git-rules.md"
+    rules_path = Path(project_path) / ".claude" / "git-rules.md"
     if rules_path.exists() or rules_path.is_symlink():
         return
 

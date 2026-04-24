@@ -48,9 +48,11 @@ function connectLsp() {
 
   var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   var host = window.location.host;
-  var url = protocol + '//' + host + '/ws/lsp/'
+  var url = _appendTokenToWsUrl(
+    protocol + '//' + host + '/ws/lsp/'
     + encodeURIComponent(ctx.projectId) + '/'
-    + encodeURIComponent(ctx.branch);
+    + encodeURIComponent(ctx.branch)
+  );
 
   var socket = new WebSocket(url);
 

@@ -9,4 +9,3 @@ Foundation layer — no business logic, no domain imports. Everything else depen
 - `phase.py` — `phase_key()` function returning a comparable tuple from a dotted-string phase identifier
 - `terminal.py` — tmux session management, PTY-WebSocket bridge
 - `decorators.py` — Flask route decorators (`with_workspace`, `with_project`)
-- `global_flags.py` — process-wide feature toggles read by routes and MCP tools

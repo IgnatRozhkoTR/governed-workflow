@@ -127,7 +127,10 @@ def _serialize_rule(name: str, description: str, paths: list, body: str) -> str:
 def list_rules(project_path) -> list[dict]:
     """Return metadata for every rule in <project>/.claude/rules/.
 
-    Malformed files are included with an 'error' field instead of raising.
+    Only direct *.md files in the rules directory are considered; files that
+    live elsewhere under .claude/ (Git Rules, Task Context) are not rules and
+    are not reached by this glob.  Malformed files are included with an
+    'error' field instead of raising.
     """
     directory = _rules_dir(project_path)
     if not directory.exists():

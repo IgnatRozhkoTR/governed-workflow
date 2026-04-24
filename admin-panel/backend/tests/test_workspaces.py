@@ -102,6 +102,86 @@ def test_archive_workspace_already_archived(client, workspace, project):
     assert r.status_code == 404
 
 
+def test_create_workspace_recovers_from_stale_worktree_dir(client, project):
+    """A leftover directory at .claude/worktrees/<branch> with no registered
+    git worktree should be cleaned up automatically on workspace creation."""
+    stale_dir = Path(project["path"]) / ".claude" / "worktrees" / "MP-12"
+    stale_dir.mkdir(parents=True, exist_ok=True)
+    (stale_dir / "leftover.txt").write_text("orphan")
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "MP-12", "source": "develop", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    assert r.json["branch"] == "MP-12"
+    assert stale_dir.exists()
+
+
+def test_create_workspace_returns_409_with_details_when_worktree_add_fails(
+    client, project, monkeypatch
+):
+    """When git worktree add fails, the response must expose stderr in
+    `details`, return 409, and leave no phantom workspace row in the DB."""
+    from core.db import get_db
+    from routes import workspaces as workspaces_module
+
+    real_run_git = workspaces_module.run_git
+
+    def fake_run_git(cwd, *args):
+        if args[:2] == ("worktree", "add"):
+            return False, "", "fatal: simulated worktree add failure"
+        return real_run_git(cwd, *args)
+
+    monkeypatch.setattr(workspaces_module, "run_git", fake_run_git)
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/worktree-fail", "source": "develop", "worktree": True},
+    )
+
+    assert r.status_code == 409
+    assert "error" in r.json
+    assert r.json["details"] == "fatal: simulated worktree add failure"
+
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id FROM workspaces WHERE project_id = ? AND branch = ?",
+            (project["id"], "feature/worktree-fail"),
+        ).fetchone()
+    finally:
+        db.close()
+    assert row is None
+
+
+def test_create_workspace_friendly_error_when_worktree_path_exists(
+    client, project, monkeypatch
+):
+    """When stderr indicates the target path already exists, the response
+    must surface a path-specific error message instead of the generic one."""
+    from routes import workspaces as workspaces_module
+
+    real_run_git = workspaces_module.run_git
+
+    def fake_run_git(cwd, *args):
+        if args[:2] == ("worktree", "add"):
+            return False, "", "fatal: '/some/path' already exists"
+        return real_run_git(cwd, *args)
+
+    monkeypatch.setattr(workspaces_module, "run_git", fake_run_git)
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/exists", "source": "develop", "worktree": True},
+    )
+
+    assert r.status_code == 409
+    assert "already exists" in r.json["error"]
+    assert r.json["details"] == "fatal: '/some/path' already exists"
+
+
 # ─── 3.2 MERGE LAYER TESTS ────────────────────────────────────────────────────
 
 REPO_ROOT = Path(__file__).resolve().parents[3]  # worktrees/Restructuring

@@ -100,6 +100,19 @@ Hexagonal nodes are **user gates** — the workflow pauses until a human approve
 
 **Setup wizard.** Accessible from the project selector page in the admin panel. Configures modules and verification profiles in one go. Launches Claude Code in an embedded terminal and follows the setup skill to install selected modules, verify required tools, and create or assign verification profiles.
 
+## Security Model
+
+Governed Workflow is a local workflow-governance layer for Claude Code. It is designed to prevent accidental or overconfident agent bypasses, not to defend against malicious local users, compromised machines, or hostile networks.
+
+Assumptions:
+
+- The local machine is trusted.
+- The user controls the running admin panel.
+- Network mode should only be used on trusted LANs or behind a secure tunnel.
+- Do not expose port 5111 directly to the public internet.
+- The admin token grants full control over the workflow.
+- Browser-stored credentials may be accessible to sufficiently privileged local tools.
+
 ## Getting Started
 
 Clone the repo, then see [admin-panel/README.md](admin-panel/README.md) for installation and full API/MCP tool reference. For a step-by-step install including Windows/WSL, use the `/workflow-migration` skill.

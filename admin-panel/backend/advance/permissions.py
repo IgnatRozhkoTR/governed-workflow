@@ -36,7 +36,7 @@ _GH_PR_CREATE_RE = re.compile(r'gh\s+pr\s+create')
 _MCP_MR_CREATE_RE = re.compile(r'mcp.*gitlab.*create_merge_request', re.IGNORECASE)
 _DOCKER_RE = re.compile(r'^\s*(docker|docker-compose|podman)\s')
 _CURL_APPROVE_RE = re.compile(r'curl.*(approve|reject)')
-_SQLITE_BYPASS_RE = re.compile(r'sqlite3.*admin-panel|gate_nonce')
+_SQLITE_BYPASS_RE = re.compile(r'sqlite3.*admin-panel')
 _HTTP_BYPASS_RE = re.compile(r'(curl|wget|python3?|ruby|node|fetch).*(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0):5111')
 _GRADLE_TEST_RE = re.compile(r'gradlew.*test')
 

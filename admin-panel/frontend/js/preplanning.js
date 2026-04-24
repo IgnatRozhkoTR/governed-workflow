@@ -314,12 +314,10 @@ async function ppApprove() {
   var ctx = getWorkspaceContext();
   if (!ctx) { showToast(t('errors.workspaceNotSelected')); return; }
 
-  var nonceResp = await apiGetGateNonce(ctx.projectId, ctx.branch);
-  var token = nonceResp.nonce;
-  if (!token) { showToast(t('errors.noApprovalGateActive')); return; }
+  if (!isUserGate(state.phase)) { showToast(t('errors.noApprovalGateActive')); return; }
 
   try {
-    var result = await apiApprove(ctx.projectId, ctx.branch, token, '');
+    var result = await apiApprove(ctx.projectId, ctx.branch, '');
     showToast(t('messages.approved', { phase: result.phase }));
     await refreshState();
   } catch (e) {
@@ -331,16 +329,14 @@ async function ppReject() {
   var ctx = getWorkspaceContext();
   if (!ctx) { showToast(t('errors.workspaceNotSelected')); return; }
 
+  if (!isUserGate(state.phase)) { showToast(t('errors.noApprovalGateActive')); return; }
+
   var feedback = '';
   var textarea = document.getElementById('ppRejectFeedback');
   if (textarea) feedback = textarea.value.trim();
 
-  var nonceResp = await apiGetGateNonce(ctx.projectId, ctx.branch);
-  var token = nonceResp.nonce;
-  if (!token) { showToast(t('errors.noApprovalGateActive')); return; }
-
   try {
-    var result = await apiReject(ctx.projectId, ctx.branch, token, feedback);
+    var result = await apiReject(ctx.projectId, ctx.branch, feedback);
     showToast(t('messages.rejected', { phase: result.phase }));
     await refreshState();
   } catch (e) {

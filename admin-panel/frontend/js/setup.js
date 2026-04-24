@@ -389,7 +389,7 @@ function connectSetupTerminal(sessionName) {
   if (_setupTermWs && _setupTermWs.readyState === WebSocket.OPEN) return;
 
   var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  var wsUrl = protocol + '//' + window.location.host + '/ws/setup-terminal';
+  var wsUrl = _appendTokenToWsUrl(protocol + '//' + window.location.host + '/ws/setup-terminal');
 
   _setupUpdateTerminalStatus('connecting');
 

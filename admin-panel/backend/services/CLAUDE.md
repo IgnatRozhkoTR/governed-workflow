@@ -1,6 +1,6 @@
 # services
 
-Domain CRUD layer. One file per domain (comment, criteria, discussion, improvement, lsp, plan, progress, research, rule, scope, verification, phase_settings, modules_discovery, module_phase_loader, phase_resolver, phase_sequencer).
+Domain CRUD layer. One file per domain (comment, criteria, discussion, git_rules, improvement, lsp, plan, progress, research, rule, scope, verification, phase_settings, modules_discovery, module_phase_loader, phase_resolver, phase_sequencer).
 
 ## Conventions
 

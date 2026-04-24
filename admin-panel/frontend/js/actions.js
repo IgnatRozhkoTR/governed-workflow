@@ -6,16 +6,14 @@ async function handleApprove() {
   var ctx = getWorkspaceContext();
   if (!ctx) { showToast(t('errors.workspaceNotSelected')); return; }
 
-  var nonceResp = await apiGetGateNonce(ctx.projectId, ctx.branch);
-  var token = nonceResp.nonce;
-  if (!token) { showToast(t('errors.noApprovalGateActive')); return; }
+  if (!isUserGate(state.phase)) { showToast(t('errors.noApprovalGateActive')); return; }
 
   var commitMessage = '';
   var input = document.getElementById('commitMessageInput');
   if (input) commitMessage = input.value.trim();
 
   try {
-    var result = await apiApprove(ctx.projectId, ctx.branch, token, commitMessage);
+    var result = await apiApprove(ctx.projectId, ctx.branch, commitMessage);
     showToast(t('messages.approved', {phase: result.phase}));
     await refreshState();
   } catch (e) {
@@ -27,14 +25,12 @@ async function handleReject(feedback) {
   var ctx = getWorkspaceContext();
   if (!ctx) { showToast(t('errors.workspaceNotSelected')); return; }
 
+  if (!isUserGate(state.phase)) { showToast(t('errors.noApprovalGateActive')); return; }
+
   var comments = feedback || '';
 
-  var nonceResp = await apiGetGateNonce(ctx.projectId, ctx.branch);
-  var token = nonceResp.nonce;
-  if (!token) { showToast(t('errors.noApprovalGateActive')); return; }
-
   try {
-    var result = await apiReject(ctx.projectId, ctx.branch, token, comments);
+    var result = await apiReject(ctx.projectId, ctx.branch, comments);
     showToast(t('messages.rejected', {phase: result.phase}));
     await refreshState();
   } catch (e) {
@@ -141,11 +137,7 @@ async function tryAutoAdvanceGate() {
   if (!ctx) return;
 
   try {
-    var nonceResp = await apiGetGateNonce(ctx.projectId, ctx.branch);
-    var token = nonceResp.nonce;
-    if (!token) return;
-
-    var result = await apiApprove(ctx.projectId, ctx.branch, token, '');
+    var result = await apiApprove(ctx.projectId, ctx.branch, '');
     showToast(t('messages.approved', {phase: result.phase}));
     await refreshState();
   } catch (e) {

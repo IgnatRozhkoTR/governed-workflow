@@ -23,6 +23,7 @@ from core.paths import (
     hook_command,
 )
 from core.terminal import session_name
+from services.git_rules_service import migrate_legacy_git_rules
 
 bp = Blueprint("workspaces", __name__)
 
@@ -206,7 +207,7 @@ _BACKUP_FILES = [".claude/settings.json", ".mcp.json", "CLAUDE.md"]
 
 _BACKUP_DIRS = [".claude/agents", ".claude/hooks"]
 
-_SYMLINK_TO_PROJECT = ["rules", "git-config.json"]
+_SYMLINK_TO_PROJECT = ["rules", "git-config.json", "git-rules.md"]
 
 
 def _ensure_workspace_mcp(mcp_path):
@@ -483,9 +484,16 @@ def _setup_worktree_workspace(project_path, branch, sanitized, source_ref):
     Returns (working_dir, error_response) where error_response is None on success.
     """
     wt_path = Path(project_path) / ".claude" / "worktrees" / sanitized
+
+    run_git(project_path, "worktree", "prune")
+
     if wt_path.exists():
         run_git(project_path, "worktree", "remove", str(wt_path), "--force")
         run_git(project_path, "branch", "-D", branch)
+        if wt_path.exists():
+            shutil.rmtree(wt_path, ignore_errors=True)
+
+    run_git(project_path, "worktree", "prune")
 
     ok_head, current_branch, _ = run_git(project_path, "symbolic-ref", "--short", "HEAD")
     if ok_head and current_branch.strip() == branch:
@@ -498,7 +506,11 @@ def _setup_worktree_workspace(project_path, branch, sanitized, source_ref):
         ok, stdout, stderr = run_git(project_path, "worktree", "add", str(wt_path), "-b", branch, source_ref)
 
     if not ok:
-        return None, (jsonify({"error": t("api.error.gitWorktreeAddFailed"), "details": stderr}), 409)
+        if "already exists" in (stderr or ""):
+            error_msg = t("api.error.worktreeTargetPathExists", path=str(wt_path))
+        else:
+            error_msg = t("api.error.gitWorktreeAddFailed")
+        return None, (jsonify({"error": error_msg, "details": stderr}), 409)
 
     return str(wt_path), None
 
@@ -525,6 +537,9 @@ def _install_worktree_configs(project_path, wt_path):
     wt_path = Path(wt_path)
     dst_claude = wt_path / ".claude"
     src_claude = Path(project_path) / ".claude"
+
+    # Legacy cleanup: move git-rules.md from its old home inside rules/ to .claude/ root
+    migrate_legacy_git_rules(project_path)
 
     # a) Merge repo defaults + project-local content into .claude/
     _merge_project_assets(project_path, wt_path)
@@ -578,6 +593,9 @@ def _install_checkout_configs(project_path):
     CLAUDE.md is left alone if it already exists.
     """
     _backup_project_files(project_path)
+
+    # Legacy cleanup: move git-rules.md from its old home inside rules/ to .claude/ root
+    migrate_legacy_git_rules(project_path)
 
     project = Path(project_path)
 

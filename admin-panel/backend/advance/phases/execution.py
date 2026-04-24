@@ -22,6 +22,41 @@ def _max_execution_n(execution):
     return max_n
 
 
+def _diff_files_outside_scope(ws, checkpoint: str, commit_hash: str) -> tuple[list[str], list[str]]:
+    """Return (offending_files, allowed_patterns) for the commit diff.
+
+    Compares files changed between checkpoint..commit_hash against the active
+    sub-phase's must + may scope patterns. offending_files is empty when every
+    changed file matches at least one pattern.
+    """
+    ok, stdout, _ = run_git(ws["working_dir"], "diff", "--name-only", f"{checkpoint}..{commit_hash}")
+    if not ok:
+        return [], []
+
+    changed = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if not changed:
+        return [], []
+
+    scope_map = json.loads(ws["scope_json"]) if ws["scope_json"] else {}
+    must_patterns, may_patterns = scope_service.get_scope_patterns(scope_map, ws["phase"])
+    all_patterns = list(must_patterns) + list(may_patterns)
+
+    if not all_patterns:
+        return [], []
+
+    offending = []
+    for path in changed:
+        matched = False
+        for pattern in all_patterns:
+            match_pattern = pattern.rstrip("/") + "/**" if pattern.endswith("/") else pattern
+            if match_scope_pattern(path, match_pattern):
+                matched = True
+                break
+        if not matched:
+            offending.append(path)
+    return offending, all_patterns
+
+
 class ImplementationPhase(Phase):
     """Execution sub-phase K=0: implementation."""
     name = "Implementation"
@@ -214,6 +249,17 @@ class CommitPhase(Phase):
         return f"3.{self._n}"
 
     def validate(self, ws, body, project_path):
+        """Validate the submitted commit for this commit sub-phase.
+
+        Runs, in order:
+        1. Basic commit presence + existence + phase_history replay guard.
+        2. Commit progression checks (HEAD match, forward-only checkpoint,
+           scope-bounded diff) via ``_validate_commit_progression``.
+        3. Acceptance-criteria validation on the final sub-phase.
+
+        All checks are gated by ``perform_advance``'s ``if not yolo_mode:``
+        block, so yolo mode bypasses them by not calling ``validate`` at all.
+        """
         locale = ws["locale"]
         commit_hash = body.get("commit_hash", "")
         if not commit_hash:
@@ -228,15 +274,17 @@ class CommitPhase(Phase):
                 "SELECT id FROM phase_history WHERE workspace_id = ? AND commit_hash = ?",
                 (ws["id"], commit_hash)
             ).fetchone()
-
         if used:
             return False, {"message": t("advance.error.commitAlreadyUsed", locale, commit_hash=commit_hash)}
+
+        progression_ok, progression_details = self._validate_commit_progression(ws, commit_hash)
+        if not progression_ok:
+            return False, progression_details
 
         plan = plan_service.get_plan(ws)
         max_n = _max_execution_n(plan.get("execution", []))
 
-        yolo_mode = ws_field(ws, "yolo_mode", 0)
-        if self._n >= max_n and not yolo_mode:
+        if self._n >= max_n:
             with get_db_ctx() as db:
                 all_passed, results = validate_all(db, ws["id"], ws["working_dir"])
                 db.commit()
@@ -247,6 +295,60 @@ class CommitPhase(Phase):
                 return False, {
                     "message": t("advance.error.acceptanceCriteriaNotMet", locale, messages="\n".join(messages))
                 }
+
+        return True, {}
+
+    def _validate_commit_progression(self, ws, commit_hash: str) -> tuple[bool, dict]:
+        """Enforce HEAD match, forward-only checkpoint, and scope-bounded diff.
+
+        Legacy workspaces that entered 3.N.4 before lazy init was introduced
+        may still have ``last_confirmed_commit = NULL``. In that case, fall
+        back to ``commit_hash^`` (the parent) and persist it so subsequent
+        checks have a stable base.
+        """
+        locale = ws["locale"]
+        working_dir = ws["working_dir"]
+
+        ok, stdout, _ = run_git(working_dir, "rev-parse", "HEAD")
+        if not ok:
+            return False, {"message": t("advance.error.commitNotFound", locale, commit_hash=commit_hash)}
+        head = stdout.strip()
+        if head != commit_hash:
+            return False, {"message": t("advance.error.commitNotHead", locale, commit_hash=commit_hash, head=head)}
+
+        checkpoint = ws_field(ws, "last_confirmed_commit", None)
+        if not checkpoint:
+            ok_parent, parent_stdout, _ = run_git(working_dir, "rev-parse", f"{commit_hash}^")
+            if not ok_parent or not parent_stdout.strip():
+                return False, {"message": t("advance.error.commitNotDescendant", locale)}
+            checkpoint = parent_stdout.strip()
+            with get_db_ctx() as db:
+                db.execute(
+                    "UPDATE workspaces SET last_confirmed_commit = ? WHERE id = ?",
+                    (checkpoint, ws["id"])
+                )
+                db.commit()
+
+        if checkpoint == commit_hash:
+            return False, {"message": t("advance.error.commitNoForwardProgress", locale)}
+
+        ancestor_ok, _, _ = run_git(working_dir, "merge-base", "--is-ancestor", checkpoint, commit_hash)
+        if not ancestor_ok:
+            return False, {"message": t("advance.error.commitNotDescendant", locale)}
+
+        offending, allowed_patterns = _diff_files_outside_scope(ws, checkpoint, commit_hash)
+        if offending:
+            shown = offending[:5]
+            files_str = "\n".join(f"  - {f}" for f in shown)
+            if len(offending) > len(shown):
+                files_str += f"\n  ... and {len(offending) - len(shown)} more"
+            patterns_str = "\n".join(f"  - {p}" for p in allowed_patterns) if allowed_patterns else "  (none)"
+            return False, {
+                "message": t(
+                    "advance.error.commitDiffOutsideScope", locale,
+                    files=files_str, patterns=patterns_str,
+                )
+            }
 
         return True, {}
 

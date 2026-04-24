@@ -145,21 +145,6 @@ def test_set_phase_not_found(client, project):
     assert "error" in response.get_json()
 
 
-def test_get_gate_nonce(client, workspace):
-    set_phase(workspace["id"], "2.1", gate_nonce="test-nonce-123")
-    response = client.get(_ws_url(workspace, "gate-nonce"))
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["nonce"] == "test-nonce-123"
-
-
-def test_get_gate_nonce_none(client, workspace):
-    response = client.get(_ws_url(workspace, "gate-nonce"))
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["nonce"] is None
-
-
 def test_query_progress(client, workspace):
     add_progress(workspace["id"], "1.0", "Assessment done")
     today = date.today().isoformat()
