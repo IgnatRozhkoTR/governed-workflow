@@ -1,4 +1,4 @@
-# server
+# backend
 
 Flask + MCP backend. Both entry points (`app.py` for HTTP, `mcp_server.py` for MCP stdio) delegate to the same services.
 

@@ -3,7 +3,7 @@
 # Setup: chmod +x <repo>/admin-panel/start.sh && <repo>/admin-panel/start.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVER_DIR="$SCRIPT_DIR/server"
+SERVER_DIR="$SCRIPT_DIR/backend"
 LOG_FILE="/tmp/admin-panel.log"
 PORT=5111
 

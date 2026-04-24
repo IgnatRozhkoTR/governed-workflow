@@ -7,9 +7,9 @@ GOVERNED_WORKFLOW_REPO to the install path if the parents[] computation
 does not match your layout.
 
 Depth from this file to REPO_ROOT:
-  admin-panel/server/core/paths.py
+  admin-panel/backend/core/paths.py
   parents[0] = core/
-  parents[1] = server/
+  parents[1] = backend/
   parents[2] = admin-panel/
   parents[3] = REPO_ROOT  (contains admin-panel/, claude/, …)
 """

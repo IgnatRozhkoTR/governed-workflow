@@ -95,7 +95,7 @@ cd ~/governed-workflow
 
 ### 2. (Optional) Export repo path
 
-`core/paths.py` auto-detects the repo root when launched from `admin-panel/server/*`, so this is mostly a safety override for shells launched outside the repo:
+`core/paths.py` auto-detects the repo root when launched from `admin-panel/backend/*`, so this is mostly a safety override for shells launched outside the repo:
 ```bash
 echo 'export GOVERNED_WORKFLOW_REPO=~/governed-workflow' >> ~/.bashrc
 ```
@@ -126,10 +126,10 @@ cd <repo> && git checkout HEAD -- .claude/settings.json
 
 ### 5. Initialize the database
 
-The server auto-applies migrations from `admin-panel/server/migrations/` on first start. If you prefer to initialize explicitly:
+The server auto-applies migrations from `admin-panel/backend/migrations/` on first start. If you prefer to initialize explicitly:
 
 ```bash
-cd <repo>/admin-panel/server
+cd <repo>/admin-panel/backend
 python3 -c "from core.db import init_db; init_db(); print('DB initialized')"
 ```
 
@@ -167,7 +167,7 @@ For every project that uses the governed workflow, create `.mcp.json` in the pro
     "workspace": {
       "command": "/absolute/path/to/governed-workflow/admin-panel/.venv/bin/python3",
       "args": ["-m", "mcp_server"],
-      "cwd": "/absolute/path/to/governed-workflow/admin-panel/server"
+      "cwd": "/absolute/path/to/governed-workflow/admin-panel/backend"
     }
   }
 }
@@ -182,19 +182,19 @@ git config --global core.excludesfile ~/.gitignore_global
 
 Use tmux so the server survives terminal closes:
 ```bash
-tmux new-session -d -s admin-panel "cd <repo>/admin-panel/server && python3 app.py"
+tmux new-session -d -s admin-panel "cd <repo>/admin-panel/backend && python3 app.py"
 ```
 
 Convenience shell function (add before the interactive guard in `~/.bashrc`):
 ```bash
 REPO=~/governed-workflow   # adjust to your path
 ccadmin() {
-  pkill -f "admin-panel/server/app.py" 2>/dev/null; sleep 1
+  pkill -f "admin-panel/backend/app.py" 2>/dev/null; sleep 1
   tmux kill-session -t admin-panel 2>/dev/null || true
-  tmux new-session -d -s admin-panel "cd $REPO/admin-panel/server && python3 app.py"
+  tmux new-session -d -s admin-panel "cd $REPO/admin-panel/backend && python3 app.py"
   for i in 1 2 3 4 5; do
     sleep 1
-    pgrep -f "admin-panel/server/app.py" > /dev/null && echo "Admin panel started on port 5111" && return
+    pgrep -f "admin-panel/backend/app.py" > /dev/null && echo "Admin panel started on port 5111" && return
   done
   echo "Failed — check: tmux attach -t admin-panel"
 }
@@ -223,7 +223,7 @@ To pick up changes after a `git pull` on the repo:
 1. Restart the admin panel so it reloads Python code, migrations, and module registrations:
    ```bash
    tmux kill-session -t admin-panel 2>/dev/null || true
-   tmux new-session -d -s admin-panel "cd <repo>/admin-panel/server && python3 app.py"
+   tmux new-session -d -s admin-panel "cd <repo>/admin-panel/backend && python3 app.py"
    ```
 2. Restart any open Claude Code sessions — hooks are snapshotted at session start, so running sessions keep using the old versions until restarted.
 3. Newly-created workspaces automatically receive the latest agents, rules, defaults, and codex assets. Existing workspaces keep their current content — delete a file under `<project>/.claude/workspaces/<branch>/` if you want the next create/re-create to pick up the repo version.
@@ -250,8 +250,8 @@ echo "exit: $?"  # Should be 0
 
 | Component | Path | Purpose |
 |-----------|------|---------|
-| Admin panel server | `<repo>/admin-panel/server/` | Flask app (port 5111) + SQLite DB |
-| MCP server | `<repo>/admin-panel/server/mcp_server.py` | 38 workspace tools via stdio |
+| Admin panel server | `<repo>/admin-panel/backend/` | Flask app (port 5111) + SQLite DB |
+| MCP server | `<repo>/admin-panel/backend/mcp_server.py` | 38 workspace tools via stdio |
 | Orchestrator block hook | `<repo>/claude/hooks/block-orchestrator-writes.py` | Prevents the main agent from writing files in git repos |
 | Phase gate hook | `<repo>/claude/hooks/pre-tool-hook.py` | Enforces edit/commit/push restrictions per phase |
 | Session start hook | `<repo>/claude/hooks/session-start.py` | Registers sessions, outputs recovery context |
@@ -313,7 +313,7 @@ For remote session control via Telegram:
 
 - **MCP server not connecting**: Check `.mcp.json` path is absolute and the file exists. Restart Claude Code after adding `.mcp.json`.
 - **Hook not firing**: Hooks are snapshotted at session start. Restart the session after changing `settings.json`.
-- **DB errors**: Stop the admin panel, delete `<repo>/admin-panel/server/admin-panel.db*` files, and restart — migrations will recreate the schema.
+- **DB errors**: Stop the admin panel, delete `<repo>/admin-panel/backend/admin-panel.db*` files, and restart — migrations will recreate the schema.
 - **Flask server not starting**: Check port 5111 is free (`lsof -i :5111`).
 - **`java`/`mvn` not found**: Exports are after the `.bashrc` interactive guard — move them above `# If not running interactively`.
 - **pip3 install fails**: Add `--break-system-packages` on Ubuntu 24.04+.

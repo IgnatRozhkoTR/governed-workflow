@@ -106,8 +106,8 @@ The repo can be cloned to any path on disk (`~/governed-workflow`, `/opt/governe
 
 ```
 ├── admin-panel/          # Flask web app + MCP server (see admin-panel/README.md)
-│   ├── server/           #   Backend: routes, advance logic, MCP tools, tests
-│   └── templates/        #   Frontend: HTML, CSS, JS (vanilla SPA)
+│   ├── backend/          #   Backend: routes, advance logic, MCP tools, tests
+│   └── frontend/         #   Frontend: HTML, CSS, JS (vanilla SPA)
 ├── claude/               # Claude Code payload (shipped to workspaces)
 │   ├── agents/           #   Agent role definitions (16 specialized roles)
 │   ├── hooks/            #   Claude Code hook scripts

@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, send_from_directory
 
 bp = Blueprint("static_files", __name__)
 
-TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
+TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 _I18N_DIR = TEMPLATES_DIR / "i18n"
 
 

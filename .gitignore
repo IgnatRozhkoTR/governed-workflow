@@ -31,8 +31,8 @@ claude/skills/postman-collection/
 *.db-shm
 *.db-wal
 *.zip
-admin-panel/server/projects.json
+admin-panel/backend/projects.json
 admin-panel/.reviews/
-admin-panel/server/sdkman*/
+admin-panel/backend/sdkman*/
 claude/tools/
 claude/modules-local/

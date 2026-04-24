@@ -5,7 +5,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 
-TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
+TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 
 
 @pytest.fixture(scope="module")

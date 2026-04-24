@@ -7,11 +7,11 @@ description: Authoring MCP tools in the Anthropic-recommended style — annotati
 
 ## When to use
 
-Read this before adding a new MCP tool to `admin-panel/server/mcp_tools/`, renaming one, changing a parameter shape, or materially reworking an error path. The patterns below are load-bearing — tests, the frontend, and the orchestrator all depend on the envelope shape and the tool-annotation contract.
+Read this before adding a new MCP tool to `admin-panel/backend/mcp_tools/`, renaming one, changing a parameter shape, or materially reworking an error path. The patterns below are load-bearing — tests, the frontend, and the orchestrator all depend on the envelope shape and the tool-annotation contract.
 
 ## FastMCP basics
 
-- One shared `FastMCP` instance lives at the bottom of `admin-panel/server/mcp_tools/__init__.py`:
+- One shared `FastMCP` instance lives at the bottom of `admin-panel/backend/mcp_tools/__init__.py`:
   ```python
   mcp = FastMCP("workspace", instructions="Workspace state management for orchestrator workflow.")
   ```
@@ -20,7 +20,7 @@ Read this before adding a new MCP tool to `admin-panel/server/mcp_tools/`, renam
   ```python
   from mcp_tools import rules  # noqa: F401, E402
   ```
-- The MCP process entry point is `admin-panel/server/mcp_server.py`, which just imports `mcp_tools` and calls `mcp.run()`.
+- The MCP process entry point is `admin-panel/backend/mcp_server.py`, which just imports `mcp_tools` and calls `mcp.run()`.
 
 ## ToolAnnotations — the four hints
 
@@ -129,8 +129,8 @@ Transient DB failures (`sqlite3.OperationalError`, `sqlite3.DatabaseError`) are 
        db.commit()
        return result
    ```
-4. Add a matching test in `admin-panel/server/tests/test_mcp_tools.py` — call the function directly (bypassing MCP dispatch), cover the happy path, and cover at least one error path.
-5. If your tool introduces a new user-facing message, add the i18n key to `admin-panel/server/messages/` and reach it via `t(key)`.
+4. Add a matching test in `admin-panel/backend/tests/test_mcp_tools.py` — call the function directly (bypassing MCP dispatch), cover the happy path, and cover at least one error path.
+5. If your tool introduces a new user-facing message, add the i18n key to `admin-panel/backend/messages/` and reach it via `t(key)`.
 
 ## Common pitfalls
 
@@ -149,10 +149,10 @@ Every tool needs at least:
 - A test that calls the tool function directly (not through MCP dispatch).
 - Coverage for the happy path — asserts on the returned structure.
 - Coverage for one known error path — asserts the envelope shape (`error`, `errorCategory`, `isRetryable`).
-- Use the shared DB fixture from `admin-panel/server/tests/conftest.py`; don't mock the DB.
+- Use the shared DB fixture from `admin-panel/backend/tests/conftest.py`; don't mock the DB.
 
 Run the full suite before merging:
 
 ```bash
-cd admin-panel/server && python3 -m pytest tests/ -v --tb=short
+cd admin-panel/backend && python3 -m pytest tests/ -v --tb=short
 ```

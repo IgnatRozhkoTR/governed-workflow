@@ -2,7 +2,7 @@
 name: css
 description: CSS conventions — per-feature files, theme tokens, BEM-ish, flat selectors.
 paths:
-  - "admin-panel/templates/css/**/*.css"
+  - "admin-panel/frontend/css/**/*.css"
   - "**/*.css"
 ---
 

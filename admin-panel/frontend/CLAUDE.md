@@ -1,4 +1,4 @@
-# templates
+# frontend
 
 Frontend for the admin panel. Vanilla JS SPA — no framework.
 

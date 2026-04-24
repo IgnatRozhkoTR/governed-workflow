@@ -8,10 +8,10 @@ The admin panel and MCP server for the [governed workflow](../README.md). Flask 
 |-------|---------|
 | Backend | Flask with Blueprints (22 route modules) |
 | Frontend | Vanilla HTML/CSS/JS (36 JS modules, 21 CSS modules) |
-| Storage | SQLite (`server/admin-panel.db`) |
-| Agent Interface | MCP server over stdio (`server/mcp_server.py`, 38 tools) |
-| i18n | JSON message bundles (`server/messages/`) |
-| Tests | pytest suite (`server/tests/`, 27 test modules) |
+| Storage | SQLite (`backend/admin-panel.db`) |
+| Agent Interface | MCP server over stdio (`backend/mcp_server.py`, 38 tools) |
+| i18n | JSON message bundles (`backend/messages/`) |
+| Tests | pytest suite (`backend/tests/`, 27 test modules) |
 
 ## Getting Started
 
@@ -42,7 +42,7 @@ chmod +x start.sh
 **Option B -- direct**:
 
 ```bash
-cd <repo>/admin-panel/server
+cd <repo>/admin-panel/backend
 python3 app.py
 ```
 
@@ -58,7 +58,7 @@ Add to your `.mcp.json` (use absolute expanded paths — no `~` or `$HOME`):
     "workspace": {
       "command": "/absolute/path/to/governed-workflow/admin-panel/.venv/bin/python3",
       "args": ["-m", "mcp_server"],
-      "cwd": "/absolute/path/to/governed-workflow/admin-panel/server"
+      "cwd": "/absolute/path/to/governed-workflow/admin-panel/backend"
     }
   }
 }
@@ -71,7 +71,7 @@ admin-panel/
   CLAUDE.md                     # Project instructions for Claude Code
   README.md                     # This file
   start.sh                      # Launch script (background server + browser)
-  server/
+  backend/
     app.py                      # Flask app factory, entry point
     mcp_server.py               # MCP stdio entry point (thin bootstrap)
     requirements.txt            # Python dependencies
@@ -144,14 +144,14 @@ admin-panel/
       rules.py                  # Project-scoped Markdown rule files (CRUD)
       setup.py                  # Workspace setup skill launcher + WebSocket
       state.py                  # Phase, scope, plan, progress, research proving
-      static.py                 # Serves templates/ (HTML, CSS, JS, i18n)
+      static.py                 # Serves frontend/ (HTML, CSS, JS, i18n)
       terminal_routes.py        # Embedded terminal (tmux + xterm.js + WebSocket)
       verification.py           # Verification profiles, steps, assignment, results
       workspaces.py             # Workspace + branch management, worktree creation
     migrations/                 # Yoyo-style SQLite migrations applied on startup
     messages/                   # i18n JSON bundles (en, ru)
     tests/                      # pytest suite (27 test modules)
-  templates/
+  frontend/
     admin.html                  # Single-page admin UI
     css/                        # 21 modular stylesheets
     js/                         # 36 vanilla JS modules
