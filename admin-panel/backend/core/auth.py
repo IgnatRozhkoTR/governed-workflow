@@ -27,6 +27,12 @@ UNPROTECTED_PREFIXES = (
     "/js/",
     "/img/",
     "/i18n/",
+    # Hook endpoints are called by the pre-tool-hook on every tool use from
+    # inside the agent session; the agent has no bearer token. These endpoints
+    # only perform permission checks and session-start bookkeeping against a
+    # workspace the caller's cwd must already be inside — they never grant
+    # admin privileges — so they are safe to expose unauthenticated locally.
+    "/api/hook/",
 )
 
 UNPROTECTED_EXACT = frozenset({

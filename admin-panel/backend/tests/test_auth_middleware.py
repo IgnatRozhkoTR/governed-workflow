@@ -114,6 +114,25 @@ def test_auth_check_validates_supplied_token(raw_client, admin_token):
     assert body["configured"] is True
 
 
+def test_hook_check_permission_accessible_without_token(raw_client, admin_token):
+    """The pre-tool hook runs inside an agent session and has no bearer token,
+    so /api/hook/check-permission must remain callable unauthenticated."""
+    response = raw_client.post(
+        "/api/hook/check-permission",
+        json={"cwd": "/tmp", "tool_name": "Read"},
+    )
+    assert response.status_code == 200
+
+
+def test_hook_session_start_accessible_without_token(raw_client, admin_token):
+    """The session-start hook fires at agent boot with no token available."""
+    response = raw_client.post(
+        "/api/hook/session-start",
+        json={"session_id": "sess-1", "cwd": "/tmp"},
+    )
+    assert response.status_code == 200
+
+
 def test_auth_check_rejects_wrong_token(raw_client, admin_token):
     response = raw_client.post("/api/auth/check", json={"token": "gwf_wrong"})
 
