@@ -1,32 +1,41 @@
 """Device-scoped settings backed by the ``device_settings`` SQLite table.
 
 All values are stored as TEXT and parsed in the getter helpers. The table is a
-generic key/value store deliberately reused for multiple concerns (admin token,
-auth-enabled flag, bind host) so we do not grow a new config surface for each
-device-level toggle.
+generic key/value store deliberately reused for multiple concerns (admin token
+hash, bind host) so we do not grow a new config surface for each device-level
+toggle.
+
+Auth is always on. Every protected HTTP route requires a valid admin token.
+The only way to mint a token is ``python3 backend/app.py auth-token`` run in a
+shell on the host — there is no API or web-facing endpoint that creates one.
+
+The environment variable ``GOVERNED_WORKFLOW_DISABLE_AUTH=1`` is a test-only
+escape hatch used by the pytest suite to bypass the middleware uniformly. It
+must not be relied on in production.
 
 Known keys
 ----------
 - ``admin_token_hash`` — SHA-256 hex of the raw admin token. Never stores the
-  raw token. Empty/absent means auth has not been configured yet.
-- ``auth_enabled`` — ``"1"`` when the token is required, ``"0"`` to bypass.
-  Defaults to ``"1"`` once a token has been generated so auth is on by default.
+  raw token. Empty/absent means no token has been configured yet and every
+  protected route will 401 until one is minted via the CLI.
 - ``bind_host`` — Host the Flask server binds to (``127.0.0.1`` or ``0.0.0.0``).
   Defaults to ``127.0.0.1`` for a safe-by-default local-only install.
 """
 import hashlib
 import hmac
+import os
 import secrets
 from datetime import datetime
 
 ADMIN_TOKEN_HASH_KEY = "admin_token_hash"
-AUTH_ENABLED_KEY = "auth_enabled"
 BIND_HOST_KEY = "bind_host"
 
 DEFAULT_BIND_HOST = "127.0.0.1"
 NETWORK_BIND_HOST = "0.0.0.0"
 
 TOKEN_PREFIX = "gwf_"
+
+DISABLE_AUTH_ENV_VAR = "GOVERNED_WORKFLOW_DISABLE_AUTH"
 
 
 def get_setting(db, key: str, default: str | None = None) -> str | None:
@@ -65,33 +74,41 @@ def generate_token() -> str:
 
 
 def set_admin_token(db, raw_token: str) -> None:
+    """Persist the SHA-256 hash of ``raw_token`` as the configured admin token.
+
+    Auth is always on; there is no flag to flip, so this only writes the hash.
+    """
     set_setting(db, ADMIN_TOKEN_HASH_KEY, hash_token(raw_token))
-    set_setting(db, AUTH_ENABLED_KEY, "1")
 
 
 def clear_admin_token(db) -> None:
+    """Remove the configured admin token hash.
+
+    After this call every protected route will 401 until a new token is minted
+    via the ``auth-token`` CLI. Auth itself cannot be turned off — it is always
+    required.
+    """
     delete_setting(db, ADMIN_TOKEN_HASH_KEY)
-    set_setting(db, AUTH_ENABLED_KEY, "0")
 
 
 def get_admin_token_hash(db) -> str | None:
     return get_setting(db, ADMIN_TOKEN_HASH_KEY)
 
 
-def is_auth_enabled(db) -> bool:
-    stored_hash = get_setting(db, ADMIN_TOKEN_HASH_KEY)
-    if not stored_hash:
-        return False
-    flag = get_setting(db, AUTH_ENABLED_KEY, "1")
-    return flag == "1"
+def auth_disabled_by_env() -> bool:
+    """Return True when the test-only bypass env var is set to ``"1"``.
+
+    This exists so the pytest suite can run without threading a token through
+    every request. Production must never set this.
+    """
+    return os.environ.get(DISABLE_AUTH_ENV_VAR) == "1"
 
 
 def verify_token(db, presented_token: str) -> bool:
     """Constant-time compare the presented token against the stored hash.
 
-    Returns False when auth is not enabled (no token configured). Callers use
-    ``is_auth_enabled`` to decide whether to require a token at all; this
-    helper only answers "does this token match the configured one".
+    Returns False when no token is configured or the presented token is empty
+    or does not match.
     """
     if not presented_token:
         return False

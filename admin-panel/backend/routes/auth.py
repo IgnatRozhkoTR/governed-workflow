@@ -1,16 +1,14 @@
 """Auth + network-mode routes.
 
-These endpoints have to stay callable *without* a token in some cases — the
-frontend needs to know whether auth is configured before it can show the token
-paste screen, and check a pasted token before persisting it to localStorage.
-``/api/auth/check`` and ``/api/auth/status`` are therefore on the auth bypass
-list; all other routes below require a valid token like any other admin route.
+``/api/auth/status`` and ``/api/auth/check`` stay callable without a token so
+the frontend can render the login screen and verify a pasted token before
+persisting it to localStorage. Every other route below is behind the global
+before_request auth guard.
 """
 import logging
 import os
 import socket
 import threading
-from typing import Iterable
 
 from flask import Blueprint, jsonify, request
 
@@ -18,8 +16,8 @@ from core.db import get_db_ctx
 from core.device_settings import (
     DEFAULT_BIND_HOST,
     NETWORK_BIND_HOST,
+    get_admin_token_hash,
     get_bind_host,
-    is_auth_enabled,
     set_bind_host,
     verify_token,
 )
@@ -64,10 +62,14 @@ def _lan_ip_candidates() -> list[str]:
 
 @bp.route("/api/auth/status", methods=["GET"])
 def auth_status():
-    """Return whether auth is enabled on this device. Unauthenticated."""
+    """Return whether an admin token has been configured. Unauthenticated.
+
+    Used by the login screen to pick between "no token yet — generate one"
+    and "paste your existing token" subtitles.
+    """
     with get_db_ctx() as db:
         return jsonify({
-            "auth_enabled": is_auth_enabled(db),
+            "configured": get_admin_token_hash(db) is not None,
         })
 
 
@@ -78,12 +80,15 @@ def auth_check():
     body = request.get_json(silent=True) or {}
     token = (body.get("token") or "").strip()
     with get_db_ctx() as db:
-        if not is_auth_enabled(db):
-            return jsonify({"ok": True, "auth_enabled": False})
-        ok = verify_token(db, token)
-        if not ok:
-            return jsonify({"ok": False}), 401
-        return jsonify({"ok": True, "auth_enabled": True})
+        stored_hash = get_admin_token_hash(db)
+        if stored_hash is None:
+            return jsonify({
+                "error": "no_token_configured",
+                "configured": False,
+            }), 401
+        if verify_token(db, token):
+            return jsonify({"ok": True, "configured": True})
+        return jsonify({"ok": False, "configured": True}), 401
 
 
 @bp.route("/api/network-mode", methods=["GET"])

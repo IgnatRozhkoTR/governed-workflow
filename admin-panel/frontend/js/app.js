@@ -3,25 +3,18 @@
 // ═══════════════════════════════════════════════
 
 async function initApp() {
+  const stored = getAuthToken();
+  if (!stored) {
+    showAuthScreen();
+    return;
+  }
   try {
-    const authStatus = await apiAuthStatus();
-    if (authStatus.auth_enabled) {
-      const stored = getAuthToken();
-      if (!stored) {
-        showAuthScreen();
-        return;
-      }
-      try {
-        const check = await apiAuthCheck(stored);
-        if (!check || !check.ok) throw new Error('invalid');
-      } catch (e) {
-        clearAuthToken();
-        showAuthScreen();
-        return;
-      }
-    }
+    const res = await apiAuthCheck(stored);
+    if (!res || !res.ok) throw new Error('check failed');
   } catch (e) {
-    console.warn('Auth status check failed:', e.message);
+    clearAuthToken();
+    showAuthScreen();
+    return;
   }
 
   const ctx = getWorkspaceContext();

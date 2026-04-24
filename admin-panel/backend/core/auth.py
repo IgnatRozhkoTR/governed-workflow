@@ -1,16 +1,23 @@
 """Admin token authentication for the Flask admin panel.
 
 Applies a ``before_request`` guard that requires ``Authorization: Bearer <token>``
-for protected routes once an admin token has been configured. The whitelist is
-kept intentionally small: static assets needed to render the token-entry screen,
-the auth status/check endpoints, and WebSocket upgrades (which authenticate
-differently via a query param because browsers cannot set custom headers on the
-initial WS handshake).
+(or ``?token=<token>``) on every protected route. Auth is always required —
+when no admin token has been configured on this device, every non-whitelist
+route returns 401 so the frontend can show the CLI instructions.
+
+The whitelist is kept intentionally small: static assets needed to render the
+token-entry screen, the auth status/check endpoints, and WebSocket upgrades
+(which authenticate differently via a query param because browsers cannot set
+custom headers on the initial WS handshake).
 """
 from flask import g, jsonify, request
 
 from core.db import get_db
-from core.device_settings import is_auth_enabled, verify_token
+from core.device_settings import (
+    auth_disabled_by_env,
+    get_admin_token_hash,
+    verify_token,
+)
 
 UNPROTECTED_PREFIXES = (
     "/css/",
@@ -49,17 +56,11 @@ def _should_bypass(path: str) -> bool:
     return any(path.startswith(prefix) for prefix in UNPROTECTED_PREFIXES)
 
 
-def _auth_required_response():
+def _auth_required_response(configured: bool):
     return jsonify({
         "error": "authentication_required",
-        "reason": "Admin token required. Paste your token in the admin panel.",
-    }), 401
-
-
-def _auth_invalid_response():
-    return jsonify({
-        "error": "invalid_token",
-        "reason": "Admin token invalid. Re-paste the token from your terminal.",
+        "reason": "Admin token required. Generate one via the CLI and paste it in the admin panel.",
+        "configured": configured,
     }), 401
 
 
@@ -74,6 +75,13 @@ def register_auth_guard(app):
         if request.method == "OPTIONS":
             return None
 
+        if auth_disabled_by_env():
+            g.admin_authenticated = True
+            return None
+
+        if _should_bypass(path):
+            return None
+
         if _is_websocket_upgrade(request):
             # WebSocket handlers enforce auth themselves before accepting data
             # (see routes/terminal_routes.py, routes/lsp.py, routes/setup.py).
@@ -82,24 +90,15 @@ def register_auth_guard(app):
             # missing/invalid.
             return None
 
-        if _should_bypass(path):
-            return None
-
         db = get_db()
         try:
-            if not is_auth_enabled(db):
+            token = _extract_bearer_token(request)
+            if token and verify_token(db, token):
                 g.admin_authenticated = True
                 return None
 
-            token = _extract_bearer_token(request)
-            if not token:
-                return _auth_required_response()
-
-            if not verify_token(db, token):
-                return _auth_invalid_response()
-
-            g.admin_authenticated = True
-            return None
+            configured = get_admin_token_hash(db) is not None
+            return _auth_required_response(configured)
         finally:
             db.close()
 
@@ -107,9 +106,9 @@ def register_auth_guard(app):
 def websocket_auth_ok(db, token: str) -> bool:
     """Check whether a websocket should be allowed based on a supplied token.
 
-    Auth is considered ok when either auth is disabled (no token configured)
-    or the supplied token verifies against the configured hash.
+    The test-only env bypass short-circuits to True. Otherwise the presented
+    token must verify against the stored admin token hash.
     """
-    if not is_auth_enabled(db):
+    if auth_disabled_by_env():
         return True
     return verify_token(db, token or "")

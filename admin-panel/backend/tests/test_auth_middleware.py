@@ -1,8 +1,24 @@
-"""Tests for the Flask before_request auth guard in ``core.auth``."""
+"""Tests for the Flask before_request auth guard in ``core.auth``.
+
+This suite exercises the REAL middleware, so the test-only env bypass is
+explicitly removed for every test in the module. A single test at the bottom
+re-enables the bypass to document the escape hatch used by the rest of the
+pytest suite.
+"""
 import pytest
 
 from core.db import get_db
-from core.device_settings import clear_admin_token, generate_token, set_admin_token
+from core.device_settings import (
+    DISABLE_AUTH_ENV_VAR,
+    clear_admin_token,
+    generate_token,
+    set_admin_token,
+)
+
+
+@pytest.fixture(autouse=True)
+def _real_auth(monkeypatch):
+    monkeypatch.delenv(DISABLE_AUTH_ENV_VAR, raising=False)
 
 
 @pytest.fixture
@@ -20,18 +36,22 @@ def configured_token():
         db.close()
 
 
-def test_all_routes_accessible_when_auth_disabled(client, project):
-    """With no token configured, the guard lets every request through."""
-    response = client.get(f"/api/projects")
+def test_protected_route_returns_401_when_no_token_configured(client):
+    response = client.get("/api/projects")
 
-    assert response.status_code == 200
+    assert response.status_code == 401
+    body = response.get_json()
+    assert body["error"] == "authentication_required"
+    assert body["configured"] is False
 
 
 def test_protected_route_returns_401_when_no_token_presented(client, configured_token):
     response = client.get("/api/projects")
 
     assert response.status_code == 401
-    assert response.get_json()["error"] == "authentication_required"
+    body = response.get_json()
+    assert body["error"] == "authentication_required"
+    assert body["configured"] is True
 
 
 def test_protected_route_returns_401_when_token_invalid(client, configured_token):
@@ -41,7 +61,9 @@ def test_protected_route_returns_401_when_token_invalid(client, configured_token
     )
 
     assert response.status_code == 401
-    assert response.get_json()["error"] == "invalid_token"
+    body = response.get_json()
+    assert body["error"] == "authentication_required"
+    assert body["configured"] is True
 
 
 def test_protected_route_accessible_with_valid_bearer_token(client, configured_token):
@@ -59,18 +81,18 @@ def test_protected_route_accessible_with_valid_query_token(client, configured_to
     assert response.status_code == 200
 
 
-def test_auth_status_always_accessible_without_token(client, configured_token):
+def test_auth_status_accessible_without_token_when_configured(client, configured_token):
     response = client.get("/api/auth/status")
 
     assert response.status_code == 200
-    assert response.get_json() == {"auth_enabled": True}
+    assert response.get_json() == {"configured": True}
 
 
-def test_auth_status_returns_false_when_no_token_configured(client):
+def test_auth_status_returns_unconfigured_when_no_token_set(client):
     response = client.get("/api/auth/status")
 
     assert response.status_code == 200
-    assert response.get_json() == {"auth_enabled": False}
+    assert response.get_json() == {"configured": False}
 
 
 def test_auth_check_validates_supplied_token(client, configured_token):
@@ -79,23 +101,25 @@ def test_auth_check_validates_supplied_token(client, configured_token):
     assert response.status_code == 200
     body = response.get_json()
     assert body["ok"] is True
-    assert body["auth_enabled"] is True
+    assert body["configured"] is True
 
 
 def test_auth_check_rejects_wrong_token(client, configured_token):
     response = client.post("/api/auth/check", json={"token": "gwf_wrong"})
 
     assert response.status_code == 401
-    assert response.get_json()["ok"] is False
+    body = response.get_json()
+    assert body["ok"] is False
+    assert body["configured"] is True
 
 
-def test_auth_check_ok_when_auth_disabled(client):
+def test_auth_check_reports_no_token_configured(client):
     response = client.post("/api/auth/check", json={"token": ""})
 
-    assert response.status_code == 200
+    assert response.status_code == 401
     body = response.get_json()
-    assert body["ok"] is True
-    assert body["auth_enabled"] is False
+    assert body["error"] == "no_token_configured"
+    assert body["configured"] is False
 
 
 def test_static_css_path_bypasses_auth(client, configured_token):
@@ -136,3 +160,11 @@ def test_websocket_upgrade_bypasses_auth_at_http_layer(client, configured_token)
     )
 
     assert response.status_code != 401
+
+
+def test_env_var_bypass_allows_all_protected_routes(client, monkeypatch):
+    monkeypatch.setenv(DISABLE_AUTH_ENV_VAR, "1")
+
+    response = client.get("/api/projects")
+
+    assert response.status_code == 200

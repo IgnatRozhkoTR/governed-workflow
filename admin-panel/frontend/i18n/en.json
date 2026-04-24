@@ -490,11 +490,15 @@
   "history.errors.squashFailed": "Squash failed: {error}",
 
   "auth.title": "Admin token required",
-  "auth.subtitle": "Paste the token printed by auth-token",
+  "auth.subtitleUnconfigured": "No token is set up on this machine. Generate one using the command below, then paste it here.",
+  "auth.subtitleConfigured": "Paste your admin token to unlock the workspace.",
+  "auth.commandLabel": "Run this in your terminal on this machine:",
+  "auth.commandHint": "The token will print once. Copy it here to unlock.",
+  "auth.copy": "Copy",
+  "auth.copied": "Copied",
   "auth.placeholder": "gwf_…",
   "auth.submit": "Unlock",
-  "auth.hint": "Run python3 backend/app.py auth-token in your terminal to generate a new token.",
-  "auth.invalid": "Token invalid. Try again.",
+  "auth.invalid": "Token invalid. Generate a new one with the command above or check for typos.",
 
   "networkMode.title": "Network Mode",
   "networkMode.allowAccess": "Allow access from other devices on this network",

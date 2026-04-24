@@ -13,6 +13,7 @@ from core.db import get_db_ctx, init_db
 from core.device_settings import (
     clear_admin_token,
     generate_token,
+    get_admin_token_hash,
     get_bind_host,
     set_admin_token,
 )
@@ -77,8 +78,11 @@ if __name__ == "__main__":
     init_db()
     with get_db_ctx() as db:
         bind_host = get_bind_host(db)
+        token_configured = get_admin_token_hash(db) is not None
     app = create_app()
     print("Workspace Control server starting...")
     print(f"  URL: http://localhost:5111")
     print(f"  Bind host: {bind_host}")
+    if not token_configured:
+        print("  [!] No admin token configured. Run `python3 backend/app.py auth-token` to generate one.")
     app.run(host=bind_host, port=5111, debug=False)

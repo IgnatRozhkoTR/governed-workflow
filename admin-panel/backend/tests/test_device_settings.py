@@ -4,18 +4,19 @@ import pytest
 from core.db import get_db
 from core.device_settings import (
     ADMIN_TOKEN_HASH_KEY,
-    AUTH_ENABLED_KEY,
     BIND_HOST_KEY,
     DEFAULT_BIND_HOST,
+    DISABLE_AUTH_ENV_VAR,
     NETWORK_BIND_HOST,
     TOKEN_PREFIX,
+    auth_disabled_by_env,
     clear_admin_token,
     delete_setting,
     generate_token,
+    get_admin_token_hash,
     get_bind_host,
     get_setting,
     hash_token,
-    is_auth_enabled,
     set_admin_token,
     set_bind_host,
     set_setting,
@@ -72,14 +73,13 @@ def test_generate_token_is_prefixed_and_unique():
     assert a != b
 
 
-def test_set_admin_token_stores_hash_and_enables_auth(db):
+def test_set_admin_token_stores_hash(db):
     token = generate_token()
 
     set_admin_token(db, token)
 
     assert get_setting(db, ADMIN_TOKEN_HASH_KEY) == hash_token(token)
-    assert get_setting(db, AUTH_ENABLED_KEY) == "1"
-    assert is_auth_enabled(db) is True
+    assert get_admin_token_hash(db) == hash_token(token)
 
 
 def test_set_admin_token_never_persists_plaintext(db):
@@ -95,26 +95,14 @@ def test_set_admin_token_never_persists_plaintext(db):
     assert row["value"] == hash_token(token)
 
 
-def test_clear_admin_token_disables_auth(db):
+def test_clear_admin_token_removes_hash(db):
     token = generate_token()
     set_admin_token(db, token)
 
     clear_admin_token(db)
 
     assert get_setting(db, ADMIN_TOKEN_HASH_KEY) is None
-    assert get_setting(db, AUTH_ENABLED_KEY) == "0"
-    assert is_auth_enabled(db) is False
-
-
-def test_is_auth_enabled_false_when_no_token_configured(db):
-    assert is_auth_enabled(db) is False
-
-
-def test_is_auth_enabled_false_when_flag_explicitly_zero(db):
-    set_admin_token(db, generate_token())
-    set_setting(db, AUTH_ENABLED_KEY, "0")
-
-    assert is_auth_enabled(db) is False
+    assert get_admin_token_hash(db) is None
 
 
 def test_verify_token_returns_true_when_token_matches(db):
@@ -138,6 +126,20 @@ def test_verify_token_returns_false_when_presented_token_empty(db):
     set_admin_token(db, generate_token())
 
     assert verify_token(db, "") is False
+
+
+def test_auth_disabled_by_env_reads_env_var(monkeypatch):
+    monkeypatch.delenv(DISABLE_AUTH_ENV_VAR, raising=False)
+    assert auth_disabled_by_env() is False
+
+    monkeypatch.setenv(DISABLE_AUTH_ENV_VAR, "1")
+    assert auth_disabled_by_env() is True
+
+    monkeypatch.setenv(DISABLE_AUTH_ENV_VAR, "true")
+    assert auth_disabled_by_env() is False
+
+    monkeypatch.setenv(DISABLE_AUTH_ENV_VAR, "0")
+    assert auth_disabled_by_env() is False
 
 
 def test_get_bind_host_defaults_to_localhost(db):

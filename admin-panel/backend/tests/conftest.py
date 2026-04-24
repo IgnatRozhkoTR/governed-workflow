@@ -1,4 +1,8 @@
 """Shared fixtures for admin panel integration tests."""
+import os
+
+os.environ.setdefault("GOVERNED_WORKFLOW_DISABLE_AUTH", "1")
+
 import sys
 from datetime import datetime
 from pathlib import Path
