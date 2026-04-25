@@ -102,14 +102,41 @@ Hexagonal nodes are **user gates** — the workflow pauses until a human approve
 
 ## Security Model
 
-Governed Workflow is a local workflow-governance layer for Claude Code. It is designed to prevent accidental or overconfident agent bypasses, not to defend against malicious local users, compromised machines, or hostile networks.
+Governed Workflow is a workflow-governance layer for Claude Code. It is designed to prevent accidental or overconfident agent bypasses, not to defend against a malicious local user, a compromised machine, or a hostile network.
 
-Assumptions:
+### What is protected
 
-- The local machine is trusted.
+- **Admin authentication.** Every HTTP and WebSocket route (except the login-screen helpers and the local hook endpoints) requires an admin bearer token. The token is generated only via the CLI (`python3 admin-panel/backend/app.py auth-token`) — there is no web-facing endpoint that can mint one. The plaintext is never persisted; only its SHA-256 hash lives in the SQLite `device_settings` table. There is no environment variable or runtime flag that disables the middleware.
+- **Governed-workflow tree block.** A workspace-agnostic check runs in the hook API before workspace resolution and before the yolo bypass. Any `Edit`/`Write`/`Bash` that targets a path inside the governed-workflow install (admin panel source, SQLite DB, hooks, shipped rules) is denied. The single exemption is the self-edit context: cwd already inside the install tree, used by maintainers developing the admin panel itself.
+- **cwd-escape.** Because the block above runs before workspace lookup, an agent that does `cd /tmp` to land outside any registered workspace cannot reach governed-workflow files either.
+- **Direct admin-API access.** Bash commands containing `curl/wget/python/ruby/node/fetch` to `localhost:5111` are denied — agents must use MCP workspace tools.
+- **Per-workspace scope.** During execution sub-phases, edits are restricted to the `must`/`may` patterns of the current sub-phase scope. Plan and scope each carry an approval status; updating either revokes its approval.
+- **User gates.** Phases 1.4, 2.1, 3.N.3, and 4.2 halt until the user clicks Approve in the admin panel. The agent has no way to self-approve.
+- **DB file permissions.** The SQLite database and its WAL/SHM sidecars are `chmod 0600` on `init_db()` so other local users on the machine cannot read them.
+- **Fail-closed hook.** When the admin API is unreachable, the pre-tool hook denies every tool — no local guesses about which tools are safe.
+
+### What is NOT protected
+
+- **Read access by other code running as your user.** Any process you launch can still read the SQLite DB and the admin panel source. The 0600 permissions only block *other* local users.
+- **A compromised user account.** If someone has shell access as your user, they can read the admin token from your browser's localStorage or sniff it from local network traffic (the panel speaks plain HTTP).
+- **Network exposure.** Network mode binds to `0.0.0.0:5111` for LAN access. The admin token is the only barrier — do not enable network mode on untrusted networks, and do not expose port 5111 to the public internet.
+- **Read of governed-workflow source.** The path block covers `Edit`/`Write` and Bash commands. It does not currently block `Read`/`Glob`/`Grep`/`LS` of those paths. The token hash itself reveals nothing useful, but any agent can still read source code from the install tree.
+
+### YOLO mode is not a security feature
+
+`yolo_mode` is a per-workspace toggle that bypasses scope and plan-approval checks for fast experimentation:
+
+- An agent in yolo can write to any file inside its workspace working directory, regardless of scope or approval status.
+- The governed-workflow path block still applies — yolo cannot reach the admin panel, DB, hooks, or shipped rules.
+- User gates still halt the workflow — yolo only relaxes file-write checks.
+- Use it only for throwaway workspaces or trusted sandboxes. Never enable it against production code.
+
+### Trust assumptions
+
+- The local machine is trusted; no other malicious user with shell access.
 - The user controls the running admin panel.
-- Network mode should only be used on trusted LANs or behind a secure tunnel.
-- Do not expose port 5111 directly to the public internet.
+- Network mode is used only on trusted LANs or behind a secure tunnel.
+- Port 5111 is never exposed directly to the public internet.
 - The admin token grants full control over the workflow.
 - Browser-stored credentials may be accessible to sufficiently privileged local tools.
 

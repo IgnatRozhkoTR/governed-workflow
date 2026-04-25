@@ -48,6 +48,26 @@ python3 app.py
 
 The server starts at http://localhost:5111. The SQLite database is created automatically on first run.
 
+### Admin token
+
+Auth is always on. Generate a token from a shell on the host:
+
+```bash
+python3 backend/app.py auth-token
+```
+
+The CLI prints the token and copies it to the system clipboard. Paste it into the admin panel login screen — the token persists in browser localStorage. Re-running with `--force` rotates the token (and disconnects any open sessions). To clear:
+
+```bash
+python3 backend/app.py auth-reset
+```
+
+Only the SHA-256 hash is stored on disk (in the `device_settings` table); the plaintext is never persisted. There is no environment variable that disables the middleware. See the root [Security Model](../README.md#security-model) for the full set of trust boundaries.
+
+### Network mode
+
+By default the panel binds `127.0.0.1:5111` (localhost only). The Configuration page has a Network Mode toggle that switches the bind host to `0.0.0.0:5111` so the panel is reachable from another device on the LAN. The admin token is still required. Restart is triggered automatically. Never enable on an untrusted network.
+
 ### MCP Server
 
 Add to your `.mcp.json` (use absolute expanded paths — no `~` or `$HOME`):
@@ -88,7 +108,9 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 |-------|-----------|
 | Projects | `GET/POST /api/projects`, `DELETE /api/projects/<id>` |
 | Workspaces | `GET .../branches`, `GET/POST .../workspaces`, `PUT .../archive` |
-| State | `GET .../state`, `PUT .../phase`, `PUT .../scope`, `PUT .../locale`, `PUT .../yolo`, `GET .../gate-nonce` |
+| Auth | `GET /api/auth/status`, `POST /api/auth/check` |
+| State | `GET .../state`, `PUT .../phase`, `PUT .../scope`, `PUT .../locale`, `PUT .../yolo` |
+| Network | `GET/PUT /api/network-mode`, `POST /api/restart` |
 | Plan/Scope Approval | `POST .../plan-status`, `POST .../scope-status` |
 | Advance | `POST .../approve`, `POST .../reject` |
 | Comments | `GET/POST .../comments`, `PUT .../comments/<id>/resolve`, `POST .../comments/<id>/reply` |
