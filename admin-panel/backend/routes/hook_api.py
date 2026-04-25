@@ -40,26 +40,23 @@ def check_permission():
     body = request.get_json(silent=True) or {}
     cwd = body.get("cwd", ".")
     tool_name = body.get("tool_name", "")
+    tool_input = {
+        "file_path": body.get("file_path", ""),
+        "command": body.get("command", ""),
+    }
+
+    # Workspace-agnostic security block runs BEFORE workspace resolution so it
+    # catches cwd-escape (cd /tmp), the yolo bypass, and direct admin-panel
+    # HTTP calls — none of which depend on a workspace match.
+    gw_block = permission_service.check_global_security_block(tool_name, tool_input, cwd)
+    if gw_block is not None:
+        return jsonify(gw_block)
 
     db = get_db()
     try:
         ws = _resolve_workspace(db, cwd)
         if not ws:
             return jsonify({"governed": False, "allowed": True})
-
-        tool_input = {
-            "file_path": body.get("file_path", ""),
-            "command": body.get("command", ""),
-        }
-
-        # The governed-workflow install path block runs BEFORE the yolo-mode
-        # bypass so agents cannot use yolo to overwrite the admin panel, its
-        # SQLite DB, or the shipped hooks/rules.
-        gw_block = permission_service.check_governed_workflow_install_block(
-            ws, tool_name, tool_input, cwd
-        )
-        if gw_block is not None:
-            return jsonify(gw_block)
 
         if ws_field(ws, "yolo_mode", 0):
             return jsonify({"governed": True, "allowed": True})

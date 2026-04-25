@@ -36,7 +36,6 @@ _GH_PR_CREATE_RE = re.compile(r'gh\s+pr\s+create')
 _MCP_MR_CREATE_RE = re.compile(r'mcp.*gitlab.*create_merge_request', re.IGNORECASE)
 _DOCKER_RE = re.compile(r'^\s*(docker|docker-compose|podman)\s')
 _CURL_APPROVE_RE = re.compile(r'curl.*(approve|reject)')
-_SQLITE_BYPASS_RE = re.compile(r'sqlite3.*admin-panel')
 _HTTP_BYPASS_RE = re.compile(r'(curl|wget|python3?|ruby|node|fetch).*(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0):5111')
 _GRADLE_TEST_RE = re.compile(r'gradlew.*test')
 
@@ -54,42 +53,61 @@ GOVERNED_WORKFLOW_DENIAL_REASON = (
 )
 
 
-def check_governed_workflow_install_block(ws, tool_name, tool_input, cwd):
-    """Deny a tool invocation when it targets the governed-workflow install.
+def check_global_security_block(tool_name, tool_input, cwd):
+    """Workspace-agnostic security blocks. Run BEFORE workspace resolution.
 
-    Runs before the yolo-mode bypass in the hook API so the admin panel tree,
-    its SQLite DB, the shipped hooks, and the default rules/agents are
-    protected even when an agent flips yolo on. Self-editing workspaces (those
-    whose ``working_dir`` lives inside ``REPO_ROOT``) are exempt so maintainers
-    can still develop the admin panel from inside the governed-workflow repo.
+    Catches three classes of attack that don't depend on a workspace match:
 
-    Returns a denial dict (same shape as ``check_tool_permission``) when the
-    tool must be blocked, or ``None`` when the invocation should continue
-    through the normal permission flow.
+    1. **cwd-escape** — agent does ``cd /tmp`` to land outside any registered
+       workspace and would otherwise slip past the per-workspace flow. The
+       global block applies regardless of workspace.
+    2. **YOLO bypass** — runs before the yolo-mode early return so an agent
+       cannot flip yolo on to overwrite the admin panel / DB / hooks.
+    3. **Direct admin-API access** — curl/wget/etc. to localhost:5111 that
+       could otherwise be used to fake hook responses, mass-list workspaces,
+       or call approve/reject endpoints if a token were present.
+
+    The single exemption is the self-edit context: cwd inside ``REPO_ROOT``.
+    We trust cwd here because it is harder to spoof at the hook layer than
+    tool inputs are — Claude Code reports the agent session's actual cwd.
+
+    Returns a denial dict when the tool must be blocked, or ``None`` when it
+    should continue through the normal permission flow.
     """
-    if _workspace_is_governed_workflow_self(ws):
+    if _is_governed_workflow_install_path(os.path.abspath(cwd)):
         return None
-
-    phase = ws["phase"]
-    denial = {"governed": True, "phase": phase, "allowed": False,
-              "reason": GOVERNED_WORKFLOW_DENIAL_REASON}
 
     if tool_name in _EDIT_TOOLS:
         file_path = tool_input.get("file_path", "") or ""
-        if not file_path:
-            return None
-        canon = _canonicalize_path(file_path, cwd)
-        if _is_governed_workflow_install_path(canon):
-            return denial
+        if file_path:
+            canon = _canonicalize_path(file_path, cwd)
+            if _is_governed_workflow_install_path(canon):
+                return _global_denial(GOVERNED_WORKFLOW_DENIAL_REASON)
         return None
 
     if tool_name == "Bash":
         command = tool_input.get("command", "") or ""
-        if command and _GOVERNED_WORKFLOW_ROOT in command:
-            return denial
+        if not command:
+            return None
+        if _HTTP_BYPASS_RE.search(command):
+            return _global_denial(
+                "Direct HTTP requests to the admin panel are blocked. "
+                "Use MCP workspace tools instead."
+            )
+        if _CURL_APPROVE_RE.search(command):
+            return _global_denial(
+                "Direct API calls to approve/reject are blocked. "
+                "Use the admin panel UI."
+            )
+        if _GOVERNED_WORKFLOW_ROOT in command:
+            return _global_denial(GOVERNED_WORKFLOW_DENIAL_REASON)
         return None
 
     return None
+
+
+def _global_denial(reason):
+    return {"governed": True, "allowed": False, "reason": reason}
 
 
 def check_tool_permission(ws, tool_name, tool_input, project_path):
@@ -150,28 +168,6 @@ def _is_governed_workflow_install_path(abs_path: str) -> bool:
         return False
     normalized = os.path.abspath(abs_path)
     return normalized == _GOVERNED_WORKFLOW_ROOT or normalized.startswith(
-        _GOVERNED_WORKFLOW_ROOT + os.sep
-    )
-
-
-def _workspace_is_governed_workflow_self(ws) -> bool:
-    """True when the current workspace is editing the governed-workflow repo itself.
-
-    Identified by the workspace ``working_dir`` living under ``REPO_ROOT``. A
-    normal user workspace lives under some other project's tree (e.g.
-    ``/Users/ig/Projects/backend/.claude/worktrees/MP-95``) and returns False,
-    so the path-block applies. The governed-workflow's own development workspace
-    (``<repo>/.claude/worktrees/<branch>``) returns True so maintainers can still
-    edit their own source tree.
-    """
-    try:
-        working_dir = ws["working_dir"]
-    except (KeyError, TypeError):
-        return False
-    if not working_dir:
-        return False
-    abs_wd = os.path.abspath(working_dir)
-    return abs_wd == _GOVERNED_WORKFLOW_ROOT or abs_wd.startswith(
         _GOVERNED_WORKFLOW_ROOT + os.sep
     )
 
@@ -293,10 +289,6 @@ def _check_edit_tool(ws, file_path, cwd):
     """Check permission for Edit/Write/MultiEdit/NotebookEdit tools."""
     canon = _canonicalize_path(file_path, cwd)
 
-    if _is_governed_workflow_install_path(canon) and not _workspace_is_governed_workflow_self(ws):
-        return {"governed": True, "phase": ws["phase"], "allowed": False,
-                "reason": GOVERNED_WORKFLOW_DENIAL_REASON}
-
     if _is_claude_metadata(canon):
         return {"governed": True, "phase": ws["phase"], "allowed": True,
                 "reason": "Workspace metadata is always writable"}
@@ -333,29 +325,13 @@ def _check_bash(ws, command, cwd):
     phase = ws["phase"]
     result = {"governed": True, "phase": phase}
 
-    if _GOVERNED_WORKFLOW_ROOT in command and not _workspace_is_governed_workflow_self(ws):
-        result["allowed"] = False
-        result["reason"] = GOVERNED_WORKFLOW_DENIAL_REASON
-        return result
-
     if _DOCKER_RE.search(command):
         result["allowed"] = True
         return result
 
-    if _CURL_APPROVE_RE.search(command):
-        result["allowed"] = False
-        result["reason"] = "Direct API calls to approve/reject are blocked. Use the admin panel UI."
-        return result
-
-    if _SQLITE_BYPASS_RE.search(command):
-        result["allowed"] = False
-        result["reason"] = "Direct database access to admin panel is blocked."
-        return result
-
-    if _HTTP_BYPASS_RE.search(command):
-        result["allowed"] = False
-        result["reason"] = "Direct HTTP requests to admin panel are blocked. Use MCP workspace tools."
-        return result
+    # Direct HTTP/sqlite/curl-approve bypass attempts are caught by
+    # check_global_security_block in the hook API before we get here, so the
+    # per-workspace flow can stay focused on phase/scope decisions.
 
     if _GIT_ADD_RE.search(command):
         return _check_git_add(ws, command, cwd)
