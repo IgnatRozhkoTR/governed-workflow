@@ -1,7 +1,7 @@
 ---
 name: research-prover
 description: Verify research findings against their proofs. Reads referenced code, commits, and sources to confirm claims are supported. Strictly verifies — does NOT research or find alternatives.
-tools: Bash, Glob, Grep, LS, Read, mcp__workspace__workspace_get_state, mcp__workspace__workspace_list_research, mcp__workspace__workspace_get_research, mcp__workspace__workspace_prove_research
+tools: Bash, Glob, Grep, LS, Read, mcp__governed-workflow__workspace_get_state, mcp__governed-workflow__workspace_list_research, mcp__governed-workflow__workspace_get_research, mcp__governed-workflow__workspace_prove_research
 model: opus
 color: red
 ---

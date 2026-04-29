@@ -1,7 +1,7 @@
 ---
 name: diff-researcher
 description: Analyze git commits, diffs, understand what changed in codebase. Researches specific commits or ranges, understands nature and impact of changes, provides comprehensive analysis.
-tools: Bash, Glob, Grep, LS, Read, Write, mcp__workspace__workspace_get_state, mcp__workspace__workspace_save_research
+tools: Bash, Glob, Grep, LS, Read, Write, mcp__governed-workflow__workspace_get_state, mcp__governed-workflow__workspace_save_research
 model: sonnet
 color: gray
 ---

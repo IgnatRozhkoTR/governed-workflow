@@ -75,7 +75,7 @@ Add to your `.mcp.json` (use absolute expanded paths — no `~` or `$HOME`):
 ```json
 {
   "mcpServers": {
-    "workspace": {
+    "governed-workflow": {
       "command": "/absolute/path/to/governed-workflow/admin-panel/.venv/bin/python3",
       "args": ["-m", "mcp_server"],
       "cwd": "/absolute/path/to/governed-workflow/admin-panel/backend"

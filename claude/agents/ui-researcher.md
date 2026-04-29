@@ -1,7 +1,7 @@
 ---
 name: ui-researcher
 description: Investigate actual UI structure, page layout, user interactions, visual appearance of web applications. Chrome automation for analyzing live pages, DOM structure, screenshots, interactions.
-tools: mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__javascript_tool, mcp__claude-in-chrome__read_console_messages, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__find, mcp__claude-in-chrome__tabs_context_mcp, mcp__workspace__workspace_get_state, mcp__workspace__workspace_save_research
+tools: mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__javascript_tool, mcp__claude-in-chrome__read_console_messages, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__find, mcp__claude-in-chrome__tabs_context_mcp, mcp__governed-workflow__workspace_get_state, mcp__governed-workflow__workspace_save_research
 model: sonnet
 color: indigo
 ---

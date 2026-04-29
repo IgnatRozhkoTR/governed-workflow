@@ -1,7 +1,7 @@
 ---
 name: review-validator
 description: Validates review issue resolutions. For 'fixed' issues, checks if the problematic code was actually changed. For 'false_positive' issues, independently verifies the code is correct. Updates resolution via MCP tool if incorrect.
-tools: Grep, Read, mcp__workspace__workspace_get_review_issues, mcp__workspace__workspace_resolve_review_issue
+tools: Grep, Read, mcp__governed-workflow__workspace_get_review_issues, mcp__governed-workflow__workspace_resolve_review_issue
 model: opus
 color: red
 ---

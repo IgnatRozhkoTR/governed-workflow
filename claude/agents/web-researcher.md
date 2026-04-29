@@ -1,7 +1,7 @@
 ---
 name: web-researcher
 description: Research web information about libraries, frameworks, solutions, best practices, technical documentation. Investigates web resources, compares solutions, gathers info from docs and articles.
-tools: WebFetch, WebSearch, Write, mcp__workspace__workspace_get_state, mcp__workspace__workspace_save_research
+tools: WebFetch, WebSearch, Write, mcp__governed-workflow__workspace_get_state, mcp__governed-workflow__workspace_save_research
 model: sonnet
 color: yellow
 ---

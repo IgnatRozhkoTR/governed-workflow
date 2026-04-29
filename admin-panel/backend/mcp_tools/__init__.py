@@ -195,7 +195,7 @@ def with_global_db(func):
 init_db()
 
 
-mcp = FastMCP("workspace", instructions="Workspace state management for orchestrator workflow.")
+mcp = FastMCP("governed-workflow", instructions="Workspace state management for orchestrator workflow.")
 
 
 def _detect_workspace():

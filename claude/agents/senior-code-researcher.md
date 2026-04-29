@@ -1,7 +1,7 @@
 ---
 name: senior-code-researcher
 description: Deep code investigation as persistent teammate. Thorough analysis requiring iterative exploration, pattern discovery, and cross-component tracing. Writes detailed findings to workspace files, sends brief summaries via messages. For simple one-shot research, use code-researcher instead.
-tools: Glob, Grep, LS, Read, Write, mcp__workspace__workspace_get_state, mcp__workspace__workspace_save_research
+tools: Glob, Grep, LS, Read, Write, mcp__governed-workflow__workspace_get_state, mcp__governed-workflow__workspace_save_research
 model: opus
 color: orange
 ---

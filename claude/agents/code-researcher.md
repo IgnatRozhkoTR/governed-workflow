@@ -1,7 +1,7 @@
 ---
 name: code-researcher
 description: Deeply research and understand how code works. Thorough analysis of code structure, patterns, dependencies, implementation details. Traces code paths, understands component relationships, provides comprehensive explanations.
-tools: Glob, Grep, LS, Read, Write, mcp__workspace__workspace_get_state, mcp__workspace__workspace_save_research
+tools: Glob, Grep, LS, Read, Write, mcp__governed-workflow__workspace_get_state, mcp__governed-workflow__workspace_save_research
 model: sonnet
 color: orange
 ---

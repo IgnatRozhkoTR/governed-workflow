@@ -164,7 +164,7 @@ For every project that uses the governed workflow, create `.mcp.json` in the pro
 ```json
 {
   "mcpServers": {
-    "workspace": {
+    "governed-workflow": {
       "command": "/absolute/path/to/governed-workflow/admin-panel/.venv/bin/python3",
       "args": ["-m", "mcp_server"],
       "cwd": "/absolute/path/to/governed-workflow/admin-panel/backend"
