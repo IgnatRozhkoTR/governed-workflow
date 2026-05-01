@@ -107,6 +107,8 @@ async function switchTab(tabId) {
     if (typeof initMemory === 'function') initMemory();
   } else if (tabId === 'proposals') {
     if (typeof initProposals === 'function') initProposals();
+  } else if (tabId === 'work-modes') {
+    if (typeof initWorkModes === 'function') initWorkModes();
   }
 }
 

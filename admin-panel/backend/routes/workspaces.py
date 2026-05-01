@@ -647,18 +647,30 @@ def _install_git_hooks(dst_claude, working_dir):
 
 
 def _register_workspace(db, project_id, branch, sanitized, working_dir, source, locale, project_path):
-    """Insert workspace into DB and return the creation response."""
+    """Insert workspace into DB and return the creation response.
+
+    New workspaces are bound to the seeded ``basic`` work mode by default so
+    their phase sequence matches the canonical workflow on creation. The
+    operator can swap them onto a custom mode later via the work-mode API.
+    """
     ws_path = workspace_dir(project_path, branch)
     ws_path.mkdir(parents=True, exist_ok=True)
 
     created = datetime.now().isoformat()
 
+    basic_row = db.execute(
+        "SELECT id FROM work_modes WHERE name = 'basic'"
+    ).fetchone()
+    basic_id = basic_row["id"] if basic_row is not None else None
+
     db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, session_id, "
-        "working_dir, created, status, phase, scope_json, plan_json, source_branch, locale) "
-        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?)",
+        "working_dir, created, status, phase, scope_json, plan_json, source_branch, locale, "
+        "work_mode_id) "
+        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?, ?)",
         (project_id, branch, sanitized, str(working_dir), created,
-         '{}', '{"description":"","systemDiagram":"","execution":[]}', source, locale)
+         '{}', '{"description":"","systemDiagram":"","execution":[]}', source, locale,
+         basic_id)
     )
     db.commit()
 

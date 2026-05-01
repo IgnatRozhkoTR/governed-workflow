@@ -62,6 +62,7 @@
 <link rel="stylesheet" href="css/reflection.css?v=1">
 <link rel="stylesheet" href="css/memory.css?v=1">
 <link rel="stylesheet" href="css/proposals.css?v=1">
+<link rel="stylesheet" href="css/work-modes.css?v=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -164,6 +165,9 @@
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
     <span class="proposals-badge" id="proposalsBadge" style="display:none"></span>
   </button>
+  <button class="sidebar-btn" data-tab="work-modes" title="Work Modes" data-i18n-title="tabs.workModes">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="3"/><circle cx="17" cy="17" r="3"/><path d="M10 7h7a3 3 0 013 3v0"/><path d="M14 17H7a3 3 0 01-3-3v0"/></svg>
+  </button>
   <button class="sidebar-btn" id="splitTerminalBtn" title="Split Terminal" data-i18n-title="tabs.splitTerminal" onclick="toggleSplitTerminal()">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <rect x="3" y="3" width="18" height="18" rx="2"></rect>
@@ -183,6 +187,7 @@
   <button class="tab-btn" data-tab="reflection" data-i18n="tabs.reflection">Reflection</button>
   <button class="tab-btn" data-tab="memory" data-i18n="tabs.memory">Memory</button>
   <button class="tab-btn" data-tab="proposals" data-i18n="tabs.proposals">Proposals</button>
+  <button class="tab-btn" data-tab="work-modes" data-i18n="tabs.workModes">Work Modes</button>
 </nav>
 
 <!-- ═══ MAIN CONTENT ═══ -->
@@ -822,6 +827,37 @@
     </div>
   </div>
 
+
+  <!-- ─── WORK MODES ─── -->
+  <div class="tab-panel" id="panel-work-modes">
+    <div class="card" style="margin-bottom: 12px;">
+      <div class="card-header">
+        <span class="card-title" data-i18n="workModes.title">Work Modes</span>
+        <button class="btn btn-sm btn-primary" id="workModeNewBtn" data-i18n="workModes.new">New mode</button>
+      </div>
+    </div>
+    <div class="work-modes-layout">
+      <div class="work-modes-list-pane">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="workModes.modesList">Modes</span>
+          </div>
+          <div class="card-body" id="workModesList"></div>
+        </div>
+      </div>
+      <div class="work-modes-editor-pane" id="workModesEditor">
+        <div class="work-modes-empty" data-i18n="workModes.selectEntry">Select a mode to edit, or create a new one.</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top: 16px;">
+      <div class="card-header">
+        <span class="card-title" data-i18n="workModes.assignments">Workspace Assignments</span>
+        <button class="btn btn-sm btn-outline" id="workModeAssignmentsRefreshBtn" data-i18n="buttons.refresh">Refresh</button>
+      </div>
+      <div class="card-body" id="workModeAssignments"></div>
+    </div>
+  </div>
+
 </div><!-- /split-main -->
 <div class="split-handle" id="splitHandle"></div>
 <div class="split-terminal" id="splitTerminal">
@@ -880,6 +916,7 @@
 <script src="js/reflection.js?v=1"></script>
 <script src="js/memory.js?v=1"></script>
 <script src="js/proposals.js?v=1"></script>
+<script src="js/work-modes.js?v=1"></script>
 <script src="js/claude-config.js?v=10"></script>
 <script src="js/network-mode.js?v=11"></script>
 <script src="js/context.js?v=10"></script>
