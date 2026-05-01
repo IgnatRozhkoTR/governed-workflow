@@ -94,6 +94,9 @@ function runReflection() {
       REFLECTION_LIST.unshift(r);
       renderReflectionList();
       if (r && r.id) loadReflectionDetail(r.id);
+      if (r && Array.isArray(r.proposal_ids) && r.proposal_ids.length > 0) {
+        showReflectionProposalsBanner(r.proposal_ids.length, ctx.projectId, ctx.branch);
+      }
     })
     .catch(function(e) {
       if (btn) { btn.disabled = false; btn.textContent = 'Run Reflection'; }
@@ -105,6 +108,23 @@ function runReflection() {
         showToast('Reflection failed: ' + (e && e.message));
       }
     });
+}
+
+function showReflectionProposalsBanner(count, projectId, branch) {
+  var detailEl = document.getElementById('reflectionDetail');
+  if (!detailEl) return;
+
+  var banner = document.createElement('div');
+  banner.className = 'reflection-proposals-banner';
+  var noun = count === 1 ? 'proposal' : 'proposals';
+  banner.innerHTML = 'Proposals emitted: ' + count + ' ' + noun +
+    ' &mdash; <a href="#" class="reflection-proposals-link">view in Proposals tab</a>';
+  banner.querySelector('.reflection-proposals-link').onclick = function(e) {
+    e.preventDefault();
+    switchTab('proposals');
+    EventBus.emit('proposals:filter', { origin: 'reflection', workspace_id: getWorkspaceContext() && getWorkspaceContext().workspaceId });
+  };
+  detailEl.insertBefore(banner, detailEl.firstChild);
 }
 
 function initReflection() {

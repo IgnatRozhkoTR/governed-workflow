@@ -16,7 +16,7 @@ def _translate_reflection_error(exc: ReflectionServiceError) -> dict:
         return mcp_error("transient", str(exc), retryable=True)
     if exc.code == "llm_unconfigured":
         return mcp_error("business", str(exc), retryable=False)
-    if exc.code == "llm_failure":
+    if exc.code in ("llm_failure", "llm_invalid_json"):
         return mcp_error("transient", str(exc), retryable=True)
     return mcp_error("business", str(exc), retryable=False)
 
@@ -39,12 +39,13 @@ def reflection_run(ws, project, db, locale) -> dict:
       and lessons learned. The report is persisted and returned.
 
     Returns
-      {id, workspace_id, content_md, summary, session_id, created_at}
+      {id, workspace_id, content_md, summary, session_id, created_at, proposal_ids}
 
     Errors
       not_found       — workspace not detected for current directory.
       business        — LLM not configured (set OPENAI_API_KEY or ANTHROPIC_API_KEY).
-      transient       — no session found yet, or LLM call failed; caller may retry.
+      transient       — no session found yet, LLM call failed, or LLM returned
+                        malformed JSON (llm_invalid_json); caller may retry.
     """
     try:
         result = reflection_service.run(db, ws["id"])

@@ -162,6 +162,22 @@ class TestListProposals:
         assert len(result) == 1
         assert result[0]["title"] == "ws-scoped"
 
+    def test_list_proposals_filter_by_origin(self, clean_db):
+        db = _db()
+        try:
+            create(db, type="memory_write", title="Reflection note", origin="reflection")
+            create(db, type="rule_new", title="Agent rule", origin="agent")
+            create(db, type="workflow_improvement", title="Reflection improvement", origin="reflection")
+
+            result = list_proposals(db, origin="reflection")
+        finally:
+            db.close()
+
+        assert len(result) == 2
+        assert all(r["origin"] == "reflection" for r in result)
+        titles = {r["title"] for r in result}
+        assert titles == {"Reflection note", "Reflection improvement"}
+
 
 class TestGetProposal:
     def test_get_returnsProposal_byId(self, clean_db):

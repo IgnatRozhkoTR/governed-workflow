@@ -33,8 +33,10 @@ No arguments are required. The workspace is inferred from the MCP connection con
 - A Markdown report visible in the admin panel under the Reflection tab.
 - A summary line printed to the console: `Reflection #<id> saved: <summary>`.
 
-## Behavior Notes
+## Behavior
 
-- **v1 scope**: The skill only writes a reflection report. Proposal emission (automatically surfacing improvement suggestions back into the workflow) is planned for v3.5 and is not present here.
+Reflection produces both a Markdown report (visible on the Reflection card) AND zero or more proposals (visible on the Proposals tab). Proposals are not auto-applied; an admin must approve each one via the Proposals tab. Proposal types include memory_write/memory_delete (project memories), rule_new/rule_update (project rules), agent_new/agent_update (agent definitions), skill_new/skill_update (skill files), and workflow_improvement (free-form notes for the maintainer).
+
 - If no active session is found (HTTP 409 from the API), the skill prints an error and stops.
 - If the LLM provider is not configured (HTTP 503), the skill prints a setup hint and stops.
+- If the LLM returns malformed JSON (HTTP 502), the call may be retried.

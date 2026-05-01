@@ -1,4 +1,6 @@
 """Reflection generation and persistence for workspace sessions."""
+import json
+import sys
 from datetime import datetime
 
 from core import llm_client
@@ -8,12 +10,32 @@ from services.session_extractor import SessionExtractorError
 
 
 _REFLECTION_PROMPT_TEMPLATE = """\
-Summarize this Claude Code session as a concise reflection. Output Markdown with sections:
-## What was done
-## What worked
-## What did not work
-## Lessons
-Then a one-line summary on its own line prefixed with SUMMARY:
+You will summarize the Claude Code session AND propose improvements.
+Return ONLY a JSON object with this exact shape:
+
+{{
+  "report_md": "<full markdown report with sections What was done, What worked, What did not work, Lessons>",
+  "summary": "<one-line summary>",
+  "proposals": [
+    {{
+      "type": "<one of memory_write|memory_delete|rule_new|rule_update|agent_new|agent_update|skill_new|skill_update|workflow_improvement>",
+      "title": "<short title>",
+      "body": "<longer explanation>",
+      "payload": {{}}
+    }}
+  ]
+}}
+
+Type-specific payload shapes:
+- memory_write: {{content, scope: {{kind, project_id?, workspace_id?}}, metadata}}
+- memory_delete: {{memory_id}}
+- rule_new: {{project, name, description, paths, body}}
+- rule_update: {{project, name, description?, paths?, body?}}
+- agent_new / agent_update: {{project, name, description, body, tools?, model?, color?}}
+- skill_new / skill_update: {{project, name, description, body, args?, user_invocable?, tools_required?}}
+- workflow_improvement: {{title, body}}
+
+Empty `proposals` array is fine if no improvements are warranted.
 
 Session transcript:
 {transcript}"""
@@ -29,17 +51,9 @@ class ReflectionServiceError(Exception):
 
 def _fetch_workspace(db, workspace_id: int):
     row = db.execute(
-        "SELECT id FROM workspaces WHERE id = ?", (workspace_id,)
+        "SELECT id, project_id FROM workspaces WHERE id = ?", (workspace_id,)
     ).fetchone()
     return row
-
-
-def _parse_summary(content_md: str) -> str:
-    marker = "\nSUMMARY: "
-    idx = content_md.find(marker)
-    if idx == -1:
-        return ""
-    return content_md[idx + len(marker):].split("\n")[0].strip()
 
 
 def _insert_reflection(db, workspace_id: int, content_md: str, summary: str, session_id: str | None) -> dict:
@@ -59,19 +73,44 @@ def _insert_reflection(db, workspace_id: int, content_md: str, summary: str, ses
     }
 
 
+def _create_proposals(db, raw_proposals: list, workspace_id: int, project_id: int | None) -> list[int]:
+    from services import proposal_service
+    from services.proposal_service import ProposalServiceError
+
+    proposal_ids: list[int] = []
+    for item in raw_proposals:
+        try:
+            created = proposal_service.create(
+                db,
+                type=item.get("type", ""),
+                title=item.get("title", ""),
+                body=item.get("body", ""),
+                payload=item.get("payload") or {},
+                origin="reflection",
+                workspace_id=workspace_id,
+                project_id=project_id,
+            )
+            proposal_ids.append(created["id"])
+        except (ValueError, ProposalServiceError) as exc:
+            print(f"reflection_service: skipping proposal {item!r}: {exc}", file=sys.stderr)
+    return proposal_ids
+
+
 def run(db, workspace_id: int) -> dict:
     """Generate a reflection for the workspace's latest session and persist it.
 
     Returns
-        {id, workspace_id, content_md, summary, session_id, created_at}
+        {id, workspace_id, content_md, summary, session_id, created_at, proposal_ids}
 
     Raises
         ReflectionServiceError(code='not_found')        — workspace missing.
         ReflectionServiceError(code='no_session_found') — no session JSONL located.
         ReflectionServiceError(code='llm_unconfigured') — no LLM API key set.
         ReflectionServiceError(code='llm_failure')      — LLM call failed.
+        ReflectionServiceError(code='llm_invalid_json') — LLM returned malformed JSON.
     """
-    if _fetch_workspace(db, workspace_id) is None:
+    workspace = _fetch_workspace(db, workspace_id)
+    if workspace is None:
         raise ReflectionServiceError(
             f"Workspace {workspace_id} not found",
             code="not_found",
@@ -85,15 +124,31 @@ def run(db, workspace_id: int) -> dict:
     prompt = _REFLECTION_PROMPT_TEMPLATE.format(transcript=extracted["transcript"])
 
     try:
-        content_md = llm_client.complete(prompt, json_mode=False)
+        raw_response = llm_client.complete(prompt, json_mode=True)
     except LLMClientError as exc:
         if exc.code == "unconfigured":
             raise ReflectionServiceError(str(exc), code="llm_unconfigured") from exc
         raise ReflectionServiceError(str(exc), code="llm_failure") from exc
 
-    summary = _parse_summary(content_md)
+    try:
+        parsed = json.loads(raw_response)
+    except (ValueError, TypeError) as exc:
+        raise ReflectionServiceError(
+            f"LLM returned malformed JSON: {exc}",
+            code="llm_invalid_json",
+        ) from exc
+
+    content_md = parsed.get("report_md", "")
+    summary = parsed.get("summary", "")
+    raw_proposals = parsed.get("proposals") or []
+
     result = _insert_reflection(db, workspace_id, content_md, summary, extracted["session_id"])
     db.commit()
+
+    project_id = workspace["project_id"] if workspace["project_id"] is not None else None
+    proposal_ids = _create_proposals(db, raw_proposals, workspace_id, project_id)
+
+    result["proposal_ids"] = proposal_ids
     return result
 
 

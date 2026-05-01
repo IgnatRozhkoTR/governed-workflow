@@ -96,7 +96,7 @@ class TestListProposalsRoute:
     def test_get_filtersPassedToService(self, client):
         captured = {}
 
-        def _capture_list(db, status=None, type=None, workspace_id=None, project_id=None):
+        def _capture_list(db, status=None, type=None, workspace_id=None, project_id=None, origin=None):
             captured.update({"status": status, "type": type})
             return []
 
@@ -105,6 +105,26 @@ class TestListProposalsRoute:
 
         assert captured["status"] == "pending"
         assert captured["type"] == "memory_write"
+
+    def test_get_proposals_filters_by_origin_query_param(self, client, clean_db):
+        from core.db import get_db
+        from services.proposal_service import create
+
+        db = get_db()
+        try:
+            create(db, type="memory_write", title="From reflection", origin="reflection")
+            create(db, type="rule_new", title="From agent", origin="agent")
+            create(db, type="workflow_improvement", title="Also from reflection", origin="reflection")
+        finally:
+            db.close()
+
+        response = client.get("/api/proposals?origin=reflection")
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+        assert all(item["origin"] == "reflection" for item in data)
 
 
 class TestGetProposalRoute:

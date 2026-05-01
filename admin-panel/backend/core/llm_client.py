@@ -33,19 +33,27 @@ def _call_openai(prompt: str, model: str, json_mode: bool) -> str:
     return response.choices[0].message.content or ""
 
 
-def _call_anthropic(prompt: str, model: str) -> str:
+def _call_anthropic(prompt: str, model: str, json_mode: bool) -> str:
     import anthropic  # type: ignore[import]
 
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    # Prefilling the assistant turn with '{' steers the model to return valid JSON.
+    messages: list = [{"role": "user", "content": prompt}]
+    if json_mode:
+        messages.append({"role": "assistant", "content": "{"})
     message = client.messages.create(
         model=model,
         max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
     )
+    text = ""
     for block in message.content:
         if block.type == "text":
-            return block.text
-    return ""
+            text = block.text
+            break
+    if json_mode:
+        return "{" + text
+    return text
 
 
 def complete(prompt: str, model: str | None = None, json_mode: bool = False) -> str:
@@ -69,7 +77,7 @@ def complete(prompt: str, model: str | None = None, json_mode: bool = False) -> 
             return _call_openai(prompt, resolved_model, json_mode)
 
         resolved_model = model or _model_from_env(_DEFAULT_ANTHROPIC_MODEL)
-        return _call_anthropic(prompt, resolved_model)
+        return _call_anthropic(prompt, resolved_model, json_mode)
     except LLMClientError:
         raise
     except Exception as exc:

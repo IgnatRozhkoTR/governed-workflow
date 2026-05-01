@@ -128,6 +128,41 @@ class TestRunReflectionRoute:
         assert response.status_code == 409
         assert "error" in response.get_json()
 
+    def test_post_reflection_returns_502_on_llm_invalid_json(self, client, clean_db):
+        from core.db import get_db
+
+        db = get_db()
+        try:
+            project_id, branch, ws_id = _make_workspace(db)
+        finally:
+            db.close()
+
+        with patch(
+            "routes.reflections.reflection_service.run",
+            side_effect=ReflectionServiceError("LLM returned malformed JSON", code="llm_invalid_json"),
+        ):
+            response = client.post(f"/api/ws/{project_id}/{branch}/reflections")
+
+        assert response.status_code == 502
+        assert "error" in response.get_json()
+
+    def test_post_reflection_returns_proposal_ids_in_body(self, client, clean_db):
+        from core.db import get_db
+
+        db = get_db()
+        try:
+            project_id, branch, ws_id = _make_workspace(db)
+        finally:
+            db.close()
+
+        service_result = {**_REFLECTION_DICT, "workspace_id": ws_id, "proposal_ids": [42, 43]}
+        with patch("routes.reflections.reflection_service.run", return_value=service_result):
+            response = client.post(f"/api/ws/{project_id}/{branch}/reflections")
+
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data["proposal_ids"] == [42, 43]
+
 
 # ---------------------------------------------------------------------------
 # GET /api/ws/<project_id>/<branch>/reflections

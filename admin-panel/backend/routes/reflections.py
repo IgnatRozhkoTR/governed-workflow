@@ -12,6 +12,7 @@ _STATUS_BY_CODE = {
     "not_found": 404,
     "llm_unconfigured": 503,
     "llm_failure": 502,
+    "llm_invalid_json": 502,
     "no_session_found": 409,
 }
 

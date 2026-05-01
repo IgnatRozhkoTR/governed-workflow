@@ -26,12 +26,16 @@ _FAKE_TRANSCRIPT = {
     "started_at": "2024-01-01T10:00:00",
 }
 
-_LLM_REPORT = (
+_LLM_REPORT_MD = (
     "## What was done\nImplemented feature X.\n"
     "## What worked\nTests passed.\n"
     "## What did not work\nNothing major.\n"
-    "## Lessons\nStart simple.\n"
-    "\nSUMMARY: Feature X delivered cleanly."
+    "## Lessons\nStart simple."
+)
+
+_LLM_JSON_RESPONSE = (
+    '{"report_md": "' + _LLM_REPORT_MD.replace('"', '\\"').replace("\n", "\\n") + '",'
+    ' "summary": "Feature X delivered cleanly.", "proposals": []}'
 )
 
 
@@ -63,7 +67,7 @@ class TestReflectionServiceRun:
             ws_id = _make_workspace(db)
             with (
                 patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
-                patch("services.reflection_service.llm_client.complete", return_value=_LLM_REPORT),
+                patch("services.reflection_service.llm_client.complete", return_value=_LLM_JSON_RESPONSE),
             ):
                 result = reflection_service.run(db, ws_id)
         finally:
@@ -85,7 +89,7 @@ class TestReflectionServiceRun:
         assert row is not None
         assert row["workspace_id"] == ws_id
 
-    def test_run_parses_summary_line(self, clean_db):
+    def test_run_parses_summary_from_json(self, clean_db):
         from core.db import get_db
 
         db = get_db()
@@ -93,14 +97,14 @@ class TestReflectionServiceRun:
             ws_id = _make_workspace(db)
             with (
                 patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
-                patch("services.reflection_service.llm_client.complete", return_value=_LLM_REPORT),
+                patch("services.reflection_service.llm_client.complete", return_value=_LLM_JSON_RESPONSE),
             ):
                 result = reflection_service.run(db, ws_id)
         finally:
             db.close()
 
         assert result["summary"] == "Feature X delivered cleanly."
-        assert result["content_md"] == _LLM_REPORT
+        assert result["content_md"] == _LLM_REPORT_MD
 
     def test_run_raises_not_found_for_missing_workspace(self, clean_db):
         from core.db import get_db
@@ -175,6 +179,170 @@ class TestReflectionServiceRun:
             db.close()
 
         assert exc_info.value.code == "llm_failure"
+
+    def test_run_v2_emits_proposals_for_each_valid_proposal(self, clean_db):
+        import json
+        from core.db import get_db
+
+        llm_json = json.dumps({
+            "report_md": "## Report\nSome content.",
+            "summary": "Two proposals emitted.",
+            "proposals": [
+                {
+                    "type": "memory_write",
+                    "title": "Save context note",
+                    "body": "Remember this approach.",
+                    "payload": {"content": "important note"},
+                },
+                {
+                    "type": "workflow_improvement",
+                    "title": "Add reflection step",
+                    "body": "Always reflect after finalization.",
+                    "payload": {},
+                },
+            ],
+        })
+
+        db = get_db()
+        try:
+            ws_id = _make_workspace(db)
+            with (
+                patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
+                patch("services.reflection_service.llm_client.complete", return_value=llm_json),
+            ):
+                result = reflection_service.run(db, ws_id)
+
+            proposals = db.execute(
+                "SELECT * FROM proposals WHERE origin = 'reflection' ORDER BY id",
+            ).fetchall()
+        finally:
+            db.close()
+
+        assert len(proposals) == 2
+        assert proposals[0]["type"] == "memory_write"
+        assert proposals[1]["type"] == "workflow_improvement"
+        assert all(p["origin"] == "reflection" for p in proposals)
+        assert all(p["project_id"] is not None for p in proposals)
+
+    def test_run_v2_returns_proposal_ids_in_result(self, clean_db):
+        import json
+        from core.db import get_db
+
+        llm_json = json.dumps({
+            "report_md": "## Report\nDone.",
+            "summary": "Single proposal.",
+            "proposals": [
+                {
+                    "type": "rule_new",
+                    "title": "New lint rule",
+                    "body": "Enforce style.",
+                    "payload": {},
+                },
+            ],
+        })
+
+        db = get_db()
+        try:
+            ws_id = _make_workspace(db)
+            with (
+                patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
+                patch("services.reflection_service.llm_client.complete", return_value=llm_json),
+            ):
+                result = reflection_service.run(db, ws_id)
+        finally:
+            db.close()
+
+        assert "proposal_ids" in result
+        assert isinstance(result["proposal_ids"], list)
+        assert len(result["proposal_ids"]) == 1
+        assert isinstance(result["proposal_ids"][0], int)
+
+    def test_run_v2_skips_invalid_proposal_types_and_logs(self, clean_db, capsys):
+        import json
+        from core.db import get_db
+
+        llm_json = json.dumps({
+            "report_md": "## Report",
+            "summary": "Mixed proposals.",
+            "proposals": [
+                {
+                    "type": "foobar",
+                    "title": "Bad type",
+                    "body": "Should be skipped.",
+                    "payload": {},
+                },
+                {
+                    "type": "memory_write",
+                    "title": "Valid one",
+                    "body": "This should persist.",
+                    "payload": {"content": "valid content"},
+                },
+            ],
+        })
+
+        db = get_db()
+        try:
+            ws_id = _make_workspace(db)
+            with (
+                patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
+                patch("services.reflection_service.llm_client.complete", return_value=llm_json),
+            ):
+                result = reflection_service.run(db, ws_id)
+
+            rows = db.execute("SELECT * FROM proposals").fetchall()
+        finally:
+            db.close()
+
+        assert len(rows) == 1
+        assert rows[0]["type"] == "memory_write"
+        assert len(result["proposal_ids"]) == 1
+
+        captured = capsys.readouterr()
+        assert "foobar" in captured.err or "skipping" in captured.err
+
+    def test_run_v2_raises_llm_invalid_json_on_malformed_json(self, clean_db):
+        from core.db import get_db
+
+        db = get_db()
+        try:
+            ws_id = _make_workspace(db)
+            with (
+                patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
+                patch("services.reflection_service.llm_client.complete", return_value='{"report_md": "truncated json'),
+            ):
+                with pytest.raises(ReflectionServiceError) as exc_info:
+                    reflection_service.run(db, ws_id)
+        finally:
+            db.close()
+
+        assert exc_info.value.code == "llm_invalid_json"
+
+    def test_run_v2_with_empty_proposals_list_succeeds(self, clean_db):
+        import json
+        from core.db import get_db
+
+        llm_json = json.dumps({
+            "report_md": "## Report\nNothing to improve.",
+            "summary": "Quiet session.",
+            "proposals": [],
+        })
+
+        db = get_db()
+        try:
+            ws_id = _make_workspace(db)
+            with (
+                patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
+                patch("services.reflection_service.llm_client.complete", return_value=llm_json),
+            ):
+                result = reflection_service.run(db, ws_id)
+
+            count = db.execute("SELECT COUNT(*) FROM proposals").fetchone()[0]
+        finally:
+            db.close()
+
+        assert count == 0
+        assert result["proposal_ids"] == []
+        assert result["summary"] == "Quiet session."
 
 
 # ---------------------------------------------------------------------------

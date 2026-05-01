@@ -153,10 +153,11 @@ def list_proposals(
     db,
     status: str | None = None,
     type: str | None = None,
+    origin: str | None = None,
     workspace_id: int | None = None,
     project_id: int | None = None,
 ) -> list:
-    """List proposals filtered by status / type / workspace / project, newest first."""
+    """List proposals filtered by status / type / origin / workspace / project, newest first."""
     clauses = []
     params: list = []
     if status:
@@ -165,6 +166,9 @@ def list_proposals(
     if type:
         clauses.append("type = ?")
         params.append(type)
+    if origin:
+        clauses.append("origin = ?")
+        params.append(origin)
     if workspace_id is not None:
         clauses.append("workspace_id = ?")
         params.append(workspace_id)

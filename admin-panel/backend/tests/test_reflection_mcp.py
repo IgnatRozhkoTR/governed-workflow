@@ -94,6 +94,18 @@ class TestReflectionRunMcpEnvelopes:
 
         _assert_error_envelope(result, expected_category="transient", expected_retryable=True)
 
+    def test_reflection_run_llm_invalid_json_envelope(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_tools.reflection import reflection_run
+
+        with patch(
+            "mcp_tools.reflection.reflection_service.run",
+            side_effect=ReflectionServiceError("LLM returned malformed JSON", code="llm_invalid_json"),
+        ):
+            result = reflection_run()
+
+        _assert_error_envelope(result, expected_category="transient", expected_retryable=True)
+
 
 # ---------------------------------------------------------------------------
 # reflection_get MCP tool error envelope tests

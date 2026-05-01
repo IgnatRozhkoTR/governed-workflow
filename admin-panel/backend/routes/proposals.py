@@ -40,6 +40,7 @@ def _parse_int_param(name: str) -> int | None:
 def list_proposals_endpoint():
     status = request.args.get("status") or None
     type_ = request.args.get("type") or None
+    origin = request.args.get("origin") or None
     project_id = _parse_int_param("project_id")
     workspace_id = _parse_int_param("workspace_id")
     with get_db_ctx() as db:
@@ -48,6 +49,7 @@ def list_proposals_endpoint():
                 db,
                 status=status,
                 type=type_,
+                origin=origin,
                 workspace_id=workspace_id,
                 project_id=project_id,
             )
