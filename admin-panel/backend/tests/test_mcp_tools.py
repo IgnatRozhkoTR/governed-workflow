@@ -1276,6 +1276,7 @@ EXPECTED_ANNOTATIONS = {
     "proposal_approve": (False, True, False),
     "proposal_reject": (False, True, False),
     "proposal_resolve": (False, True, False),
+    "memory_promotion_run": (False, False, False),
 }
 
 
@@ -1287,7 +1288,7 @@ class TestMcpToolContracts:
     def test_all_tools_have_annotations(self):
         from mcp.types import ToolAnnotations
         tools = self._tools()
-        assert len(tools) == 52, f"expected 52 registered tools, got {len(tools)}"
+        assert len(tools) == 53, f"expected 53 registered tools, got {len(tools)}"
         for name, tool in tools.items():
             ann = tool.annotations
             assert ann is not None, f"{name} missing annotations"
