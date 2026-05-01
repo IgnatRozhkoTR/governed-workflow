@@ -4,7 +4,7 @@ from typing import Annotated
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from mcp_tools import mcp, mcp_error, with_mcp_workspace
+from mcp_tools import TRANSIENT_DB_EXCEPTIONS, mcp, mcp_error, with_mcp_workspace
 from services import memory_service
 from services.memory_provider import MemoryProviderError
 
@@ -60,6 +60,8 @@ def memory_save(
         return memory_service.save(content, scope, metadata)
     except MemoryProviderError as exc:
         return _translate_memory_error(exc)
+    except TRANSIENT_DB_EXCEPTIONS as exc:
+        return mcp_error("transient", str(exc), retryable=True)
 
 
 @mcp.tool(
@@ -95,6 +97,8 @@ def memory_retrieve(
         return memory_service.retrieve(query, scope_filter, limit)
     except MemoryProviderError as exc:
         return [_translate_memory_error(exc)]
+    except TRANSIENT_DB_EXCEPTIONS as exc:
+        return [mcp_error("transient", str(exc), retryable=True)]
 
 
 @mcp.tool(
@@ -127,6 +131,8 @@ def memory_get(
         return memory_service.get(memory_id)
     except MemoryProviderError as exc:
         return _translate_memory_error(exc)
+    except TRANSIENT_DB_EXCEPTIONS as exc:
+        return mcp_error("transient", str(exc), retryable=True)
 
 
 @mcp.tool(
@@ -159,6 +165,8 @@ def memory_delete(
         memory_service.delete(memory_id)
     except MemoryProviderError as exc:
         return _translate_memory_error(exc)
+    except TRANSIENT_DB_EXCEPTIONS as exc:
+        return mcp_error("transient", str(exc), retryable=True)
     return {"ok": True, "deleted_id": memory_id}
 
 
@@ -192,3 +200,5 @@ def memory_list(
         return memory_service.list_memories(scope_filter)
     except MemoryProviderError as exc:
         return [_translate_memory_error(exc)]
+    except TRANSIENT_DB_EXCEPTIONS as exc:
+        return [mcp_error("transient", str(exc), retryable=True)]

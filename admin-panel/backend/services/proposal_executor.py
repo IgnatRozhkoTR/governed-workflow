@@ -47,10 +47,20 @@ def _require_field(payload: dict, key: str) -> object:
 
 
 def _resolve_project_path(db, project_ref) -> str:
+    """Resolve a project path by id first, then by name.
+
+    Splitting the lookup avoids the OR-collision where a project happens to
+    be named like another project's id and would shadow the intended row.
+    """
     row = db.execute(
-        "SELECT path FROM projects WHERE id = ? OR name = ?",
-        (project_ref, project_ref),
+        "SELECT path FROM projects WHERE id = ?",
+        (project_ref,),
     ).fetchone()
+    if row is None:
+        row = db.execute(
+            "SELECT path FROM projects WHERE name = ?",
+            (project_ref,),
+        ).fetchone()
     if row is None:
         raise _wrap_execution_error(
             "not_found",

@@ -34,13 +34,37 @@ def _find_jsonl_for_session(project_dir: Path, session_id: str) -> Path | None:
 
 
 def _find_most_recent_jsonl(project_dir: Path, ws_created_at: str | None) -> Path | None:
-    """Return the most recently modified *.jsonl in project_dir."""
+    """Return the most recently modified *.jsonl in project_dir.
+
+    When ``ws_created_at`` is supplied (ISO-8601 string from the workspace row),
+    candidates whose mtime predates the workspace creation are filtered out so
+    we don't accidentally select a transcript from before this workspace existed.
+    Falsy or unparseable timestamps disable the filter and the original
+    "most recently modified" semantics apply.
+    """
     if not project_dir.exists():
         return None
     candidates = list(project_dir.glob("*.jsonl"))
     if not candidates:
         return None
+
+    cutoff = _parse_workspace_cutoff(ws_created_at)
+    if cutoff is not None:
+        eligible = [p for p in candidates if p.stat().st_mtime >= cutoff]
+        if eligible:
+            candidates = eligible
+
     return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def _parse_workspace_cutoff(ws_created_at: str | None) -> float | None:
+    if not ws_created_at:
+        return None
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(ws_created_at).timestamp()
+    except (TypeError, ValueError):
+        return None
 
 
 def _is_real_user_message(record: dict) -> bool:

@@ -45,7 +45,6 @@ def create_mode_endpoint():
     with get_db_ctx() as db:
         try:
             mode = work_mode_service.create(db, name=name, description=description, phases=phases)
-            db.commit()
         except WorkModeServiceError as exc:
             return _error_response(exc)
     return jsonify(mode), 201
@@ -76,7 +75,6 @@ def update_mode_endpoint(mode_id: int):
                 description=description,
                 phases=phases,
             )
-            db.commit()
         except WorkModeServiceError as exc:
             return _error_response(exc)
     return jsonify(mode)
@@ -87,7 +85,6 @@ def delete_mode_endpoint(mode_id: int):
     with get_db_ctx() as db:
         try:
             work_mode_service.delete(db, mode_id)
-            db.commit()
         except WorkModeServiceError as exc:
             return _error_response(exc)
     return jsonify({"status": "deleted", "id": mode_id})
@@ -106,7 +103,6 @@ def assign_mode_endpoint(workspace_id: int):
     with get_db_ctx() as db:
         try:
             result = work_mode_service.assign(db, workspace_id, mode_id_int)
-            db.commit()
         except WorkModeServiceError as exc:
             return _error_response(exc)
     return jsonify(result)
@@ -117,7 +113,6 @@ def apply_mode_endpoint(workspace_id: int):
     with get_db_ctx() as db:
         try:
             result = work_mode_service.apply(db, workspace_id)
-            db.commit()
         except WorkModeServiceError as exc:
             return _error_response(exc)
     return jsonify(result)

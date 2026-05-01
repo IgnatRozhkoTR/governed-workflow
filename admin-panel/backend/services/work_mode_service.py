@@ -93,7 +93,7 @@ def _validate_phases(phases) -> list[dict]:
     return cleaned
 
 
-def _row_to_mode(row, phase_rows) -> dict:
+def _row_to_mode(row, phase_rows, used_by_count: int = 0) -> dict:
     return {
         "id": row["id"],
         "name": row["name"],
@@ -101,6 +101,7 @@ def _row_to_mode(row, phase_rows) -> dict:
         "origin": row["origin"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
+        "used_by_count": used_by_count,
         "phases": [
             {
                 "phase_id": pr["phase_id"],
@@ -110,6 +111,14 @@ def _row_to_mode(row, phase_rows) -> dict:
             for pr in phase_rows
         ],
     }
+
+
+def _count_workspaces_using_mode(db, mode_id: int) -> int:
+    row = db.execute(
+        "SELECT COUNT(*) AS c FROM workspaces WHERE work_mode_id = ?",
+        (mode_id,),
+    ).fetchone()
+    return row["c"] if row else 0
 
 
 def _fetch_phase_rows(db, mode_id: int):
@@ -174,16 +183,54 @@ def create(db, name: str, description: str = "", phases: list[dict] | None = Non
 
 
 def list_modes(db) -> list[dict]:
-    """Return every work mode with its phase rows attached."""
-    rows = db.execute(
+    """Return every work mode with its phase rows and used_by counts attached.
+
+    Issues a constant three queries — modes, all phase rows, grouped workspace
+    counts — and groups results in Python. Avoids the per-mode N+1 fanout that
+    a naive ``_fetch_phase_rows`` loop would produce.
+    """
+    mode_rows = db.execute(
         "SELECT * FROM work_modes ORDER BY origin DESC, name"
     ).fetchall()
-    return [_row_to_mode(row, _fetch_phase_rows(db, row["id"])) for row in rows]
+    if not mode_rows:
+        return []
+
+    phase_rows_by_mode = _fetch_all_phase_rows(db)
+    counts_by_mode = _fetch_all_workspace_counts(db)
+
+    return [
+        _row_to_mode(
+            row,
+            phase_rows_by_mode.get(row["id"], []),
+            counts_by_mode.get(row["id"], 0),
+        )
+        for row in mode_rows
+    ]
 
 
 def get(db, mode_id: int) -> dict:
     row = _require_mode_row(db, mode_id)
-    return _row_to_mode(row, _fetch_phase_rows(db, mode_id))
+    used_by_count = _count_workspaces_using_mode(db, mode_id)
+    return _row_to_mode(row, _fetch_phase_rows(db, mode_id), used_by_count)
+
+
+def _fetch_all_phase_rows(db) -> dict[int, list]:
+    rows = db.execute(
+        "SELECT work_mode_id, phase_id, enabled, position "
+        "FROM work_mode_phases ORDER BY position, phase_id"
+    ).fetchall()
+    grouped: dict[int, list] = {}
+    for row in rows:
+        grouped.setdefault(row["work_mode_id"], []).append(row)
+    return grouped
+
+
+def _fetch_all_workspace_counts(db) -> dict[int, int]:
+    rows = db.execute(
+        "SELECT work_mode_id, COUNT(*) AS c FROM workspaces "
+        "WHERE work_mode_id IS NOT NULL GROUP BY work_mode_id"
+    ).fetchall()
+    return {row["work_mode_id"]: row["c"] for row in rows}
 
 
 def update(
@@ -251,7 +298,7 @@ def assign(db, workspace_id: int, mode_id: int) -> dict:
     mode only takes effect at the next phase resolution call. Raises
     ``not_found`` when either the workspace or mode is missing.
     """
-    _require_mode_row(db, mode_id)
+    mode_row = _require_mode_row(db, mode_id)
     workspace = db.execute(
         "SELECT id, work_mode_id FROM workspaces WHERE id = ?",
         (workspace_id,),
@@ -262,6 +309,7 @@ def assign(db, workspace_id: int, mode_id: int) -> dict:
             code="not_found",
         )
 
+    assigned_at = datetime.now().isoformat()
     db.execute(
         "UPDATE workspaces SET work_mode_id = ? WHERE id = ?",
         (mode_id, workspace_id),
@@ -272,6 +320,8 @@ def assign(db, workspace_id: int, mode_id: int) -> dict:
         "workspace_id": workspace_id,
         "previous_mode_id": workspace["work_mode_id"],
         "mode_id": mode_id,
+        "mode_name": mode_row["name"],
+        "assigned_at": assigned_at,
     }
 
 

@@ -79,8 +79,6 @@ class MemPalaceAdapter(MemoryProvider):
             raise MemoryProviderError(code="invalid_scope", message=str(exc)) from exc
         except self._mempalace.PalaceError as exc:
             raise MemoryProviderError(code="transient", message=str(exc)) from exc
-        except Exception as exc:
-            raise MemoryProviderError(code="transient", message=str(exc)) from exc
         return _drawer_to_dict(drawer)
 
     def retrieve(self, query: str, scope_filter: list[dict] | None, limit: int = 10) -> list[dict]:
@@ -94,8 +92,6 @@ class MemPalaceAdapter(MemoryProvider):
             results = self._palace.search(query, wing=wing, room=room, limit=limit)
         except self._mempalace.PalaceError as exc:
             raise MemoryProviderError(code="transient", message=str(exc)) from exc
-        except Exception as exc:
-            raise MemoryProviderError(code="transient", message=str(exc)) from exc
         return [_search_result_to_dict(item) for item in results]
 
     def get(self, memory_id: str) -> dict:
@@ -105,8 +101,6 @@ class MemPalaceAdapter(MemoryProvider):
             raise MemoryProviderError(code="memory_not_found", message=str(exc)) from exc
         except self._mempalace.PalaceError as exc:
             raise MemoryProviderError(code="transient", message=str(exc)) from exc
-        except Exception as exc:
-            raise MemoryProviderError(code="transient", message=str(exc)) from exc
         return _drawer_to_dict(drawer)
 
     def delete(self, memory_id: str) -> bool:
@@ -115,8 +109,6 @@ class MemPalaceAdapter(MemoryProvider):
         except self._mempalace.DrawerNotFoundError as exc:
             raise MemoryProviderError(code="memory_not_found", message=str(exc)) from exc
         except self._mempalace.PalaceError as exc:
-            raise MemoryProviderError(code="transient", message=str(exc)) from exc
-        except Exception as exc:
             raise MemoryProviderError(code="transient", message=str(exc)) from exc
 
     def list_memories(self, scope_filter: list[dict] | None) -> list[dict]:
@@ -129,8 +121,6 @@ class MemPalaceAdapter(MemoryProvider):
         try:
             drawers = self._palace.list_drawers(wing=wing, room=room)
         except self._mempalace.PalaceError as exc:
-            raise MemoryProviderError(code="transient", message=str(exc)) from exc
-        except Exception as exc:
             raise MemoryProviderError(code="transient", message=str(exc)) from exc
         return [_drawer_to_dict(d) for d in drawers]
 

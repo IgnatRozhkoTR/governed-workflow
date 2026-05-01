@@ -138,9 +138,17 @@ def run(db, workspace_id: int) -> dict:
             code="llm_invalid_json",
         ) from exc
 
+    if not isinstance(parsed, dict):
+        raise ReflectionServiceError(
+            f"LLM JSON root must be an object, got {type(parsed).__name__}",
+            code="llm_invalid_json",
+        )
+
     content_md = parsed.get("report_md", "")
     summary = parsed.get("summary", "")
     raw_proposals = parsed.get("proposals") or []
+    if not isinstance(raw_proposals, list):
+        raw_proposals = []
 
     result = _insert_reflection(db, workspace_id, content_md, summary, extracted["session_id"])
     db.commit()

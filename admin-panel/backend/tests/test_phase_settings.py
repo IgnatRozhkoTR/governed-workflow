@@ -37,12 +37,12 @@ def test_is_always_on_returns_false_for_core_phases(phase_id):
 
 
 @pytest.mark.parametrize("phase_id", ["3.1.3", "3.2.3", "3.99.3"])
-def test_is_always_on_returns_false_for_commit_gate_pattern(phase_id):
-    assert is_always_on(phase_id) is False
+def test_is_always_on_returns_true_for_commit_gate_pattern(phase_id):
+    assert is_always_on(phase_id) is True
 
 
-def test_is_always_on_returns_false_for_commit_gate_template():
-    assert is_always_on("3.x.3") is False
+def test_is_always_on_returns_true_for_commit_gate_template():
+    assert is_always_on("3.x.3") is True
 
 
 @pytest.mark.parametrize("phase_id", ["1.1", "1.2", "1.3", "1.4", "4.0", "4.1", "3.1.0", "3.1.4"])
@@ -90,13 +90,29 @@ def test_set_scope_settings_accepts_formerly_always_on_disable(db):
 
 
 @pytest.mark.parametrize("scope_type", ["device", "project", "workspace"])
-def test_set_scope_settings_accepts_any_phase_disable(db, scope_type):
-    """set_scope_settings no longer rejects disabling any phase — ValueError is not raised."""
+def test_set_scope_settings_accepts_any_non_commit_gate_phase_disable(db, scope_type):
+    """set_scope_settings no longer rejects disabling non-commit-gate phases — ValueError is not raised."""
     set_scope_settings(db, scope_type, "x", {"0": False})
     db.commit()
 
     result = get_scope_settings(db, scope_type, "x")
     assert result["0"] is False
+
+
+@pytest.mark.parametrize("phase_id", ["3.1.3", "3.7.3", "3.x.3"])
+def test_set_scope_settings_rejects_disable_for_commit_gate(db, phase_id):
+    """Commit-gate phases (3.N.3 and 3.x.3 template) cannot be disabled via scope overrides."""
+    with pytest.raises(ValueError):
+        set_scope_settings(db, "device", "", {phase_id: False})
+
+
+def test_set_scope_settings_allows_enable_for_commit_gate(db):
+    """Enabling a commit-gate phase (no-op effectively) is allowed."""
+    set_scope_settings(db, "device", "", {"3.1.3": True})
+    db.commit()
+
+    result = get_scope_settings(db, "device", "")
+    assert result["3.1.3"] is True
 
 
 def test_set_scope_settings_allows_phase_enable(db):

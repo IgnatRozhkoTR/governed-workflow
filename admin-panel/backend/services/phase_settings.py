@@ -2,26 +2,37 @@
 
 As of sub-phase 3.6, mandatory-phase enforcement moved from this file to the
 ``work_mode_phases`` table. The ``basic`` system mode pins the canonical
-sequence; user-defined modes may disable any phase. This module no longer
-hardcodes always-on phase ids — it just upserts override rows for the
-device / project / workspace scope chain. The phase resolver (see
-``services.phase_resolver``) layers those overrides on top of the workspace's
-selected work mode.
+sequence; user-defined modes may disable any phase. This module just upserts
+override rows for the device / project / workspace scope chain. The phase
+resolver (see ``services.phase_resolver``) layers those overrides on top of
+the workspace's selected work mode.
+
+The single residual enforcement point is the commit gate: phase ids matching
+``COMMIT_GATE_PATTERN`` (``3.N.3`` and the ``3.x.3`` template) cannot be
+disabled via scope overrides. Templated commit-gate phases would slip past
+the work-mode baseline check otherwise.
 """
+import re
 from datetime import datetime
 
 ALWAYS_ON_PHASE_IDS = frozenset()
+COMMIT_GATE_PATTERN = re.compile(r"^3\.(\d+|x)\.3$")
 VALID_SCOPE_TYPES = frozenset({"device", "project", "workspace"})
 
 
 def is_always_on(phase_id: str) -> bool:
-    """Always returns ``False``: mandatory phases are now governed by work modes.
+    """Return True only for the commit-gate phases (``3.N.3`` / ``3.x.3``).
 
-    The constant ``ALWAYS_ON_PHASE_IDS`` is kept (empty) so callers that import
-    it for legacy reasons keep working without raising ``ImportError``.
+    Work modes own the rest of the always-on contract; ``ALWAYS_ON_PHASE_IDS``
+    is kept (empty) for backward import compatibility. The commit gate stays
+    here because templated ids slip past the work-mode baseline check and the
+    UI uses this flag to disable the toggle row.
     """
-    del phase_id
-    return False
+    return _is_commit_gate(phase_id)
+
+
+def _is_commit_gate(phase_id: str) -> bool:
+    return isinstance(phase_id, str) and bool(COMMIT_GATE_PATTERN.match(phase_id))
 
 
 def _validate_scope_type(scope_type: str) -> None:
@@ -40,6 +51,11 @@ def get_scope_settings(db, scope_type: str, scope_id: str = "") -> dict:
 
 def set_scope_settings(db, scope_type: str, scope_id: str, settings: dict) -> None:
     _validate_scope_type(scope_type)
+    for phase_id, enabled in settings.items():
+        if not enabled and _is_commit_gate(phase_id):
+            raise ValueError(
+                f"Phase {phase_id} is the commit gate and cannot be disabled"
+            )
     now = datetime.now().isoformat()
     try:
         for phase_id, enabled in settings.items():

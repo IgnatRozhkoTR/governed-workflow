@@ -206,12 +206,15 @@ def _mark_failed(db, proposal_id: int, error_dict: dict) -> None:
     )
 
 
-def _mark_approved(db, proposal_id: int) -> None:
+def _atomic_claim_for_approval(db, proposal_id: int) -> bool:
+    """Atomically transition pending → approved. Returns True if this caller won the race."""
     now = datetime.utcnow().isoformat()
-    db.execute(
-        "UPDATE proposals SET status = 'approved', reviewed_at = ? WHERE id = ?",
+    cursor = db.execute(
+        "UPDATE proposals SET status = 'approved', reviewed_at = ? "
+        "WHERE id = ? AND status = 'pending'",
         (now, proposal_id),
     )
+    return cursor.rowcount == 1
 
 
 def approve(db, proposal_id: int) -> dict:
@@ -221,9 +224,14 @@ def approve(db, proposal_id: int) -> dict:
     without re-running the executor. Approving a terminal proposal (rejected,
     executed, failed) raises invalid_state.
 
+    The pending → approved transition is performed via a single conditional
+    UPDATE so concurrent approvers cannot both invoke the executor.
+
     On executor success: status='executed', result_json holds the executor result.
     On executor failure: status='failed', result_json holds {underlying_code,
-    underlying_message, details}.
+    underlying_message, details}. Any exception raised by the executor — domain
+    or otherwise — flips the proposal to 'failed' so it always reaches a
+    terminal state.
     """
     proposal = _require_proposal(db, proposal_id)
     status = proposal["status"]
@@ -237,8 +245,11 @@ def approve(db, proposal_id: int) -> dict:
             details={"current_status": status},
         )
 
-    _mark_approved(db, proposal_id)
+    won_race = _atomic_claim_for_approval(db, proposal_id)
     db.commit()
+
+    if not won_race:
+        return _require_proposal(db, proposal_id)
 
     from services import proposal_executor
     approved = _require_proposal(db, proposal_id)
@@ -249,6 +260,15 @@ def approve(db, proposal_id: int) -> dict:
             "underlying_code": exc.details.get("underlying_code") or exc.code,
             "underlying_message": str(exc),
             "details": exc.details,
+        }
+        _mark_failed(db, proposal_id, error_payload)
+        db.commit()
+        return _require_proposal(db, proposal_id)
+    except Exception as exc:
+        error_payload = {
+            "underlying_code": "unexpected_error",
+            "underlying_message": str(exc),
+            "details": {"exception_type": type(exc).__name__},
         }
         _mark_failed(db, proposal_id, error_payload)
         db.commit()

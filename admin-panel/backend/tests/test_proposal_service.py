@@ -286,6 +286,48 @@ class TestApproveProposal:
         assert result["result"] is not None
         assert result["result"]["underlying_code"] is not None
 
+    def test_approve_onUnexpectedException_marksFailed_andDoesNotPropagate(self, clean_db):
+        """Non-domain exceptions (RuntimeError etc.) must still flip the proposal to 'failed'."""
+        db = _db()
+        try:
+            proposal = _create_pending(db)
+
+            with patch(
+                "services.proposal_executor.execute",
+                side_effect=RuntimeError("unexpected boom"),
+            ):
+                result = approve(db, proposal["id"])
+        finally:
+            db.close()
+
+        assert result["status"] == "failed"
+        assert result["result"]["underlying_code"] == "unexpected_error"
+        assert "unexpected boom" in result["result"]["underlying_message"]
+        assert result["result"]["details"]["exception_type"] == "RuntimeError"
+
+    def test_approve_isAtomic_doesNotReExecuteIfAlreadyApprovedMidFlight(self, clean_db):
+        """Simulates a concurrent caller: pre-flip status to 'approved' before approve() runs.
+        The atomic UPDATE sees rowcount=0 and the executor must NOT run.
+        """
+        db = _db()
+        try:
+            proposal = _create_pending(db)
+
+            # Simulate "another caller already won the race" — flip to approved.
+            db.execute(
+                "UPDATE proposals SET status = 'approved', reviewed_at = '2024-01-01T00:00:00' WHERE id = ?",
+                (proposal["id"],),
+            )
+            db.commit()
+
+            with patch("services.proposal_executor.execute") as exec_mock:
+                result = approve(db, proposal["id"])
+        finally:
+            db.close()
+
+        assert result["status"] == "approved"
+        exec_mock.assert_not_called()
+
 
 class TestRejectProposal:
     def test_reject_setsStatusRejected_withReason(self, clean_db):

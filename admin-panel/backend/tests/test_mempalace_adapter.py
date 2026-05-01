@@ -288,7 +288,8 @@ class TestMemPalaceAdapterErrorMapping:
             a.save("c", {"kind": "project"}, {})
         assert exc_info.value.code == "invalid_scope"
 
-    def test_unexpected_exception_maps_to_transient(self, stub_mempalace, tmp_path):
+    def test_unexpected_exception_propagates_as_bug(self, stub_mempalace, tmp_path):
+        """Unknown exceptions propagate so they surface as bugs, not transient retries."""
         original = stub_mempalace.MemPalace
 
         class FailingPalace(original):
@@ -303,13 +304,11 @@ class TestMemPalaceAdapterErrorMapping:
 
         a = MemPalaceAdapter(tmp_path / "palace-tx")
 
-        with pytest.raises(MemoryProviderError) as exc_info:
+        with pytest.raises(RuntimeError):
             a.retrieve("query", scope_filter=None)
-        assert exc_info.value.code == "transient"
 
-        with pytest.raises(MemoryProviderError) as exc_info:
+        with pytest.raises(RuntimeError):
             a.list_memories(scope_filter=None)
-        assert exc_info.value.code == "transient"
 
 
 # ---------------------------------------------------------------------------

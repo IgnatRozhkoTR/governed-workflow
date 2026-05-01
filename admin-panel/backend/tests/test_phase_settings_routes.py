@@ -129,12 +129,20 @@ def test_get_phases_available_excludes_templated_ids(client):
     )
 
 
-# ── Commit-gate phases now accepted ──────────────────────────────────────────
+# ── Commit-gate phases stay protected ────────────────────────────────────────
 
-def test_put_workspace_accepts_3_1_3_disable(client, workspace):
-    """3.1.3 is no longer always-on; disabling it via settings is accepted."""
+def test_put_workspace_rejects_3_1_3_disable(client, workspace):
+    """3.1.3 is the commit gate; disabling it must be rejected with 400."""
     pid = workspace["project_id"]
     response = client.put(f"/api/ws/{pid}/feature/test/phase-settings", json={"settings": {"3.1.3": False}})
+    assert response.status_code == 400
+    assert "error" in response.get_json()
+
+
+def test_put_workspace_accepts_non_commit_gate_disable(client, workspace):
+    """Non-commit-gate phases stay user-toggleable via settings."""
+    pid = workspace["project_id"]
+    response = client.put(f"/api/ws/{pid}/feature/test/phase-settings", json={"settings": {"1.1": False}})
     assert response.status_code == 200
     assert response.get_json()["ok"] is True
 

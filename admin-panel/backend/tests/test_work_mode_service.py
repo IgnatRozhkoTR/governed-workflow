@@ -181,12 +181,39 @@ def test_assign_sets_work_mode_id_does_not_change_phase_column(db, project, work
 
     assert result["workspace_id"] == workspace["id"]
     assert result["mode_id"] == basic["id"]
+    assert result["mode_name"] == "basic"
+    assert "assigned_at" in result and isinstance(result["assigned_at"], str)
 
     row = db.execute(
         "SELECT phase, work_mode_id FROM workspaces WHERE id = ?", (workspace["id"],)
     ).fetchone()
     assert row["work_mode_id"] == basic["id"]
     assert row["phase"] == original_phase
+
+
+def test_list_modes_includes_used_by_count(db, user_mode, workspace):
+    work_mode_service.assign(db, workspace["id"], user_mode["id"])
+
+    modes = work_mode_service.list_modes(db)
+
+    target = next(m for m in modes if m["id"] == user_mode["id"])
+    assert "used_by_count" in target
+    assert target["used_by_count"] == 1
+
+
+def test_list_modes_used_by_count_is_zero_for_unassigned_mode(db, user_mode):
+    modes = work_mode_service.list_modes(db)
+
+    target = next(m for m in modes if m["id"] == user_mode["id"])
+    assert target["used_by_count"] == 0
+
+
+def test_get_mode_includes_used_by_count(db, user_mode, workspace):
+    work_mode_service.assign(db, workspace["id"], user_mode["id"])
+
+    fetched = work_mode_service.get(db, user_mode["id"])
+
+    assert fetched["used_by_count"] == 1
 
 
 # ── apply ─────────────────────────────────────────────────────────────────────

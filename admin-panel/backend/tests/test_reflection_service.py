@@ -317,6 +317,49 @@ class TestReflectionServiceRun:
 
         assert exc_info.value.code == "llm_invalid_json"
 
+    def test_run_v2_raises_llm_invalid_json_on_non_object_root(self, clean_db):
+        """LLM returning a JSON list/string instead of an object must be rejected, not crash on .get()."""
+        from core.db import get_db
+
+        db = get_db()
+        try:
+            ws_id = _make_workspace(db)
+            with (
+                patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
+                patch("services.reflection_service.llm_client.complete", return_value='["not", "an", "object"]'),
+            ):
+                with pytest.raises(ReflectionServiceError) as exc_info:
+                    reflection_service.run(db, ws_id)
+        finally:
+            db.close()
+
+        assert exc_info.value.code == "llm_invalid_json"
+
+    def test_run_v2_coerces_non_list_proposals_to_empty(self, clean_db):
+        """If 'proposals' arrives as a non-list (e.g. dict), treat it as empty and continue."""
+        import json
+        from core.db import get_db
+
+        llm_json = json.dumps({
+            "report_md": "## Report\nDone.",
+            "summary": "Bad proposals shape.",
+            "proposals": {"this": "is not a list"},
+        })
+
+        db = get_db()
+        try:
+            ws_id = _make_workspace(db)
+            with (
+                patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
+                patch("services.reflection_service.llm_client.complete", return_value=llm_json),
+            ):
+                result = reflection_service.run(db, ws_id)
+        finally:
+            db.close()
+
+        assert result["proposal_ids"] == []
+        assert result["summary"] == "Bad proposals shape."
+
     def test_run_v2_with_empty_proposals_list_succeeds(self, clean_db):
         import json
         from core.db import get_db
