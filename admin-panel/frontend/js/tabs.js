@@ -101,6 +101,8 @@ async function switchTab(tabId) {
     }
   } else if (tabId === 'terminal') {
     if (typeof onTerminalTabActivated === 'function') onTerminalTabActivated();
+  } else if (tabId === 'reflection') {
+    if (typeof initReflection === 'function') initReflection();
   }
 }
 

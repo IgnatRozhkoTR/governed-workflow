@@ -60,8 +60,8 @@ def clean_db(setup_db, admin_token):
     tables = [
         "acceptance_criteria", "review_issues", "discussions",
         "research_entries", "progress_entries", "session_history",
-        "phase_history", "workspaces", "projects", "modules_enabled",
-        "improvements",
+        "phase_history", "reflections", "workspaces", "projects",
+        "modules_enabled", "improvements",
         "verification_step_results", "verification_runs",
         "project_verification_profiles",
         "device_settings",
