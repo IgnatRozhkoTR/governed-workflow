@@ -103,6 +103,8 @@ async function switchTab(tabId) {
     if (typeof onTerminalTabActivated === 'function') onTerminalTabActivated();
   } else if (tabId === 'reflection') {
     if (typeof initReflection === 'function') initReflection();
+  } else if (tabId === 'memory') {
+    if (typeof initMemory === 'function') initMemory();
   }
 }
 

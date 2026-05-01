@@ -60,6 +60,7 @@
 <link rel="stylesheet" href="css/workspace.css?v=11">
 <link rel="stylesheet" href="css/phase-settings.css?v=1">
 <link rel="stylesheet" href="css/reflection.css?v=1">
+<link rel="stylesheet" href="css/memory.css?v=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -155,6 +156,9 @@
   <button class="sidebar-btn" data-tab="reflection" title="Reflection" data-i18n-title="tabs.reflection">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><circle cx="12" cy="10" r="2" fill="currentColor" stroke="none"/><line x1="12" y1="7" x2="12" y2="7.01"/></svg>
   </button>
+  <button class="sidebar-btn" data-tab="memory" title="Memory" data-i18n-title="tabs.memory">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>
+  </button>
   <button class="sidebar-btn" id="splitTerminalBtn" title="Split Terminal" data-i18n-title="tabs.splitTerminal" onclick="toggleSplitTerminal()">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <rect x="3" y="3" width="18" height="18" rx="2"></rect>
@@ -172,6 +176,7 @@
   <button class="tab-btn" data-tab="research" data-i18n="tabs.research">Research</button>
   <button class="tab-btn" data-tab="phases" data-i18n="tabs.phaseControl">Phase Control</button>
   <button class="tab-btn" data-tab="reflection" data-i18n="tabs.reflection">Reflection</button>
+  <button class="tab-btn" data-tab="memory" data-i18n="tabs.memory">Memory</button>
 </nav>
 
 <!-- ═══ MAIN CONTENT ═══ -->
@@ -739,6 +744,32 @@
     </div>
   </div>
 
+
+  <!-- ─── MEMORY ─── -->
+  <div class="tab-panel" id="panel-memory">
+    <div class="memory-scope-tabs">
+      <button class="memory-scope-tab active" data-scope="project">Project</button>
+      <button class="memory-scope-tab" data-scope="ticket">Ticket</button>
+    </div>
+    <div class="memory-search-bar">
+      <input type="text" class="context-input" id="memorySearchInput" placeholder="Search memories..." data-i18n-placeholder="placeholders.searchMemories">
+      <button class="btn btn-sm" id="memorySearchBtn" data-i18n="buttons.search">Search</button>
+    </div>
+    <div class="memory-layout">
+      <div class="memory-list-pane">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="cards.memoryEntries">Memory Entries</span>
+          </div>
+          <div class="card-body" id="memoryList"></div>
+        </div>
+      </div>
+      <div class="memory-detail-pane" id="memoryDetail">
+        <div class="memory-empty" data-i18n="memory.selectEntry">Select a memory entry to view details.</div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /split-main -->
 <div class="split-handle" id="splitHandle"></div>
 <div class="split-terminal" id="splitTerminal">
@@ -795,6 +826,7 @@
 <script src="js/git-config.js?v=10"></script>
 <script src="js/rules.js?v=1"></script>
 <script src="js/reflection.js?v=1"></script>
+<script src="js/memory.js?v=1"></script>
 <script src="js/claude-config.js?v=10"></script>
 <script src="js/network-mode.js?v=11"></script>
 <script src="js/context.js?v=10"></script>
