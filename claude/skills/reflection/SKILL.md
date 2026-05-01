@@ -40,3 +40,8 @@ Reflection produces both a Markdown report (visible on the Reflection card) AND 
 - If no active session is found (HTTP 409 from the API), the skill prints an error and stops.
 - If the LLM provider is not configured (HTTP 503), the skill prints a setup hint and stops.
 - If the LLM returns malformed JSON (HTTP 502), the call may be retried.
+
+## See also
+
+- `claude/skills/memory-promotion/SKILL.md` — promotes proven research findings into memory_write proposals.
+- `claude/modules/mempalace/SKILL.md` — long-term memory provider consumed during reflection runs.

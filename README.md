@@ -68,6 +68,32 @@ flowchart TD
 
 Hexagonal nodes are **user gates** — the workflow pauses until a human approves or rejects. Diamond nodes are validation checkpoints. Rectangular nodes advance automatically when their criteria are met.
 
+## Agent-facing subsystems
+
+**Reflection.** A post-task report invoked via `/reflection`. v1 calls the LLM to produce a Markdown document covering decisions, trade-offs, open questions, and next steps; the report is persisted to the admin panel Reflection tab. v2 also emits proposals into the approval gate — rule changes, memory writes, agent updates — so nothing is applied without a human sign-off.
+
+**Memory.** A cross-task knowledge store backed by an abstract `MemoryProvider` interface. The default implementation is MemPalace, shipped as the `mempalace` module. Once enabled, agents gain five MCP tools — `memory_save`, `memory_retrieve`, `memory_get`, `memory_delete`, `memory_list` — usable during research, planning, and reflection phases.
+
+**Proposals.** A unified approval-gated entity for changes emitted by reflection and memory promotion. Nine types: `memory_write`, `memory_delete`, `rule_new`, `rule_update`, `agent_new`, `agent_update`, `skill_new`, `skill_update`, `workflow_improvement`. Proposals sit in `pending` state until an admin approves or rejects them via the Proposals tab. On approval the executor dispatches each proposal to the matching service.
+
+**Memory promotion.** The `/memory-promotion` skill scans all proven research entries and splits findings into project-level vs ticket-specific by heuristic (file span, keyword match, cross-entry frequency), then applies an LLM gate and a dedup check against existing memories. Only project-level, LLM-confirmed, non-duplicate findings advance to `memory_write` proposals. Nothing is written until an admin approves.
+
+**Work modes.** Every phase is toggleable per workspace. The built-in `basic` system mode preserves the full workflow; user-defined modes can disable individual phases. Resolution chain: device setting → project default → workspace override → mode baseline. The phase resolver reads the active mode before deciding which phases are required for the current workspace.
+
+```mermaid
+flowchart LR
+    WM["Work Modes"] --> PR["Phase Resolver"]
+    PR --> GATE["Phase Gate"]
+    GATE -->|user gate| ADMIN["Admin Panel"]
+    ADMIN -->|approve| EXEC["Execution"]
+    EXEC --> REF["Reflection v2"]
+    REF -->|proposals| PROP["Proposals Tab"]
+    PROP -->|approve| PROPEXEC["Proposal Executor"]
+    MEM["Memory (MemPalace)"] <--> EXEC
+    MEM <--> REF
+    MEMPROMO["/memory-promotion"] -->|memory_write proposals| PROP
+```
+
 ## Key Concepts
 
 **Phase advancement.** The agent calls `workspace_advance` — the backend decides the next phase. Each phase has an advancer that validates prerequisites (progress documented, research proven, scope changes present, commit hash valid). Failures return specific errors explaining what's missing.

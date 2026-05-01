@@ -61,3 +61,8 @@ No arguments are required. The workspace is inferred from the MCP connection con
 ## Behavior notes
 
 This is a skill, not a declarative phase. Orchestrators must invoke it explicitly — it is not triggered automatically by phase transitions.
+
+## See also
+
+- `claude/skills/reflection/SKILL.md` — post-task report that can also emit memory_write proposals via the reflection v2 path.
+- `claude/modules/mempalace/SKILL.md` — memory provider that stores the approved proposals written by this skill.

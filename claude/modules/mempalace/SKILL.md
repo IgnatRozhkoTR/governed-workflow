@@ -40,4 +40,5 @@ A result means installed. "Package(s) not found" means not installed.
 ## See also
 
 - `claude/modules/telegram/SKILL.md` — multi-session Telegram channel manager.
-- Reflection skill (post-3.5): will consume memory promotions produced during reflection runs.
+- `claude/skills/reflection/SKILL.md` — post-task report that reads and writes memories during reflection runs.
+- `claude/skills/memory-promotion/SKILL.md` — promotes proven research findings into memory_write proposals stored by this provider.
