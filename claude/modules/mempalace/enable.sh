@@ -23,7 +23,9 @@ fi
 rm -f err.log
 
 # 4. palace dir
-PALACE_DIR="${GW_MEMPALACE_DIR:-$HOME/.governed-workflow/mempalace}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+PALACE_DIR="${GW_MEMPALACE_DIR:-$REPO_ROOT/.local/mempalace}"
 mkdir -p "$PALACE_DIR"
 echo "Palace dir: $PALACE_DIR"
 

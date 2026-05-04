@@ -18,6 +18,7 @@ Scope → MemPalace mapping:
 import os
 from pathlib import Path
 
+from core.paths import REPO_ROOT
 from services.memory_provider import MemoryProvider, MemoryProviderError
 
 
@@ -25,7 +26,7 @@ def _default_palace_dir() -> Path:
     env = os.environ.get("GW_MEMPALACE_DIR")
     if env:
         return Path(env).expanduser().resolve()
-    return Path.home() / ".governed-workflow" / "mempalace"
+    return REPO_ROOT / ".local" / "mempalace"
 
 
 _singleton: MemoryProvider | None = None
