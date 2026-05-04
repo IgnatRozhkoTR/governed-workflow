@@ -1,7 +1,7 @@
-"""End-to-end pipeline: reflection_run → proposals (origin='reflection') → admin approval.
+"""End-to-end pipeline: reflection_run → proposals (origin='reflection') → admin sees them.
 
-Mocks the LLM and session_extractor since neither is available in CI. The proposal
-storage, REST listing, and per-type executor side-effects use the real services.
+Mocks the LLM and session_extractor since neither is available in CI. Proposals
+are now text-only — approval is a status flip with no downstream execution.
 """
 import json
 from unittest.mock import patch
@@ -37,19 +37,11 @@ def test_reflection_run_emits_proposals_visible_in_proposals_list(
             "type": "memory_write",
             "title": "Save context",
             "body": "Remember decision X.",
-            "payload": {
-                "content": "We decided X over Y.",
-                "scope": {"kind": "project", "project_id": project["id"]},
-            },
         },
         {
             "type": "workflow_improvement",
             "title": "Reflect more often",
             "body": "Add reflection step after every phase.",
-            "payload": {
-                "title": "Reflect more often",
-                "body": "Always reflect after each phase.",
-            },
         },
     ]
     llm_json = _llm_response(proposals_payload)
@@ -83,21 +75,16 @@ def test_reflection_run_emits_proposals_visible_in_proposals_list(
         assert item["status"] == "pending"
 
 
-def test_reflection_proposal_approve_executes_underlying_action(
+def test_reflection_proposal_approve_flips_status_no_side_effects(
     clean_db, project, workspace, client
 ):
-    """End-to-end: reflection emits memory_write proposal, admin approves via REST,
-    memory_provider.save is called and proposal lands in 'executed'."""
+    """End-to-end: reflection emits a proposal, admin approves via REST,
+    status flips to 'approved'. No automatic execution happens."""
     proposals_payload = [
         {
             "type": "memory_write",
             "title": "Approved by admin",
-            "body": "Body text",
-            "payload": {
-                "content": "approved memory content",
-                "scope": {"kind": "project", "project_id": project["id"]},
-                "metadata": {"tags": ["from-reflection"]},
-            },
+            "body": "Body text the user reads to decide.",
         },
     ]
     llm_json = _llm_response(proposals_payload)
@@ -121,25 +108,12 @@ def test_reflection_proposal_approve_executes_underlying_action(
     finally:
         db.close()
 
-    save_return = {
-        "memory_id": "mem-from-reflection",
-        "content": "approved memory content",
-    }
-    with patch(
-        "services.proposal_executor.memory_service.save",
-        return_value=save_return,
-    ) as mock_save:
-        resp = client.post(f"/api/proposals/{proposal_id}/approve")
+    resp = client.post(f"/api/proposals/{proposal_id}/approve")
 
     assert resp.status_code == 200
     body = resp.get_json()
-    assert body["status"] == "executed"
-    assert body["result"]["memory_id"] == "mem-from-reflection"
-
-    mock_save.assert_called_once()
-    call_args = mock_save.call_args
-    assert call_args.args[0] == "approved memory content"
-    assert call_args.args[1]["kind"] == "project"
+    assert body["status"] == "approved"
+    assert body["reviewed_at"] is not None
 
 
 def test_reflection_pipeline_skips_invalid_proposals_persists_valid(
@@ -152,16 +126,11 @@ def test_reflection_pipeline_skips_invalid_proposals_persists_valid(
             "type": "totally_unknown_type",
             "title": "Bad type",
             "body": "should be skipped",
-            "payload": {},
         },
         {
             "type": "memory_write",
             "title": "Valid one",
             "body": "Valid body",
-            "payload": {
-                "content": "Valid memory",
-                "scope": {"kind": "project", "project_id": project["id"]},
-            },
         },
     ]
     llm_json = _llm_response(proposals_payload)

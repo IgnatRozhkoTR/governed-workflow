@@ -214,9 +214,9 @@ class TestExtractBasicTranscript:
 
 
 class TestExtractSubagentTranscripts:
-    def test_extract_appends_subagent_transcripts(self, clean_db, fake_home, monkeypatch):
+    def test_extract_appends_subagent_transcripts(self, clean_db, fake_home, monkeypatch, tmp_path):
         from core.db import get_db
-        import os
+        import services.session_extractor as extractor_mod
 
         working_dir = "/projects/agentapp"
         session_id = "sess001"
@@ -227,8 +227,10 @@ class TestExtractSubagentTranscripts:
         main_records = [_user_record("Do something"), _assistant_text_record("OK")]
         (project_dir / f"{session_id}.jsonl").write_text(_jsonl_lines(*main_records))
 
-        uid = str(os.getuid())
-        tasks_dir = Path(f"/private/tmp/claude-{uid}") / project_key / session_id / "tasks"
+        fake_tasks_root = tmp_path / "claude-tasks"
+        monkeypatch.setattr(extractor_mod, "_claude_tasks_root", lambda: fake_tasks_root)
+
+        tasks_dir = fake_tasks_root / project_key / session_id / "tasks"
         tasks_dir.mkdir(parents=True, exist_ok=True)
 
         sub_input = {

@@ -98,6 +98,7 @@
   "labels.fileDirectoryReferences": "Ссылки на файлы и директории",
   "labels.sourceBranch": "Исходная ветка",
   "labels.createAsGitWorktree": "Создать как git worktree",
+  "labels.workMode": "Режим работы",
   "labels.workingDirectory": "Рабочая директория",
   "labels.command": "Команда",
   "labels.alwaysOn": "Всегда включено",

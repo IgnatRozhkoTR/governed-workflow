@@ -204,6 +204,7 @@
   "api.error.invalidDirectoryPath": "Invalid directory path",
   "api.error.projectAlreadyRegistered": "Project already registered",
   "api.error.branchNameRequired": "Branch name required",
+  "api.error.workModeNotFound": "Work mode not found",
   "api.error.sourceBranchNotFound": "Source branch '{source}' not found locally or on remote",
   "api.error.workspaceAlreadyExists": "Workspace already exists for branch '{branch}'",
   "api.error.cannotCreateWorktreeCheckedOut": "Cannot create worktree: branch '{branch}' is currently checked out. Use non-worktree mode or choose a different branch.",

@@ -47,15 +47,10 @@ function loadProposalDetail(proposalId) {
 }
 
 function approveProposal(proposalId) {
-  if (!confirm('Approve and execute this proposal?')) return;
+  if (!confirm('Approve this proposal?')) return;
   apiPost('/api/proposals/' + encodeURIComponent(proposalId) + '/approve', {})
     .then(function(item) {
-      if (item.status === 'failed') {
-        var underlying = item.result && item.result.underlying_message ? item.result.underlying_message : 'unknown';
-        showToast('Approval recorded but execution failed: ' + underlying);
-      } else {
-        showToast('Proposal approved.');
-      }
+      showToast('Proposal approved.');
       _replaceProposalInList(item);
       renderProposalList();
       renderProposalDetail(item);
@@ -117,7 +112,7 @@ function _replaceProposalInList(updated) {
 
 function _proposalStatusBadgeClass(status) {
   if (status === 'pending') return 'badge badge-warning';
-  if (status === 'approved') return 'badge badge-info';
+  if (status === 'approved') return 'badge badge-success';
   if (status === 'executed') return 'badge badge-success';
   if (status === 'rejected') return 'badge badge-muted';
   if (status === 'failed') return 'badge badge-danger';
@@ -160,7 +155,7 @@ function _renderProposalActions(p) {
     return '<button class="btn btn-sm btn-primary" onclick="approveProposal(' + p.id + ')" data-i18n="buttons.approve">Approve</button>' +
       '<button class="btn btn-sm btn-danger-outline" onclick="_promptRejectProposal(' + p.id + ')" data-i18n="buttons.reject">Reject</button>';
   }
-  if (p.status === 'failed' || p.status === 'approved') {
+  if (p.status === 'approved' || p.status === 'failed') {
     return '<button class="btn btn-sm btn-outline" onclick="resolveProposal(' + p.id + ')" data-i18n="buttons.resolve">Resolve</button>';
   }
   return '';
@@ -174,11 +169,11 @@ function _promptRejectProposal(proposalId) {
 
 function _renderProposalPayload(p) {
   var payload = p.payload || {};
-  var parts = [];
-
-  if (payload.diff && typeof Diff2HtmlUI !== 'undefined') {
-    parts.push('<div class="proposals-diff" id="proposalsDiff_' + p.id + '"></div>');
+  var hasPayload = false;
+  for (var k in payload) {
+    if (Object.prototype.hasOwnProperty.call(payload, k)) { hasPayload = true; break; }
   }
+  if (!hasPayload) return '';
 
   var jsonText = '';
   try {
@@ -186,21 +181,8 @@ function _renderProposalPayload(p) {
   } catch (e) {
     jsonText = String(payload);
   }
-  parts.push('<div class="proposals-section-title" data-i18n="proposals.payload">Payload</div>');
-  parts.push('<pre class="proposals-payload"><code>' + escapeHtml(jsonText) + '</code></pre>');
-
-  if (p.result) {
-    var resultText = '';
-    try {
-      resultText = JSON.stringify(p.result, null, 2);
-    } catch (e) {
-      resultText = String(p.result);
-    }
-    parts.push('<div class="proposals-section-title" data-i18n="proposals.result">Result</div>');
-    parts.push('<pre class="proposals-result"><code>' + escapeHtml(resultText) + '</code></pre>');
-  }
-
-  return parts.join('');
+  return '<div class="proposals-section-title" data-i18n="proposals.payload">Payload</div>' +
+    '<pre class="proposals-payload"><code>' + escapeHtml(jsonText) + '</code></pre>';
 }
 
 function renderProposalDetail(p) {
@@ -220,7 +202,6 @@ function renderProposalDetail(p) {
   var badgeClass = _proposalStatusBadgeClass(status);
   var created = p.created_at ? new Date(p.created_at).toLocaleString() : '';
   var reviewed = p.reviewed_at ? new Date(p.reviewed_at).toLocaleString() : '';
-  var executed = p.executed_at ? new Date(p.executed_at).toLocaleString() : '';
 
   var bodyHtml = '';
   if (p.body) {
@@ -248,28 +229,10 @@ function renderProposalDetail(p) {
       '<div class="proposals-meta-row"><span class="proposals-meta-label" data-i18n="proposals.origin">Origin:</span> ' + originSafe + '</div>' +
       '<div class="proposals-meta-row"><span class="proposals-meta-label" data-i18n="proposals.created">Created:</span> ' + escapeHtml(created) + '</div>' +
       (reviewed ? '<div class="proposals-meta-row"><span class="proposals-meta-label" data-i18n="proposals.reviewed">Reviewed:</span> ' + escapeHtml(reviewed) + '</div>' : '') +
-      (executed ? '<div class="proposals-meta-row"><span class="proposals-meta-label" data-i18n="proposals.executed">Executed:</span> ' + escapeHtml(executed) + '</div>' : '') +
       reasonHtml +
     '</div>' +
     bodyHtml +
     _renderProposalPayload(p);
-
-  if (p.payload && p.payload.diff && typeof Diff2HtmlUI !== 'undefined') {
-    var target = document.getElementById('proposalsDiff_' + p.id);
-    if (target) {
-      var ui = new Diff2HtmlUI(target, p.payload.diff, {
-        drawFileList: false,
-        matching: 'none',
-        renderNothingWhenEmpty: true,
-        outputFormat: 'side-by-side',
-        highlight: true,
-        synchronisedScroll: true,
-        stickyFileHeaders: false
-      });
-      ui.draw();
-      ui.highlightCode();
-    }
-  }
 }
 
 function _refreshProposalsBadge() {

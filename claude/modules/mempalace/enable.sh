@@ -23,7 +23,9 @@ fi
 rm -f err.log
 
 # 4. palace dir
-mkdir -p "$HOME/.claude/governed-workflow/mempalace"
+PALACE_DIR="${GW_MEMPALACE_DIR:-$HOME/.governed-workflow/mempalace}"
+mkdir -p "$PALACE_DIR"
+echo "Palace dir: $PALACE_DIR"
 
 # 5. success
 echo "OK: mempalace installed; restart MCP server to pick up the provider"

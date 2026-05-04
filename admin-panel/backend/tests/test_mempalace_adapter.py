@@ -328,13 +328,11 @@ class TestGetProvider:
 
         assert exc_info.value.code == "provider_unavailable"
 
-    def test_get_provider_returns_singleton(self, stub_mempalace, tmp_path, monkeypatch):
-        import services.mempalace_adapter as mod
-        monkeypatch.setattr(mod, "_PALACE_DIR", tmp_path / "singleton-palace")
-
+    def test_get_provider_returns_singleton(self, stub_mempalace, tmp_path):
         from services import mempalace_adapter
 
-        p1 = mempalace_adapter.get_provider()
+        palace = tmp_path / "singleton-palace"
+        p1 = mempalace_adapter.get_provider(palace_dir=palace)
         p2 = mempalace_adapter.get_provider()
 
         assert p1 is p2

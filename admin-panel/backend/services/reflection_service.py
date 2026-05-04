@@ -20,20 +20,15 @@ Return ONLY a JSON object with this exact shape:
     {{
       "type": "<one of memory_write|memory_delete|rule_new|rule_update|agent_new|agent_update|skill_new|skill_update|workflow_improvement>",
       "title": "<short title>",
-      "body": "<longer explanation>",
-      "payload": {{}}
+      "body": "<full markdown text the user reads to decide whether to act on this proposal>"
     }}
   ]
 }}
 
-Type-specific payload shapes:
-- memory_write: {{content, scope: {{kind, project_id?, workspace_id?}}, metadata}}
-- memory_delete: {{memory_id}}
-- rule_new: {{project, name, description, paths, body}}
-- rule_update: {{project, name, description?, paths?, body?}}
-- agent_new / agent_update: {{project, name, description, body, tools?, model?, color?}}
-- skill_new / skill_update: {{project, name, description, body, args?, user_invocable?, tools_required?}}
-- workflow_improvement: {{title, body}}
+Each proposal is a text recommendation for a human reader. The `type` is a
+label so the user can filter proposals by category; nothing executes
+automatically. Put the actionable detail in `body` — the user will instruct an
+agent how to proceed.
 
 Empty `proposals` array is fine if no improvements are warranted.
 
@@ -85,7 +80,7 @@ def _create_proposals(db, raw_proposals: list, workspace_id: int, project_id: in
                 type=item.get("type", ""),
                 title=item.get("title", ""),
                 body=item.get("body", ""),
-                payload=item.get("payload") or {},
+                payload={},
                 origin="reflection",
                 workspace_id=workspace_id,
                 project_id=project_id,

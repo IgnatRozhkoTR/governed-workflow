@@ -229,10 +229,10 @@ function apiListWorkspaces(projectId) {
   return apiGet('/api/projects/' + encodeURIComponent(projectId) + '/workspaces');
 }
 
-function apiCreateWorkspace(projectId, branch, source, worktree) {
-  return apiPost('/api/projects/' + encodeURIComponent(projectId) + '/workspaces', {
-    branch, source, worktree
-  });
+function apiCreateWorkspace(projectId, branch, source, worktree, workModeId) {
+  var body = { branch, source, worktree };
+  if (workModeId !== undefined) body.work_mode_id = workModeId;
+  return apiPost('/api/projects/' + encodeURIComponent(projectId) + '/workspaces', body);
 }
 
 function apiArchiveWorkspace(projectId, branch) {

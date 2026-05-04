@@ -20,6 +20,9 @@ Steps the setup skill executes:
 The script will exit with a non-zero status and an `ERROR:` message if Python 3.9+
 or pip3 is missing, or if the pip install fails.
 
+The palace data directory defaults to `~/.governed-workflow/mempalace/`. Set
+`GW_MEMPALACE_DIR` to override it (e.g. `export GW_MEMPALACE_DIR=/data/palace`).
+
 ## Disable
 
 ```bash

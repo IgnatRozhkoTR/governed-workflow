@@ -98,6 +98,7 @@
   "labels.fileDirectoryReferences": "File & Directory References",
   "labels.sourceBranch": "Source branch",
   "labels.createAsGitWorktree": "Create as git worktree",
+  "labels.workMode": "Work mode",
   "labels.workingDirectory": "Working directory",
   "labels.command": "Command",
   "labels.alwaysOn": "Always on",

@@ -29,7 +29,7 @@ _PENDING_PROPOSAL = {
     "reason": None,
 }
 
-_EXECUTED_PROPOSAL = {**_PENDING_PROPOSAL, "status": "executed", "result": {"ok": True}}
+_APPROVED_PROPOSAL = {**_PENDING_PROPOSAL, "status": "approved", "reviewed_at": "2024-01-01T01:00:00"}
 _REJECTED_PROPOSAL = {**_PENDING_PROPOSAL, "status": "rejected", "reason": "Not needed"}
 
 
@@ -155,13 +155,13 @@ class TestApproveProposalRoute:
     def test_post_approve_happyPath_returns200(self, client):
         with patch(
             "routes.proposals.proposal_service.approve",
-            return_value=_EXECUTED_PROPOSAL,
+            return_value=_APPROVED_PROPOSAL,
         ):
             response = client.post("/api/proposals/1/approve")
 
         assert response.status_code == 200
         data = response.get_json()
-        assert data["status"] == "executed"
+        assert data["status"] == "approved"
 
     def test_post_approve_invalidState_returns409(self, client):
         with patch(
@@ -175,18 +175,6 @@ class TestApproveProposalRoute:
         assert response.status_code == 409
         data = response.get_json()
         assert data["code"] == "invalid_state"
-
-    def test_post_approve_executionFailed_returns500(self, client):
-        with patch(
-            "routes.proposals.proposal_service.approve",
-            side_effect=ProposalServiceError(
-                "execution failed", code="execution_failed",
-                details={"underlying_code": "not_found"},
-            ),
-        ):
-            response = client.post("/api/proposals/1/approve")
-
-        assert response.status_code == 500
 
 
 class TestRejectProposalRoute:
@@ -208,7 +196,7 @@ class TestRejectProposalRoute:
         with patch(
             "routes.proposals.proposal_service.reject",
             side_effect=ProposalServiceError(
-                "already executed", code="invalid_state", details={"current_status": "executed"}
+                "already approved", code="invalid_state", details={"current_status": "approved"}
             ),
         ):
             response = client.post(
@@ -231,16 +219,3 @@ class TestResolveProposalRoute:
         assert response.status_code == 200
         data = response.get_json()
         assert data["status"] == "rejected"
-
-    def test_post_resolve_invalidState_returns409_forExecuted(self, client):
-        with patch(
-            "routes.proposals.proposal_service.resolve",
-            side_effect=ProposalServiceError(
-                "already executed", code="invalid_state", details={"current_status": "executed"}
-            ),
-        ):
-            response = client.post("/api/proposals/1/resolve")
-
-        assert response.status_code == 409
-        data = response.get_json()
-        assert data["code"] == "invalid_state"

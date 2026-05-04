@@ -1,16 +1,20 @@
-"""Approval-gated proposals for changes emitted by reflection and memory promotion.
+"""Approval-gated text proposals emitted by reflection, memory promotion, and agents.
 
-Proposals execute in approval order; cross-proposal ordering is not enforced in v1.
+A proposal is a structured text record describing a recommended change (memory
+note, rule update, agent/skill edit, workflow improvement). It stays in
+'pending' until a human approves or rejects it. Approval is a pure status flip —
+no automatic execution happens. The user reads the proposal in the admin panel
+and instructs an agent how to proceed if they want.
 
-A proposal is a structured change request (memory write, rule update, agent/skill
-edit, workflow improvement) created by an agent or by automated reflection. It
-stays in 'pending' until a human approves or rejects it. Approval triggers the
-matching proposal_executor branch which performs the underlying mutation; on
-success the proposal flips to 'executed', on failure to 'failed' with the
-underlying error captured in result_json.
+The `type` field is metadata for human readers; it is preserved as a label and
+filter key but is no longer used to route to an executor. The `payload` field is
+opaque — it must be a valid JSON object but no per-type schema is enforced.
 
-Re-approving an already-approved-but-still-running proposal is a no-op (returns
-the current row). Re-approving an already-executed proposal raises invalid_state.
+Status lifecycle:
+    pending → approved (idempotent)
+    pending → rejected (idempotent)
+    failed/executed in older rows are legacy values from before the executor
+    was removed; the column may still hold them for backward compatibility.
 """
 import json
 from datetime import datetime
@@ -28,18 +32,15 @@ PROPOSAL_TYPES = frozenset({
     "workflow_improvement",
 })
 
-_TERMINAL_STATUSES = frozenset({"rejected", "executed", "failed"})
-
 
 class ProposalServiceError(Exception):
     """Domain error for proposal service operations.
 
     Codes:
         not_found        — proposal id missing.
-        invalid_type     — type not in PROPOSAL_TYPES.
-        invalid_payload  — payload not a dict / not JSON-serialisable.
+        invalid_type     — type not in PROPOSAL_TYPES (label validation only).
+        invalid_payload  — payload not a dict / not JSON-serialisable, or title empty.
         invalid_state    — illegal status transition (e.g. approve after reject).
-        execution_failed — downstream executor raised; underlying error in details.
     """
 
     def __init__(self, message: str, code: str, details: dict | None = None):
@@ -188,93 +189,32 @@ def get(db, proposal_id: int) -> dict:
     return _require_proposal(db, proposal_id)
 
 
-def _mark_executed(db, proposal_id: int, result_dict: dict) -> None:
-    now = datetime.utcnow().isoformat()
-    db.execute(
-        "UPDATE proposals SET status = 'executed', "
-        "result_json = ?, executed_at = ? WHERE id = ?",
-        (json.dumps(result_dict, ensure_ascii=False), now, proposal_id),
-    )
-
-
-def _mark_failed(db, proposal_id: int, error_dict: dict) -> None:
-    now = datetime.utcnow().isoformat()
-    db.execute(
-        "UPDATE proposals SET status = 'failed', "
-        "result_json = ?, executed_at = ? WHERE id = ?",
-        (json.dumps(error_dict, ensure_ascii=False), now, proposal_id),
-    )
-
-
-def _atomic_claim_for_approval(db, proposal_id: int) -> bool:
-    """Atomically transition pending → approved. Returns True if this caller won the race."""
-    now = datetime.utcnow().isoformat()
-    cursor = db.execute(
-        "UPDATE proposals SET status = 'approved', reviewed_at = ? "
-        "WHERE id = ? AND status = 'pending'",
-        (now, proposal_id),
-    )
-    return cursor.rowcount == 1
-
-
 def approve(db, proposal_id: int) -> dict:
-    """Approve a pending proposal and run its executor.
-
-    Idempotent: re-approving an already-approved proposal returns the current row
-    without re-running the executor. Approving a terminal proposal (rejected,
-    executed, failed) raises invalid_state.
+    """Approve a pending proposal — pure status flip, no execution.
 
     The pending → approved transition is performed via a single conditional
-    UPDATE so concurrent approvers cannot both invoke the executor.
-
-    On executor success: status='executed', result_json holds the executor result.
-    On executor failure: status='failed', result_json holds {underlying_code,
-    underlying_message, details}. Any exception raised by the executor — domain
-    or otherwise — flips the proposal to 'failed' so it always reaches a
-    terminal state.
+    UPDATE so concurrent approvers see consistent state. Re-approving an
+    already-approved proposal returns the current row (idempotent). Approving
+    a rejected proposal raises invalid_state.
     """
     proposal = _require_proposal(db, proposal_id)
     status = proposal["status"]
 
     if status == "approved":
         return proposal
-    if status != "pending":
+    if status == "rejected":
         raise ProposalServiceError(
             f"cannot approve proposal in state '{status}'",
             code="invalid_state",
             details={"current_status": status},
         )
 
-    won_race = _atomic_claim_for_approval(db, proposal_id)
-    db.commit()
-
-    if not won_race:
-        return _require_proposal(db, proposal_id)
-
-    from services import proposal_executor
-    approved = _require_proposal(db, proposal_id)
-    try:
-        result = proposal_executor.execute(db, approved)
-    except ProposalServiceError as exc:
-        error_payload = {
-            "underlying_code": exc.details.get("underlying_code") or exc.code,
-            "underlying_message": str(exc),
-            "details": exc.details,
-        }
-        _mark_failed(db, proposal_id, error_payload)
-        db.commit()
-        return _require_proposal(db, proposal_id)
-    except Exception as exc:
-        error_payload = {
-            "underlying_code": "unexpected_error",
-            "underlying_message": str(exc),
-            "details": {"exception_type": type(exc).__name__},
-        }
-        _mark_failed(db, proposal_id, error_payload)
-        db.commit()
-        return _require_proposal(db, proposal_id)
-
-    _mark_executed(db, proposal_id, result if isinstance(result, dict) else {"value": result})
+    now = datetime.utcnow().isoformat()
+    db.execute(
+        "UPDATE proposals SET status = 'approved', reviewed_at = ? "
+        "WHERE id = ? AND status = 'pending'",
+        (now, proposal_id),
+    )
     db.commit()
     return _require_proposal(db, proposal_id)
 
@@ -302,20 +242,14 @@ def reject(db, proposal_id: int, reason: str) -> dict:
 
 
 def resolve(db, proposal_id: int) -> dict:
-    """Mark a failed proposal as resolved (rejected) without re-executing.
+    """Close out a proposal as rejected without re-running anything.
 
-    Useful for closing out a 'failed' proposal once the underlying issue has
-    been handled out-of-band. Re-resolving an already-executed proposal raises
-    invalid_state.
+    Useful for clearing legacy 'failed' rows or any non-pending state aside from
+    'rejected' (which is idempotent). 'pending' rows are flipped to 'rejected'
+    here too so the same UI button works regardless of state.
     """
     proposal = _require_proposal(db, proposal_id)
     status = proposal["status"]
-    if status == "executed":
-        raise ProposalServiceError(
-            "proposal already executed",
-            code="invalid_state",
-            details={"current_status": status},
-        )
     if status == "rejected":
         return proposal
     now = datetime.utcnow().isoformat()
