@@ -186,6 +186,25 @@ async function apiDelete(path) {
   return res.json();
 }
 
+async function apiPatch(path, body) {
+  const res = await fetch(API_BASE + path, {
+    method: 'PATCH',
+    headers: _authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body || {})
+  });
+  if (res.status === 401) {
+    await _handleAuthFailure();
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    throw err;
+  }
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({ error: res.statusText }));
+    throw _apiError(res, payload);
+  }
+  return res.json();
+}
+
 // ─── Project endpoints ───
 
 function apiListProjects() {

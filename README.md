@@ -68,6 +68,32 @@ flowchart TD
 
 Hexagonal nodes are **user gates** — the workflow pauses until a human approves or rejects. Diamond nodes are validation checkpoints. Rectangular nodes advance automatically when their criteria are met.
 
+## Agent-facing subsystems
+
+**Reflection.** A post-task report invoked via `/reflection`. v1 calls the LLM to produce a Markdown document covering decisions, trade-offs, open questions, and next steps; the report is persisted to the admin panel Reflection tab. v2 also emits proposals into the approval gate — rule changes, memory writes, agent updates — so nothing is applied without a human sign-off.
+
+**Memory.** A cross-task knowledge store backed by an abstract `MemoryProvider` interface. The default implementation is MemPalace, shipped as the `mempalace` module. Once enabled, agents gain five MCP tools — `memory_save`, `memory_retrieve`, `memory_get`, `memory_delete`, `memory_list` — usable during research, planning, and reflection phases.
+
+**Proposals.** A unified approval-gated entity for changes emitted by reflection and memory promotion. Nine types: `memory_write`, `memory_delete`, `rule_new`, `rule_update`, `agent_new`, `agent_update`, `skill_new`, `skill_update`, `workflow_improvement`. Proposals sit in `pending` state until an admin approves or rejects them via the Proposals tab. On approval the executor dispatches each proposal to the matching service.
+
+**Memory promotion.** The `/memory-promotion` skill scans all proven research entries and splits findings into project-level vs ticket-specific by heuristic (file span, keyword match, cross-entry frequency), then applies an LLM gate and a dedup check against existing memories. Only project-level, LLM-confirmed, non-duplicate findings advance to `memory_write` proposals. Nothing is written until an admin approves.
+
+**Work modes.** Every phase is toggleable per workspace. The built-in `basic` system mode preserves the full workflow; user-defined modes can disable individual phases. Resolution chain: device setting → project default → workspace override → mode baseline. The phase resolver reads the active mode before deciding which phases are required for the current workspace.
+
+```mermaid
+flowchart LR
+    WM["Work Modes"] --> PR["Phase Resolver"]
+    PR --> GATE["Phase Gate"]
+    GATE -->|user gate| ADMIN["Admin Panel"]
+    ADMIN -->|approve| EXEC["Execution"]
+    EXEC --> REF["Reflection v2"]
+    REF -->|proposals| PROP["Proposals Tab"]
+    PROP -->|approve| PROPEXEC["Proposal Executor"]
+    MEM["Memory (MemPalace)"] <--> EXEC
+    MEM <--> REF
+    MEMPROMO["/memory-promotion"] -->|memory_write proposals| PROP
+```
+
 ## Key Concepts
 
 **Phase advancement.** The agent calls `workspace_advance` — the backend decides the next phase. Each phase has an advancer that validates prerequisites (progress documented, research proven, scope changes present, commit hash valid). Failures return specific errors explaining what's missing.
@@ -96,7 +122,7 @@ Hexagonal nodes are **user gates** — the workflow pauses until a human approve
 
 **Telegram integration.** Sessions can be controlled remotely via a Telegram bot. The Telegram module replaces the default plugin with a custom multi-session server, allowing multiple Claude Code sessions to share one bot — each session prefixes replies with its workspace name (e.g., `[mp-72]`). Telegram users can list active sessions with `/sessions` and switch between them with `/switch <name>`. Orphan detection ensures that if the polling session dies, another session auto-recovers within seconds. Setup: `/telegram-multi-session install`.
 
-**Modules.** Self-contained feature packages that live at `<repo>/claude/modules/`. Each module is a directory containing a `SKILL.md` and any supporting files the module needs. Modules are discoverable — the admin panel scans the directory for available modules. Users enable or disable modules via the Setup page or the Modules card on the dashboard. The system currently ships with the Telegram module for remote session control.
+**Modules.** Self-contained feature packages that live at `<repo>/claude/modules/`. Each module is a directory containing a `SKILL.md` and any supporting files the module needs. Modules are discoverable — the admin panel scans the directory for available modules. Users enable or disable modules via the Setup page or the Modules card on the dashboard. The system ships two modules: `telegram/` for remote session control and `mempalace/` for long-term memory (see Memory above).
 
 **Setup wizard.** Accessible from the project selector page in the admin panel. Configures modules and verification profiles in one go. Launches Claude Code in an embedded terminal and follows the setup skill to install selected modules, verify required tools, and create or assign verification profiles.
 
@@ -143,4 +169,34 @@ Governed Workflow is a workflow-governance layer for Claude Code. It is designed
 ## Getting Started
 
 Clone the repo, then see [admin-panel/README.md](admin-panel/README.md) for installation and full API/MCP tool reference. For a step-by-step install including Windows/WSL, use the `/workflow-migration` skill.
+
+### Dependencies
+
+Core dependencies (install once):
+
+```bash
+pip install flask mcp flask-sock
+```
+
+MemPalace (long-term memory, optional):
+
+```bash
+bash claude/modules/mempalace/enable.sh
+```
+
+This installs the `mempalace` package on demand. It is not in `requirements.txt` because it is optional — the rest of the system runs without it. After install, restart the MCP server so the memory provider is picked up.
+
+### Environment variables
+
+| Variable | Required for | Notes |
+|---|---|---|
+| `OPENAI_API_KEY` | Reflection, Memory Promotion | Used when `GW_REFLECTION_MODEL` is an OpenAI model |
+| `ANTHROPIC_API_KEY` | Reflection, Memory Promotion | Used when `GW_REFLECTION_MODEL` is an Anthropic model |
+| `GW_REFLECTION_MODEL` | Reflection, Memory Promotion | Default: `claude-opus-4-5`. Set to any model the LLM client supports. |
+
+Without an LLM key, `/reflection` and `/memory-promotion` return HTTP 503. All other workflow phases continue to work.
+
+### Work modes
+
+Every phase in the workflow is toggleable. The built-in `basic` system mode enables all phases and is applied automatically to existing workspaces via migrations 0029 and 0030. To create a custom mode that skips phases you do not need, use the Work Modes tab in the admin panel. The commit-gate phases (3.N.3) cannot be disabled.
 

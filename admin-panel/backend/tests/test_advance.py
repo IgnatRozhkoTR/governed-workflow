@@ -715,8 +715,14 @@ def test_advance_through_multiple_disabled(workspace, project):
         _clean_phase_settings()
 
 
-def test_advance_keeps_always_on_enabled_even_if_disabled_row_exists(workspace, project):
-    """always-on phase 2.0 is reached even when a disabled DB row exists for it."""
+def test_advance_scope_override_beats_basic_mode_baseline(workspace, project):
+    """A device-level disable row overrides the basic mode baseline for 2.0.
+
+    In the new model mandatory phases are pinned by the basic work mode, but
+    scope-level overrides (device → project → workspace) still take precedence
+    over the mode baseline.  A device-level disabled row for 2.0 therefore
+    causes the resolver to skip 2.0 entirely and land on the next enabled phase.
+    """
     from datetime import datetime as dt
     db = get_db()
     db.execute(
@@ -731,7 +737,8 @@ def test_advance_keeps_always_on_enabled_even_if_disabled_row_exists(workspace, 
         r_approve = _get_ws_row(workspace["id"])
         from advance.orchestrator import approve_gate
         result = approve_gate(r_approve)
-        assert result.get("phase") == "2.0"
+        assert result.get("phase") != "2.0", "device disable should skip 2.0"
+        assert result.get("phase") is not None, "a successor phase should be found"
     finally:
         _clean_phase_settings()
 

@@ -1,0 +1,233 @@
+/* ═══════════════════════════════════════════════ */
+/*  MEMORY                                         */
+/* ═══════════════════════════════════════════════ */
+
+/* ─── Layout ──────────────────────────────────── */
+
+.memory-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+/* ─── Scope sub-tabs ──────────────────────────── */
+
+.memory-scope-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.memory-scope-tab {
+  padding: 5px 14px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.memory-scope-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.memory-scope-tab.active {
+  background: var(--accent-dim);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+/* ─── Search bar ──────────────────────────────── */
+
+.memory-search-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.memory-search-bar input {
+  flex: 1;
+}
+
+/* ─── List pane ───────────────────────────────── */
+
+.memory-list-pane {
+  flex: 0 0 380px;
+  min-width: 0;
+}
+
+.memory-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.memory-table thead tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.memory-table th {
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.memory-row {
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background var(--transition);
+}
+
+.memory-row:last-child {
+  border-bottom: none;
+}
+
+.memory-row:hover {
+  background: var(--bg-hover);
+}
+
+.memory-row.active {
+  background: var(--accent-dim);
+}
+
+.memory-row td {
+  padding: 8px 10px;
+  vertical-align: top;
+}
+
+.memory-id {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.memory-col-id {
+  width: 60px;
+}
+
+.memory-col-content {
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.memory-snippet {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.memory-col-date {
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ─── Tags ────────────────────────────────────── */
+
+.memory-tags,
+.memory-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.memory-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+/* ─── Detail pane ─────────────────────────────── */
+
+.memory-detail-pane {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  min-height: 200px;
+}
+
+.memory-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.memory-detail-id {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.memory-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.memory-meta-label {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.memory-detail-tags {
+  margin-bottom: 12px;
+}
+
+.memory-detail-content pre {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* ─── Empty / loading states ──────────────────── */
+
+.memory-empty {
+  padding: 12px 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+/* ─── Responsive collapse ─────────────────────── */
+
+@media (max-width: 768px) {
+  .memory-layout {
+    flex-direction: column;
+  }
+
+  .memory-list-pane {
+    flex: none;
+    width: 100%;
+  }
+}

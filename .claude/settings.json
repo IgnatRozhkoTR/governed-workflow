@@ -6,21 +6,85 @@
     "PreToolUse": [
       {
         "matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
-        "hooks": [{"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/block-orchestrator-writes.py"}]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/block-orchestrator-writes.py"
+          }
+        ]
       },
       {
         "matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash|mcp__.*gitlab.*",
-        "hooks": [{"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/pre-tool-hook.py"}]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/pre-tool-hook.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ig/Projects/governed-workflow/claude/hooks/block-orchestrator-writes.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__.*gitlab.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ig/Projects/governed-workflow/claude/hooks/pre-tool-hook.py"
+          }
+        ]
       }
     ],
     "SessionStart": [
       {
-        "hooks": [{"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/session-start.py"}]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/claude/hooks/session-start.py"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ig/Projects/governed-workflow/claude/hooks/session-start.py"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ig/Projects/governed-workflow/claude/hooks/session-start.py"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{"type": "command", "command": "bash ${CLAUDE_PROJECT_DIR}/claude/hooks/user-prompt-submit.sh"}]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/claude/hooks/user-prompt-submit.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/ig/Projects/governed-workflow/claude/hooks/user-prompt-submit.sh"
+          }
+        ]
       }
     ]
   },
