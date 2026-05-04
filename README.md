@@ -184,7 +184,7 @@ MemPalace (long-term memory, optional):
 bash claude/modules/mempalace/enable.sh
 ```
 
-This installs the `mempalace` package on demand. It is not in `requirements.txt` because it is optional — the rest of the system runs without it. After install, restart the MCP server so the memory provider is picked up.
+This installs the `mempalace` package on demand. It is not in `requirements.txt` because it is optional — the rest of the system runs without it. After install, restart the MCP server so the memory provider is picked up. The default memory storage location is `<repo-root>/.local/mempalace/` per-checkout isolation; set `GW_MEMPALACE_DIR` to store memory elsewhere.
 
 ### Environment variables
 
