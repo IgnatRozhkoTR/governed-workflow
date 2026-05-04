@@ -39,7 +39,7 @@ _PENDING_PROPOSAL = {
     "reason": None,
 }
 
-_EXECUTED_PROPOSAL = {**_PENDING_PROPOSAL, "status": "executed", "result": {"ok": True}}
+_APPROVED_PROPOSAL = {**_PENDING_PROPOSAL, "status": "approved", "reviewed_at": "2024-01-01T01:00:00"}
 
 
 class TestProposalCreateMcp:
@@ -119,13 +119,13 @@ class TestProposalGetMcp:
 
 
 class TestProposalApproveMcp:
-    def test_proposalApprove_happyPath_returnsExecutedProposal(self, clean_db):
+    def test_proposalApprove_happyPath_returnsApprovedProposal(self, clean_db):
         from mcp_tools.proposals import proposal_approve
 
-        with patch("mcp_tools.proposals.proposal_service.approve", return_value=_EXECUTED_PROPOSAL):
+        with patch("mcp_tools.proposals.proposal_service.approve", return_value=_APPROVED_PROPOSAL):
             result = proposal_approve(proposal_id=1)
 
-        assert result["status"] == "executed"
+        assert result["status"] == "approved"
         assert "error" not in result
 
     def test_proposalApprove_invalidState_returnsBusinessError(self, clean_db):
@@ -140,22 +140,6 @@ class TestProposalApproveMcp:
             result = proposal_approve(proposal_id=1)
 
         _assert_error_envelope(result, expected_category="business", expected_retryable=False)
-
-    def test_proposalApprove_executionFailed_returnsBusinessError_withDetails(self, clean_db):
-        from mcp_tools.proposals import proposal_approve
-
-        with patch(
-            "mcp_tools.proposals.proposal_service.approve",
-            side_effect=ProposalServiceError(
-                "execution failed: project missing",
-                code="execution_failed",
-                details={"underlying_code": "not_found", "underlying_message": "project missing"},
-            ),
-        ):
-            result = proposal_approve(proposal_id=1)
-
-        _assert_error_envelope(result, expected_category="business", expected_retryable=False)
-        assert result.get("underlying_code") == "not_found"
 
 
 class TestProposalRejectMcp:
@@ -175,7 +159,7 @@ class TestProposalRejectMcp:
         with patch(
             "mcp_tools.proposals.proposal_service.reject",
             side_effect=ProposalServiceError(
-                "already executed", code="invalid_state", details={"current_status": "executed"}
+                "already approved", code="invalid_state", details={"current_status": "approved"}
             ),
         ):
             result = proposal_reject(proposal_id=1, reason="too late")
@@ -193,16 +177,3 @@ class TestProposalResolveMcp:
 
         assert result["status"] == "rejected"
         assert "error" not in result
-
-    def test_proposalResolve_invalidState_returnsBusinessError(self, clean_db):
-        from mcp_tools.proposals import proposal_resolve
-
-        with patch(
-            "mcp_tools.proposals.proposal_service.resolve",
-            side_effect=ProposalServiceError(
-                "already executed", code="invalid_state", details={"current_status": "executed"}
-            ),
-        ):
-            result = proposal_resolve(proposal_id=1)
-
-        _assert_error_envelope(result, expected_category="business", expected_retryable=False)

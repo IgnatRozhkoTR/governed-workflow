@@ -277,11 +277,11 @@ class TestIntegration:
         assert row is not None
         assert row["origin"] == "memory_promotion"
         assert row["type"] == "memory_write"
+        assert row["title"] == "architectural convention for service layer"
+        assert row["body"] == "Services must not call routes."
         payload = json.loads(row["payload_json"])
-        assert "content" in payload
-        assert payload["scope"]["kind"] == "project"
-        assert "tags" in payload["metadata"]
-        assert "source_research_id" in payload["metadata"]
+        assert payload["title"] == "architectural convention for service layer"
+        assert payload["body"] == "Services must not call routes."
 
     def test_promote_returns_correct_counts(self, clean_db):
         from core.db import get_db

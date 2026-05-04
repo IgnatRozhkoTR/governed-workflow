@@ -1,7 +1,9 @@
-"""Tests for proposal_service: CRUD, state transitions, and approval logic."""
+"""Tests for proposal_service: CRUD and pure status-flip lifecycle.
+
+The proposal subsystem is text-only — approval is a status flip, no execution.
+"""
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -44,7 +46,7 @@ def _create_pending(db, type_="memory_write", title="Test proposal", payload=Non
         db,
         type=type_,
         title=title,
-        payload=payload or {"content": "some content"},
+        payload=payload or {},
     )
 
 
@@ -61,7 +63,7 @@ class TestCreateProposal:
                 db,
                 type="memory_write",
                 title="Save a memory",
-                payload={"content": "hello", "scope": {"kind": "project"}},
+                payload={"some": "metadata"},
             )
         finally:
             db.close()
@@ -69,7 +71,22 @@ class TestCreateProposal:
         assert result["type"] == "memory_write"
         assert result["status"] == "pending"
         assert result["title"] == "Save a memory"
-        assert result["payload"] == {"content": "hello", "scope": {"kind": "project"}}
+        assert result["payload"] == {"some": "metadata"}
+
+    def test_create_acceptsEmptyPayload(self, clean_db):
+        db = _db()
+        try:
+            result = create(
+                db,
+                type="memory_write",
+                title="Body-only",
+                body="Read this and decide.",
+            )
+        finally:
+            db.close()
+
+        assert result["payload"] == {}
+        assert result["body"] == "Read this and decide."
 
     def test_create_raises_invalidType_forUnknownType(self, clean_db):
         db = _db()
@@ -86,6 +103,16 @@ class TestCreateProposal:
         try:
             with pytest.raises(ProposalServiceError) as exc_info:
                 create(db, type="memory_write", title="Test", payload="not-a-dict")
+        finally:
+            db.close()
+
+        assert exc_info.value.code == "invalid_payload"
+
+    def test_create_raises_invalidPayload_whenTitleEmpty(self, clean_db):
+        db = _db()
+        try:
+            with pytest.raises(ProposalServiceError) as exc_info:
+                create(db, type="memory_write", title="   ")
         finally:
             db.close()
 
@@ -204,40 +231,32 @@ class TestGetProposal:
 
 
 class TestApproveProposal:
-    def test_approve_happyPath_executesAndSetsStatusExecuted(self, clean_db):
+    def test_approve_pendingProposal_flipsStatusAndStampsReviewedAt(self, clean_db):
         db = _db()
         try:
             proposal = _create_pending(db)
-            mock_result = {"ok": True, "memory_id": "mem-1"}
-
-            with patch("services.proposal_executor.execute", return_value=mock_result):
-                result = approve(db, proposal["id"])
-        finally:
-            db.close()
-
-        assert result["status"] == "executed"
-        assert result["result"] is not None
-        assert result["result"].get("ok") is True
-
-    def test_approve_idempotent_returnsCurrentRow_whenStatusIsApproved(self, clean_db):
-        """Re-approving a proposal still in 'approved' state (executor not yet run) is a no-op."""
-        db = _db()
-        try:
-            proposal = _create_pending(db)
-            # Force status to 'approved' without running executor
-            now = "2024-01-01T00:00:00"
-            db.execute(
-                "UPDATE proposals SET status = 'approved', reviewed_at = ? WHERE id = ?",
-                (now, proposal["id"]),
-            )
-            db.commit()
 
             result = approve(db, proposal["id"])
         finally:
             db.close()
 
         assert result["status"] == "approved"
+        assert result["reviewed_at"] is not None
         assert result["id"] == proposal["id"]
+
+    def test_approve_idempotent_returnsCurrentRow_whenAlreadyApproved(self, clean_db):
+        db = _db()
+        try:
+            proposal = _create_pending(db)
+            first = approve(db, proposal["id"])
+
+            second = approve(db, proposal["id"])
+        finally:
+            db.close()
+
+        assert first["status"] == "approved"
+        assert second["status"] == "approved"
+        assert second["id"] == first["id"]
 
     def test_approve_raises_invalidState_forRejectedProposal(self, clean_db):
         db = _db()
@@ -252,81 +271,23 @@ class TestApproveProposal:
 
         assert exc_info.value.code == "invalid_state"
 
-    def test_approve_raises_invalidState_forExecutedProposal(self, clean_db):
-        db = _db()
-        try:
-            proposal = _create_pending(db)
-            with patch("services.proposal_executor.execute", return_value={"ok": True}):
-                executed = approve(db, proposal["id"])
-
-            with pytest.raises(ProposalServiceError) as exc_info:
-                approve(db, executed["id"])
-        finally:
-            db.close()
-
-        assert exc_info.value.code == "invalid_state"
-
-    def test_approve_onExecutorFailure_setsStatusFailed_andCapturesError(self, clean_db):
-        from services.proposal_service import ProposalServiceError as PSE
-        db = _db()
-        try:
-            proposal = _create_pending(db)
-            executor_error = PSE(
-                "downstream failed",
-                code="execution_failed",
-                details={"underlying_code": "not_found", "underlying_message": "project missing"},
-            )
-
-            with patch("services.proposal_executor.execute", side_effect=executor_error):
-                result = approve(db, proposal["id"])
-        finally:
-            db.close()
-
-        assert result["status"] == "failed"
-        assert result["result"] is not None
-        assert result["result"]["underlying_code"] is not None
-
-    def test_approve_onUnexpectedException_marksFailed_andDoesNotPropagate(self, clean_db):
-        """Non-domain exceptions (RuntimeError etc.) must still flip the proposal to 'failed'."""
+    def test_approve_isAtomic_doesNotRevertOnAlreadyApprovedConcurrent(self, clean_db):
         db = _db()
         try:
             proposal = _create_pending(db)
 
-            with patch(
-                "services.proposal_executor.execute",
-                side_effect=RuntimeError("unexpected boom"),
-            ):
-                result = approve(db, proposal["id"])
-        finally:
-            db.close()
-
-        assert result["status"] == "failed"
-        assert result["result"]["underlying_code"] == "unexpected_error"
-        assert "unexpected boom" in result["result"]["underlying_message"]
-        assert result["result"]["details"]["exception_type"] == "RuntimeError"
-
-    def test_approve_isAtomic_doesNotReExecuteIfAlreadyApprovedMidFlight(self, clean_db):
-        """Simulates a concurrent caller: pre-flip status to 'approved' before approve() runs.
-        The atomic UPDATE sees rowcount=0 and the executor must NOT run.
-        """
-        db = _db()
-        try:
-            proposal = _create_pending(db)
-
-            # Simulate "another caller already won the race" — flip to approved.
             db.execute(
                 "UPDATE proposals SET status = 'approved', reviewed_at = '2024-01-01T00:00:00' WHERE id = ?",
                 (proposal["id"],),
             )
             db.commit()
 
-            with patch("services.proposal_executor.execute") as exec_mock:
-                result = approve(db, proposal["id"])
+            result = approve(db, proposal["id"])
         finally:
             db.close()
 
         assert result["status"] == "approved"
-        exec_mock.assert_not_called()
+        assert result["reviewed_at"] == "2024-01-01T00:00:00"
 
 
 class TestRejectProposal:
@@ -342,12 +303,11 @@ class TestRejectProposal:
         assert result["status"] == "rejected"
         assert result["reason"] == "Not relevant anymore"
 
-    def test_reject_raises_invalidState_forExecutedProposal(self, clean_db):
+    def test_reject_raises_invalidState_forApprovedProposal(self, clean_db):
         db = _db()
         try:
             proposal = _create_pending(db)
-            with patch("services.proposal_executor.execute", return_value={"ok": True}):
-                approve(db, proposal["id"])
+            approve(db, proposal["id"])
 
             with pytest.raises(ProposalServiceError) as exc_info:
                 reject(db, proposal["id"], "too late")
@@ -368,19 +328,25 @@ class TestRejectProposal:
 
         assert result["status"] == "rejected"
 
-
-class TestResolveProposal:
-    def test_resolve_setsStatusRejected_forFailedProposal(self, clean_db):
-        from services.proposal_service import ProposalServiceError as PSE
+    def test_reject_raises_invalidPayload_whenReasonEmpty(self, clean_db):
         db = _db()
         try:
             proposal = _create_pending(db)
-            executor_error = PSE(
-                "failed", code="execution_failed",
-                details={"underlying_code": "err", "underlying_message": "x"}
-            )
-            with patch("services.proposal_executor.execute", side_effect=executor_error):
-                approve(db, proposal["id"])
+
+            with pytest.raises(ProposalServiceError) as exc_info:
+                reject(db, proposal["id"], "  ")
+        finally:
+            db.close()
+
+        assert exc_info.value.code == "invalid_payload"
+
+
+class TestResolveProposal:
+    def test_resolve_setsStatusRejected_forApprovedProposal(self, clean_db):
+        db = _db()
+        try:
+            proposal = _create_pending(db)
+            approve(db, proposal["id"])
 
             result = resolve(db, proposal["id"])
         finally:
@@ -388,19 +354,16 @@ class TestResolveProposal:
 
         assert result["status"] == "rejected"
 
-    def test_resolve_raises_invalidState_forExecutedProposal(self, clean_db):
+    def test_resolve_setsStatusRejected_forPendingProposal(self, clean_db):
         db = _db()
         try:
             proposal = _create_pending(db)
-            with patch("services.proposal_executor.execute", return_value={"ok": True}):
-                approve(db, proposal["id"])
 
-            with pytest.raises(ProposalServiceError) as exc_info:
-                resolve(db, proposal["id"])
+            result = resolve(db, proposal["id"])
         finally:
             db.close()
 
-        assert exc_info.value.code == "invalid_state"
+        assert result["status"] == "rejected"
 
     def test_resolve_idempotent_forAlreadyRejected(self, clean_db):
         db = _db()

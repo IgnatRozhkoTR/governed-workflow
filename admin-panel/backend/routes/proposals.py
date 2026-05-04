@@ -14,7 +14,6 @@ _STATUS_BY_CODE = {
     "invalid_type": 400,
     "invalid_payload": 400,
     "invalid_state": 409,
-    "execution_failed": 500,
 }
 
 

@@ -1,4 +1,9 @@
-"""MCP tools for approval-gated proposals (memory/rule/agent/skill/workflow changes)."""
+"""MCP tools for approval-gated text proposals.
+
+Proposals are read-only text records describing recommended changes. Approval
+is a pure status flip — no automatic execution happens. The user reads the
+proposal in the admin panel and instructs an agent how to act on it.
+"""
 from typing import Annotated, Literal
 
 from mcp.types import ToolAnnotations
@@ -33,8 +38,6 @@ def _translate_proposal_error(exc: ProposalServiceError) -> dict:
         return mcp_error("validation", str(exc), retryable=False, details=exc.details)
     if exc.code == "invalid_state":
         return mcp_error("business", str(exc), retryable=False, details=exc.details)
-    if exc.code == "execution_failed":
-        return mcp_error("business", str(exc), retryable=False, details=exc.details)
     return mcp_error("business", str(exc), retryable=False)
 
 
@@ -52,18 +55,18 @@ def proposal_create(
     project,
     db,
     locale,
-    type: Annotated[_PROPOSAL_TYPE_LITERAL, Field(description="Proposal type. One of: memory_write, memory_delete, rule_new, rule_update, agent_new, agent_update, skill_new, skill_update, workflow_improvement.")],
+    type: Annotated[_PROPOSAL_TYPE_LITERAL, Field(description="Proposal type label. One of: memory_write, memory_delete, rule_new, rule_update, agent_new, agent_update, skill_new, skill_update, workflow_improvement.")],
     title: Annotated[str, Field(description="Short human-readable title shown in the review UI.", min_length=1)],
-    body: Annotated[str, Field(description="Markdown body explaining the rationale. Empty string allowed.")] = "",
-    payload: Annotated[dict, Field(description="Type-specific data executed on approval. Shape depends on `type` — see proposal_executor docstrings.")] = {},
+    body: Annotated[str, Field(description="Markdown body explaining the recommendation. The user reads this and decides whether to act on it.")] = "",
+    payload: Annotated[dict, Field(description="Optional structured data as JSON object. Opaque metadata — no schema is enforced.")] = {},
     origin: Annotated[str, Field(description="Free-form origin tag (e.g. 'agent', 'reflection', 'memory_promotion').")] = "agent",
 ) -> dict:
-    """Create a pending proposal scoped to the current workspace + project.
+    """Create a pending text proposal scoped to the current workspace + project.
 
     Purpose
-      Emit a structured change request that requires human approval before being
-      applied. Used by reflection summaries, memory promotion flows, and agent
-      self-improvement loops.
+      Emit a recommended change as text for human review. Approval flips the
+      status; nothing is executed automatically. The user instructs an agent
+      to perform the recommended action if they want.
 
     Returns
       Full proposal dict (id, type, status='pending', title, body, payload,
@@ -104,7 +107,7 @@ def proposal_create(
 def proposal_list(
     db,
     status: Annotated[_PROPOSAL_STATUS_LITERAL | None, Field(description="Filter by status. None = all statuses.")] = None,
-    type: Annotated[_PROPOSAL_TYPE_LITERAL | None, Field(description="Filter by proposal type. None = all types.")] = None,
+    type: Annotated[_PROPOSAL_TYPE_LITERAL | None, Field(description="Filter by proposal type label. None = all types.")] = None,
 ) -> list:
     """List proposals across all workspaces, newest first.
 
@@ -138,7 +141,7 @@ def proposal_get(
     """Fetch a single proposal by ID.
 
     Returns
-      Full proposal dict including parsed payload and result.
+      Full proposal dict including parsed payload.
 
     Errors
       not_found  — proposal_id does not exist.
@@ -165,20 +168,20 @@ def proposal_approve(
     db,
     proposal_id: Annotated[int, Field(description="Proposal ID to approve.", ge=1)],
 ) -> dict:
-    """Approve a pending proposal and immediately run its executor.
+    """Approve a pending proposal — pure status flip, no execution.
 
     Purpose
-      Idempotent: approving an already-approved proposal returns the current
-      row. Approving a terminal proposal (rejected, executed, failed) is a
-      business error.
+      Approval marks the proposal as reviewed and accepted by the user. Nothing
+      runs automatically; the user instructs an agent to act on the proposal
+      body if they want. Idempotent: re-approving an approved proposal returns
+      the current row.
 
     Returns
-      Updated proposal dict. status will be 'executed' on success or 'failed'
-      with result_json holding the underlying error.
+      Updated proposal dict with status='approved'.
 
     Errors
       not_found  — proposal_id does not exist.
-      business   — proposal is in a terminal state, or executor failed.
+      business   — proposal is in a non-approvable state (e.g. rejected).
       transient  — DB failure; caller should retry.
     """
     try:
@@ -233,21 +236,20 @@ def proposal_reject(
 @with_global_db
 def proposal_resolve(
     db,
-    proposal_id: Annotated[int, Field(description="Proposal ID to resolve (close out without executing).", ge=1)],
+    proposal_id: Annotated[int, Field(description="Proposal ID to resolve (close out).", ge=1)],
 ) -> dict:
-    """Close out a non-executed proposal without re-running the executor.
+    """Close out a proposal as rejected. Idempotent against rejected.
 
     Purpose
-      Useful for clearing a 'failed' proposal once the underlying issue has
-      been handled out-of-band. Idempotent against rejected. Resolving an
-      already-executed proposal raises invalid_state.
+      A simple way to clear a proposal that is no longer relevant — useful for
+      legacy rows in pre-cleanup states or when the user wants to dismiss a
+      proposal without supplying a structured reason.
 
     Returns
       Updated proposal dict with status='rejected'.
 
     Errors
       not_found  — proposal_id does not exist.
-      business   — proposal already executed.
       transient  — DB failure; caller should retry.
     """
     try:
