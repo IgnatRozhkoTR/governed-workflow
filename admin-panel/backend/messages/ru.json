@@ -204,6 +204,7 @@
   "api.error.invalidDirectoryPath": "Недопустимый путь к директории",
   "api.error.projectAlreadyRegistered": "Проект уже зарегистрирован",
   "api.error.branchNameRequired": "Имя ветки обязательно",
+  "api.error.workModeNotFound": "Режим работы не найден",
   "api.error.sourceBranchNotFound": "Исходная ветка '{source}' не найдена локально или на удалённом сервере",
   "api.error.workspaceAlreadyExists": "Рабочее пространство для ветки '{branch}' уже существует",
   "api.error.cannotCreateWorktreeCheckedOut": "Невозможно создать worktree: ветка '{branch}' в данный момент извлечена. Используйте режим без worktree или выберите другую ветку.",

@@ -15,11 +15,18 @@ Scope → MemPalace mapping:
     wing  = scope.get("kind", "project")
     room  = slash-joined remaining scope fields (project_id, workspace_id, etc.)
 """
+import os
 from pathlib import Path
 
 from services.memory_provider import MemoryProvider, MemoryProviderError
 
-_PALACE_DIR = Path.home() / ".claude" / "governed-workflow" / "mempalace"
+
+def _default_palace_dir() -> Path:
+    env = os.environ.get("GW_MEMPALACE_DIR")
+    if env:
+        return Path(env).expanduser().resolve()
+    return Path.home() / ".governed-workflow" / "mempalace"
+
 
 _singleton: MemoryProvider | None = None
 
@@ -125,8 +132,13 @@ class MemPalaceAdapter(MemoryProvider):
         return [_drawer_to_dict(d) for d in drawers]
 
 
-def get_provider() -> MemoryProvider:
+def get_provider(palace_dir: Path | None = None) -> MemoryProvider:
     """Return the singleton MemPalaceAdapter, initialising it on first call.
+
+    ``palace_dir`` overrides the default directory resolved by
+    ``_default_palace_dir()`` (which honours ``GW_MEMPALACE_DIR``). Passing a
+    value is useful in tests to scope storage to a ``tmp_path`` without
+    touching the global env.
 
     Raises MemoryProviderError(code='provider_unavailable') when mempalace is
     not installed. Callers should treat this as a configuration error and surface
@@ -134,5 +146,6 @@ def get_provider() -> MemoryProvider:
     """
     global _singleton
     if _singleton is None:
-        _singleton = MemPalaceAdapter(_PALACE_DIR)
+        resolved_dir = palace_dir if palace_dir is not None else _default_palace_dir()
+        _singleton = MemPalaceAdapter(resolved_dir)
     return _singleton

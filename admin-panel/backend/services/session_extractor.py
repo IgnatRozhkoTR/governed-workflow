@@ -1,6 +1,7 @@
 """Extract and format a Claude Code session transcript for a workspace."""
 import json
 import os
+import sys
 from pathlib import Path
 
 
@@ -24,8 +25,15 @@ def _claude_projects_dir() -> Path:
     return Path.home() / ".claude" / "projects"
 
 
-def _agent_tasks_dir(uid: str, project_key: str, session_uuid: str) -> Path:
-    return Path(f"/private/tmp/claude-{uid}") / project_key / session_uuid / "tasks"
+def _claude_tasks_root() -> Path:
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    if sys.platform == "darwin":
+        return Path("/private/tmp") / f"claude-{uid}"
+    return Path("/tmp") / f"claude-{uid}"
+
+
+def _agent_tasks_dir(project_key: str, session_uuid: str) -> Path:
+    return _claude_tasks_root() / project_key / session_uuid / "tasks"
 
 
 def _find_jsonl_for_session(project_dir: Path, session_id: str) -> Path | None:
@@ -187,8 +195,7 @@ def _truncate_to_limit(text: str) -> str:
 
 
 def _collect_agent_transcripts(project_key: str, session_uuid: str) -> list[str]:
-    uid = str(os.getuid())
-    tasks_dir = _agent_tasks_dir(uid, project_key, session_uuid)
+    tasks_dir = _agent_tasks_dir(project_key, session_uuid)
     if not tasks_dir.exists():
         return []
     lines = []
