@@ -2,6 +2,21 @@
 //  INIT
 // ═══════════════════════════════════════════════
 
+async function _gateMemoryTab() {
+  try {
+    const data = await apiGet('/api/modules/enabled');
+    const enabled = Array.isArray(data && data.modules) ? data.modules : [];
+    const hasMemoryProvider = enabled.indexOf('mempalace') !== -1;
+    document.querySelectorAll('[data-tab="memory"]').forEach(function(el) {
+      el.style.display = hasMemoryProvider ? '' : 'none';
+    });
+  } catch (e) {
+    document.querySelectorAll('[data-tab="memory"]').forEach(function(el) {
+      el.style.display = 'none';
+    });
+  }
+}
+
 async function initApp() {
   const stored = getAuthToken();
   if (!stored) {
@@ -131,6 +146,7 @@ async function initApp() {
   loadClaudeCommand();
   loadChannelsPreference();
   loadModulesCard();
+  _gateMemoryTab();
   if (typeof renderNetworkMode === 'function') renderNetworkMode();
   if (typeof renderLspShortcutsConfig === 'function') renderLspShortcutsConfig();
   var wsBody = document.getElementById('phaseSettingsWorkspaceBody');

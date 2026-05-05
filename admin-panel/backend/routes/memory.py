@@ -20,7 +20,7 @@ def _error_response(exc: MemoryProviderError):
     status = _STATUS_BY_CODE.get(exc.code, 500)
     body = {"error": str(exc)}
     if exc.code == "provider_unavailable":
-        body["hint"] = "enable the mempalace module via the Setup page"
+        body["hint"] = "enable a memory module via the Setup page"
     return jsonify(body), status
 
 

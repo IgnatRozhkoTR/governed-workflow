@@ -30,7 +30,7 @@ function loadMemoryList(scopeKind) {
     })
     .catch(function(e) {
       if (e && e.status === 503) {
-        showToast('MemPalace not installed. Enable it via Setup.');
+        showToast(t('memory.noProviderTitle') + ' ' + t('memory.noProviderHint'));
       } else {
         showToast('Memory list failed: ' + (e && e.message));
       }
@@ -59,7 +59,7 @@ function searchMemory(query, scopeKind) {
     })
     .catch(function(e) {
       if (e && e.status === 503) {
-        showToast('MemPalace not installed. Enable it via Setup.');
+        showToast(t('memory.noProviderTitle') + ' ' + t('memory.noProviderHint'));
       } else {
         showToast('Memory search failed: ' + (e && e.message));
       }
@@ -85,7 +85,7 @@ function loadMemoryDetail(memoryId) {
     })
     .catch(function(e) {
       if (e && e.status === 503) {
-        showToast('MemPalace not installed. Enable it via Setup.');
+        showToast(t('memory.noProviderTitle') + ' ' + t('memory.noProviderHint'));
       } else {
         showToast('Failed to load memory: ' + (e && e.message));
       }
@@ -108,7 +108,7 @@ function deleteMemory(memoryId) {
     })
     .catch(function(e) {
       if (e && e.status === 503) {
-        showToast('MemPalace not installed. Enable it via Setup.');
+        showToast(t('memory.noProviderTitle') + ' ' + t('memory.noProviderHint'));
       } else {
         showToast('Delete failed: ' + (e && e.message));
       }

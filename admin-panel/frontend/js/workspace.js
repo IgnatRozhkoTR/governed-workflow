@@ -239,7 +239,7 @@ async function loadWorkModeOptions() {
   selectEl.innerHTML = '<option value="">' + t('research.loading') + '</option>';
   try {
     const data = await apiGet('/api/work-modes');
-    const modes = data.modes || [];
+    const modes = Array.isArray(data) ? data : (data.modes || []);
     selectEl.innerHTML = modes.map(function(m) {
       var selected = m.name === 'basic' ? ' selected' : '';
       return '<option value="' + m.id + '"' + selected + '>' + _wsEscape(m.name) + '</option>';
