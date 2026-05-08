@@ -32,7 +32,7 @@ function loadMemoryList(scopeKind) {
       if (e && e.status === 503) {
         showToast(t('memory.noProviderTitle') + ' ' + t('memory.noProviderHint'));
       } else {
-        showToast('Memory list failed: ' + (e && e.message));
+        showToast(t('memory.listFailed', {error: e && e.message}));
       }
     });
 }
@@ -61,7 +61,7 @@ function searchMemory(query, scopeKind) {
       if (e && e.status === 503) {
         showToast(t('memory.noProviderTitle') + ' ' + t('memory.noProviderHint'));
       } else {
-        showToast('Memory search failed: ' + (e && e.message));
+        showToast(t('memory.searchFailed', {error: e && e.message}));
       }
     });
 }
@@ -77,7 +77,7 @@ function loadMemoryDetail(memoryId) {
   });
 
   var detailEl = document.getElementById('memoryDetail');
-  if (detailEl) detailEl.innerHTML = '<div class="memory-empty">Loading...</div>';
+  if (detailEl) detailEl.innerHTML = '<div class="memory-empty">' + t('memory.loading') + '</div>';
 
   apiGet(base + '/' + encodeURIComponent(memoryId))
     .then(function(item) {
@@ -87,7 +87,7 @@ function loadMemoryDetail(memoryId) {
       if (e && e.status === 503) {
         showToast(t('memory.noProviderTitle') + ' ' + t('memory.noProviderHint'));
       } else {
-        showToast('Failed to load memory: ' + (e && e.message));
+        showToast(t('memory.loadFailed', {error: e && e.message}));
       }
     });
 }
@@ -100,17 +100,17 @@ function deleteMemory(memoryId) {
 
   apiDelete(base + '/' + encodeURIComponent(memoryId))
     .then(function() {
-      showToast('Memory deleted.');
+      showToast(t('memory.deleted'));
       _memorySelectedId = null;
       var detailEl = document.getElementById('memoryDetail');
-      if (detailEl) detailEl.innerHTML = '<div class="memory-empty">Select a memory entry to view details.</div>';
+      if (detailEl) detailEl.innerHTML = '<div class="memory-empty">' + t('memory.selectEntry') + '</div>';
       loadMemoryList(_memoryScopeKind);
     })
     .catch(function(e) {
       if (e && e.status === 503) {
         showToast(t('memory.noProviderTitle') + ' ' + t('memory.noProviderHint'));
       } else {
-        showToast('Delete failed: ' + (e && e.message));
+        showToast(t('memory.deleteFailed', {error: e && e.message}));
       }
     });
 }
@@ -120,7 +120,7 @@ function renderMemoryList() {
   if (!listEl) return;
 
   if (MEMORY_LIST.length === 0) {
-    listEl.innerHTML = '<div class="memory-empty">No memory entries found.</div>';
+    listEl.innerHTML = '<div class="memory-empty">' + t('memory.empty') + '</div>';
     return;
   }
 
@@ -142,7 +142,7 @@ function renderMemoryList() {
   }).join('');
 
   listEl.innerHTML = '<table class="memory-table"><thead><tr>' +
-    '<th>ID</th><th>Content</th><th>Created</th>' +
+    '<th>' + t('memory.colId') + '</th><th>' + t('memory.colContent') + '</th><th>' + t('memory.colCreated') + '</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
@@ -151,7 +151,7 @@ function renderMemoryDetail(item) {
   if (!detailEl) return;
 
   if (!item) {
-    detailEl.innerHTML = '<div class="memory-empty">No content available.</div>';
+    detailEl.innerHTML = '<div class="memory-empty">' + t('memory.noContent') + '</div>';
     return;
   }
 
@@ -166,12 +166,12 @@ function renderMemoryDetail(item) {
 
   detailEl.innerHTML =
     '<div class="memory-detail-header">' +
-      '<span class="memory-detail-id">Memory #' + mid + '</span>' +
-      '<button class="btn btn-sm btn-danger-outline" onclick="deleteMemory(\'' + mid + '\')">Delete</button>' +
+      '<span class="memory-detail-id">' + t('memory.entryTitle', {id: mid}) + '</span>' +
+      '<button class="btn btn-sm btn-danger-outline" onclick="deleteMemory(\'' + mid + '\')">' + t('buttons.delete') + '</button>' +
     '</div>' +
     '<div class="memory-detail-meta">' +
-      '<span class="memory-meta-item"><span class="memory-meta-label">Scope:</span> ' + scope + (scopeId ? ' / ' + scopeId : '') + '</span>' +
-      '<span class="memory-meta-item"><span class="memory-meta-label">Created:</span> ' + escapeHtml(created) + '</span>' +
+      '<span class="memory-meta-item"><span class="memory-meta-label">' + t('memory.scopeLabel') + '</span> ' + scope + (scopeId ? ' / ' + scopeId : '') + '</span>' +
+      '<span class="memory-meta-item"><span class="memory-meta-label">' + t('memory.createdLabel') + '</span> ' + escapeHtml(created) + '</span>' +
     '</div>' +
     (tags ? '<div class="memory-detail-tags">' + tags + '</div>' : '') +
     '<div class="memory-detail-content"><pre>' + content + '</pre></div>';
@@ -183,7 +183,7 @@ function _setMemoryScopeTab(kind) {
     btn.classList.toggle('active', btn.dataset.scope === kind);
   });
   var detailEl = document.getElementById('memoryDetail');
-  if (detailEl) detailEl.innerHTML = '<div class="memory-empty">Select a memory entry to view details.</div>';
+  if (detailEl) detailEl.innerHTML = '<div class="memory-empty">' + t('memory.selectEntry') + '</div>';
   _memorySelectedId = null;
   loadMemoryList(kind);
 }

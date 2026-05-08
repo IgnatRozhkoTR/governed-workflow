@@ -229,3 +229,45 @@ class TestGetReflectionByIdRoute:
 
         assert response.status_code == 404
         assert "error" in response.get_json()
+
+
+# ---------------------------------------------------------------------------
+# Locale-switching tests (i18n contract)
+# ---------------------------------------------------------------------------
+
+class TestReflectionRoutesLocale:
+    def _make_workspace_with_locale(self, db, locale: str) -> tuple[str, str, int]:
+        db.execute(
+            "INSERT OR IGNORE INTO projects (id, name, path, registered) VALUES (?, ?, ?, ?)",
+            ("test-project", "Test Project", "/tmp/test", "2024-01-01"),
+        )
+        cursor = db.execute(
+            "INSERT INTO workspaces "
+            "(project_id, branch, sanitized_branch, working_dir, created, status, phase, scope_json, plan_json, source_branch, locale) "
+            "VALUES ('test-project', 'feature/x', 'feature-x', '/tmp/test', '2024-01-01', 'active', '0', '{}', '{}', 'main', ?)",
+            (locale,),
+        )
+        ws_id = cursor.lastrowid
+        db.commit()
+        return ("test-project", "feature/x", ws_id)
+
+    def test_llm_unconfigured_error_is_russian_when_locale_ru(self, client, clean_db):
+        from core.db import get_db
+        from core.i18n import t, reload
+
+        reload()
+        db = get_db()
+        try:
+            project_id, branch, ws_id = self._make_workspace_with_locale(db, "ru")
+        finally:
+            db.close()
+
+        with patch(
+            "routes.reflections.reflection_service.run",
+            side_effect=ReflectionServiceError("no key", code="llm_unconfigured"),
+        ):
+            response = client.post(f"/api/ws/{project_id}/{branch}/reflections")
+
+        assert response.status_code == 503
+        data = response.get_json()
+        assert data["error"] == t("api.error.reflection.llmUnconfigured", "ru")

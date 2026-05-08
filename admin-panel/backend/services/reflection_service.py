@@ -6,34 +6,38 @@ from datetime import datetime
 from core import llm_client
 from core.llm_client import LLMClientError
 from services import session_extractor
+from services.proposal_types import ProposalType
 from services.session_extractor import SessionExtractorError
 
 
-_REFLECTION_PROMPT_TEMPLATE = """\
-You will summarize the Claude Code session AND propose improvements.
-Return ONLY a JSON object with this exact shape:
+_PROPOSAL_TYPES_STR = "|".join(ProposalType.values())
 
-{{
-  "report_md": "<full markdown report with sections What was done, What worked, What did not work, Lessons>",
-  "summary": "<one-line summary>",
-  "proposals": [
-    {{
-      "type": "<one of memory_write|memory_delete|rule_new|rule_update|agent_new|agent_update|skill_new|skill_update|workflow_improvement>",
-      "title": "<short title>",
-      "body": "<full markdown text the user reads to decide whether to act on this proposal>"
-    }}
-  ]
-}}
-
-Each proposal is a text recommendation for a human reader. The `type` is a
-label so the user can filter proposals by category; nothing executes
-automatically. Put the actionable detail in `body` — the user will instruct an
-agent how to proceed.
-
-Empty `proposals` array is fine if no improvements are warranted.
-
-Session transcript:
-{transcript}"""
+_REFLECTION_PROMPT_TEMPLATE = (
+    "You will summarize the Claude Code session AND propose improvements.\n"
+    "Return ONLY a JSON object with this exact shape:\n"
+    "\n"
+    "{{\n"
+    '  "report_md": "<full markdown report with sections What was done, What worked, What did not work, Lessons>",\n'
+    '  "summary": "<one-line summary>",\n'
+    '  "proposals": [\n'
+    "    {{\n"
+    '      "type": "<one of ' + _PROPOSAL_TYPES_STR + '>",\n'
+    '      "title": "<short title>",\n'
+    '      "body": "<full markdown text the user reads to decide whether to act on this proposal>"\n'
+    "    }}\n"
+    "  ]\n"
+    "}}\n"
+    "\n"
+    "Each proposal is a text recommendation for a human reader. The `type` is a\n"
+    "label so the user can filter proposals by category; nothing executes\n"
+    "automatically. Put the actionable detail in `body` — the user will instruct an\n"
+    "agent how to proceed.\n"
+    "\n"
+    "Empty `proposals` array is fine if no improvements are warranted.\n"
+    "\n"
+    "Session transcript:\n"
+    "{transcript}"
+)
 
 
 class ReflectionServiceError(Exception):

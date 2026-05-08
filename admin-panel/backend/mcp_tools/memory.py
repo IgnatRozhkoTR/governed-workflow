@@ -4,18 +4,19 @@ from typing import Annotated
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from core.i18n import t
 from mcp_tools import TRANSIENT_DB_EXCEPTIONS, mcp, mcp_error, with_mcp_workspace
 from services import memory_service
 from services.memory_provider import MemoryProviderError
 
 
-def _translate_memory_error(exc: MemoryProviderError) -> dict:
+def _translate_memory_error(exc: MemoryProviderError, locale: str = "en") -> dict:
     if exc.code == "provider_unavailable":
         return mcp_error(
             "business",
             str(exc),
             retryable=False,
-            details={"hint": "enable the mempalace module via the Setup page"},
+            details={"hint": t("api.hint.memory.providerUnavailable", locale)},
         )
     if exc.code == "memory_not_found":
         return mcp_error("not_found", str(exc), retryable=False)
@@ -59,7 +60,7 @@ def memory_save(
     try:
         return memory_service.save(db, content, scope, metadata)
     except MemoryProviderError as exc:
-        return _translate_memory_error(exc)
+        return _translate_memory_error(exc, locale)
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
@@ -96,7 +97,7 @@ def memory_retrieve(
     try:
         return memory_service.retrieve(db, query, scope_filter, limit)
     except MemoryProviderError as exc:
-        return [_translate_memory_error(exc)]
+        return [_translate_memory_error(exc, locale)]
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return [mcp_error("transient", str(exc), retryable=True)]
 
@@ -130,7 +131,7 @@ def memory_get(
     try:
         return memory_service.get(db, memory_id)
     except MemoryProviderError as exc:
-        return _translate_memory_error(exc)
+        return _translate_memory_error(exc, locale)
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
@@ -164,7 +165,7 @@ def memory_delete(
     try:
         memory_service.delete(db, memory_id)
     except MemoryProviderError as exc:
-        return _translate_memory_error(exc)
+        return _translate_memory_error(exc, locale)
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
     return {"ok": True, "deleted_id": memory_id}
@@ -199,6 +200,6 @@ def memory_list(
     try:
         return memory_service.list_memories(db, scope_filter)
     except MemoryProviderError as exc:
-        return [_translate_memory_error(exc)]
+        return [_translate_memory_error(exc, locale)]
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return [mcp_error("transient", str(exc), retryable=True)]

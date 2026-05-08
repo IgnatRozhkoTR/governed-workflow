@@ -2,6 +2,7 @@
 from flask import Blueprint, jsonify, request
 
 from core.db import get_db_ctx
+from core.i18n import t
 from services import work_mode_service
 from services.work_mode_service import WorkModeServiceError
 
@@ -95,11 +96,11 @@ def assign_mode_endpoint(workspace_id: int):
     body = request.get_json(silent=True) or {}
     mode_id = body.get("mode_id")
     if mode_id is None:
-        return jsonify({"error": "mode_id is required", "code": "invalid_phases"}), 400
+        return jsonify({"error": t("api.error.workMode.modeIdRequired"), "code": "invalid_phases"}), 400
     try:
         mode_id_int = int(mode_id)
     except (TypeError, ValueError):
-        return jsonify({"error": "mode_id must be an integer", "code": "invalid_phases"}), 400
+        return jsonify({"error": t("api.error.workMode.modeIdMustBeInteger"), "code": "invalid_phases"}), 400
     with get_db_ctx() as db:
         try:
             result = work_mode_service.assign(db, workspace_id, mode_id_int)

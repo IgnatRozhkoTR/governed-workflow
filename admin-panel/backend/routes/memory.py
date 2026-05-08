@@ -2,6 +2,7 @@
 from flask import Blueprint, jsonify, request
 
 from core.decorators import with_workspace
+from core.i18n import t
 from services import memory_service
 from services.memory_provider import MemoryProviderError
 
@@ -16,17 +17,18 @@ _STATUS_BY_CODE = {
 }
 
 
-def _error_response(exc: MemoryProviderError):
+def _error_response(exc: MemoryProviderError, locale: str = "en"):
     status = _STATUS_BY_CODE.get(exc.code, 500)
     body = {"error": str(exc)}
     if exc.code == "provider_unavailable":
-        body["hint"] = "enable a memory module via the Setup page"
+        body["hint"] = t("api.hint.memory.providerUnavailable", locale)
     return jsonify(body), status
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/memory", methods=["GET"])
 @with_workspace
 def list_memories(db, ws, project):
+    locale = ws["locale"] or "en"
     raw = request.args.getlist("scope_filter")
     scope_filter = None
     if raw:
@@ -34,27 +36,29 @@ def list_memories(db, ws, project):
         try:
             scope_filter = [json.loads(s) for s in raw]
         except (ValueError, TypeError) as exc:
-            return jsonify({"error": f"Invalid scope_filter: {exc}"}), 400
+            return jsonify({"error": t("api.error.memory.invalidScopeFilter", locale, detail=exc)}), 400
     try:
         items = memory_service.list_memories(db, scope_filter)
     except MemoryProviderError as exc:
-        return _error_response(exc)
+        return _error_response(exc, locale)
     return jsonify(items)
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/memory/<memory_id>", methods=["GET"])
 @with_workspace
 def get_memory(db, ws, project, memory_id: str):
+    locale = ws["locale"] or "en"
     try:
         result = memory_service.get(db, memory_id)
     except MemoryProviderError as exc:
-        return _error_response(exc)
+        return _error_response(exc, locale)
     return jsonify(result)
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/memory", methods=["POST"])
 @with_workspace
 def save_memory(db, ws, project):
+    locale = ws["locale"] or "en"
     body = request.get_json(silent=True) or {}
     content = body.get("content", "")
     scope = body.get("scope", {})
@@ -62,23 +66,25 @@ def save_memory(db, ws, project):
     try:
         result = memory_service.save(db, content, scope, metadata)
     except MemoryProviderError as exc:
-        return _error_response(exc)
+        return _error_response(exc, locale)
     return jsonify(result), 201
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/memory/<memory_id>", methods=["DELETE"])
 @with_workspace
 def delete_memory(db, ws, project, memory_id: str):
+    locale = ws["locale"] or "en"
     try:
         memory_service.delete(db, memory_id)
     except MemoryProviderError as exc:
-        return _error_response(exc)
+        return _error_response(exc, locale)
     return jsonify({"ok": True, "deleted_id": memory_id})
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/memory/search", methods=["POST"])
 @with_workspace
 def search_memories(db, ws, project):
+    locale = ws["locale"] or "en"
     body = request.get_json(silent=True) or {}
     query = body.get("query", "")
     scope_filter = body.get("scope_filter")
@@ -86,5 +92,5 @@ def search_memories(db, ws, project):
     try:
         results = memory_service.retrieve(db, query, scope_filter, limit)
     except MemoryProviderError as exc:
-        return _error_response(exc)
+        return _error_response(exc, locale)
     return jsonify(results)

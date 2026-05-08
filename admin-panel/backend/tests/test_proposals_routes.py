@@ -219,3 +219,33 @@ class TestResolveProposalRoute:
         assert response.status_code == 200
         data = response.get_json()
         assert data["status"] == "rejected"
+
+
+# ---------------------------------------------------------------------------
+# Locale-switching tests (i18n contract)
+# ---------------------------------------------------------------------------
+
+class TestProposalRoutesLocale:
+    def test_not_found_error_uses_catalog_key(self, client):
+        """Proposals are workspace-agnostic; route uses t() default locale (en).
+        Verify both en and ru catalog keys resolve to non-empty strings."""
+        from core.i18n import t, reload
+
+        reload()
+        en_msg = t("api.error.proposal.notFound", "en")
+        ru_msg = t("api.error.proposal.notFound", "ru")
+        assert en_msg and en_msg != "api.error.proposal.notFound"
+        assert ru_msg and ru_msg != "api.error.proposal.notFound"
+
+    def test_get_returns_localized_not_found_message(self, client):
+        with patch(
+            "routes.proposals.proposal_service.get",
+            side_effect=ProposalServiceError("not found", code="not_found"),
+        ):
+            response = client.get("/api/proposals/99999")
+
+        from core.i18n import t, reload
+        reload()
+        assert response.status_code == 404
+        data = response.get_json()
+        assert data["error"] == t("api.error.proposal.notFound", "en")

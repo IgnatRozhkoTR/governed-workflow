@@ -9,36 +9,38 @@ from typing import Annotated, Literal
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from core.i18n import t
 from mcp_tools import TRANSIENT_DB_EXCEPTIONS, mcp, mcp_error, with_global_db, with_mcp_workspace
 from services import proposal_service
-from services.proposal_service import PROPOSAL_TYPES, ProposalServiceError
+from services.proposal_service import ProposalServiceError
+from services.proposal_types import ProposalType
 
 
-_PROPOSAL_TYPE_LITERAL = Literal[
-    "memory_write",
-    "memory_delete",
-    "rule_new",
-    "rule_update",
-    "agent_new",
-    "agent_update",
-    "skill_new",
-    "skill_update",
-    "workflow_improvement",
-]
+_PROPOSAL_TYPE_LITERAL = Literal[*ProposalType.values()]
 
 _PROPOSAL_STATUS_LITERAL = Literal[
     "pending", "approved", "rejected", "executed", "failed"
 ]
 
 
-def _translate_proposal_error(exc: ProposalServiceError) -> dict:
+_PROPOSAL_MESSAGE_BY_CODE = {
+    "not_found": "api.error.proposal.notFound",
+    "invalid_type": "api.error.proposal.invalidType",
+    "invalid_payload": "api.error.proposal.invalidPayload",
+    "invalid_state": "api.error.proposal.invalidState",
+}
+
+
+def _translate_proposal_error(exc: ProposalServiceError, locale: str = "en") -> dict:
+    key = _PROPOSAL_MESSAGE_BY_CODE.get(exc.code)
+    message = t(key, locale) if key else str(exc)
     if exc.code == "not_found":
-        return mcp_error("not_found", str(exc), retryable=False)
+        return mcp_error("not_found", message, retryable=False)
     if exc.code in ("invalid_type", "invalid_payload"):
-        return mcp_error("validation", str(exc), retryable=False, details=exc.details)
+        return mcp_error("validation", message, retryable=False, details=exc.details)
     if exc.code == "invalid_state":
-        return mcp_error("business", str(exc), retryable=False, details=exc.details)
-    return mcp_error("business", str(exc), retryable=False)
+        return mcp_error("business", message, retryable=False, details=exc.details)
+    return mcp_error("business", message, retryable=False)
 
 
 @mcp.tool(
@@ -76,8 +78,8 @@ def proposal_create(
       validation  — type unknown, title empty, payload not a dict.
       transient   — DB failure; caller should retry.
     """
-    if type not in PROPOSAL_TYPES:
-        return mcp_error("validation", f"Unknown proposal type '{type}'", retryable=False)
+    if type not in ProposalType.values():
+        return mcp_error("validation", t("api.error.proposal.invalidType", locale), retryable=False)
     try:
         return proposal_service.create(
             db,
@@ -90,7 +92,7 @@ def proposal_create(
             project_id=project["id"] if project else None,
         )
     except ProposalServiceError as exc:
-        return _translate_proposal_error(exc)
+        return _translate_proposal_error(exc, locale)
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 

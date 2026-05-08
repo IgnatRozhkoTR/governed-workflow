@@ -155,3 +155,29 @@ def test_apply_mode_returns_200_with_effective_phases(client, workspace):
 def test_apply_mode_unknown_workspace_returns_404(client):
     resp = client.post("/api/workspaces/999999/work-mode/apply")
     assert resp.status_code == 404
+
+
+# ── Locale-switching tests (i18n contract) ────────────────────────────────────
+
+def test_assign_mode_missing_mode_id_error_uses_catalog_key(client, workspace):
+    """work_modes routes are workspace-agnostic; verify both catalog locales resolve."""
+    from core.i18n import t, reload
+
+    reload()
+    en_msg = t("api.error.workMode.modeIdRequired", "en")
+    ru_msg = t("api.error.workMode.modeIdRequired", "ru")
+    assert en_msg and en_msg != "api.error.workMode.modeIdRequired"
+    assert ru_msg and ru_msg != "api.error.workMode.modeIdRequired"
+
+
+def test_assign_mode_missing_mode_id_returns_localized_en_error(client, workspace):
+    from core.i18n import t, reload
+
+    reload()
+    resp = client.put(
+        f"/api/workspaces/{workspace['id']}/work-mode",
+        json={},
+    )
+    assert resp.status_code == 400
+    data = resp.get_json()
+    assert data["error"] == t("api.error.workMode.modeIdRequired", "en")

@@ -746,8 +746,8 @@
   <!-- ─── MEMORY ─── -->
   <div class="tab-panel" id="panel-memory">
     <div class="memory-scope-tabs">
-      <button class="memory-scope-tab active" data-scope="project">Project</button>
-      <button class="memory-scope-tab" data-scope="ticket">Ticket</button>
+      <button class="memory-scope-tab active" data-scope="project" data-i18n="memory.scopeProject">Project</button>
+      <button class="memory-scope-tab" data-scope="ticket" data-i18n="memory.scopeTicket">Ticket</button>
     </div>
     <div class="memory-search-bar">
       <input type="text" class="context-input" id="memorySearchInput" placeholder="Search memories..." data-i18n-placeholder="placeholders.searchMemories">
@@ -785,15 +785,6 @@
           </select>
           <select id="proposalsTypeFilter" class="context-input proposals-filter">
             <option value="" data-i18n="proposals.type.all">All types</option>
-            <option value="memory_write">memory_write</option>
-            <option value="memory_delete">memory_delete</option>
-            <option value="rule_new">rule_new</option>
-            <option value="rule_update">rule_update</option>
-            <option value="agent_new">agent_new</option>
-            <option value="agent_update">agent_update</option>
-            <option value="skill_new">skill_new</option>
-            <option value="skill_update">skill_update</option>
-            <option value="workflow_improvement">workflow_improvement</option>
           </select>
           <button class="btn btn-sm" id="proposalsRefreshBtn" data-i18n="buttons.refresh">Refresh</button>
         </div>

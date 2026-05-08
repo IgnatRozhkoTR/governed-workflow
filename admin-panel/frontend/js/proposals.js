@@ -23,7 +23,7 @@ function loadProposals(filterStatus, filterType) {
       _refreshProposalsBadge();
     })
     .catch(function(e) {
-      showToast('Proposal list failed: ' + (e && e.message));
+      showToast(t('proposals.listFailed', {error: e && e.message}));
     });
 }
 
@@ -35,14 +35,14 @@ function loadProposalDetail(proposalId) {
   });
 
   var detailEl = document.getElementById('proposalsDetail');
-  if (detailEl) detailEl.innerHTML = '<div class="proposals-empty">Loading...</div>';
+  if (detailEl) detailEl.innerHTML = '<div class="proposals-empty">' + t('proposals.loading') + '</div>';
 
   apiGet('/api/proposals/' + encodeURIComponent(proposalId))
     .then(function(item) {
       renderProposalDetail(item);
     })
     .catch(function(e) {
-      showToast('Failed to load proposal: ' + (e && e.message));
+      showToast(t('proposals.loadFailed', {error: e && e.message}));
     });
 }
 
@@ -50,31 +50,31 @@ function approveProposal(proposalId) {
   if (!confirm('Approve this proposal?')) return;
   apiPost('/api/proposals/' + encodeURIComponent(proposalId) + '/approve', {})
     .then(function(item) {
-      showToast('Proposal approved.');
+      showToast(t('proposals.approved'));
       _replaceProposalInList(item);
       renderProposalList();
       renderProposalDetail(item);
     })
     .catch(function(e) {
-      showToast('Approve failed: ' + (e && e.message));
+      showToast(t('proposals.approveFailed', {error: e && e.message}));
     });
 }
 
 function rejectProposal(proposalId, reason) {
   var trimmed = (reason || '').trim();
   if (!trimmed) {
-    showToast('Rejection reason is required.');
+    showToast(t('proposals.rejectReasonRequired'));
     return;
   }
   apiPost('/api/proposals/' + encodeURIComponent(proposalId) + '/reject', { reason: trimmed })
     .then(function(item) {
-      showToast('Proposal rejected.');
+      showToast(t('proposals.rejected'));
       _replaceProposalInList(item);
       renderProposalList();
       renderProposalDetail(item);
     })
     .catch(function(e) {
-      showToast('Reject failed: ' + (e && e.message));
+      showToast(t('proposals.rejectFailed', {error: e && e.message}));
     });
 }
 
@@ -82,13 +82,13 @@ function resolveProposal(proposalId) {
   if (!confirm('Mark this proposal as resolved?')) return;
   apiPost('/api/proposals/' + encodeURIComponent(proposalId) + '/resolve', {})
     .then(function(item) {
-      showToast('Proposal resolved.');
+      showToast(t('proposals.resolved'));
       _replaceProposalInList(item);
       renderProposalList();
       renderProposalDetail(item);
     })
     .catch(function(e) {
-      showToast('Resolve failed: ' + (e && e.message));
+      showToast(t('proposals.resolveFailed', {error: e && e.message}));
     });
 }
 
@@ -124,7 +124,7 @@ function renderProposalList() {
   if (!listEl) return;
 
   if (PROPOSAL_LIST.length === 0) {
-    listEl.innerHTML = '<div class="proposals-empty">No proposals match the current filter.</div>';
+    listEl.innerHTML = '<div class="proposals-empty">' + t('proposals.empty') + '</div>';
     return;
   }
 
@@ -146,7 +146,7 @@ function renderProposalList() {
   }).join('');
 
   listEl.innerHTML = '<table class="proposals-table"><thead><tr>' +
-    '<th>#</th><th>Type</th><th>Title</th><th>Status</th><th>Created</th>' +
+    '<th>' + t('proposals.colNumber') + '</th><th>' + t('proposals.colType') + '</th><th>' + t('proposals.colTitle') + '</th><th>' + t('proposals.colStatus') + '</th><th>' + t('proposals.colCreated') + '</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
@@ -248,6 +248,24 @@ function _refreshProposalsBadge() {
   }
 }
 
+function _populateTypeFilter(typeFilter) {
+  apiGet('/api/proposals/types')
+    .then(function(data) {
+      var types = Array.isArray(data && data.types) ? data.types : [];
+      var currentVal = typeFilter.value;
+      types.forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        typeFilter.appendChild(opt);
+      });
+      typeFilter.value = currentVal;
+    })
+    .catch(function() {
+      // If the endpoint fails, the filter still works — just no type options.
+    });
+}
+
 function initProposals() {
   if (!_proposalsInitialized) {
     var statusFilter = document.getElementById('proposalsStatusFilter');
@@ -261,6 +279,7 @@ function initProposals() {
       };
     }
     if (typeFilter) {
+      _populateTypeFilter(typeFilter);
       typeFilter.value = _proposalsTypeFilter;
       typeFilter.onchange = function() {
         loadProposals(_proposalsStatusFilter, typeFilter.value);

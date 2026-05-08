@@ -2,8 +2,10 @@
 from flask import Blueprint, jsonify, request
 
 from core.db import get_db_ctx
+from core.i18n import t
 from services import proposal_service
 from services.proposal_service import ProposalServiceError
+from services.proposal_types import ProposalType
 
 
 bp = Blueprint("proposals", __name__)
@@ -16,10 +18,19 @@ _STATUS_BY_CODE = {
     "invalid_state": 409,
 }
 
+_MESSAGE_BY_CODE = {
+    "not_found": "api.error.proposal.notFound",
+    "invalid_type": "api.error.proposal.invalidType",
+    "invalid_payload": "api.error.proposal.invalidPayload",
+    "invalid_state": "api.error.proposal.invalidState",
+}
+
 
 def _error_response(exc: ProposalServiceError):
     status = _STATUS_BY_CODE.get(exc.code, 500)
-    body = {"error": str(exc), "code": exc.code}
+    key = _MESSAGE_BY_CODE.get(exc.code)
+    message = t(key) if key else str(exc)
+    body = {"error": message, "code": exc.code}
     if exc.details:
         body["details"] = exc.details
     return jsonify(body), status
@@ -33,6 +44,11 @@ def _parse_int_param(name: str) -> int | None:
         return int(raw)
     except (TypeError, ValueError):
         return None
+
+
+@bp.route("/api/proposals/types", methods=["GET"])
+def list_proposal_types_endpoint():
+    return jsonify({"types": list(ProposalType.values())})
 
 
 @bp.route("/api/proposals", methods=["GET"])

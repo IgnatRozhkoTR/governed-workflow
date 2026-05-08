@@ -12,7 +12,6 @@ if SERVER_DIR not in sys.path:
     sys.path.insert(0, SERVER_DIR)
 
 from services.proposal_service import (
-    PROPOSAL_TYPES,
     ProposalServiceError,
     create,
     approve,
@@ -21,6 +20,7 @@ from services.proposal_service import (
     reject,
     resolve,
 )
+from services.proposal_types import ProposalType
 
 
 _EXPECTED_TYPES = {
@@ -52,7 +52,7 @@ def _create_pending(db, type_="memory_write", title="Test proposal", payload=Non
 
 class TestProposalTypes:
     def test_proposalTypes_containsExactlyNineExpectedStrings(self):
-        assert PROPOSAL_TYPES == _EXPECTED_TYPES
+        assert set(ProposalType.values()) == _EXPECTED_TYPES
 
 
 class TestCreateProposal:

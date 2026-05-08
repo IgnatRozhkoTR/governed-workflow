@@ -4,21 +4,32 @@ from typing import Annotated
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from core.i18n import t
 from mcp_tools import TRANSIENT_DB_EXCEPTIONS, mcp, mcp_error, with_mcp_workspace
 from services import reflection_service
 from services.reflection_service import ReflectionServiceError
 
+_REFLECTION_MESSAGE_BY_CODE = {
+    "not_found": "api.error.reflection.notFound",
+    "llm_unconfigured": "api.error.reflection.llmUnconfigured",
+    "llm_failure": "api.error.reflection.llmFailure",
+    "llm_invalid_json": "api.error.reflection.llmInvalidJson",
+    "no_session_found": "api.error.reflection.noSessionFound",
+}
 
-def _translate_reflection_error(exc: ReflectionServiceError) -> dict:
+
+def _translate_reflection_error(exc: ReflectionServiceError, locale: str = "en") -> dict:
+    key = _REFLECTION_MESSAGE_BY_CODE.get(exc.code)
+    message = t(key, locale) if key else str(exc)
     if exc.code == "not_found":
-        return mcp_error("not_found", str(exc), retryable=False)
+        return mcp_error("not_found", message, retryable=False)
     if exc.code == "no_session_found":
-        return mcp_error("transient", str(exc), retryable=True)
+        return mcp_error("transient", message, retryable=True)
     if exc.code == "llm_unconfigured":
-        return mcp_error("business", str(exc), retryable=False)
+        return mcp_error("business", message, retryable=False)
     if exc.code in ("llm_failure", "llm_invalid_json"):
-        return mcp_error("transient", str(exc), retryable=True)
-    return mcp_error("business", str(exc), retryable=False)
+        return mcp_error("transient", message, retryable=True)
+    return mcp_error("business", message, retryable=False)
 
 
 @mcp.tool(
@@ -51,7 +62,7 @@ def reflection_run(ws, project, db, locale) -> dict:
         result = reflection_service.run(db, ws["id"])
         return result
     except ReflectionServiceError as exc:
-        return _translate_reflection_error(exc)
+        return _translate_reflection_error(exc, locale)
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
@@ -84,7 +95,7 @@ def reflection_get(
     try:
         return reflection_service.get(db, reflection_id)
     except ReflectionServiceError as exc:
-        return _translate_reflection_error(exc)
+        return _translate_reflection_error(exc, locale)
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 
@@ -112,6 +123,6 @@ def reflection_list(ws, project, db, locale) -> list:
     try:
         return reflection_service.list_reflections(db, ws["id"])
     except ReflectionServiceError as exc:
-        return [_translate_reflection_error(exc)]
+        return [_translate_reflection_error(exc, locale)]
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return [mcp_error("transient", str(exc), retryable=True)]

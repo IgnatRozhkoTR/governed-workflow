@@ -12,7 +12,7 @@ function loadReflections() {
       REFLECTION_LIST = Array.isArray(data) ? data : [];
       renderReflectionList();
     })
-    .catch(function(e) { showToast('Reflection list failed: ' + (e && e.message)); });
+    .catch(function(e) { showToast(t('reflection.listFailed', {error: e && e.message})); });
 }
 
 function renderReflectionList() {
@@ -20,7 +20,7 @@ function renderReflectionList() {
   if (!listEl) return;
 
   if (REFLECTION_LIST.length === 0) {
-    listEl.innerHTML = '<div class="reflection-empty">No reflections yet. Run one after completing a task.</div>';
+    listEl.innerHTML = '<div class="reflection-empty">' + t('reflection.empty') + '</div>';
     return;
   }
 
@@ -36,7 +36,7 @@ function renderReflectionList() {
   }).join('');
 
   listEl.innerHTML = '<table class="reflection-table"><thead><tr>' +
-    '<th>#</th><th>Summary</th><th>Created</th>' +
+    '<th>' + t('reflection.colNumber') + '</th><th>' + t('reflection.colSummary') + '</th><th>' + t('reflection.colCreated') + '</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
@@ -49,13 +49,13 @@ function loadReflectionDetail(rid) {
   });
 
   var detailEl = document.getElementById('reflectionDetail');
-  if (detailEl) detailEl.innerHTML = '<div class="reflection-loading">Loading...</div>';
+  if (detailEl) detailEl.innerHTML = '<div class="reflection-loading">' + t('reflection.loading') + '</div>';
 
   apiGet('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/reflections/' + encodeURIComponent(rid))
     .then(function(r) {
       renderReflectionDetail(r);
     })
-    .catch(function(e) { showToast('Failed to load reflection: ' + (e && e.message)); });
+    .catch(function(e) { showToast(t('reflection.loadFailed', {error: e && e.message})); });
 }
 
 function renderReflectionDetail(r) {
@@ -67,7 +67,7 @@ function renderReflectionDetail(r) {
     var rendered = DOMPurify.sanitize(marked.parse(r.content_md));
     html = '<div class="reflection-md-body">' + rendered + '</div>';
   } else {
-    html = '<div class="reflection-empty">No content available.</div>';
+    html = '<div class="reflection-empty">' + t('reflection.noContent') + '</div>';
   }
 
   detailEl.innerHTML = html;
@@ -84,13 +84,13 @@ function runReflection() {
   var btn = document.getElementById('reflectionRunBtn');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = 'Running...';
+    btn.textContent = t('reflection.running');
   }
 
   apiPost('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/reflections', {})
     .then(function(r) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Run Reflection'; }
-      showToast('Reflection complete.');
+      if (btn) { btn.disabled = false; btn.textContent = t('buttons.runReflection'); }
+      showToast(t('reflection.complete'));
       REFLECTION_LIST.unshift(r);
       renderReflectionList();
       if (r && r.id) loadReflectionDetail(r.id);
@@ -99,13 +99,13 @@ function runReflection() {
       }
     })
     .catch(function(e) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Run Reflection'; }
+      if (btn) { btn.disabled = false; btn.textContent = t('buttons.runReflection'); }
       if (e && e.status === 503) {
-        showToast('LLM not configured — set up an AI provider in Configuration before running a reflection.');
+        showToast(t('reflection.runLlmNotConfigured'));
       } else if (e && e.status === 409) {
-        showToast('No active session found. Start a Claude session before running a reflection.');
+        showToast(t('reflection.runNoSession'));
       } else {
-        showToast('Reflection failed: ' + (e && e.message));
+        showToast(t('reflection.runFailed', {error: e && e.message}));
       }
     });
 }
@@ -116,9 +116,9 @@ function showReflectionProposalsBanner(count, projectId, branch) {
 
   var banner = document.createElement('div');
   banner.className = 'reflection-proposals-banner';
-  var noun = count === 1 ? 'proposal' : 'proposals';
-  banner.innerHTML = 'Proposals emitted: ' + count + ' ' + noun +
-    ' &mdash; <a href="#" class="reflection-proposals-link">view in Proposals tab</a>';
+  var noun = count === 1 ? t('reflection.proposalNoun') : t('reflection.proposalsNoun');
+  banner.innerHTML = t('reflection.proposalsBanner', {count: count, noun: noun}) +
+    '<a href="#" class="reflection-proposals-link">' + t('reflection.proposalsBannerLink') + '</a>';
   banner.querySelector('.reflection-proposals-link').onclick = function(e) {
     e.preventDefault();
     switchTab('proposals');

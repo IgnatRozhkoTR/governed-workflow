@@ -20,18 +20,7 @@ Status lifecycle:
 import json
 from datetime import datetime
 
-
-PROPOSAL_TYPES = frozenset({
-    "memory_write",
-    "memory_delete",
-    "rule_new",
-    "rule_update",
-    "agent_new",
-    "agent_update",
-    "skill_new",
-    "skill_update",
-    "workflow_improvement",
-})
+from services.proposal_types import ProposalType
 
 
 class ProposalServiceError(Exception):
@@ -102,9 +91,9 @@ def _serialize_payload(payload) -> str:
 
 
 def _validate_type(type_: str) -> None:
-    if type_ not in PROPOSAL_TYPES:
+    if type_ not in ProposalType.values():
         raise ProposalServiceError(
-            f"Unknown proposal type '{type_}'. Allowed: {sorted(PROPOSAL_TYPES)}",
+            f"Unknown proposal type '{type_}'. Allowed: {sorted(ProposalType.values())}",
             code="invalid_type",
         )
 
