@@ -387,6 +387,81 @@ class TestReflectionServiceRun:
         assert result["proposal_ids"] == []
         assert result["summary"] == "Quiet session."
 
+    def test_run_skips_non_dict_items_and_creates_valid_proposals(self, clean_db, capsys):
+        """Non-dict items in proposals list are skipped; dict items still produce rows."""
+        import json
+        from core.db import get_db
+
+        llm_json = json.dumps({
+            "report_md": "## Report",
+            "summary": "Mixed list.",
+            "proposals": [
+                None,
+                "just a string",
+                42,
+                {
+                    "type": "memory_write",
+                    "title": "Valid proposal",
+                    "body": "Keep this.",
+                },
+            ],
+        })
+
+        db = get_db()
+        try:
+            ws_id = _make_workspace(db)
+            with (
+                patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
+                patch("services.reflection_service.llm_client.complete", return_value=llm_json),
+            ):
+                result = reflection_service.run(db, ws_id)
+
+            rows = db.execute("SELECT * FROM proposals").fetchall()
+            reflection_count = db.execute("SELECT COUNT(*) FROM reflections").fetchone()[0]
+        finally:
+            db.close()
+
+        assert len(rows) == 1
+        assert rows[0]["type"] == "memory_write"
+        assert len(result["proposal_ids"]) == 1
+        assert reflection_count == 1
+
+        captured = capsys.readouterr()
+        assert "non-dict" in captured.err or "skipping" in captured.err
+
+    def test_run_rolls_back_reflection_when_proposal_creation_raises(self, clean_db):
+        """If _create_proposals raises, the reflection INSERT is rolled back — no orphan row."""
+        import json
+        from core.db import get_db
+
+        llm_json = json.dumps({
+            "report_md": "## Report",
+            "summary": "Will fail.",
+            "proposals": [
+                {"type": "memory_write", "title": "Should trigger rollback", "body": ""},
+            ],
+        })
+
+        db = get_db()
+        try:
+            ws_id = _make_workspace(db)
+            with (
+                patch("services.reflection_service.session_extractor.extract_session_transcript", return_value=_FAKE_TRANSCRIPT),
+                patch("services.reflection_service.llm_client.complete", return_value=llm_json),
+                patch(
+                    "services.reflection_service._create_proposals",
+                    side_effect=RuntimeError("forced proposal failure"),
+                ),
+            ):
+                with pytest.raises(RuntimeError):
+                    reflection_service.run(db, ws_id)
+
+            reflection_count = db.execute("SELECT COUNT(*) FROM reflections").fetchone()[0]
+        finally:
+            db.close()
+
+        assert reflection_count == 0
+
 
 # ---------------------------------------------------------------------------
 # get() tests

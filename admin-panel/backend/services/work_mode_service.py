@@ -45,7 +45,13 @@ def _validate_name(name: str) -> None:
 
 
 def _validate_phases(phases) -> list[dict]:
-    """Coerce and validate the phases payload into a list of clean dicts."""
+    """Coerce and validate the phases payload into a list of clean dicts.
+
+    Each entry must reference an id present in ``advance.phases.PHASE_REGISTRY``.
+    Templated ids (``3.x.K``) are accepted because they represent the slot for
+    every execution sub-phase; concrete ``3.N.K`` ids are rejected here because
+    they live in the per-plan expansion, not in mode storage.
+    """
     if phases is None:
         return []
     if not isinstance(phases, list):
@@ -53,6 +59,8 @@ def _validate_phases(phases) -> list[dict]:
             "'phases' must be a list",
             code="invalid_phases",
         )
+
+    from advance.phases import PHASE_REGISTRY
 
     cleaned: list[dict] = []
     seen_ids: set[str] = set()
@@ -66,6 +74,11 @@ def _validate_phases(phases) -> list[dict]:
         if not isinstance(phase_id, str) or not phase_id.strip():
             raise WorkModeServiceError(
                 f"phases[{index}].phase_id must be a non-empty string",
+                code="invalid_phases",
+            )
+        if phase_id not in PHASE_REGISTRY:
+            raise WorkModeServiceError(
+                f"phases[{index}].phase_id is not registered: {phase_id!r}",
                 code="invalid_phases",
             )
         if phase_id in seen_ids:

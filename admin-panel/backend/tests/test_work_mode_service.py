@@ -95,6 +95,57 @@ def test_create_raises_invalid_name_on_uppercase(db):
     assert exc_info.value.code == "invalid_name"
 
 
+def test_create_raises_invalid_phases_on_unregistered_phase_id(db):
+    """Unregistered phase ids (e.g. ``'3.1'`` — never a real registry key)
+    fail validation rather than silently round-tripping into the DB."""
+    with pytest.raises(WorkModeServiceError) as exc_info:
+        work_mode_service.create(
+            db,
+            name="bad-phase",
+            phases=[{"phase_id": "3.1", "enabled": False, "position": 0}],
+        )
+
+    assert exc_info.value.code == "invalid_phases"
+    assert "3.1" in str(exc_info.value)
+
+
+def test_create_raises_invalid_phases_on_typo_phase_id(db):
+    with pytest.raises(WorkModeServiceError) as exc_info:
+        work_mode_service.create(
+            db,
+            name="bad-phase-typo",
+            phases=[{"phase_id": "1.42", "enabled": True, "position": 0}],
+        )
+
+    assert exc_info.value.code == "invalid_phases"
+
+
+def test_create_accepts_templated_execution_phase_id(db):
+    """Templated ``3.x.K`` ids are first-class targets in modes."""
+    mode = work_mode_service.create(
+        db,
+        name="solo-style",
+        phases=[
+            {"phase_id": "3.x.0", "enabled": False, "position": 0},
+            {"phase_id": "3.x.3", "enabled": False, "position": 1},
+        ],
+    )
+
+    phase_ids = {p["phase_id"] for p in mode["phases"]}
+    assert phase_ids == {"3.x.0", "3.x.3"}
+
+
+def test_update_raises_invalid_phases_on_unregistered_phase_id(db, user_mode):
+    with pytest.raises(WorkModeServiceError) as exc_info:
+        work_mode_service.update(
+            db,
+            user_mode["id"],
+            phases=[{"phase_id": "3.1", "enabled": False, "position": 0}],
+        )
+
+    assert exc_info.value.code == "invalid_phases"
+
+
 # ── get ───────────────────────────────────────────────────────────────────────
 
 def test_get_returns_mode_with_phases(db, user_mode):

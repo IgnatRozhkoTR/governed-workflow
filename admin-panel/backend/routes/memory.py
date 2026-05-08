@@ -36,7 +36,7 @@ def list_memories(db, ws, project):
         except (ValueError, TypeError) as exc:
             return jsonify({"error": f"Invalid scope_filter: {exc}"}), 400
     try:
-        items = memory_service.list_memories(scope_filter)
+        items = memory_service.list_memories(db, scope_filter)
     except MemoryProviderError as exc:
         return _error_response(exc)
     return jsonify(items)
@@ -46,7 +46,7 @@ def list_memories(db, ws, project):
 @with_workspace
 def get_memory(db, ws, project, memory_id: str):
     try:
-        result = memory_service.get(memory_id)
+        result = memory_service.get(db, memory_id)
     except MemoryProviderError as exc:
         return _error_response(exc)
     return jsonify(result)
@@ -60,7 +60,7 @@ def save_memory(db, ws, project):
     scope = body.get("scope", {})
     metadata = body.get("metadata", {})
     try:
-        result = memory_service.save(content, scope, metadata)
+        result = memory_service.save(db, content, scope, metadata)
     except MemoryProviderError as exc:
         return _error_response(exc)
     return jsonify(result), 201
@@ -70,7 +70,7 @@ def save_memory(db, ws, project):
 @with_workspace
 def delete_memory(db, ws, project, memory_id: str):
     try:
-        memory_service.delete(memory_id)
+        memory_service.delete(db, memory_id)
     except MemoryProviderError as exc:
         return _error_response(exc)
     return jsonify({"ok": True, "deleted_id": memory_id})
@@ -84,7 +84,7 @@ def search_memories(db, ws, project):
     scope_filter = body.get("scope_filter")
     limit = body.get("limit", 10)
     try:
-        results = memory_service.retrieve(query, scope_filter, limit)
+        results = memory_service.retrieve(db, query, scope_filter, limit)
     except MemoryProviderError as exc:
         return _error_response(exc)
     return jsonify(results)

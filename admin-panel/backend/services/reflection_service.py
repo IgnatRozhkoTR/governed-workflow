@@ -74,6 +74,9 @@ def _create_proposals(db, raw_proposals: list, workspace_id: int, project_id: in
 
     proposal_ids: list[int] = []
     for item in raw_proposals:
+        if not isinstance(item, dict):
+            print(f"reflection_service: skipping non-dict proposal item {item!r}", file=sys.stderr)
+            continue
         try:
             created = proposal_service.create(
                 db,
@@ -84,6 +87,7 @@ def _create_proposals(db, raw_proposals: list, workspace_id: int, project_id: in
                 origin="reflection",
                 workspace_id=workspace_id,
                 project_id=project_id,
+                commit=False,
             )
             proposal_ids.append(created["id"])
         except (ValueError, ProposalServiceError) as exc:
@@ -145,11 +149,18 @@ def run(db, workspace_id: int) -> dict:
     if not isinstance(raw_proposals, list):
         raw_proposals = []
 
-    result = _insert_reflection(db, workspace_id, content_md, summary, extracted["session_id"])
-    db.commit()
-
     project_id = workspace["project_id"] if workspace["project_id"] is not None else None
-    proposal_ids = _create_proposals(db, raw_proposals, workspace_id, project_id)
+
+    # Insert reflection and proposals inside a single transaction so that a
+    # failure in proposal creation rolls back the reflection row too — no
+    # orphaned reflection rows without their proposals.
+    result = _insert_reflection(db, workspace_id, content_md, summary, extracted["session_id"])
+    try:
+        proposal_ids = _create_proposals(db, raw_proposals, workspace_id, project_id)
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
 
     result["proposal_ids"] = proposal_ids
     return result

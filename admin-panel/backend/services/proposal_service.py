@@ -13,8 +13,9 @@ opaque — it must be a valid JSON object but no per-type schema is enforced.
 Status lifecycle:
     pending → approved (idempotent)
     pending → rejected (idempotent)
-    failed/executed in older rows are legacy values from before the executor
-    was removed; the column may still hold them for backward compatibility.
+    failed  → rejected via resolve() only
+    executed in older rows is a legacy value from before the executor was
+    removed; the column may still hold it for backward compatibility.
 """
 import json
 from datetime import datetime
@@ -125,8 +126,13 @@ def create(
     origin: str = "agent",
     workspace_id: int | None = None,
     project_id: int | None = None,
+    commit: bool = True,
 ) -> dict:
-    """Insert a new pending proposal."""
+    """Insert a new pending proposal.
+
+    When ``commit=False`` the INSERT is issued but the transaction is left open
+    so the caller can batch it with other writes inside a single transaction.
+    """
     _validate_type(type)
     _require_non_empty_str(title, "title")
     payload_json = _serialize_payload(payload)
@@ -146,7 +152,8 @@ def create(
             now,
         ),
     )
-    db.commit()
+    if commit:
+        db.commit()
     return _require_proposal(db, cursor.lastrowid)
 
 
@@ -196,6 +203,10 @@ def approve(db, proposal_id: int) -> dict:
     UPDATE so concurrent approvers see consistent state. Re-approving an
     already-approved proposal returns the current row (idempotent). Approving
     a rejected proposal raises invalid_state.
+
+    If the conditional UPDATE matches zero rows the proposal was no longer
+    pending (e.g. concurrently rejected between the read and write).
+    invalid_state is raised in that case too.
     """
     proposal = _require_proposal(db, proposal_id)
     status = proposal["status"]
@@ -210,11 +221,17 @@ def approve(db, proposal_id: int) -> dict:
         )
 
     now = datetime.utcnow().isoformat()
-    db.execute(
+    cursor = db.execute(
         "UPDATE proposals SET status = 'approved', reviewed_at = ? "
         "WHERE id = ? AND status = 'pending'",
         (now, proposal_id),
     )
+    if cursor.rowcount == 0:
+        raise ProposalServiceError(
+            f"Proposal {proposal_id} is no longer pending",
+            code="invalid_state",
+            details={"proposal_id": proposal_id},
+        )
     db.commit()
     return _require_proposal(db, proposal_id)
 
@@ -242,16 +259,27 @@ def reject(db, proposal_id: int, reason: str) -> dict:
 
 
 def resolve(db, proposal_id: int) -> dict:
-    """Close out a proposal as rejected without re-running anything.
+    """Close out a stale 'failed' proposal by marking it rejected.
 
-    Useful for clearing legacy 'failed' rows or any non-pending state aside from
-    'rejected' (which is idempotent). 'pending' rows are flipped to 'rejected'
-    here too so the same UI button works regardless of state.
+    Only rows in the 'failed' state may be resolved this way — that is the
+    sole transition resolve() allows:
+        failed → rejected (idempotent against already-rejected)
+
+    Rows in any other state (pending, approved, executed) must be handled via
+    the appropriate action (approve/reject) or are already terminal. Attempting
+    to resolve them raises invalid_state so that approval decisions are never
+    silently destroyed.
     """
     proposal = _require_proposal(db, proposal_id)
     status = proposal["status"]
     if status == "rejected":
         return proposal
+    if status != "failed":
+        raise ProposalServiceError(
+            f"cannot resolve proposal in state '{status}': only 'failed' rows may be resolved",
+            code="invalid_state",
+            details={"current_status": status},
+        )
     now = datetime.utcnow().isoformat()
     db.execute(
         "UPDATE proposals SET status = 'rejected', reviewed_at = ? WHERE id = ?",

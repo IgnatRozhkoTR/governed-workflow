@@ -1,5 +1,5 @@
 """Tests for phase_key comparison utility."""
-from core.phase import is_templated, phase_key
+from core.phase import is_templated, phase_key, templated_form
 
 
 def test_equality_same():
@@ -89,3 +89,30 @@ def test_is_templated_empty_string_is_not_templated():
 def test_is_templated_ignores_x_as_substring():
     assert is_templated("mod.prep.extra") is False
     assert is_templated("3.11.0") is False
+
+
+def test_templated_form_maps_concrete_execution_phase_to_template():
+    assert templated_form("3.5.4") == "3.x.4"
+    assert templated_form("3.0.0") == "3.x.0"
+    assert templated_form("3.99.3") == "3.x.3"
+
+
+def test_templated_form_returns_none_for_static_phases():
+    assert templated_form("4.0") is None
+    assert templated_form("1.4") is None
+    assert templated_form("0") is None
+    assert templated_form("5") is None
+
+
+def test_templated_form_returns_none_for_already_templated_id():
+    assert templated_form("3.x.0") is None
+    assert templated_form("3.x.3") is None
+
+
+def test_templated_form_returns_none_for_empty_or_malformed_input():
+    assert templated_form("") is None
+    assert templated_form("3") is None
+    assert templated_form("3.5") is None
+    assert templated_form("3.5.4.7") is None
+    assert templated_form("4.5.6") is None
+    assert templated_form("3.foo.0") is None

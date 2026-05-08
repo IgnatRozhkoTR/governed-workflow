@@ -342,22 +342,20 @@ class TestRejectProposal:
 
 
 class TestResolveProposal:
-    def test_resolve_setsStatusRejected_forApprovedProposal(self, clean_db):
+    def _insert_failed(self, db) -> dict:
+        """Insert a proposal directly in 'failed' state (legacy DB row)."""
+        proposal = _create_pending(db)
+        db.execute(
+            "UPDATE proposals SET status = 'failed' WHERE id = ?",
+            (proposal["id"],),
+        )
+        db.commit()
+        return get(db, proposal["id"])
+
+    def test_resolve_setsStatusRejected_forFailedProposal(self, clean_db):
         db = _db()
         try:
-            proposal = _create_pending(db)
-            approve(db, proposal["id"])
-
-            result = resolve(db, proposal["id"])
-        finally:
-            db.close()
-
-        assert result["status"] == "rejected"
-
-    def test_resolve_setsStatusRejected_forPendingProposal(self, clean_db):
-        db = _db()
-        try:
-            proposal = _create_pending(db)
+            proposal = self._insert_failed(db)
 
             result = resolve(db, proposal["id"])
         finally:
@@ -376,3 +374,76 @@ class TestResolveProposal:
             db.close()
 
         assert result["status"] == "rejected"
+
+    def test_resolve_raises_invalidState_forPendingProposal(self, clean_db):
+        db = _db()
+        try:
+            proposal = _create_pending(db)
+
+            with pytest.raises(ProposalServiceError) as exc_info:
+                resolve(db, proposal["id"])
+        finally:
+            db.close()
+
+        assert exc_info.value.code == "invalid_state"
+        assert exc_info.value.details["current_status"] == "pending"
+
+    def test_resolve_raises_invalidState_forApprovedProposal(self, clean_db):
+        db = _db()
+        try:
+            proposal = _create_pending(db)
+            approve(db, proposal["id"])
+
+            with pytest.raises(ProposalServiceError) as exc_info:
+                resolve(db, proposal["id"])
+        finally:
+            db.close()
+
+        assert exc_info.value.code == "invalid_state"
+        assert exc_info.value.details["current_status"] == "approved"
+
+    def test_resolve_raises_invalidState_forApprovedProposal_dbRowUnchanged(self, clean_db):
+        db = _db()
+        try:
+            proposal = _create_pending(db)
+            approved = approve(db, proposal["id"])
+
+            with pytest.raises(ProposalServiceError):
+                resolve(db, proposal["id"])
+
+            row = get(db, proposal["id"])
+        finally:
+            db.close()
+
+        assert row["status"] == "approved"
+        assert row["reviewed_at"] == approved["reviewed_at"]
+
+
+class TestApproveRaceCondition:
+    def test_approve_raises_invalidState_whenConcurrentlyRejectedBetweenReadAndWrite(self, clean_db):
+        """Simulate a race: proposal read as pending, then rejected before the UPDATE fires."""
+        import threading
+
+        db_main = _db()
+        try:
+            proposal = _create_pending(db_main)
+            proposal_id = proposal["id"]
+        finally:
+            db_main.close()
+
+        # Use a second connection to simulate the concurrent rejection.
+        db_racer = _db()
+        try:
+            reject(db_racer, proposal_id, "rejected by concurrent caller")
+        finally:
+            db_racer.close()
+
+        # Now the main caller tries to approve what it read as pending.
+        db_main = _db()
+        try:
+            with pytest.raises(ProposalServiceError) as exc_info:
+                approve(db_main, proposal_id)
+        finally:
+            db_main.close()
+
+        assert exc_info.value.code == "invalid_state"

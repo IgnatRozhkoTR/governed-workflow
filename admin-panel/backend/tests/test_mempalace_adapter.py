@@ -86,13 +86,9 @@ def _make_stub_mempalace():
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
-def reset_singleton():
-    """Reset the adapter singleton before each test."""
-    import services.mempalace_adapter as mod
-    original = mod._singleton
-    mod._singleton = None
-    yield
-    mod._singleton = original
+def isolate_palace_dir(tmp_path, monkeypatch):
+    """Point the default palace dir at tmp_path so tests don't touch real FS."""
+    monkeypatch.setenv("GW_MEMPALACE_DIR", str(tmp_path / "palace-default"))
 
 
 @pytest.fixture
@@ -247,6 +243,23 @@ class TestMemPalaceAdapterErrorMapping:
         assert exc_info.value.code == "provider_unavailable"
         assert "mempalace" in str(exc_info.value).lower()
 
+    def test_os_error_during_init_raises_provider_unavailable(self, stub_mempalace, tmp_path, monkeypatch):
+        original_mempalace = stub_mempalace.MemPalace
+
+        class BrokenPalace(original_mempalace):
+            def __init__(self, palace_dir: str):
+                raise OSError("permission denied")
+
+        stub_mempalace.MemPalace = BrokenPalace
+        from services.mempalace_adapter import MemPalaceAdapter
+
+        with pytest.raises(MemoryProviderError) as exc_info:
+            MemPalaceAdapter(tmp_path / "palace-os-err")
+
+        assert exc_info.value.code == "provider_unavailable"
+        assert "initialization failed" in str(exc_info.value)
+        assert "original_error" in exc_info.value.details
+
     def test_drawer_not_found_maps_to_memory_not_found_error(self, stub_mempalace, tmp_path):
         original = stub_mempalace.MemPalace
         DrawerNotFoundError = stub_mempalace.DrawerNotFoundError
@@ -328,11 +341,13 @@ class TestGetProvider:
 
         assert exc_info.value.code == "provider_unavailable"
 
-    def test_get_provider_returns_singleton(self, stub_mempalace, tmp_path):
+    def test_get_provider_returns_fresh_instance_each_call(self, stub_mempalace, tmp_path):
         from services import mempalace_adapter
 
-        palace = tmp_path / "singleton-palace"
+        palace = tmp_path / "fresh-palace"
         p1 = mempalace_adapter.get_provider(palace_dir=palace)
-        p2 = mempalace_adapter.get_provider()
+        p2 = mempalace_adapter.get_provider(palace_dir=palace)
 
-        assert p1 is p2
+        assert p1 is not p2
+        assert isinstance(p1, mempalace_adapter.MemPalaceAdapter)
+        assert isinstance(p2, mempalace_adapter.MemPalaceAdapter)

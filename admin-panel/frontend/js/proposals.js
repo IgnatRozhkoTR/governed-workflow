@@ -155,7 +155,7 @@ function _renderProposalActions(p) {
     return '<button class="btn btn-sm btn-primary" onclick="approveProposal(' + p.id + ')" data-i18n="buttons.approve">Approve</button>' +
       '<button class="btn btn-sm btn-danger-outline" onclick="_promptRejectProposal(' + p.id + ')" data-i18n="buttons.reject">Reject</button>';
   }
-  if (p.status === 'approved' || p.status === 'failed') {
+  if (p.status === 'failed') {
     return '<button class="btn btn-sm btn-outline" onclick="resolveProposal(' + p.id + ')" data-i18n="buttons.resolve">Resolve</button>';
   }
   return '';

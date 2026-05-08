@@ -19,7 +19,7 @@ import os
 from pathlib import Path
 
 from core.paths import REPO_ROOT
-from services.memory_provider import MemoryProvider, MemoryProviderError
+from services.memory_provider import MemoryProvider, MemoryProviderError, register_provider
 
 
 def _default_palace_dir() -> Path:
@@ -27,9 +27,6 @@ def _default_palace_dir() -> Path:
     if env:
         return Path(env).expanduser().resolve()
     return REPO_ROOT / ".local" / "mempalace"
-
-
-_singleton: MemoryProvider | None = None
 
 
 def _encode_room(scope: dict) -> str:
@@ -73,8 +70,21 @@ class MemPalaceAdapter(MemoryProvider):
                 code="provider_unavailable",
                 message="mempalace not installed; enable the mempalace module via Setup",
             ) from exc
-        palace_dir.mkdir(parents=True, exist_ok=True)
-        self._palace = self._mempalace.MemPalace(str(palace_dir))
+        try:
+            palace_dir.mkdir(parents=True, exist_ok=True)
+            self._palace = self._mempalace.MemPalace(str(palace_dir))
+        except (OSError, PermissionError) as exc:
+            raise MemoryProviderError(
+                code="provider_unavailable",
+                message=f"memory provider initialization failed: {exc}",
+                details={"original_error": str(exc)},
+            ) from exc
+        except Exception as exc:
+            raise MemoryProviderError(
+                code="provider_unavailable",
+                message=f"memory provider initialization failed: {exc}",
+                details={"original_error": str(exc)},
+            ) from exc
 
     def save(self, content: str, scope: dict, metadata: dict) -> dict:
         wing = scope.get("kind", "project")
@@ -134,19 +144,19 @@ class MemPalaceAdapter(MemoryProvider):
 
 
 def get_provider(palace_dir: Path | None = None) -> MemoryProvider:
-    """Return the singleton MemPalaceAdapter, initialising it on first call.
+    """Construct and return a new MemPalaceAdapter.
 
     ``palace_dir`` overrides the default directory resolved by
-    ``_default_palace_dir()`` (which honours ``GW_MEMPALACE_DIR``). Passing a
-    value is useful in tests to scope storage to a ``tmp_path`` without
-    touching the global env.
+    ``_default_palace_dir()`` (which honours ``GW_MEMPALACE_DIR``). Each call
+    constructs a fresh adapter so that test-scoped ``palace_dir`` values and
+    production defaults never alias each other.
 
     Raises MemoryProviderError(code='provider_unavailable') when mempalace is
-    not installed. Callers should treat this as a configuration error and surface
-    the hint to the user.
+    not installed or the storage directory cannot be initialised. Callers should
+    treat this as a configuration error and surface the hint to the user.
     """
-    global _singleton
-    if _singleton is None:
-        resolved_dir = palace_dir if palace_dir is not None else _default_palace_dir()
-        _singleton = MemPalaceAdapter(resolved_dir)
-    return _singleton
+    resolved_dir = palace_dir if palace_dir is not None else _default_palace_dir()
+    return MemPalaceAdapter(resolved_dir)
+
+
+register_provider("mempalace", lambda: get_provider())

@@ -57,7 +57,7 @@ def memory_save(
       transient   — temporary storage failure; caller may retry.
     """
     try:
-        return memory_service.save(content, scope, metadata)
+        return memory_service.save(db, content, scope, metadata)
     except MemoryProviderError as exc:
         return _translate_memory_error(exc)
     except TRANSIENT_DB_EXCEPTIONS as exc:
@@ -94,7 +94,7 @@ def memory_retrieve(
       transient   — temporary failure; caller may retry.
     """
     try:
-        return memory_service.retrieve(query, scope_filter, limit)
+        return memory_service.retrieve(db, query, scope_filter, limit)
     except MemoryProviderError as exc:
         return [_translate_memory_error(exc)]
     except TRANSIENT_DB_EXCEPTIONS as exc:
@@ -128,7 +128,7 @@ def memory_get(
       transient   — DB failure; caller should retry.
     """
     try:
-        return memory_service.get(memory_id)
+        return memory_service.get(db, memory_id)
     except MemoryProviderError as exc:
         return _translate_memory_error(exc)
     except TRANSIENT_DB_EXCEPTIONS as exc:
@@ -162,7 +162,7 @@ def memory_delete(
       transient   — temporary failure; caller may retry.
     """
     try:
-        memory_service.delete(memory_id)
+        memory_service.delete(db, memory_id)
     except MemoryProviderError as exc:
         return _translate_memory_error(exc)
     except TRANSIENT_DB_EXCEPTIONS as exc:
@@ -197,7 +197,7 @@ def memory_list(
       transient   — temporary failure; caller may retry.
     """
     try:
-        return memory_service.list_memories(scope_filter)
+        return memory_service.list_memories(db, scope_filter)
     except MemoryProviderError as exc:
         return [_translate_memory_error(exc)]
     except TRANSIENT_DB_EXCEPTIONS as exc:

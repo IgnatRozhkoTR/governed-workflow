@@ -1,11 +1,18 @@
 """Thin validation wrapper over the memory provider.
 
-Validates inputs before delegating to the provider returned by
-mempalace_adapter.get_provider(). MemoryProviderError codes pass through
+Validates inputs before delegating to the provider resolved from the
+active modules_enabled configuration. MemoryProviderError codes pass through
 unchanged so callers (routes, MCP tools) can map them consistently.
 """
-from services import mempalace_adapter
-from services.memory_provider import MemoryProviderError
+import services.mempalace_adapter  # noqa: F401 — side-effect: registers "mempalace" provider
+from services.memory_provider import MemoryProviderError, get_active_provider
+
+
+def _provider(db):
+    """Resolve the active memory provider from the modules_enabled table."""
+    rows = db.execute("SELECT module_id FROM modules_enabled").fetchall()
+    enabled_ids = [row["module_id"] for row in rows]
+    return get_active_provider(enabled_ids)
 
 
 def _require_non_empty_str(value, name: str) -> None:
@@ -30,7 +37,7 @@ def _require_scope(scope) -> None:
         )
 
 
-def save(content: str, scope: dict, metadata: dict | None = None) -> dict:
+def save(db, content: str, scope: dict, metadata: dict | None = None) -> dict:
     """Validate and persist a memory.
 
     Returns
@@ -41,10 +48,10 @@ def save(content: str, scope: dict, metadata: dict | None = None) -> dict:
     """
     _require_non_empty_str(content, "content")
     _require_scope(scope)
-    return mempalace_adapter.get_provider().save(content, scope, metadata or {})
+    return _provider(db).save(content, scope, metadata or {})
 
 
-def retrieve(query: str, scope_filter: list[dict] | None = None, limit: int = 10) -> list[dict]:
+def retrieve(db, query: str, scope_filter: list[dict] | None = None, limit: int = 10) -> list[dict]:
     """Validate and perform a semantic search.
 
     Returns
@@ -59,10 +66,10 @@ def retrieve(query: str, scope_filter: list[dict] | None = None, limit: int = 10
             code="invalid_input",
             message="'limit' must be a positive integer",
         )
-    return mempalace_adapter.get_provider().retrieve(query, scope_filter, limit)
+    return _provider(db).retrieve(query, scope_filter, limit)
 
 
-def get(memory_id: str) -> dict:
+def get(db, memory_id: str) -> dict:
     """Fetch a single memory by ID.
 
     Returns
@@ -72,10 +79,10 @@ def get(memory_id: str) -> dict:
         MemoryProviderError — passed through from the provider.
     """
     _require_non_empty_str(memory_id, "memory_id")
-    return mempalace_adapter.get_provider().get(memory_id)
+    return _provider(db).get(memory_id)
 
 
-def delete(memory_id: str) -> bool:
+def delete(db, memory_id: str) -> bool:
     """Remove a memory by ID.
 
     Returns
@@ -85,10 +92,10 @@ def delete(memory_id: str) -> bool:
         MemoryProviderError — passed through from the provider.
     """
     _require_non_empty_str(memory_id, "memory_id")
-    return mempalace_adapter.get_provider().delete(memory_id)
+    return _provider(db).delete(memory_id)
 
 
-def list_memories(scope_filter: list[dict] | None = None) -> list[dict]:
+def list_memories(db, scope_filter: list[dict] | None = None) -> list[dict]:
     """List stored memories, optionally filtered by scope.
 
     Returns
@@ -97,4 +104,4 @@ def list_memories(scope_filter: list[dict] | None = None) -> list[dict]:
     Raises
         MemoryProviderError — passed through from the provider.
     """
-    return mempalace_adapter.get_provider().list_memories(scope_filter)
+    return _provider(db).list_memories(scope_filter)

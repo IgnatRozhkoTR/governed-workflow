@@ -67,8 +67,12 @@ def _load_proven_findings(db, workspace_id: int) -> list[dict]:
             entry_findings = json.loads(row["findings_json"])
         except (TypeError, ValueError):
             entry_findings = []
-        if isinstance(entry_findings, list):
-            findings.extend(entry_findings)
+        if not isinstance(entry_findings, list):
+            continue
+        for finding in entry_findings:
+            if not isinstance(finding, dict):
+                continue
+            findings.append(finding)
     return findings
 
 
@@ -94,6 +98,8 @@ def _count_title_recurrences(db, project_id) -> dict[str, int]:
         if not isinstance(entry_findings, list):
             continue
         for finding in entry_findings:
+            if not isinstance(finding, dict):
+                continue
             norm = _normalize_title(finding.get("summary", ""))
             if norm and norm not in seen_in_entry:
                 seen_in_entry.add(norm)
@@ -102,7 +108,7 @@ def _count_title_recurrences(db, project_id) -> dict[str, int]:
 
 
 def _is_project_level(finding: dict, title_counts: dict[str, int]) -> bool:
-    proof_files = finding.get("proof", {}).get("files", []) or []
+    proof_files = (finding.get("proof") or {}).get("files", []) or []
     if len(proof_files) > 2:
         return True
 
@@ -139,11 +145,11 @@ def _llm_filter(findings: list[dict]) -> list[dict]:
     return [f for f in findings if _llm_approves_one(f)]
 
 
-def _is_duplicate(finding: dict, project_id) -> bool:
+def _is_duplicate(db, finding: dict, project_id) -> bool:
     title = finding.get("summary", "")
     scope_filter = [{"kind": "project", "project_id": str(project_id)}]
     try:
-        results = memory_service.retrieve(query=title, scope_filter=scope_filter, limit=3)
+        results = memory_service.retrieve(db, query=title, scope_filter=scope_filter, limit=3)
     except MemoryProviderError as exc:
         if exc.code == "provider_unavailable":
             raise MemoryPromotionError(str(exc), code="provider_unavailable") from exc
@@ -151,13 +157,15 @@ def _is_duplicate(finding: dict, project_id) -> bool:
     return any(r.get("score", r.get("relevance", 0)) > _DEDUP_RELEVANCE_THRESHOLD for r in results)
 
 
-def _drop_duplicates(findings: list[dict], project_id) -> list[dict]:
-    return [f for f in findings if not _is_duplicate(f, project_id)]
+def _drop_duplicates(db, findings: list[dict], project_id) -> list[dict]:
+    return [f for f in findings if not _is_duplicate(db, f, project_id)]
 
 
 def _emit_memory_proposals(db, findings: list[dict], workspace: dict) -> list[int]:
     proposal_ids: list[int] = []
     for finding in findings:
+        if not isinstance(finding, dict):
+            continue
         title = finding.get("summary", "")
         body = finding.get("details", "")
         if not title.strip():
@@ -213,6 +221,6 @@ def promote(db, workspace_id: int) -> dict:
     if not candidates:
         return _empty_result(workspace_id)
     llm_approved = _llm_filter(candidates)
-    deduped = _drop_duplicates(llm_approved, workspace["project_id"])
+    deduped = _drop_duplicates(db, llm_approved, workspace["project_id"])
     proposal_ids = _emit_memory_proposals(db, deduped, workspace)
     return _build_result(workspace_id, candidates_examined=len(candidates), proposal_ids=proposal_ids)

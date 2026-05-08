@@ -44,3 +44,31 @@ def is_templated(phase_id: str) -> bool:
     if not phase_id:
         return False
     return any(segment == "x" for segment in phase_id.split("."))
+
+
+def templated_form(phase_id: str) -> str | None:
+    """Return the templated parent of a concrete execution sub-phase, else ``None``.
+
+    Execution items expand into ``3.N.K`` ids whose family is named ``3.x.K``.
+    For any other id (static phases like ``"1.4"`` or ``"4.2"``, already-templated
+    ids, malformed strings) there is no templated parent and the function
+    returns ``None``.
+
+    >>> templated_form("3.5.4")
+    '3.x.4'
+    >>> templated_form("3.0.0")
+    '3.x.0'
+    >>> templated_form("4.0") is None
+    True
+    >>> templated_form("3.x.1") is None
+    True
+    """
+    if not phase_id or is_templated(phase_id):
+        return None
+    segments = phase_id.split(".")
+    if len(segments) != 3 or segments[0] != "3":
+        return None
+    middle, tail = segments[1], segments[2]
+    if not middle.isdigit() or not tail.isdigit():
+        return None
+    return f"3.x.{tail}"

@@ -152,7 +152,7 @@ class TestListMemoriesRoute:
         scope_filter_encoded = json.dumps({"kind": "project", "project_id": "test-project"})
         captured = {}
 
-        def _capture_list(scope_filter=None):
+        def _capture_list(db, scope_filter=None):
             captured["scope_filter"] = scope_filter
             return [_MEMORY_DICT]
 

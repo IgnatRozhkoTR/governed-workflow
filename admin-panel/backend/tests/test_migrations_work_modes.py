@@ -123,6 +123,37 @@ def _apply_migration_0030(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _apply_migration_0031(conn: sqlite3.Connection) -> None:
+    """Execute the extra-modes seed migration against *conn*."""
+    import yoyo as _yoyo
+
+    captured: dict = {"fn_steps": []}
+    original_step = _yoyo.step
+
+    def _stub_step(fn_or_sql, *args, **kwargs):
+        if callable(fn_or_sql):
+            captured["fn_steps"].append(fn_or_sql)
+
+    _yoyo.step = _stub_step
+    try:
+        mod_name = "migration_0031_seed_extra_modes_test"
+        if mod_name in sys.modules:
+            del sys.modules[mod_name]
+        spec = importlib.util.spec_from_file_location(
+            mod_name,
+            str(MIGRATIONS_DIR / "0031_seed_extra_work_modes.py"),
+        )
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[mod_name] = mod
+        spec.loader.exec_module(mod)
+    finally:
+        _yoyo.step = original_step
+
+    for fn in captured["fn_steps"]:
+        fn(conn)
+    conn.commit()
+
+
 class TestWorkModesMigration:
     def test_work_modes_table_seeded_with_basic_origin_system(self, fresh_db):
         _apply_migration_0029(fresh_db)
@@ -174,3 +205,81 @@ class TestWorkModesMigration:
                 f"Workspace {ws['id']} should point at basic ({basic_id}), "
                 f"got {ws['work_mode_id']}"
             )
+
+
+class TestExtraModesMigration:
+    """Regression tests for migration 0031 (lite + solo seeded presets)."""
+
+    def test_lite_mode_disables_blind_review_phases(self, fresh_db):
+        _apply_migration_0029(fresh_db)
+        _apply_migration_0031(fresh_db)
+
+        lite_id = fresh_db.execute(
+            "SELECT id FROM work_modes WHERE name = 'lite'"
+        ).fetchone()["id"]
+        rows = fresh_db.execute(
+            "SELECT phase_id, enabled FROM work_mode_phases WHERE work_mode_id = ?",
+            (lite_id,),
+        ).fetchall()
+
+        disabled = {r["phase_id"] for r in rows if r["enabled"] == 0}
+        assert disabled == {"4.0", "4.1", "4.2"}
+
+    def test_solo_mode_disables_user_gate_phases_only(self, fresh_db):
+        """``solo`` disables exactly the user-gate phases registered in the
+        canonical sequence: ``1.4`` (preparation review), ``4.2`` (final
+        approval), and the templated ``3.x.3`` (per-item commit approval)."""
+        _apply_migration_0029(fresh_db)
+        _apply_migration_0031(fresh_db)
+
+        solo_id = fresh_db.execute(
+            "SELECT id FROM work_modes WHERE name = 'solo'"
+        ).fetchone()["id"]
+        rows = fresh_db.execute(
+            "SELECT phase_id, enabled FROM work_mode_phases WHERE work_mode_id = ?",
+            (solo_id,),
+        ).fetchall()
+
+        disabled = {r["phase_id"] for r in rows if r["enabled"] == 0}
+        assert disabled, "solo must disable a non-empty set of phase ids"
+        assert disabled == {"1.4", "4.2", "3.x.3"}
+
+    def test_solo_mode_phase_ids_are_all_registered(self, fresh_db):
+        """No row in the solo seed references an unregistered phase id."""
+        from advance.phases import PHASE_REGISTRY
+
+        _apply_migration_0029(fresh_db)
+        _apply_migration_0031(fresh_db)
+
+        solo_id = fresh_db.execute(
+            "SELECT id FROM work_modes WHERE name = 'solo'"
+        ).fetchone()["id"]
+        rows = fresh_db.execute(
+            "SELECT phase_id FROM work_mode_phases WHERE work_mode_id = ?",
+            (solo_id,),
+        ).fetchall()
+
+        unknown = [r["phase_id"] for r in rows if r["phase_id"] not in PHASE_REGISTRY]
+        assert unknown == [], f"solo references unregistered phase ids: {unknown}"
+
+    def test_solo_mode_origin_is_system(self, fresh_db):
+        _apply_migration_0029(fresh_db)
+        _apply_migration_0031(fresh_db)
+
+        row = fresh_db.execute(
+            "SELECT origin FROM work_modes WHERE name = 'solo'"
+        ).fetchone()
+        assert row["origin"] == "system"
+
+    def test_extra_modes_migration_is_idempotent(self, fresh_db):
+        """Re-running 0031 against a DB that already has the modes is a no-op."""
+        _apply_migration_0029(fresh_db)
+        _apply_migration_0031(fresh_db)
+        _apply_migration_0031(fresh_db)
+
+        names = [
+            row["name"] for row in fresh_db.execute(
+                "SELECT name FROM work_modes WHERE name IN ('lite', 'solo') ORDER BY name"
+            ).fetchall()
+        ]
+        assert names == ["lite", "solo"]
