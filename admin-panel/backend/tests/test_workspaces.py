@@ -35,6 +35,51 @@ def test_create_workspace(client, project):
     assert r.json["branch"] == "feature/new-ws"
 
 
+def test_create_workspace_with_custom_work_mode(client, project):
+    """POSTing work_mode_id of a custom mode binds the workspace to that mode."""
+    from core.db import get_db
+    from services import work_mode_service
+
+    db = get_db()
+    try:
+        custom_mode = work_mode_service.create(db, name="custom-test-mode")
+        custom_mode_id = custom_mode["id"]
+    finally:
+        db.close()
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={
+            "branch": "feature/custom-mode-ws",
+            "source": "develop",
+            "worktree": True,
+            "work_mode_id": custom_mode_id,
+        },
+    )
+    assert r.status_code == 201
+
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT work_mode_id FROM workspaces WHERE project_id = ? AND branch = ?",
+            (project["id"], "feature/custom-mode-ws"),
+        ).fetchone()
+    finally:
+        db.close()
+
+    assert row is not None
+    assert row["work_mode_id"] == custom_mode_id
+
+
+def test_create_workspace_with_invalid_work_mode_id_returns_400(client, project):
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/bad-mode", "source": "develop", "work_mode_id": 99999},
+    )
+    assert r.status_code == 400
+    assert "error" in r.json
+
+
 def test_create_workspace_no_worktree(client, project):
     _git(project["path"], "checkout", "-b", "other-branch")
     _git(project["path"], "checkout", "develop")

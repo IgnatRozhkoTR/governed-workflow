@@ -59,6 +59,10 @@
 <link rel="stylesheet" href="css/mobile.css?v=11">
 <link rel="stylesheet" href="css/workspace.css?v=11">
 <link rel="stylesheet" href="css/phase-settings.css?v=1">
+<link rel="stylesheet" href="css/reflection.css?v=1">
+<link rel="stylesheet" href="css/memory.css?v=1">
+<link rel="stylesheet" href="css/proposals.css?v=1">
+<link rel="stylesheet" href="css/work-modes.css?v=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -167,6 +171,10 @@
   <button class="tab-btn" data-tab="plan" data-i18n="tabs.planning">Planning</button>
   <button class="tab-btn" data-tab="research" data-i18n="tabs.research">Research</button>
   <button class="tab-btn" data-tab="phases" data-i18n="tabs.phaseControl">Phase Control</button>
+  <button class="tab-btn" data-tab="reflection" data-i18n="tabs.reflection">Reflection</button>
+  <button class="tab-btn" data-tab="memory" data-i18n="tabs.memory">Memory</button>
+  <button class="tab-btn" data-tab="proposals" data-i18n="tabs.proposals">Proposals</button>
+  <button class="tab-btn" data-tab="work-modes" data-i18n="tabs.workModes">Work Modes</button>
 </nav>
 
 <!-- ═══ MAIN CONTENT ═══ -->
@@ -710,6 +718,124 @@
     <div class="phase-action-grid" id="phaseActions"></div>
   </div>
 
+
+  <!-- ─── REFLECTION ─── -->
+  <div class="tab-panel" id="panel-reflection">
+    <div class="card" style="margin-bottom: 12px;">
+      <div class="card-header">
+        <span class="card-title" data-i18n="cards.reflection">Reflection</span>
+        <button id="reflectionRunBtn" class="btn btn-sm btn-primary" data-i18n="buttons.runReflection">Run Reflection</button>
+      </div>
+    </div>
+    <div class="reflection-layout">
+      <div class="reflection-list-pane">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="cards.reflectionHistory">History</span>
+          </div>
+          <div class="card-body" id="reflectionList"></div>
+        </div>
+      </div>
+      <div class="reflection-detail-pane" id="reflectionDetail">
+        <div class="reflection-empty" data-i18n="reflection.selectEntry">Select a reflection to view its report.</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ─── MEMORY ─── -->
+  <div class="tab-panel" id="panel-memory">
+    <div class="memory-scope-tabs">
+      <button class="memory-scope-tab active" data-scope="project" data-i18n="memory.scopeProject">Project</button>
+      <button class="memory-scope-tab" data-scope="ticket" data-i18n="memory.scopeTicket">Ticket</button>
+    </div>
+    <div class="memory-search-bar">
+      <input type="text" class="context-input" id="memorySearchInput" placeholder="Search memories..." data-i18n-placeholder="placeholders.searchMemories">
+      <button class="btn btn-sm" id="memorySearchBtn" data-i18n="buttons.search">Search</button>
+    </div>
+    <div class="memory-layout">
+      <div class="memory-list-pane">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="cards.memoryEntries">Memory Entries</span>
+          </div>
+          <div class="card-body" id="memoryList"></div>
+        </div>
+      </div>
+      <div class="memory-detail-pane" id="memoryDetail">
+        <div class="memory-empty" data-i18n="memory.selectEntry">Select a memory entry to view details.</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ─── PROPOSALS ─── -->
+  <div class="tab-panel" id="panel-proposals">
+    <div class="card" style="margin-bottom: 12px;">
+      <div class="card-header">
+        <span class="card-title" data-i18n="cards.proposals">Proposals</span>
+        <div class="proposals-filters">
+          <select id="proposalsStatusFilter" class="context-input proposals-filter">
+            <option value="pending" data-i18n="proposals.status.pending">Pending</option>
+            <option value="approved" data-i18n="proposals.status.approved">Approved</option>
+            <option value="rejected" data-i18n="proposals.status.rejected">Rejected</option>
+            <option value="executed" data-i18n="proposals.status.executed">Executed</option>
+            <option value="failed" data-i18n="proposals.status.failed">Failed</option>
+            <option value="" data-i18n="proposals.status.all">All</option>
+          </select>
+          <select id="proposalsTypeFilter" class="context-input proposals-filter">
+            <option value="" data-i18n="proposals.type.all">All types</option>
+          </select>
+          <button class="btn btn-sm" id="proposalsRefreshBtn" data-i18n="buttons.refresh">Refresh</button>
+        </div>
+      </div>
+    </div>
+    <div class="proposals-layout">
+      <div class="proposals-list-pane">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="cards.proposalsList">Queue</span>
+          </div>
+          <div class="card-body" id="proposalsList"></div>
+        </div>
+      </div>
+      <div class="proposals-detail-pane" id="proposalsDetail">
+        <div class="proposals-empty" data-i18n="proposals.selectEntry">Select a proposal to review its payload.</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ─── WORK MODES ─── -->
+  <div class="tab-panel" id="panel-work-modes">
+    <div class="card" style="margin-bottom: 12px;">
+      <div class="card-header">
+        <span class="card-title" data-i18n="workModes.title">Work Modes</span>
+        <button class="btn btn-sm btn-primary" id="workModeNewBtn" data-i18n="workModes.new">New mode</button>
+      </div>
+    </div>
+    <div class="work-modes-layout">
+      <div class="work-modes-list-pane">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="workModes.modesList">Modes</span>
+          </div>
+          <div class="card-body" id="workModesList"></div>
+        </div>
+      </div>
+      <div class="work-modes-editor-pane" id="workModesEditor">
+        <div class="work-modes-empty" data-i18n="workModes.selectEntry">Select a mode to edit, or create a new one.</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top: 16px;">
+      <div class="card-header">
+        <span class="card-title" data-i18n="workModes.assignments">Workspace Assignments</span>
+        <button class="btn btn-sm btn-outline" id="workModeAssignmentsRefreshBtn" data-i18n="buttons.refresh">Refresh</button>
+      </div>
+      <div class="card-body" id="workModeAssignments"></div>
+    </div>
+  </div>
+
 </div><!-- /split-main -->
 <div class="split-handle" id="splitHandle"></div>
 <div class="split-terminal" id="splitTerminal">
@@ -765,6 +891,10 @@
 <script src="js/file-explorer.js?v=10"></script>
 <script src="js/git-config.js?v=10"></script>
 <script src="js/rules.js?v=1"></script>
+<script src="js/reflection.js?v=1"></script>
+<script src="js/memory.js?v=1"></script>
+<script src="js/proposals.js?v=1"></script>
+<script src="js/work-modes.js?v=1"></script>
 <script src="js/claude-config.js?v=10"></script>
 <script src="js/network-mode.js?v=11"></script>
 <script src="js/context.js?v=10"></script>

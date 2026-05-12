@@ -60,11 +60,12 @@ def clean_db(setup_db, admin_token):
     tables = [
         "acceptance_criteria", "review_issues", "discussions",
         "research_entries", "progress_entries", "session_history",
-        "phase_history", "workspaces", "projects", "modules_enabled",
-        "improvements",
+        "phase_history", "reflections", "proposals", "workspaces", "projects",
+        "modules_enabled", "improvements",
         "verification_step_results", "verification_runs",
         "project_verification_profiles",
         "device_settings",
+        "phase_settings",
     ]
 
     def _do_clean(db):
@@ -75,6 +76,10 @@ def clean_db(setup_db, admin_token):
         db.execute("DELETE FROM verification_steps WHERE profile_id IN "
                    "(SELECT id FROM verification_profiles WHERE origin = 'user')")
         db.execute("DELETE FROM verification_profiles WHERE origin = 'user'")
+        # Remove only user-created work modes so the seeded basic system mode persists
+        db.execute("DELETE FROM work_mode_phases WHERE work_mode_id IN "
+                   "(SELECT id FROM work_modes WHERE origin = 'user')")
+        db.execute("DELETE FROM work_modes WHERE origin = 'user'")
         # Restore the session admin token so the next test's wrapped client still works.
         set_admin_token(db, admin_token)
         db.commit()

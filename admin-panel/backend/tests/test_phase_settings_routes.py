@@ -44,26 +44,27 @@ def test_put_workspace_persists(client, workspace):
     assert get_resp.get_json()["settings"]["1.1"] is False
 
 
-# ── Always-on rejection ───────────────────────────────────────────────────────
+# ── Formerly always-on phases now accept disable ──────────────────────────────
 
-def test_put_device_rejects_always_on_disable(client):
+def test_put_device_accepts_formerly_always_on_disable(client):
+    """Disabling a formerly-always-on phase is now accepted at the REST layer."""
     response = client.put("/api/phase-settings/device", json={"settings": {"0": False}})
-    assert response.status_code == 400
-    assert "error" in response.get_json()
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
 
 
-def test_put_project_rejects_always_on_disable(client, project):
+def test_put_project_accepts_formerly_always_on_disable(client, project):
     pid = project["id"]
     response = client.put(f"/api/projects/{pid}/phase-settings", json={"settings": {"0": False}})
-    assert response.status_code == 400
-    assert "error" in response.get_json()
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
 
 
-def test_put_workspace_rejects_always_on_disable(client, workspace):
+def test_put_workspace_accepts_formerly_always_on_disable(client, workspace):
     pid = workspace["project_id"]
     response = client.put(f"/api/ws/{pid}/feature/test/phase-settings", json={"settings": {"0": False}})
-    assert response.status_code == 400
-    assert "error" in response.get_json()
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
 
 
 def test_put_device_accepts_always_on_enable(client):
@@ -96,11 +97,12 @@ def test_get_phases_available_includes_core_phases(client):
     assert {"0", "1.0", "2.0", "4.2", "5"}.issubset(ids)
 
 
-def test_get_phases_available_marks_always_on(client):
+def test_get_phases_available_marks_always_on_false(client):
+    """always_on is now always False since enforcement moved to work mode phases."""
     response = client.get("/api/phases/available")
     phases_by_id = {p["id"]: p for p in response.get_json()["phases"]}
     for pid in ("0", "1.0", "2.0", "4.2", "5"):
-        assert phases_by_id[pid]["always_on"] is True, f"phase {pid} should be always_on"
+        assert phases_by_id[pid]["always_on"] is False, f"phase {pid} always_on should be False"
 
 
 def test_get_phases_available_marks_user_gates(client):
@@ -127,13 +129,22 @@ def test_get_phases_available_excludes_templated_ids(client):
     )
 
 
-# ── Commit-gate regex enforcement ─────────────────────────────────────────────
+# ── Commit-gate phases stay protected ────────────────────────────────────────
 
 def test_put_workspace_rejects_3_1_3_disable(client, workspace):
+    """3.1.3 is the commit gate; disabling it must be rejected with 400."""
     pid = workspace["project_id"]
     response = client.put(f"/api/ws/{pid}/feature/test/phase-settings", json={"settings": {"3.1.3": False}})
     assert response.status_code == 400
     assert "error" in response.get_json()
+
+
+def test_put_workspace_accepts_non_commit_gate_disable(client, workspace):
+    """Non-commit-gate phases stay user-toggleable via settings."""
+    pid = workspace["project_id"]
+    response = client.put(f"/api/ws/{pid}/feature/test/phase-settings", json={"settings": {"1.1": False}})
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
 
 
 # ── Input shape validation (issue #767) ──────────────────────────────────────

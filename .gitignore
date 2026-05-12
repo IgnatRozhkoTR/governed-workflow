@@ -36,3 +36,4 @@ admin-panel/.reviews/
 admin-panel/backend/sdkman*/
 claude/tools/
 claude/modules-local/
+/.local/

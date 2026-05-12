@@ -101,6 +101,14 @@ async function switchTab(tabId) {
     }
   } else if (tabId === 'terminal') {
     if (typeof onTerminalTabActivated === 'function') onTerminalTabActivated();
+  } else if (tabId === 'reflection') {
+    if (typeof initReflection === 'function') initReflection();
+  } else if (tabId === 'memory') {
+    if (typeof initMemory === 'function') initMemory();
+  } else if (tabId === 'proposals') {
+    if (typeof initProposals === 'function') initProposals();
+  } else if (tabId === 'work-modes') {
+    if (typeof initWorkModes === 'function') initWorkModes();
   }
 }
 

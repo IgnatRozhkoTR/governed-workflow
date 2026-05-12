@@ -269,3 +269,7 @@ from mcp_tools import criteria  # noqa: F401, E402
 from mcp_tools import improvements  # noqa: F401, E402
 from mcp_tools import verification  # noqa: F401, E402
 from mcp_tools import rules  # noqa: F401, E402
+from mcp_tools import reflection  # noqa: F401, E402
+from mcp_tools import memory  # noqa: F401, E402
+from mcp_tools import proposals  # noqa: F401, E402
+from mcp_tools import memory_promotion  # noqa: F401, E402

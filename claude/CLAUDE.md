@@ -5,9 +5,9 @@ Payload shipped into user workspaces by the installer — Claude Code extensions
 ## Folder Map
 
 - `agents/` — 16 specialized agent role definitions. See `agents/CLAUDE.md`.
-- `skills/` — 9 slash-command skills (governed-workflow, plan-preparation, planning, setup, rules, telegram-multi-session, commit-push-mr, local-review, chrome-troubleshooter). See `skills/CLAUDE.md`.
+- `skills/` — 11 slash-command skills (governed-workflow, plan-preparation, planning, setup, rules, telegram-multi-session, commit-push-mr, local-review, chrome-troubleshooter, reflection, memory-promotion). See `skills/CLAUDE.md`.
 - `rules/` — Default Markdown rule files with YAML frontmatter; auto-loaded by Claude Code based on `paths` globs.
-- `modules/` — Self-contained feature packages (currently `telegram/` for remote session control).
+- `modules/` — Self-contained feature packages (`telegram/` for remote session control; `mempalace/` for long-term memory — SKILL.md + enable.sh).
 - `hooks/` — Claude Code hooks: `pre-tool-hook.py`, `session-start.py`, `block-orchestrator-writes.py`, `user-prompt-submit.sh`.
 - `defaults/` — Templates copied into workspaces: `git-rules.md`, `git-hooks/`, `.mcp-funnel.json`.
 - `tools/` — Verification binaries (ktlint, google-java-format, pmd).

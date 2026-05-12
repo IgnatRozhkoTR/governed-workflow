@@ -27,24 +27,46 @@ def db(clean_phase_settings):
     conn.close()
 
 
+def test_always_on_phase_ids_is_empty():
+    assert ALWAYS_ON_PHASE_IDS == frozenset()
+
+
 @pytest.mark.parametrize("phase_id", ["0", "1.0", "2.0", "4.2", "5"])
-def test_is_always_on_core_phases(phase_id):
-    assert is_always_on(phase_id) is True
+def test_is_always_on_returns_false_for_core_phases(phase_id):
+    assert is_always_on(phase_id) is False
 
 
 @pytest.mark.parametrize("phase_id", ["3.1.3", "3.2.3", "3.99.3"])
-def test_is_always_on_commit_gate_pattern(phase_id):
+def test_is_always_on_returns_true_for_commit_gate_pattern(phase_id):
     assert is_always_on(phase_id) is True
 
 
-def test_is_always_on_commit_gate_template():
-    """The template id 3.x.3 must also be always-on so the template cannot be disabled."""
+def test_is_always_on_returns_true_for_commit_gate_template():
     assert is_always_on("3.x.3") is True
 
 
 @pytest.mark.parametrize("phase_id", ["1.1", "1.2", "1.3", "1.4", "4.0", "4.1", "3.1.0", "3.1.4"])
-def test_is_always_on_toggleable_phases(phase_id):
+def test_is_always_on_returns_false_for_toggleable_phases(phase_id):
     assert is_always_on(phase_id) is False
+
+
+def test_basic_mode_includes_core_phases_enabled(db):
+    """The basic system mode has all core phase ids with enabled=1."""
+    from advance.phases import PHASE_REGISTRY
+    from core.phase import is_templated
+
+    rows = db.execute(
+        "SELECT wmp.phase_id, wmp.enabled "
+        "FROM work_mode_phases wmp "
+        "JOIN work_modes wm ON wm.id = wmp.work_mode_id "
+        "WHERE wm.name = 'basic'"
+    ).fetchall()
+    basic_phases = {row["phase_id"]: bool(row["enabled"]) for row in rows}
+
+    canonical_ids = [pid for pid in PHASE_REGISTRY.keys() if not is_templated(pid)]
+    for phase_id in canonical_ids:
+        assert phase_id in basic_phases, f"phase {phase_id} missing from basic mode"
+        assert basic_phases[phase_id] is True, f"phase {phase_id} should be enabled in basic mode"
 
 
 def test_set_scope_settings_upserts_rows(db):
@@ -58,13 +80,42 @@ def test_set_scope_settings_upserts_rows(db):
     assert all(row["enabled"] == 0 for row in rows)
 
 
+def test_set_scope_settings_accepts_formerly_always_on_disable(db):
+    """Disabling a formerly-pinned phase now succeeds — basic mode still pins it in the baseline."""
+    set_scope_settings(db, "device", "", {"0": False})
+    db.commit()
+
+    result = get_scope_settings(db, "device", "")
+    assert result["0"] is False
+
+
 @pytest.mark.parametrize("scope_type", ["device", "project", "workspace"])
-def test_set_scope_settings_rejects_always_on_disable(db, scope_type):
+def test_set_scope_settings_accepts_any_non_commit_gate_phase_disable(db, scope_type):
+    """set_scope_settings no longer rejects disabling non-commit-gate phases — ValueError is not raised."""
+    set_scope_settings(db, scope_type, "x", {"0": False})
+    db.commit()
+
+    result = get_scope_settings(db, scope_type, "x")
+    assert result["0"] is False
+
+
+@pytest.mark.parametrize("phase_id", ["3.1.3", "3.7.3", "3.x.3"])
+def test_set_scope_settings_rejects_disable_for_commit_gate(db, phase_id):
+    """Commit-gate phases (3.N.3 and 3.x.3 template) cannot be disabled via scope overrides."""
     with pytest.raises(ValueError):
-        set_scope_settings(db, scope_type, "x", {"0": False})
+        set_scope_settings(db, "device", "", {phase_id: False})
 
 
-def test_set_scope_settings_allows_always_on_enable(db):
+def test_set_scope_settings_allows_enable_for_commit_gate(db):
+    """Enabling a commit-gate phase (no-op effectively) is allowed."""
+    set_scope_settings(db, "device", "", {"3.1.3": True})
+    db.commit()
+
+    result = get_scope_settings(db, "device", "")
+    assert result["3.1.3"] is True
+
+
+def test_set_scope_settings_allows_phase_enable(db):
     set_scope_settings(db, "device", "", {"0": True})
     db.commit()
 
@@ -124,7 +175,8 @@ def test_resolve_project_overrides_device(db):
     assert "1.1" in result
 
 
-def test_resolve_always_on_force_included_even_when_disabled_in_db(db):
+def test_resolve_formerly_always_on_can_be_overridden_by_scope(db):
+    """A workspace-level disable row now takes effect for a formerly-pinned phase."""
     from datetime import datetime
     db.execute(
         "INSERT INTO phase_settings (scope_type, scope_id, phase_id, enabled, updated_at) VALUES (?, ?, ?, ?, ?)",
@@ -133,7 +185,7 @@ def test_resolve_always_on_force_included_even_when_disabled_in_db(db):
     db.commit()
 
     result = resolve_enabled_phases(db, None, None, {"0", "1.1"})
-    assert "0" in result
+    assert "0" not in result
 
 
 def test_resolve_workspace_disables(db):

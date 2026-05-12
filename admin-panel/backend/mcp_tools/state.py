@@ -9,6 +9,7 @@ from services import discussion_service
 from services import plan_service
 from services import progress_service
 from services import research_service
+from services.phase_resolver import resolve_for_workspace
 from services.phase_sequencer import resolve_phase_sequence
 
 
@@ -33,10 +34,10 @@ def workspace_get_state(ws, project, db, locale) -> dict:
 
     Returns:
         Dict with keys: phase, status, scope, scope_status, phase_sequence,
-        context, discussions, plan_summary, progress_summary,
-        research_summary, unresolved_comments_count, review_issues_summary,
-        criteria_summary, previous_sessions_count, locale, branch,
-        working_dir, _detail_tools.
+        mode_id, mode_name, work_mode_phases, context, discussions,
+        plan_summary, progress_summary, research_summary,
+        unresolved_comments_count, review_issues_summary, criteria_summary,
+        previous_sessions_count, locale, branch, working_dir, _detail_tools.
 
     Errors:
         not_found  — no workspace matched the current working directory.
@@ -49,6 +50,16 @@ def workspace_get_state(ws, project, db, locale) -> dict:
     scope = plan_service.get_scope(ws)
     plan = plan_service.get_plan(ws)
     _, phase_sequence = resolve_phase_sequence(db, ws, plan)
+    work_mode_phases = resolve_for_workspace(db, ws["id"])
+
+    mode_id = ws_field(ws, "work_mode_id", None)
+    mode_name = None
+    if mode_id is not None:
+        mode_row = db.execute(
+            "SELECT name FROM work_modes WHERE id = ?", (mode_id,)
+        ).fetchone()
+        if mode_row is not None:
+            mode_name = mode_row["name"]
 
     context = {
         "ticket_id": ws["ticket_id"] or "",
@@ -108,6 +119,9 @@ def workspace_get_state(ws, project, db, locale) -> dict:
         "scope": scope,
         "scope_status": ws["scope_status"],
         "phase_sequence": phase_sequence,
+        "mode_id": mode_id,
+        "mode_name": mode_name,
+        "work_mode_phases": work_mode_phases,
         "context": context,
         "discussions": discussions,
         "plan_summary": plan_summary,

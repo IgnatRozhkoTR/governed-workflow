@@ -223,12 +223,29 @@ async function openProject(projectId) {
   }
 
   await loadBranches(projectId);
+  await loadWorkModeOptions();
 
   var projectCard = document.getElementById('phaseSettingsProjectCard');
   var projectBody = document.getElementById('phaseSettingsProjectBody');
   if (projectCard && projectBody && typeof renderPhaseToggleCard === 'function') {
     projectCard.style.display = '';
     renderPhaseToggleCard(projectBody, 'project', '/api/projects/' + encodeURIComponent(projectId) + '/phase-settings');
+  }
+}
+
+async function loadWorkModeOptions() {
+  const selectEl = document.getElementById('ws-work-mode');
+  if (!selectEl) return;
+  selectEl.innerHTML = '<option value="">' + t('research.loading') + '</option>';
+  try {
+    const data = await apiGet('/api/work-modes');
+    const modes = Array.isArray(data) ? data : (data.modes || []);
+    selectEl.innerHTML = modes.map(function(m) {
+      var selected = m.name === 'basic' ? ' selected' : '';
+      return '<option value="' + m.id + '"' + selected + '>' + _wsEscape(m.name) + '</option>';
+    }).join('');
+  } catch (_err) {
+    selectEl.innerHTML = '<option value="">basic</option>';
   }
 }
 
@@ -259,11 +276,13 @@ async function createWorkspace(projectId) {
   const branchInput = document.getElementById('ws-new-branch');
   const sourceSelect = document.getElementById('ws-source-branch');
   const worktreeCheckbox = document.getElementById('ws-worktree');
+  const workModeSelect = document.getElementById('ws-work-mode');
   const resultEl = document.getElementById('ws-create-result');
 
   const branch = branchInput.value.trim();
   const source = sourceSelect.value;
   const worktree = worktreeCheckbox.checked;
+  const workModeId = workModeSelect ? (parseInt(workModeSelect.value, 10) || undefined) : undefined;
 
   _wsClearError('ws-create-error');
   resultEl.innerHTML = '';
@@ -275,7 +294,7 @@ async function createWorkspace(projectId) {
 
   let result;
   try {
-    result = await apiCreateWorkspace(projectId, branch, source, worktree);
+    result = await apiCreateWorkspace(projectId, branch, source, worktree, workModeId);
   } catch (err) {
     resultEl.innerHTML = '';
     _wsShowError('ws-create-error', err.message);
@@ -397,6 +416,12 @@ function _wsInitSelector() {
             <div class="ws-form-row">
               <label class="ws-label">${t('labels.sourceBranch')}</label>
               <select id="ws-source-branch" class="ws-select">
+                <option value="">${t('research.loading')}</option>
+              </select>
+            </div>
+            <div class="ws-form-row">
+              <label class="ws-label">${t('labels.workMode')}</label>
+              <select id="ws-work-mode" class="ws-select">
                 <option value="">${t('research.loading')}</option>
               </select>
             </div>

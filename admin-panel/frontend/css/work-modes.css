@@ -1,0 +1,318 @@
+/* ═══════════════════════════════════════════════ */
+/*  WORK MODES                                      */
+/* ═══════════════════════════════════════════════ */
+
+.work-modes-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+/* ─── List pane ───────────────────────────────── */
+
+.work-modes-list-pane {
+  flex: 0 0 360px;
+  min-width: 0;
+}
+
+.work-modes-row {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.work-modes-row:hover {
+  background: var(--bg-hover);
+}
+
+.work-modes-row.active {
+  background: var(--accent-dim);
+  border-color: var(--border-active);
+}
+
+.work-modes-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.work-modes-row-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+.work-modes-row-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.work-modes-row-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.work-modes-used-by {
+  font-family: var(--font-mono);
+}
+
+/* ─── Origin badge ────────────────────────────── */
+
+.work-modes-origin {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+}
+
+.work-modes-origin--system {
+  background: var(--info-dim);
+  border-color: var(--info);
+  color: var(--info);
+}
+
+.work-modes-origin--user {
+  background: var(--success-dim);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+/* ─── Editor pane ─────────────────────────────── */
+
+.work-modes-editor-pane {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  min-height: 240px;
+}
+
+.work-modes-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.work-modes-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.work-modes-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.work-modes-editor-field {
+  margin-bottom: 14px;
+}
+
+.work-modes-editor-field label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.work-modes-editor-field .context-input,
+.work-modes-editor-field .context-textarea {
+  width: 100%;
+}
+
+.work-modes-editor-field .context-textarea {
+  min-height: 70px;
+  font-family: var(--font-sans);
+}
+
+.work-modes-system-note {
+  background: var(--info-dim);
+  border: 1px solid var(--info);
+  color: var(--info);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  margin-bottom: 12px;
+}
+
+/* ─── Phase list ──────────────────────────────── */
+
+.work-modes-phase-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+}
+
+.work-modes-phase-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.work-modes-phase-row:last-child {
+  border-bottom: none;
+}
+
+.work-modes-phase-row--dragging {
+  opacity: 0.5;
+}
+
+.work-modes-phase-row--drop-target {
+  background: var(--accent-dim);
+  outline: 2px dashed var(--border-active);
+  outline-offset: -2px;
+}
+
+.work-modes-drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  user-select: none;
+  padding: 0 4px;
+}
+
+.work-modes-drag-handle:active {
+  cursor: grabbing;
+}
+
+.work-modes-phase-input {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+.work-modes-phase-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.work-modes-phase-remove {
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+/* ─── Empty state ─────────────────────────────── */
+
+.work-modes-empty {
+  padding: 12px 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+/* ─── Workspace assignments ───────────────────── */
+
+.work-modes-assign-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.work-modes-assign-table thead tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.work-modes-assign-table th {
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.work-modes-assign-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.work-modes-assign-row:last-child {
+  border-bottom: none;
+}
+
+.work-modes-assign-row td {
+  padding: 8px 10px;
+  vertical-align: middle;
+  color: var(--text-secondary);
+}
+
+.work-modes-branch {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-primary);
+}
+
+.work-modes-assign-select {
+  min-width: 180px;
+  font-size: 0.82rem;
+}
+
+.work-modes-assign-actions {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* ─── Responsive ──────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .work-modes-list-pane {
+    flex: 0 0 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .work-modes-layout {
+    flex-direction: column;
+  }
+
+  .work-modes-list-pane {
+    flex: none;
+    width: 100%;
+  }
+
+  .work-modes-assign-table {
+    font-size: 0.75rem;
+  }
+
+  .work-modes-assign-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

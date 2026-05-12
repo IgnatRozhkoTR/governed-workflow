@@ -1262,6 +1262,21 @@ EXPECTED_ANNOTATIONS = {
     "rule_create": (False, False, False),
     "rule_update": (False, True, False),
     "rule_delete": (False, True, True),
+    "reflection_run": (False, False, False),
+    "reflection_get": (True, True, False),
+    "reflection_list": (True, True, False),
+    "memory_save": (False, False, False),
+    "memory_retrieve": (True, True, False),
+    "memory_get": (True, True, False),
+    "memory_delete": (False, True, True),
+    "memory_list": (True, True, False),
+    "proposal_create": (False, False, False),
+    "proposal_list": (True, True, False),
+    "proposal_get": (True, True, False),
+    "proposal_approve": (False, True, False),
+    "proposal_reject": (False, True, False),
+    "proposal_resolve": (False, True, False),
+    "memory_promotion_run": (False, False, False),
 }
 
 
@@ -1273,7 +1288,7 @@ class TestMcpToolContracts:
     def test_all_tools_have_annotations(self):
         from mcp.types import ToolAnnotations
         tools = self._tools()
-        assert len(tools) == 38, f"expected 38 registered tools, got {len(tools)}"
+        assert len(tools) == 53, f"expected 53 registered tools, got {len(tools)}"
         for name, tool in tools.items():
             ann = tool.annotations
             assert ann is not None, f"{name} missing annotations"

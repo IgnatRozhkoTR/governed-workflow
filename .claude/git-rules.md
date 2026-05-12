@@ -1,0 +1,1 @@
+/Users/ig/Projects/governed-workflow/.claude/git-rules.md
