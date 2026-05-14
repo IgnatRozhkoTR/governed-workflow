@@ -243,7 +243,6 @@ function registerLspProviders(editor, filePath, languageId) {
             if (locations.length === 0) return null;
 
             return locations.map(function(loc) {
-              var targetPath = lspUriToPath(loc.uri);
               var range = new monaco.Range(
                 loc.range.start.line + 1,
                 loc.range.start.character + 1,
@@ -251,6 +250,14 @@ function registerLspProviders(editor, filePath, languageId) {
                 loc.range.end.character + 1
               );
 
+              // kotlin-lsp returns `inmemory://...` for targets within the currently-open
+              // document (local variables, same-method declarations). Route them back to
+              // the open model instead of letting Monaco try to open a non-file URI.
+              if (loc.uri.indexOf('file://') !== 0) {
+                return { uri: model.uri, range: range };
+              }
+
+              var targetPath = lspUriToPath(loc.uri);
               if (targetPath === filePath) {
                 return { uri: model.uri, range: range };
               }
@@ -286,7 +293,13 @@ function registerLspProviders(editor, filePath, languageId) {
           .then(function(result) {
             if (!result) return null;
             var locations = Array.isArray(result) ? result : [result];
-            return locations.map(lspLocationToMonaco);
+            return locations.map(function(loc) {
+              var range = _lspRangeToMonaco(loc.range);
+              if (loc.uri.indexOf('file://') !== 0) {
+                return { uri: model.uri, range: range };
+              }
+              return { uri: monaco.Uri.parse(loc.uri), range: range };
+            });
           })
           .catch(function() { return null; });
       }

@@ -20,7 +20,8 @@ bp = Blueprint("lsp", __name__)
 def get_profiles(db, ws, project):
     """List LSP-capable profiles assigned to this project."""
     profiles = lsp_service.get_project_lsp_profiles(db, project["id"])
-    return jsonify({"profiles": profiles, "project_path": project["path"]})
+    workspace_path = ws["working_dir"] or project["path"]
+    return jsonify({"profiles": profiles, "project_path": workspace_path})
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/lsp/status", methods=["GET"])

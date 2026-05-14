@@ -76,6 +76,24 @@ function initMonaco() {
     require(['vs/editor/editor.main'], function() {
       monaco.editor.registerEditorOpener({
         openCodeEditor: function(source, resource, selectionOrPosition) {
+          // In-document jump: target URI matches the currently-open editor's model URI
+          // (Monaco auto-assigns it as `inmemory://model/N`). Navigate within the
+          // editor instead of falling through to the external-source toast.
+          var currentEditor = window._monacoEditor;
+          var currentModel = currentEditor && currentEditor.getModel();
+          if (currentModel && resource.toString() === currentModel.uri.toString()) {
+            if (selectionOrPosition) {
+              var line = selectionOrPosition.startLineNumber || selectionOrPosition.lineNumber;
+              var column = selectionOrPosition.startColumn || selectionOrPosition.column || 1;
+              if (typeof line === 'number') {
+                currentEditor.setPosition({ lineNumber: line, column: column });
+                currentEditor.revealLineInCenter(line);
+                currentEditor.focus();
+              }
+            }
+            return true;
+          }
+
           if (resource.scheme && resource.scheme !== 'file') {
             if (typeof showToast === 'function') {
               showToast('External library source (' + resource.scheme + '://) — open the project in your IDE to navigate into it');

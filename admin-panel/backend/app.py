@@ -27,6 +27,7 @@ os.environ.setdefault("GOVERNED_WORKFLOW_TOOLS_DIR", str(DEFAULT_TOOLS_DIR))
 def create_app():
     templates_dir = Path(__file__).resolve().parent.parent / "frontend"
     app = Flask(__name__, static_folder=None, template_folder=str(templates_dir))
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
     register_module_phases_from_disk()
     register_blueprints(app)
     register_auth_guard(app)

@@ -234,15 +234,25 @@ def _initialize_lsp_server(key, workspace_path):
     except (BrokenPipeError, OSError) as exc:
         raise RuntimeError(f"Failed to send initialize request: {exc}")
 
-    deadline = time.time() + 30
+    initialize_timeout_seconds = 300
+    deadline = time.time() + initialize_timeout_seconds
     response = None
     while True:
         remaining = deadline - time.time()
         if remaining <= 0:
-            raise RuntimeError("Timed out waiting for initialize response (30s)")
+            raise RuntimeError(
+                f"Timed out waiting for initialize response ({initialize_timeout_seconds}s). "
+                "First-time Gradle import on kotlin-lsp / jdtls can be slow; "
+                "subsequent starts reuse the cache."
+            )
         response = _read_lsp_message(process.stdout, timeout=remaining)
         if response is None:
-            raise RuntimeError("LSP server closed stdout before responding to initialize")
+            if process.poll() is not None:
+                raise RuntimeError(
+                    f"LSP server exited (returncode={process.returncode}) "
+                    "before responding to initialize"
+                )
+            continue
         if response.get("id") == request_id:
             break
         if "method" in response:
@@ -301,7 +311,32 @@ def start_lsp_server(db, project_id, profile_id, workspace_path):
     ).fetchone()
     if existing and existing["status"] == "running" and existing["pid"]:
         if _is_pid_alive(existing["pid"]):
-            return {"ok": True, "status": "already_running", "pid": existing["pid"]}
+            existing_key = _process_key(project_id, profile_id)
+            if existing_key in _LSP_PROCESSES:
+                return {"ok": True, "status": "already_running", "pid": existing["pid"]}
+            # Orphan: DB says running and process is alive, but the relay lost
+            # track of its stdin/stdout pipes (e.g. earlier BrokenPipeError).
+            # The unreachable child must be terminated before we spawn a fresh
+            # tracked instance, otherwise resources leak.
+            logger.warning(
+                "Found orphan LSP pid=%s for project=%s profile=%s; terminating before respawn",
+                existing["pid"], project_id, profile_id,
+            )
+            try:
+                os.kill(existing["pid"], signal.SIGTERM)
+            except OSError:
+                pass
+            # Brief wait, then SIGKILL if still alive
+            for _ in range(10):
+                if not _is_pid_alive(existing["pid"]):
+                    break
+                time.sleep(0.2)
+            else:
+                try:
+                    os.kill(existing["pid"], signal.SIGKILL)
+                except OSError:
+                    pass
+            # Fall through to spawn fresh below
 
     cmd = [profile["lsp_command"]] + json.loads(profile["lsp_args"] or "[]")
     logger.info("Starting LSP server: %s (project=%s, profile=%s)", cmd, project_id, profile_id)
