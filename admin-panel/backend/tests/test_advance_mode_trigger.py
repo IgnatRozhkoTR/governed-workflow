@@ -107,9 +107,12 @@ def test_major_transition_compact_mode_writes_file(tmp_path):
     _insert_workspace(db, ws)
     set_modes(db, project_id, {2: "compact"})
 
-    result = transition_phase(db, ws, "2.0")
+    post_commit = transition_phase(db, ws, "2.0")
 
-    assert result is True
+    assert post_commit is not None
+    db.commit()
+    for callback in post_commit:
+        callback()
     action_file = _action_file(working_dir)
     assert os.path.isfile(action_file), "pending-advance-action file must be written"
     assert open(action_file).read() == "compact"
@@ -125,9 +128,12 @@ def test_major_transition_clear_mode_writes_file(tmp_path):
     _insert_workspace(db, ws)
     set_modes(db, project_id, {3: "clear"})
 
-    result = transition_phase(db, ws, "3.1.0")
+    post_commit = transition_phase(db, ws, "3.1.0")
 
-    assert result is True
+    assert post_commit is not None
+    db.commit()
+    for callback in post_commit:
+        callback()
     action_file = _action_file(working_dir)
     assert os.path.isfile(action_file)
     assert open(action_file).read() == "clear"
@@ -143,9 +149,12 @@ def test_sub_phase_transition_writes_no_file(tmp_path):
     _insert_workspace(db, ws)
     set_modes(db, project_id, {3: "compact"})
 
-    result = transition_phase(db, ws, "3.1.1")
+    post_commit = transition_phase(db, ws, "3.1.1")
 
-    assert result is True
+    assert post_commit is not None
+    db.commit()
+    for callback in post_commit:
+        callback()
     assert not os.path.isfile(_action_file(working_dir))
 
 
@@ -159,9 +168,12 @@ def test_major_transition_none_mode_writes_no_file(tmp_path):
     _insert_workspace(db, ws)
     # mode defaults to 'none'; no explicit set_modes call needed
 
-    result = transition_phase(db, ws, "2.0")
+    post_commit = transition_phase(db, ws, "2.0")
 
-    assert result is True
+    assert post_commit is not None
+    db.commit()
+    for callback in post_commit:
+        callback()
     assert not os.path.isfile(_action_file(working_dir))
 
 
@@ -175,7 +187,10 @@ def test_missing_working_dir_is_graceful(tmp_path):
     set_modes(db, project_id, {2: "compact"})
 
     # Must not raise; transition still succeeds
-    result = transition_phase(db, ws, "2.0")
+    post_commit = transition_phase(db, ws, "2.0")
 
-    assert result is True
+    assert post_commit is not None
+    db.commit()
+    for callback in post_commit:
+        callback()
     assert not os.path.isfile(_action_file(non_existent_dir))

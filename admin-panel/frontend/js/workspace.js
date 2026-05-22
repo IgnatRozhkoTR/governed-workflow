@@ -225,10 +225,15 @@ async function openProject(projectId) {
     headerEl.textContent = projectId;
   }
 
+  var activeWorkspaceNumericId = null;
   try {
     const wsData = await apiListWorkspaces(projectId);
     const workspaces = wsData.workspaces || [];
     workspaceListEl.innerHTML = _wsRenderWorkspaceCards(projectId, workspaces);
+    var activeWs = workspaces.find(function(ws) { return ws.status === 'active'; });
+    if (activeWs && activeWs.workspace_id != null) {
+      activeWorkspaceNumericId = activeWs.workspace_id;
+    }
   } catch (err) {
     _wsShowError('ws-workspace-error', err.message);
   }
@@ -256,8 +261,8 @@ async function openProject(projectId) {
   }
 
   var reviewPipelineCard = document.getElementById('reviewPipelineCard');
-  if (reviewPipelineCard && typeof renderReviewPipelineCard === 'function') {
-    renderReviewPipelineCard(reviewPipelineCard, projectId);
+  if (reviewPipelineCard && typeof renderReviewPipelineCard === 'function' && activeWorkspaceNumericId) {
+    renderReviewPipelineCard(reviewPipelineCard, activeWorkspaceNumericId);
   }
 }
 

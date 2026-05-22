@@ -129,17 +129,34 @@ def _set_status(status: PipelineStatus) -> None:
         _STATUS[status.workspace_id] = status
 
 
+_IN_PROGRESS_STATES: frozenset[PipelineState] = frozenset(
+    {"queued", "filtering", "file_stage", "integration_stage"}
+)
+
+
 def start_in_background(
     workspace_id: int,
     project_path: Path,
     base_branch: str = "main",
-) -> threading.Thread:
+) -> threading.Thread | None:
     """Start the pipeline in a daemon thread and return it.
 
     Flask is synchronous; ``asyncio.create_task`` cannot be used from a
     request handler. The thread owns its own DB connection (Sqlite handles
     are not thread-safe across threads) and its own asyncio event loop.
+
+    Returns ``None`` if the pipeline is already running for this workspace.
     """
+    with _STATUS_LOCK:
+        existing = _STATUS.get(workspace_id)
+        if existing is not None and existing.state in _IN_PROGRESS_STATES:
+            log.warning(
+                "review pipeline for workspace %s is already in state %r; skipping duplicate start",
+                workspace_id,
+                existing.state,
+            )
+            return None
+
     status = PipelineStatus(workspace_id=workspace_id, started_at=time.time())
     _set_status(status)
 
@@ -311,15 +328,35 @@ async def _run_integration_agent(
         timeout_s=_timeout_s() * _INTEGRATION_TIMEOUT_MULTIPLIER,
     )
     if agent_name in _SELF_SUBMITTING_AGENTS:
-        envelope = json.loads(stdout) if stdout.strip() else {}
-        if envelope.get("is_error") or len(stdout.strip()) < 20:
+        try:
+            envelope = json.loads(stdout) if stdout.strip() else {}
+            if envelope.get("is_error"):
+                log.warning(
+                    "%s returned is_error=True; findings may be missing",
+                    agent_name,
+                )
+        except json.JSONDecodeError:
             log.warning(
-                "%s returned a suspect output (is_error=%s, len=%d); findings may be missing",
-                agent_name, envelope.get("is_error"), len(stdout.strip()),
+                "%s envelope malformed but findings may have been submitted via MCP; "
+                "check workspace_get_review_issues",
+                agent_name,
             )
         return
 
-    text = _extract_envelope_result(stdout)
+    try:
+        text = _extract_envelope_result(stdout)
+    except RuntimeError:
+        log.warning(
+            "%s envelope malformed; attaching parse-failure finding",
+            agent_name,
+        )
+        _submit_text_finding(
+            workspace_id,
+            agent_name,
+            f"[{agent_name}] agent output could not be parsed — envelope was malformed.",
+        )
+        return
+
     if text.strip():
         _submit_text_finding(workspace_id, agent_name, text)
     else:

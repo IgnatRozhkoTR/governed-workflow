@@ -205,8 +205,11 @@ def _maybe_write_advance_action(db, ws, new_phase: str) -> None:
 def transition_phase(db, ws, new_phase, commit_hash=None):
     """Shared phase transition: update phase and record history.
 
-    Returns True if the transition succeeded, False if the phase was already changed
-    by a concurrent request (optimistic lock via WHERE phase = current).
+    Returns a list of zero-argument callables that MUST be invoked after
+    ``db.commit()`` succeeds (e.g. write action file, start pipeline thread).
+    Returns an empty list when the phase was already changed by a concurrent
+    request (optimistic lock via WHERE phase = current) — callers must check
+    with ``if transition_phase(...) is not None``.
 
     When the FROM phase is a commit phase (``3.N.4``) and a ``commit_hash`` is
     provided, ``workspaces.last_confirmed_commit`` is advanced to that hash so
@@ -226,7 +229,7 @@ def transition_phase(db, ws, new_phase, commit_hash=None):
         (new_phase, ws["id"], ws["phase"])
     ).rowcount
     if rows == 0:
-        return False
+        return None
 
     db.execute(
         "INSERT INTO phase_history (workspace_id, from_phase, to_phase, time, commit_hash) VALUES (?, ?, ?, ?, ?)",
@@ -240,12 +243,14 @@ def transition_phase(db, ws, new_phase, commit_hash=None):
         )
 
     _lazy_init_execution_checkpoint(db, ws, new_phase)
-    _maybe_write_advance_action(db, ws, new_phase)
 
+    post_commit: list = []
+    ws_snapshot = dict(ws)
+    post_commit.append(lambda: _maybe_write_advance_action(db, ws_snapshot, new_phase))
     if new_phase == "4.0":
-        _start_review_pipeline(ws)
+        post_commit.append(lambda: _start_review_pipeline(ws_snapshot))
 
-    return True
+    return post_commit
 
 
 def _start_review_pipeline(ws) -> None:
@@ -321,13 +326,15 @@ def approve_gate(ws, commit_message=None):
         phase.on_approve(ws, {"commit_message": commit_message} if commit_message else {}, db)
 
         try:
-            advanced = transition_phase(db, ws, new_phase)
+            post_commit = transition_phase(db, ws, new_phase)
         except AdvanceBusinessRuleError as exc:
             return {"error": str(exc), "status_code": 422}
-        if not advanced:
+        if post_commit is None:
             return {"error": t("gate.error.phaseAlreadyChanged", locale), "status_code": 409}
 
         db.commit()
+        for callback in post_commit:
+            callback()
         return {"phase": new_phase, "previous_phase": phase_str, "status": "ok", "status_code": 200}
 
 
@@ -356,10 +363,10 @@ def reject_gate(ws, comments=""):
             }
 
         try:
-            advanced = transition_phase(db, ws, new_phase)
+            post_commit = transition_phase(db, ws, new_phase)
         except AdvanceBusinessRuleError as exc:
             return {"error": str(exc), "status_code": 422}
-        if not advanced:
+        if post_commit is None:
             return {"error": t("gate.error.phaseAlreadyChanged", locale), "status_code": 409}
 
         if comments:
@@ -370,6 +377,8 @@ def reject_gate(ws, comments=""):
             )
 
         db.commit()
+        for callback in post_commit:
+            callback()
         return {"phase": new_phase, "previous_phase": phase_str, "status": "rejected", "status_code": 200}
 
 
@@ -431,13 +440,15 @@ def perform_advance(ws, project_path, body=None):
             }, 409
 
         try:
-            advanced = transition_phase(db, ws, new_phase, commit_hash=body.get("commit_hash"))
+            post_commit = transition_phase(db, ws, new_phase, commit_hash=body.get("commit_hash"))
         except AdvanceBusinessRuleError as exc:
             return {"error": str(exc), "status": "blocked"}, 422
-        if not advanced:
+        if post_commit is None:
             return {"error": t("advance.error.phaseAlreadyChanged", locale)}, 409
 
         db.commit()
+        for callback in post_commit:
+            callback()
 
         yolo_enabled = ws_field(ws, "yolo_mode", 0)
         if is_user_gate(new_phase) and yolo_enabled:

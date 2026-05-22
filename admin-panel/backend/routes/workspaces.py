@@ -479,6 +479,7 @@ def list_workspaces(project_id):
         for row in rows:
             workspaces.append({
                 "id": row["sanitized_branch"],
+                "workspace_id": row["id"],
                 "branch": row["branch"],
                 "phase": row["phase"],
                 "session_id": row["session_id"],

@@ -176,7 +176,7 @@ def test_transition_to_4_0_proceeds_when_under_limit(tmp_path):
     _insert_workspace(db, ws)
     with _patch_count(50):
         result = transition_phase(db, ws, "4.0")
-    assert result is True
+    assert result is not None
 
 
 def test_transition_to_4_0_proceeds_when_at_limit(tmp_path):
@@ -185,7 +185,7 @@ def test_transition_to_4_0_proceeds_when_at_limit(tmp_path):
     _insert_workspace(db, ws)
     with _patch_count(100):
         result = transition_phase(db, ws, "4.0")
-    assert result is True
+    assert result is not None
 
 
 def test_transition_to_4_0_raises_when_over_limit(tmp_path):
@@ -217,7 +217,7 @@ def test_non_4_0_transition_never_calls_count_modified(tmp_path):
         side_effect=AssertionError("count_modified must not be called for non-4.0 transitions"),
     ):
         result = transition_phase(db, ws, "4.1")
-    assert result is True
+    assert result is not None
 
 
 def test_transition_to_4_0_graceful_when_diff_filter_raises(tmp_path):
@@ -226,4 +226,4 @@ def test_transition_to_4_0_graceful_when_diff_filter_raises(tmp_path):
     _insert_workspace(db, ws)
     with patch("services.diff_filter.count_modified", side_effect=RuntimeError("git error")):
         result = transition_phase(db, ws, "4.0")
-    assert result is True  # graceful degradation — advance proceeds
+    assert result is not None  # graceful degradation — advance proceeds

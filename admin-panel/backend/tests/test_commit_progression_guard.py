@@ -258,9 +258,11 @@ def test_lazy_init_on_entering_execution_start_sets_head(workspace, project):
 
     ws = _get_ws_row(workspace["id"])
     db = get_db()
-    ok = transition_phase(db, ws, "3.1.0")
+    post_commit = transition_phase(db, ws, "3.1.0")
     db.commit()
+    for callback in post_commit:
+        callback()
     db.close()
 
-    assert ok is True
+    assert post_commit is not None
     assert _last_confirmed_commit(workspace["id"]) == head
