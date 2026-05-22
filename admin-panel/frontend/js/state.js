@@ -113,6 +113,7 @@ function isUserGate(phase) {
 
 function applyStateData(stateData) {
   // Lock / session state
+  LOCK_DATA.workspace_id = stateData.workspace_id || null;
   LOCK_DATA.phase = stateData.phase || "0";
   LOCK_DATA.status = stateData.status || "active";
   LOCK_DATA.scope = stateData.scope || {};
@@ -155,6 +156,7 @@ function applyStateData(stateData) {
 function resetAppState() {
   // Reset server state
   LOCK_DATA.branch = "";
+  LOCK_DATA.workspace_id = null;
   LOCK_DATA.phase = "0";
   LOCK_DATA.status = "active";
   LOCK_DATA.scope = {};

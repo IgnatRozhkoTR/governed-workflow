@@ -124,14 +124,69 @@ function _rpRenderStatus(container, data) {
     + _rpFilesHtml(data.files)
     + _rpIntegrationHtml(data.integration)
     + '</div>';
+
+  _rpRenderRunButton(container, data.state);
 }
 
 function _rpRenderEmpty(container) {
   container.innerHTML = '<div class="rp-empty">' + t('reviewPipeline.empty') + '</div>';
+  _rpRenderRunButton(container, null);
 }
 
 function _rpRenderError(container) {
   container.innerHTML = '<div class="rp-fetch-error">' + t('reviewPipeline.error') + '</div>';
+  _rpRenderRunButton(container, null);
+}
+
+function _rpCanRun(state) {
+  if (state === null || state === undefined) return true;
+  return state === 'done' || state === 'failed';
+}
+
+function _rpRenderRunButton(container, state) {
+  var phase = container.dataset.workspacePhase || '';
+  var workspaceId = container.dataset.workspaceId;
+  if (!workspaceId) return;
+  if (phase !== '4.0') return;
+  if (!_rpCanRun(state)) return;
+
+  var actions = document.createElement('div');
+  actions.className = 'rp-actions';
+
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-sm';
+  btn.id = 'reviewPipelineRunBtn';
+  btn.textContent = t('reviewPipeline.runButton');
+  btn.onclick = function() { _rpHandleRunClick(container, workspaceId); };
+
+  actions.appendChild(btn);
+  container.appendChild(actions);
+}
+
+async function _rpHandleRunClick(container, workspaceId) {
+  var confirmed = window.confirm(t('reviewPipeline.runConfirm'));
+  if (!confirmed) return;
+  var btn = container.querySelector('#reviewPipelineRunBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = t('reviewPipeline.runStarting');
+  }
+  try {
+    await apiStartReviewPipeline(workspaceId);
+    if (typeof showToast === 'function') {
+      showToast(t('reviewPipeline.runStarted'));
+    }
+    _rpFetchAndRender(container, workspaceId);
+  } catch (err) {
+    if (typeof showToast === 'function') {
+      showToast(t('reviewPipeline.runFailed', { error: err.message }));
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = t('reviewPipeline.runButton');
+    }
+  }
 }
 
 function _rpStopPolling(workspaceId) {
@@ -184,9 +239,11 @@ async function _rpFetchAndRender(container, workspaceId) {
   }
 }
 
-function renderReviewPipelineCard(container, workspaceId) {
+function renderReviewPipelineCard(container, workspaceId, options) {
   if (!container || !workspaceId) return;
   _rpStopPolling(workspaceId);
+  container.dataset.workspaceId = String(workspaceId);
+  container.dataset.workspacePhase = (options && options.phase) || '';
   container.innerHTML = '<div class="rp-loading">' + t('research.loading') + '</div>';
   _rpFetchAndRender(container, workspaceId);
 }

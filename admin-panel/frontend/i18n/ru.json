@@ -659,5 +659,15 @@
   "reviewPipeline.filesProgress": "{done}/{total} файлов проверено",
   "reviewPipeline.elapsed": "Прошло: {seconds}с",
   "reviewPipeline.filesSection": "Файлы",
-  "reviewPipeline.integrationSection": "Интеграция"
+  "reviewPipeline.integrationSection": "Интеграция",
+  "reviewPipeline.runButton": "Запустить ревью",
+  "reviewPipeline.runConfirm": "Перезапустить пайплайн ревью? Это потратит API-токены.",
+  "reviewPipeline.runStarting": "Запуск…",
+  "reviewPipeline.runStarted": "Пайплайн ревью запущен.",
+  "reviewPipeline.runFailed": "Не удалось запустить пайплайн ревью: {error}",
+
+  "review.resolveAll": "Разрешить все открытые ({count})",
+  "review.resolveAllConfirm": "Разрешить {count} открытых замечаний ревью как out-of-scope?",
+  "review.resolveAllDone": "Разрешено замечаний: {count}.",
+  "review.resolveAllNoWorkspace": "Воркспейс не выбран."
 }

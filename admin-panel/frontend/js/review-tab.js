@@ -35,8 +35,13 @@ function renderReviewTab() {
     var filtered = showResolved ? allReview : allReview.filter(function(c) { return !c.resolved; });
     var roots = filtered.filter(function(c) { return !c.parent_id; });
 
+    renderReviewResolveAllBar(container, allReview);
+
     if (roots.length === 0) {
-        container.innerHTML = '<div class="no-items-msg">' + t('review.noComments') + '</div>';
+        var empty = document.createElement('div');
+        empty.className = 'no-items-msg';
+        empty.textContent = t('review.noComments');
+        container.appendChild(empty);
         return;
     }
 
@@ -51,6 +56,42 @@ function renderReviewTab() {
         });
         container.appendChild(thread);
     });
+}
+
+function renderReviewResolveAllBar(container, allReview) {
+    var openCount = allReview.filter(function(c) { return !c.parent_id && !c.resolved; }).length;
+    if (openCount === 0) return;
+
+    var bar = document.createElement('div');
+    bar.className = 'review-resolve-all-bar';
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm';
+    btn.id = 'reviewResolveAllBtn';
+    btn.textContent = t('review.resolveAll', { count: openCount });
+    btn.onclick = function() { resolveAllOpenReviewIssues(openCount); };
+
+    bar.appendChild(btn);
+    container.appendChild(bar);
+}
+
+async function resolveAllOpenReviewIssues(openCount) {
+    var workspaceId = LOCK_DATA && LOCK_DATA.workspace_id;
+    if (!workspaceId) {
+        showToast(t('review.resolveAllNoWorkspace'));
+        return;
+    }
+    var confirmed = window.confirm(t('review.resolveAllConfirm', { count: openCount }));
+    if (!confirmed) return;
+    try {
+        var result = await apiResolveAllReviewIssues(workspaceId, 'out_of_scope');
+        showToast(t('review.resolveAllDone', { count: result.resolved_count }));
+        await loadReviewComments();
+        renderDiffView();
+    } catch (e) {
+        showToast(t('messages.failedToResolve', { error: e.message }));
+    }
 }
 
 async function resolveReviewTabComment(commentId) {

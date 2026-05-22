@@ -96,6 +96,7 @@ def get_workspace_state(db, ws, project):
             pass
 
     payload = {
+        "workspace_id": ws["id"],
         "phase": ws["phase"],
         "status": ws["status"],
         "scope": scope,

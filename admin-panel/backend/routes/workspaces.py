@@ -26,7 +26,7 @@ from core.paths import (
 )
 from core.terminal import session_name
 from services.git_rules_service import migrate_legacy_git_rules
-from services import work_mode_service
+from services import comment_service, review_pipeline_service, work_mode_service
 from services.configurator_service import ConfiguratorChain
 
 bp = Blueprint("workspaces", __name__)
@@ -813,3 +813,86 @@ def archive_workspace(db, ws, project):
     db.commit()
 
     return jsonify({"status": "archived", "branch": ws["branch"]})
+
+
+_VALID_REVIEW_RESOLUTIONS = frozenset({"fixed", "out_of_scope", "false_positive"})
+
+
+@bp.route(
+    "/api/workspaces/<int:workspace_id>/review-issues/resolve-all",
+    methods=["POST"],
+)
+def resolve_all_review_issues(workspace_id: int):
+    """Bulk-resolve every open scope='review' discussion for the workspace.
+
+    Marks each open review item with the given resolution AND sets
+    status='resolved' + resolved_at=NOW() in one transaction. Defaults to
+    out_of_scope when no resolution is supplied.
+    """
+    body = request.get_json(silent=True) or {}
+    resolution = (body.get("resolution") or "out_of_scope").strip()
+    if resolution not in _VALID_REVIEW_RESOLUTIONS:
+        return jsonify({
+            "error": "invalid_resolution",
+            "allowed": sorted(_VALID_REVIEW_RESOLUTIONS),
+        }), 400
+
+    with get_db_ctx() as db:
+        ws = db.execute(
+            "SELECT id FROM workspaces WHERE id = ?", (workspace_id,)
+        ).fetchone()
+        if not ws:
+            return jsonify({"error": t("api.error.workspaceNotFound")}), 404
+
+        resolved_count = comment_service.resolve_all_open_review_issues(
+            db, workspace_id, resolution
+        )
+        db.commit()
+
+    return jsonify({"resolved_count": resolved_count})
+
+
+@bp.route(
+    "/api/workspaces/<int:workspace_id>/review-pipeline/start",
+    methods=["POST"],
+)
+def start_review_pipeline(workspace_id: int):
+    """Manually (re-)trigger the headless review pipeline for a workspace.
+
+    Refuses with 409 when the workspace is not at phase 4.0 unless the body
+    sets ``force: true``. Refuses with 409 when the pipeline is already in
+    flight for this workspace.
+    """
+    body = request.get_json(silent=True) or {}
+    force = bool(body.get("force"))
+    base_branch_override = body.get("base_branch")
+
+    with get_db_ctx() as db:
+        ws = db.execute(
+            "SELECT id, phase, working_dir, source_branch FROM workspaces WHERE id = ?",
+            (workspace_id,)
+        ).fetchone()
+        if not ws:
+            return jsonify({"error": t("api.error.workspaceNotFound")}), 404
+
+        working_dir = ws["working_dir"]
+        if not working_dir:
+            return jsonify({"error": "workspace_has_no_working_dir"}), 409
+
+        if ws["phase"] != "4.0" and not force:
+            return jsonify({
+                "error": "wrong_phase",
+                "phase": ws["phase"],
+            }), 409
+
+        base_branch = (base_branch_override or ws["source_branch"] or "main").strip()
+
+    thread = review_pipeline_service.start_in_background(
+        workspace_id=workspace_id,
+        project_path=Path(working_dir),
+        base_branch=base_branch,
+    )
+    if thread is None:
+        return jsonify({"error": "already_running"}), 409
+
+    return jsonify({"status": "started"}), 202

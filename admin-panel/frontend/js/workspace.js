@@ -226,6 +226,7 @@ async function openProject(projectId) {
   }
 
   var activeWorkspaceNumericId = null;
+  var activeWorkspacePhase = null;
   try {
     const wsData = await apiListWorkspaces(projectId);
     const workspaces = wsData.workspaces || [];
@@ -233,6 +234,7 @@ async function openProject(projectId) {
     var activeWs = workspaces.find(function(ws) { return ws.status === 'active'; });
     if (activeWs && activeWs.workspace_id != null) {
       activeWorkspaceNumericId = activeWs.workspace_id;
+      activeWorkspacePhase = activeWs.phase || null;
     }
   } catch (err) {
     _wsShowError('ws-workspace-error', err.message);
@@ -262,7 +264,7 @@ async function openProject(projectId) {
 
   var reviewPipelineCard = document.getElementById('reviewPipelineCard');
   if (reviewPipelineCard && typeof renderReviewPipelineCard === 'function' && activeWorkspaceNumericId) {
-    renderReviewPipelineCard(reviewPipelineCard, activeWorkspaceNumericId);
+    renderReviewPipelineCard(reviewPipelineCard, activeWorkspaceNumericId, { phase: activeWorkspacePhase });
   }
 }
 

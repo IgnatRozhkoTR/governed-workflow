@@ -659,5 +659,15 @@
   "reviewPipeline.filesProgress": "{done}/{total} files reviewed",
   "reviewPipeline.elapsed": "Elapsed: {seconds}s",
   "reviewPipeline.filesSection": "Files",
-  "reviewPipeline.integrationSection": "Integration"
+  "reviewPipeline.integrationSection": "Integration",
+  "reviewPipeline.runButton": "Run review",
+  "reviewPipeline.runConfirm": "Re-run review pipeline? This may consume API tokens.",
+  "reviewPipeline.runStarting": "Starting…",
+  "reviewPipeline.runStarted": "Review pipeline started.",
+  "reviewPipeline.runFailed": "Failed to start review pipeline: {error}",
+
+  "review.resolveAll": "Resolve all open ({count})",
+  "review.resolveAllConfirm": "Resolve {count} open review issues as out-of-scope?",
+  "review.resolveAllDone": "{count} review issues resolved.",
+  "review.resolveAllNoWorkspace": "No workspace selected."
 }

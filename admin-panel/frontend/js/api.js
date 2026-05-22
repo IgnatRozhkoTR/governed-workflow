@@ -250,6 +250,23 @@ function apiResolveComment(projectId, branch, commentId, resolved) {
   return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/comments/' + commentId + '/resolve', { resolved: resolved });
 }
 
+function apiResolveAllReviewIssues(workspaceId, resolution) {
+  return apiPost(
+    '/api/workspaces/' + encodeURIComponent(workspaceId) + '/review-issues/resolve-all',
+    { resolution: resolution }
+  );
+}
+
+function apiStartReviewPipeline(workspaceId, options) {
+  var body = {};
+  if (options && options.force) body.force = true;
+  if (options && options.baseBranch) body.base_branch = options.baseBranch;
+  return apiPost(
+    '/api/workspaces/' + encodeURIComponent(workspaceId) + '/review-pipeline/start',
+    body
+  );
+}
+
 function apiListComments(projectId, branch, scope, showResolved) {
   var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/comments';
   var params = [];

@@ -187,3 +187,21 @@ def resolve_review_issue(db, issue_id, workspace_id, resolution, locale="en"):
         (resolution, issue_id)
     )
     return {"ok": True, "issue_id": issue_id, "resolution": resolution}
+
+
+def resolve_all_open_review_issues(db, workspace_id, resolution):
+    """Bulk-resolve every open scope='review' discussion for a workspace.
+
+    For every row matching workspace_id with scope='review' and status='open',
+    sets resolution to the given value and marks the row resolved with the
+    current timestamp. Caller owns the transaction (commits after the call).
+
+    Returns the number of rows updated.
+    """
+    cursor = db.execute(
+        "UPDATE discussions "
+        "SET resolution = ?, status = 'resolved', resolved_at = ? "
+        "WHERE workspace_id = ? AND scope = 'review' AND status = 'open'",
+        (resolution, datetime.now().isoformat(), workspace_id)
+    )
+    return cursor.rowcount
