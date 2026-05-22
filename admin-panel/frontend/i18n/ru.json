@@ -317,6 +317,8 @@
   "diff.commit": "Коммит",
   "diff.history": "История",
   "diff.historyToggle": "История",
+  "diff.movedFrom": "перемещено из",
+  "diff.to": "в",
 
   "explorer.projectFiles": "Файлы проекта",
   "explorer.selectFile": "Выберите файл для просмотра содержимого",
@@ -639,5 +641,23 @@
   "advanceModes.modeCompact": "Кратко",
   "advanceModes.modeCompactTitle": "Агент продвигается с кратким уведомлением.",
   "advanceModes.modeClear": "Сразу",
-  "advanceModes.modeClearTitle": "Агент продвигается немедленно без уведомления."
+  "advanceModes.modeClearTitle": "Агент продвигается немедленно без уведомления.",
+
+  "cards.reviewPipeline": "Пайплайн ревью",
+  "reviewPipeline.state.queued": "В очереди",
+  "reviewPipeline.state.filtering": "Фильтрация",
+  "reviewPipeline.state.file_stage": "Ревью файлов",
+  "reviewPipeline.state.integration_stage": "Интеграционное ревью",
+  "reviewPipeline.state.done": "Завершено",
+  "reviewPipeline.state.failed": "Ошибка",
+  "reviewPipeline.fileStatus.pending": "Ожидание",
+  "reviewPipeline.fileStatus.running": "Выполняется",
+  "reviewPipeline.fileStatus.done": "Готово",
+  "reviewPipeline.fileStatus.failed": "Ошибка",
+  "reviewPipeline.empty": "Пайплайн ревью для этого воркспейса ещё не запускался.",
+  "reviewPipeline.error": "Не удалось загрузить статус пайплайна ревью.",
+  "reviewPipeline.filesProgress": "{done}/{total} файлов проверено",
+  "reviewPipeline.elapsed": "Прошло: {seconds}с",
+  "reviewPipeline.filesSection": "Файлы",
+  "reviewPipeline.integrationSection": "Интеграция"
 }

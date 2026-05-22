@@ -254,6 +254,11 @@ async function openProject(projectId) {
       }
     });
   }
+
+  var reviewPipelineCard = document.getElementById('reviewPipelineCard');
+  if (reviewPipelineCard && typeof renderReviewPipelineCard === 'function') {
+    renderReviewPipelineCard(reviewPipelineCard, projectId);
+  }
 }
 
 async function loadBranches(projectId) {
@@ -413,6 +418,11 @@ function _wsInitSelector() {
           <div id="phaseSettingsProjectBody"></div>
           <div class="advance-modes__section-title">${t('cards.advanceModes')}</div>
           <div id="advanceModesProjectBody"></div>
+        </div>
+
+        <div class="ws-section">
+          <div class="ws-section-title">${t('cards.reviewPipeline')}</div>
+          <div id="reviewPipelineCard"></div>
         </div>
 
         <div class="ws-section">

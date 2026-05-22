@@ -49,7 +49,13 @@ function renderFileList() {
       div.onclick = (e) => { if (!e.target.closest('.comment-icon, .go-to-file-btn')) selectFile(f.path); };
       var unresolvedDot = fileHasUnresolvedComments(f.path) ? '<span class="file-unresolved-dot" title="Has unresolved comments"></span>' : '';
       var goToBtn = '<button class="btn btn-sm go-to-file-btn" data-filepath="' + escapeHtml(f.path) + '" title="' + t('buttons.goToFileViewer') + '" style="padding: 0 4px; font-size: 0.7rem; line-height: 1; flex-shrink: 0;">&#128196;</button>';
-      div.innerHTML = `<span>${escapeHtml(f.path.split('/').pop())}</span>${unresolvedDot}${renderCommentIcon('review', f.path)}${goToBtn}<div class="file-stat"><span class="file-stat-add">+${f.additions}</span><span class="file-stat-del">-${f.deletions}</span></div>`;
+      var displayName = f.path.split('/').pop();
+      var renameLabel = '';
+      if (f.old_path && f.old_path !== f.path) {
+        renameLabel = '<span style="font-size: 0.8rem; color: var(--text-muted); margin-right: 4px;">' + escapeHtml(t('diff.movedFrom')) + ' ' + escapeHtml(f.old_path.split('/').pop()) + '</span>';
+        displayName = f.path.split('/').pop() + ' ← ' + f.old_path.split('/').pop();
+      }
+      div.innerHTML = `<span>${escapeHtml(displayName)}</span>${unresolvedDot}${renderCommentIcon('review', f.path)}${goToBtn}<div class="file-stat"><span class="file-stat-add">+${f.additions}</span><span class="file-stat-del">-${f.deletions}</span></div>`;
       container.appendChild(div);
     });
   } else {
@@ -61,7 +67,12 @@ function renderFileList() {
       renderFileContent: function(val, key) {
         var unresolvedDot = fileHasUnresolvedComments(val.path) ? '<span class="file-unresolved-dot" title="Has unresolved comments"></span>' : '';
         var goToBtn = '<button class="btn btn-sm go-to-file-btn" data-filepath="' + escapeHtml(val.path) + '" title="' + t('buttons.goToFileViewer') + '" style="padding: 0 4px; font-size: 0.7rem; line-height: 1; flex-shrink: 0;">&#128196;</button>';
-        return '<span>' + escapeHtml(key) + '</span>' + unresolvedDot + renderCommentIcon('review', val.path) + goToBtn + '<div class="file-stat"><span class="file-stat-add">+' + val.additions + '</span><span class="file-stat-del">-' + val.deletions + '</span></div>';
+        var displayKey = key;
+        if (val.old_path && val.old_path !== val.path) {
+          var oldName = val.old_path.split('/').pop();
+          displayKey = key + ' ← ' + oldName;
+        }
+        return '<span>' + escapeHtml(displayKey) + '</span>' + unresolvedDot + renderCommentIcon('review', val.path) + goToBtn + '<div class="file-stat"><span class="file-stat-add">+' + val.additions + '</span><span class="file-stat-del">-' + val.deletions + '</span></div>';
       }
     });
   }
@@ -105,7 +116,11 @@ function renderDiff(path) {
   pathHeader.className = 'diff-path-header';
   pathHeader.style.cssText = 'padding: 6px 12px; font-size: 0.8rem; font-family: var(--font-mono); color: var(--text-secondary); background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;';
 
-  pathHeader.innerHTML = '<span style="opacity: 0.6;">\uD83D\uDCC4</span> ' + escapeHtml(path) + ' <span style="font-size: 0.75rem; color: var(--text-muted);">+' + file.additions + ' \u2212' + file.deletions + '</span>';
+  var pathText = escapeHtml(path);
+  if (file.old_path && file.old_path !== path) {
+    pathText = '<span style="color: var(--text-muted);">' + escapeHtml(file.old_path) + '</span> <span style="color: var(--text-secondary); font-size: 0.75rem;">\u2192</span> ' + escapeHtml(path);
+  }
+  pathHeader.innerHTML = '<span style="opacity: 0.6;">\uD83D\uDCC4</span> ' + pathText + ' <span style="font-size: 0.75rem; color: var(--text-muted);">+' + file.additions + ' \u2212' + file.deletions + '</span>';
 
   var goToFileViewerBtn = document.createElement('button');
   goToFileViewerBtn.className = 'btn btn-sm';

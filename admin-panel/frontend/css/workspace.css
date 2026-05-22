@@ -347,3 +347,180 @@
   color: var(--text-primary);
   word-break: break-all;
 }
+
+/* ═══════════════════════════════════════════════ */
+/*  REVIEW PIPELINE CARD                           */
+/* ═══════════════════════════════════════════════ */
+
+.rp-loading,
+.rp-empty,
+.rp-fetch-error {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.rp-fetch-error {
+  color: var(--danger);
+}
+
+.rp-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rp-state-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rp-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rp-badge--queued {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.rp-badge--filtering {
+  background: var(--info-dim);
+  color: var(--info);
+}
+
+.rp-badge--file-stage {
+  background: var(--warning-dim);
+  color: var(--warning);
+}
+
+.rp-badge--integration-stage {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.rp-badge--done {
+  background: var(--success-dim);
+  color: var(--success);
+}
+
+.rp-badge--failed {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
+.rp-elapsed {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.rp-pipeline-error {
+  font-size: 0.78rem;
+  color: var(--danger);
+  padding: 6px 10px;
+  background: var(--danger-dim);
+  border-radius: var(--radius-sm);
+}
+
+.rp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rp-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rp-section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.rp-progress-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.rp-files-list,
+.rp-integration-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rp-file-row,
+.rp-integration-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+
+.rp-file-row:last-child,
+.rp-integration-row:last-child {
+  border-bottom: none;
+}
+
+.rp-status-icon {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  width: 14px;
+  text-align: center;
+}
+
+.rp-status-icon--done    { color: var(--success); }
+.rp-status-icon--failed  { color: var(--danger); }
+.rp-status-icon--running { color: var(--info); }
+.rp-status-icon--pending { color: var(--text-muted); }
+
+.rp-file-path {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp-findings-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.rp-file-error {
+  font-size: 0.72rem;
+  color: var(--danger);
+  margin-top: 2px;
+}
+
+.rp-reviewer-name {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.rp-reviewer-status {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}

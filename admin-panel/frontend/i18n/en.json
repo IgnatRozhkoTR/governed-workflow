@@ -317,6 +317,8 @@
   "diff.commit": "Commit",
   "diff.history": "History",
   "diff.historyToggle": "History",
+  "diff.movedFrom": "moved from",
+  "diff.to": "to",
 
   "explorer.projectFiles": "Project Files",
   "explorer.selectFile": "Select a file to view its contents",
@@ -639,5 +641,23 @@
   "advanceModes.modeCompact": "Compact",
   "advanceModes.modeCompactTitle": "Agent advances with a brief summary notification.",
   "advanceModes.modeClear": "Clear",
-  "advanceModes.modeClearTitle": "Agent advances immediately without any notification."
+  "advanceModes.modeClearTitle": "Agent advances immediately without any notification.",
+
+  "cards.reviewPipeline": "Review Pipeline",
+  "reviewPipeline.state.queued": "Queued",
+  "reviewPipeline.state.filtering": "Filtering",
+  "reviewPipeline.state.file_stage": "File Review",
+  "reviewPipeline.state.integration_stage": "Integration Review",
+  "reviewPipeline.state.done": "Done",
+  "reviewPipeline.state.failed": "Failed",
+  "reviewPipeline.fileStatus.pending": "Pending",
+  "reviewPipeline.fileStatus.running": "Running",
+  "reviewPipeline.fileStatus.done": "Done",
+  "reviewPipeline.fileStatus.failed": "Failed",
+  "reviewPipeline.empty": "No review pipeline has run for this workspace yet.",
+  "reviewPipeline.error": "Failed to load review pipeline status.",
+  "reviewPipeline.filesProgress": "{done}/{total} files reviewed",
+  "reviewPipeline.elapsed": "Elapsed: {seconds}s",
+  "reviewPipeline.filesSection": "Files",
+  "reviewPipeline.integrationSection": "Integration"
 }

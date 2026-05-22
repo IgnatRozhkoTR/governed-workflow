@@ -14,6 +14,23 @@ if SERVER_DIR not in sys.path:
 
 
 @pytest.fixture(scope="session", autouse=True)
+def disable_review_pipeline_subprocesses():
+    """Prevent transition_phase from forking real claude subprocesses in tests.
+
+    Tests that exercise the pipeline itself patch its async helpers directly,
+    so this flag is fine to keep on across the suite.
+    """
+    import os
+    previous = os.environ.get("GOVERNED_WORKFLOW_DISABLE_REVIEW_PIPELINE")
+    os.environ["GOVERNED_WORKFLOW_DISABLE_REVIEW_PIPELINE"] = "1"
+    yield
+    if previous is None:
+        os.environ.pop("GOVERNED_WORKFLOW_DISABLE_REVIEW_PIPELINE", None)
+    else:
+        os.environ["GOVERNED_WORKFLOW_DISABLE_REVIEW_PIPELINE"] = previous
+
+
+@pytest.fixture(scope="session", autouse=True)
 def setup_db(tmp_path_factory):
     """Patch DB_PATH to temp file before any app imports."""
     db_dir = tmp_path_factory.mktemp("db")

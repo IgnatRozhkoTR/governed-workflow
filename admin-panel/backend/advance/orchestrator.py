@@ -8,6 +8,7 @@ import logging
 import os
 import re
 from datetime import datetime
+from pathlib import Path
 
 from advance.guards import GUARD_ORCHESTRATOR
 from advance.phases import get_phase
@@ -22,6 +23,13 @@ from services.phase_sequencer import full_phase_sequence, plan_from_workspace, r
 logger = logging.getLogger(__name__)
 
 _COMMIT_PHASE_RE = re.compile(r'^3\.\d+\.4$')
+_DEFAULT_MAX_FILES_PER_REVIEW = 100
+
+
+class AdvanceBusinessRuleError(Exception):
+    """Raised when a business-rule pre-flight check blocks a phase transition."""
+
+
 _EXECUTION_START_RE = re.compile(r'^3\.\d+\.0$')
 _PENDING_ADVANCE_ACTION_PATH = ".claude/state/pending-advance-action"
 
@@ -111,6 +119,45 @@ def _lazy_init_execution_checkpoint(db, ws, new_phase: str) -> None:
     )
 
 
+def _max_files_for_review() -> int:
+    raw = os.environ.get("GOVERNED_WORKFLOW_MAX_FILES_PER_REVIEW", str(_DEFAULT_MAX_FILES_PER_REVIEW))
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return _DEFAULT_MAX_FILES_PER_REVIEW
+
+
+def _check_review_file_count(ws) -> None:
+    """Raise AdvanceBusinessRuleError if the branch diff size exceeds the review limit.
+
+    Called only when transitioning INTO phase 4.0. Diff-filter failures are
+    swallowed (graceful degradation) — we never block a legitimate advance
+    because the count couldn't be determined.
+    """
+    from services import diff_filter
+
+    working_dir = ws_field(ws, "working_dir")
+    if not working_dir:
+        return
+    base_ref = ws_field(ws, "base_branch") or "main"
+    try:
+        count = diff_filter.count_modified(
+            repo_path=Path(working_dir),
+            base_ref=base_ref,
+            head_ref="HEAD",
+        )
+    except Exception:
+        logger.exception("pre-flight file count failed; allowing advance")
+        return
+    limit = _max_files_for_review()
+    if count > limit:
+        raise AdvanceBusinessRuleError(
+            f"Cannot advance to 4.0: branch diff contains {count} reviewable files "
+            f"(limit {limit}). Set GOVERNED_WORKFLOW_MAX_FILES_PER_REVIEW to override, "
+            f"or split the work into smaller branches."
+        )
+
+
 def _maybe_write_advance_action(db, ws, new_phase: str) -> None:
     """Write pending-advance-action file when crossing a major-phase boundary.
 
@@ -171,6 +218,9 @@ def transition_phase(db, ws, new_phase, commit_hash=None):
     the checkpoint so the first commit submitted in the execution can be
     validated against a concrete base.
     """
+    if new_phase == "4.0":
+        _check_review_file_count(ws)
+
     rows = db.execute(
         "UPDATE workspaces SET phase = ? WHERE id = ? AND phase = ?",
         (new_phase, ws["id"], ws["phase"])
@@ -192,7 +242,38 @@ def transition_phase(db, ws, new_phase, commit_hash=None):
     _lazy_init_execution_checkpoint(db, ws, new_phase)
     _maybe_write_advance_action(db, ws, new_phase)
 
+    if new_phase == "4.0":
+        _start_review_pipeline(ws)
+
     return True
+
+
+def _start_review_pipeline(ws) -> None:
+    """Spawn the background headless review pipeline.
+
+    Disabled when ``GOVERNED_WORKFLOW_DISABLE_REVIEW_PIPELINE`` is truthy
+    (used by tests that do not want to fork a real Claude subprocess).
+    Failures here never block the phase transition.
+    """
+    if os.environ.get("GOVERNED_WORKFLOW_DISABLE_REVIEW_PIPELINE"):
+        return
+
+    working_dir = ws_field(ws, "working_dir")
+    if not working_dir:
+        return
+
+    try:
+        from services import review_pipeline_service
+
+        review_pipeline_service.start_in_background(
+            workspace_id=ws["id"],
+            project_path=Path(working_dir),
+            base_branch=ws_field(ws, "base_branch") or "main",
+        )
+    except Exception:
+        logger.exception(
+            "failed to start review pipeline for workspace %s", ws["id"]
+        )
 
 
 def _notify_yolo_approve(ws, phase):
@@ -239,7 +320,11 @@ def approve_gate(ws, commit_message=None):
 
         phase.on_approve(ws, {"commit_message": commit_message} if commit_message else {}, db)
 
-        if not transition_phase(db, ws, new_phase):
+        try:
+            advanced = transition_phase(db, ws, new_phase)
+        except AdvanceBusinessRuleError as exc:
+            return {"error": str(exc), "status_code": 422}
+        if not advanced:
             return {"error": t("gate.error.phaseAlreadyChanged", locale), "status_code": 409}
 
         db.commit()
@@ -270,7 +355,11 @@ def reject_gate(ws, comments=""):
                 "status_code": 409,
             }
 
-        if not transition_phase(db, ws, new_phase):
+        try:
+            advanced = transition_phase(db, ws, new_phase)
+        except AdvanceBusinessRuleError as exc:
+            return {"error": str(exc), "status_code": 422}
+        if not advanced:
             return {"error": t("gate.error.phaseAlreadyChanged", locale), "status_code": 409}
 
         if comments:
@@ -341,7 +430,11 @@ def perform_advance(ws, project_path, body=None):
                 "message": t("advance.error.noEnabledSuccessor", locale, candidate=candidate),
             }, 409
 
-        if not transition_phase(db, ws, new_phase, commit_hash=body.get("commit_hash")):
+        try:
+            advanced = transition_phase(db, ws, new_phase, commit_hash=body.get("commit_hash"))
+        except AdvanceBusinessRuleError as exc:
+            return {"error": str(exc), "status": "blocked"}, 422
+        if not advanced:
             return {"error": t("advance.error.phaseAlreadyChanged", locale)}, 409
 
         db.commit()

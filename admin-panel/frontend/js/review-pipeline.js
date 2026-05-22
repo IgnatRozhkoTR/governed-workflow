@@ -1,0 +1,192 @@
+// ═══════════════════════════════════════════════
+//  REVIEW PIPELINE STATUS CARD
+// ═══════════════════════════════════════════════
+
+var _rpPollingTimers = {};
+
+var _RP_ACTIVE_STATES = new Set(['queued', 'filtering', 'file_stage', 'integration_stage']);
+
+function _rpEscape(str) {
+  var el = document.createElement('span');
+  el.textContent = String(str || '');
+  return el.innerHTML;
+}
+
+function _rpStateBadgeClass(state) {
+  switch (state) {
+    case 'done':               return 'rp-badge--done';
+    case 'failed':             return 'rp-badge--failed';
+    case 'queued':             return 'rp-badge--queued';
+    case 'filtering':          return 'rp-badge--filtering';
+    case 'file_stage':         return 'rp-badge--file-stage';
+    case 'integration_stage':  return 'rp-badge--integration-stage';
+    default:                   return 'rp-badge--queued';
+  }
+}
+
+function _rpStateLabel(state) {
+  return t('reviewPipeline.state.' + state) || state;
+}
+
+function _rpFileStatusIcon(status) {
+  switch (status) {
+    case 'done':    return '<span class="rp-status-icon rp-status-icon--done">&#10003;</span>';
+    case 'failed':  return '<span class="rp-status-icon rp-status-icon--failed">&#10007;</span>';
+    case 'running': return '<span class="rp-status-icon rp-status-icon--running">&#9679;</span>';
+    default:        return '<span class="rp-status-icon rp-status-icon--pending">&#9675;</span>';
+  }
+}
+
+function _rpReviewerStatusIcon(status) {
+  return _rpFileStatusIcon(status);
+}
+
+function _rpElapsed(startedAt, finishedAt) {
+  if (!startedAt) return '';
+  var endTs = finishedAt || (Date.now() / 1000);
+  var seconds = Math.max(0, Math.round(endTs - startedAt));
+  return t('reviewPipeline.elapsed').replace('{seconds}', seconds);
+}
+
+function _rpFilesHtml(files) {
+  if (!files || Object.keys(files).length === 0) return '';
+
+  var entries = Object.values(files);
+  var total = entries.length;
+  var done = entries.filter(function(f) { return f.status === 'done' || f.status === 'failed'; }).length;
+  var progressLabel = t('reviewPipeline.filesProgress')
+    .replace('{done}', done)
+    .replace('{total}', total);
+
+  var rows = entries.map(function(f) {
+    var findingsHtml = (f.status === 'done' && f.findings_count != null)
+      ? ' <span class="rp-findings-count">(' + _rpEscape(f.findings_count) + ')</span>'
+      : '';
+    var errorHtml = f.error
+      ? '<div class="rp-file-error">' + _rpEscape(f.error) + '</div>'
+      : '';
+    return '<div class="rp-file-row">'
+      + _rpFileStatusIcon(f.status)
+      + '<span class="rp-file-path">' + _rpEscape(f.file) + '</span>'
+      + findingsHtml
+      + errorHtml
+      + '</div>';
+  }).join('');
+
+  return '<div class="rp-section">'
+    + '<div class="rp-section-header">'
+    + '<span class="rp-section-label">' + t('reviewPipeline.filesSection') + '</span>'
+    + '<span class="rp-progress-label">' + _rpEscape(progressLabel) + '</span>'
+    + '</div>'
+    + '<div class="rp-files-list">' + rows + '</div>'
+    + '</div>';
+}
+
+function _rpIntegrationHtml(integration) {
+  if (!integration || Object.keys(integration).length === 0) return '';
+
+  var rows = Object.entries(integration).map(function(entry) {
+    var reviewer = entry[0];
+    var status = entry[1];
+    var statusLabel = t('reviewPipeline.fileStatus.' + status) || status;
+    return '<div class="rp-integration-row">'
+      + _rpReviewerStatusIcon(status)
+      + '<span class="rp-reviewer-name">' + _rpEscape(reviewer) + '</span>'
+      + '<span class="rp-reviewer-status">' + _rpEscape(statusLabel) + '</span>'
+      + '</div>';
+  }).join('');
+
+  return '<div class="rp-section">'
+    + '<div class="rp-section-header">'
+    + '<span class="rp-section-label">' + t('reviewPipeline.integrationSection') + '</span>'
+    + '</div>'
+    + '<div class="rp-integration-list">' + rows + '</div>'
+    + '</div>';
+}
+
+function _rpRenderStatus(container, data) {
+  var elapsedHtml = data.started_at
+    ? '<div class="rp-elapsed">' + _rpEscape(_rpElapsed(data.started_at, data.finished_at)) + '</div>'
+    : '';
+
+  var errorHtml = data.error
+    ? '<div class="rp-pipeline-error">' + _rpEscape(data.error) + '</div>'
+    : '';
+
+  container.innerHTML = '<div class="rp-card-body">'
+    + '<div class="rp-state-row">'
+    + '<span class="rp-badge ' + _rpStateBadgeClass(data.state) + '">'
+    + _rpEscape(_rpStateLabel(data.state))
+    + '</span>'
+    + elapsedHtml
+    + '</div>'
+    + errorHtml
+    + _rpFilesHtml(data.files)
+    + _rpIntegrationHtml(data.integration)
+    + '</div>';
+}
+
+function _rpRenderEmpty(container) {
+  container.innerHTML = '<div class="rp-empty">' + t('reviewPipeline.empty') + '</div>';
+}
+
+function _rpRenderError(container) {
+  container.innerHTML = '<div class="rp-fetch-error">' + t('reviewPipeline.error') + '</div>';
+}
+
+function _rpStopPolling(workspaceId) {
+  var timer = _rpPollingTimers[workspaceId];
+  if (timer) {
+    clearTimeout(timer);
+    delete _rpPollingTimers[workspaceId];
+  }
+}
+
+async function _rpFetchAndRender(container, workspaceId) {
+  var url = '/api/workspaces/' + encodeURIComponent(workspaceId) + '/review-pipeline-status';
+  var res;
+  try {
+    res = await fetch(url, { headers: _authHeaders ? _authHeaders() : {} });
+  } catch (_err) {
+    _rpRenderError(container);
+    return;
+  }
+
+  if (res.status === 404) {
+    _rpRenderEmpty(container);
+    return;
+  }
+
+  if (!res.ok) {
+    _rpRenderError(container);
+    return;
+  }
+
+  var data;
+  try {
+    data = await res.json();
+  } catch (_err) {
+    _rpRenderError(container);
+    return;
+  }
+
+  if (!data) {
+    _rpRenderEmpty(container);
+    return;
+  }
+
+  _rpRenderStatus(container, data);
+
+  if (_RP_ACTIVE_STATES.has(data.state)) {
+    _rpPollingTimers[workspaceId] = setTimeout(function() {
+      _rpFetchAndRender(container, workspaceId);
+    }, 2000);
+  }
+}
+
+function renderReviewPipelineCard(container, workspaceId) {
+  if (!container || !workspaceId) return;
+  _rpStopPolling(workspaceId);
+  container.innerHTML = '<div class="rp-loading">' + t('research.loading') + '</div>';
+  _rpFetchAndRender(container, workspaceId);
+}

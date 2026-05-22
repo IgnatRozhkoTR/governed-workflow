@@ -286,7 +286,7 @@ def _diff_for_commit(working_dir, sha):
     if not ok_anc:
         return jsonify({"error": "commit is not an ancestor of HEAD"}), 400
 
-    ok, diff_output, _ = run_git(working_dir, "show", "--format=", "--patch", sha)
+    ok, diff_output, _ = run_git(working_dir, "show", "--format=", "--patch", "--find-renames", sha)
     return _parse_diff(diff_output if ok else "")
 
 
@@ -294,9 +294,9 @@ def _diff_for_branch(working_dir, source_branch):
     """Return diff output against the source branch, trying origin first then local fallbacks."""
     for ref in (f"origin/{source_branch}", source_branch, "HEAD", None):
         if ref is not None:
-            ok, diff_output, _ = run_git(working_dir, "diff", ref)
+            ok, diff_output, _ = run_git(working_dir, "diff", "--find-renames", ref)
         else:
-            ok, diff_output, _ = run_git(working_dir, "diff")
+            ok, diff_output, _ = run_git(working_dir, "diff", "--find-renames")
         if ok:
             return diff_output
     return ""
@@ -334,6 +334,8 @@ def _untracked_files_diff(working_dir, mode, tracked_paths):
         ] + ["+" + l for l in content_lines]
         entries.append({
             "path": rel_path,
+            "old_path": None,
+            "similarity": None,
             "additions": len(content_lines),
             "deletions": 0,
             "diff": "\n".join(diff_lines),
@@ -369,7 +371,7 @@ def get_diff(db, ws, project):
         if mode == "branch":
             diff_output = _diff_for_branch(working_dir, source_branch)
         else:
-            ok, diff_output, _ = run_git(working_dir, "diff", "HEAD")
+            ok, diff_output, _ = run_git(working_dir, "diff", "--find-renames", "HEAD")
             if not ok:
                 diff_output = ""
 
@@ -385,12 +387,14 @@ def get_diff(db, ws, project):
 
 
 def _parse_diff(diff_output):
-    """Parse unified diff output into a list of file entries."""
+    """Parse unified diff output into a list of file entries, detecting renames."""
     files = []
     if not diff_output or not diff_output.strip():
         return files
 
     current_file = None
+    current_old_file = None
+    current_similarity = None
     current_diff_lines = []
 
     for line in diff_output.split("\n"):
@@ -398,19 +402,37 @@ def _parse_diff(diff_output):
             if current_file:
                 files.append({
                     "path": current_file,
+                    "old_path": current_old_file,
+                    "similarity": current_similarity,
                     "additions": sum(1 for l in current_diff_lines if l.startswith("+") and not l.startswith("+++")),
                     "deletions": sum(1 for l in current_diff_lines if l.startswith("-") and not l.startswith("---")),
                     "diff": "\n".join(current_diff_lines)
                 })
             parts = line.split(" b/", 1)
             current_file = parts[1] if len(parts) > 1 else ""
+            current_old_file = None
+            current_similarity = None
             current_diff_lines = [line]
         elif current_file is not None:
             current_diff_lines.append(line)
+            if line.startswith("similarity index"):
+                similarity_str = line.split("similarity index ")[1].rstrip("%") if " " in line else ""
+                try:
+                    current_similarity = int(similarity_str)
+                except ValueError:
+                    current_similarity = None
+            elif line.startswith("rename from "):
+                current_old_file = line.split("rename from ", 1)[1]
+            elif line.startswith("--- a/"):
+                old_name = line[6:]
+                if not current_old_file and old_name != current_file:
+                    current_old_file = old_name
 
     if current_file:
         files.append({
             "path": current_file,
+            "old_path": current_old_file,
+            "similarity": current_similarity,
             "additions": sum(1 for l in current_diff_lines if l.startswith("+") and not l.startswith("+++")),
             "deletions": sum(1 for l in current_diff_lines if l.startswith("-") and not l.startswith("---")),
             "diff": "\n".join(current_diff_lines)
