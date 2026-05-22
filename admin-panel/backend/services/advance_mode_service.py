@@ -11,7 +11,8 @@ major phase:
 Absence of a row is equivalent to 'none', so no seed data is required.
 """
 
-_VALID_MODES = frozenset({"none", "compact", "clear"})
+VALID_MODES = frozenset({"none", "compact", "clear"})
+VALID_MAJOR_PHASES = frozenset({1, 2, 3, 4, 5})
 _ALL_MAJOR_PHASES = (1, 2, 3, 4, 5)
 
 
@@ -43,9 +44,9 @@ def _validate_major_phase(major_phase: int) -> None:
 
 
 def _validate_mode(mode: str) -> None:
-    if mode not in _VALID_MODES:
+    if mode not in VALID_MODES:
         raise AdvanceModeServiceError(
-            f"mode must be one of {sorted(_VALID_MODES)}, got {mode!r}",
+            f"mode must be one of {sorted(VALID_MODES)}, got {mode!r}",
             code="invalid_mode",
         )
 

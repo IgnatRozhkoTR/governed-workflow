@@ -88,9 +88,14 @@ async function amSave(container, projectId) {
   if (!container || !amHasPending(container)) return;
   var endpoint = '/api/projects/' + encodeURIComponent(projectId) + '/advance-modes';
   await apiPut(endpoint, { modes: container._amPending });
-  var refreshed = await apiGet(endpoint);
-  container._amCanonical = refreshed;
+  Object.assign(container._amCanonical, container._amPending);
   container._amPending = {};
+  try {
+    var refreshed = await apiGet(endpoint);
+    container._amCanonical = refreshed;
+  } catch (e) {
+    console.warn('advance-modes: refresh after save failed', e);
+  }
   _amRefresh(container);
 }
 

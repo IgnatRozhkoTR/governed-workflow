@@ -197,6 +197,17 @@ async function openProject(projectId) {
   _wsSelectedProjectId = projectId;
   _wsSwitchView('workspace');
 
+  var advanceBody = document.getElementById('advanceModesProjectBody');
+  if (advanceBody && advanceBody._amLinked) {
+    delete advanceBody._amLinked;
+    delete advanceBody._amSharedPhaseContainer;
+  }
+  var projectBody = document.getElementById('phaseSettingsProjectBody');
+  if (projectBody && projectBody._amLinked) {
+    delete projectBody._amLinked;
+    delete projectBody._amSharedPhaseContainer;
+  }
+
   const headerEl = document.getElementById('ws-workspace-project-name');
   headerEl.textContent = t('research.loading');
 

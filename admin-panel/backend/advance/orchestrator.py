@@ -131,12 +131,7 @@ def _maybe_write_advance_action(db, ws, new_phase: str) -> None:
     if mode not in ("compact", "clear"):
         return
 
-    working_dir = ws.get("working_dir") if isinstance(ws, dict) else None
-    if not working_dir:
-        try:
-            working_dir = ws["working_dir"]
-        except (KeyError, TypeError):
-            working_dir = None
+    working_dir = ws_field(ws, "working_dir")
 
     if not working_dir or not os.path.isdir(working_dir):
         logger.warning(

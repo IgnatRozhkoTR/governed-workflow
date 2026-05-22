@@ -204,8 +204,10 @@ def build_claude_command(ws, resume=False, channels=None):
     if ch:
         base += f' --channels {ch}'
     working_dir = ws['working_dir']
+    quoted_wd = shlex.quote(working_dir)
     return (
-        f"bash -c 'cd \"{working_dir}\" && mkdir -p .claude/state && while true; do "
+        f"bash -c "
+        f"'cd \"$0\" && mkdir -p .claude/state && while true; do "
         f"if [ -e .claude/state/wrapper-stop ]; then rm -f .claude/state/wrapper-stop; break; fi; "
         f"if [ -e .claude/state/force-new-session ]; then "
         f"rm -f .claude/state/force-new-session; "
@@ -213,7 +215,9 @@ def build_claude_command(ws, resume=False, channels=None):
         f"else "
         f"{base} --continue; "
         f"fi; "
-        f"done'"
+        f"sleep 2; "
+        f"done' "
+        f"{quoted_wd}"
     )
 
 

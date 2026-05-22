@@ -4,14 +4,17 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from core.decorators import with_project
-from services.advance_mode_service import AdvanceModeServiceError, list_modes, set_modes
+from services.advance_mode_service import (
+    AdvanceModeServiceError,
+    VALID_MAJOR_PHASES,
+    VALID_MODES,
+    list_modes,
+    set_modes,
+)
 
 log = logging.getLogger(__name__)
 
 bp = Blueprint("advance_modes", __name__)
-
-_VALID_MODES = frozenset({"none", "compact", "clear"})
-_VALID_MAJOR_PHASES = frozenset({1, 2, 3, 4, 5})
 
 _STATUS_BY_CODE = {
     "invalid_phase": 400,
@@ -41,10 +44,10 @@ def _validate_modes_payload(raw_modes) -> tuple[dict[int, str] | None, str | Non
             phase = int(key)
         except (TypeError, ValueError):
             return None, f"modes key {key!r} must be an integer (1–5)"
-        if phase not in _VALID_MAJOR_PHASES:
+        if phase not in VALID_MAJOR_PHASES:
             return None, f"modes key {phase} is not a valid major phase (1–5)"
-        if not isinstance(value, str) or value not in _VALID_MODES:
-            return None, f"modes[{phase}] must be one of {sorted(_VALID_MODES)}, got {value!r}"
+        if not isinstance(value, str) or value not in VALID_MODES:
+            return None, f"modes[{phase}] must be one of {sorted(VALID_MODES)}, got {value!r}"
         coerced[phase] = value
     return coerced, None
 
