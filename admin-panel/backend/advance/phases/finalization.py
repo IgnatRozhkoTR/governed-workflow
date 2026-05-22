@@ -13,11 +13,10 @@ class AgenticReviewPhase(Phase):
 
 **Actors**: Headless review pipeline (background daemon) | **Code edits: OFF**
 
-On entry to 4.0 the admin panel **automatically launches** the headless review pipeline. Per-file reviewers fan out in parallel across the diff, then three specialised integration reviewers run concurrently:
+On entry to 4.0 the admin panel **automatically launches** the headless review pipeline. Per-file reviewers fan out in parallel across the diff, then two specialised integration reviewers run concurrently:
 
-- **architecture-reviewer** — SRP/OCP, coupling, layer boundaries, clean-code principles
-- **logic-reviewer** — business logic correctness, edge cases, error handling, contracts
-- **security-reviewer** — input validation, auth, injection, secrets, API contracts
+- **architecture-reviewer** — SRP/OCP, coupling, layer boundaries, clean-code principles, naming, method/class size, DRY
+- **correctness-reviewer** — business-logic correctness, edge cases, error handling, security (input validation, injection, auth/authz, secrets, sensitive data in logs, API contract leaks)
 
 **Do NOT manually dispatch reviewers.** The pipeline is already running. Manual dispatch would duplicate work and confuse findings.
 
@@ -27,9 +26,10 @@ On entry to 4.0 the admin panel **automatically launches** the headless review p
 2. When state is `done` or `failed`:
    - Call `workspace_get_review_issues` to see the findings.
    - Call `workspace_update_progress(phase="4.0", summary="Pipeline complete. N findings.")`.
+   - Before calling `workspace_advance`, call `workspace_review_pipeline_summary` (or `GET /api/workspaces/<id>/review-pipeline/summary`). Confirm `is_complete=true` and `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: re-trigger via the Run Review button (workspace page) or `POST /api/workspaces/<id>/review-pipeline/start`, OR proceed with the partial result if the failures are recoverable.
    - Call `workspace_advance` to move to 4.1.
 
-If the pipeline failed mid-run, the failure reason appears as a `review-agent-failure` typed issue. Inspect it via `workspace_get_review_issues` and decide whether to re-trigger (currently manual) or proceed.
+If the pipeline failed mid-run, the failure reason appears as a `review-agent-failure` typed issue. Inspect it via `workspace_get_review_issues` and decide whether to re-trigger or proceed.
 
 **Advance 4.0 → 4.1** requires: progress entry for phase `"4.0"`."""
 

@@ -20,3 +20,19 @@ def get_review_pipeline_status(workspace_id: int):
     if snapshot is None:
         return jsonify({"error": "no pipeline status for workspace"}), 404
     return jsonify(snapshot)
+
+
+@bp.route(
+    "/api/workspaces/<int:workspace_id>/review-pipeline/summary",
+    methods=["GET"],
+)
+def get_review_pipeline_summary(workspace_id: int):
+    """Return a flat completion summary for the orchestrator to gate phase 4.0.
+
+    The orchestrator should confirm ``is_complete=true`` and ``is_ok=true``
+    before calling ``workspace_advance``. Returns 404 when no run is tracked.
+    """
+    summary = review_pipeline_service.status_summary(workspace_id)
+    if summary is None:
+        return jsonify({"error": "no pipeline status for workspace"}), 404
+    return jsonify(summary)

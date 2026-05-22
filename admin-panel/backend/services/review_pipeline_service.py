@@ -136,6 +136,64 @@ def status_as_dict(workspace_id: int) -> dict | None:
     return asdict(status)
 
 
+_TERMINAL_STATES: frozenset[PipelineState] = frozenset({"done", "failed"})
+
+
+def status_summary(workspace_id: int) -> dict | None:
+    """Return a flat completion summary for the orchestrator/UI.
+
+    Distinct from :func:`status_as_dict` (the full detail dump). Aggregates
+    per-file and per-integration-agent counts so callers can make an
+    advance/retry decision without walking the nested dict.
+
+    Returns ``None`` if no run is tracked for this workspace.
+    """
+    status = get_status(workspace_id)
+    if status is None:
+        return None
+
+    file_states = {"pending": 0, "running": 0, "done": 0, "failed": 0}
+    failed_files: list[str] = []
+    files_with_findings = 0
+    for path, result in status.files.items():
+        file_states[result.status] = file_states.get(result.status, 0) + 1
+        if result.status == "failed":
+            failed_files.append(path)
+        if result.findings_count > 0:
+            files_with_findings += 1
+
+    integ_states = {"pending": 0, "running": 0, "done": 0, "failed": 0}
+    for agent_state in status.integration.values():
+        integ_states[agent_state] = integ_states.get(agent_state, 0) + 1
+
+    is_complete = status.state in _TERMINAL_STATES
+    is_ok = (
+        status.state == "done"
+        and file_states["failed"] == 0
+        and integ_states["failed"] == 0
+    )
+
+    return {
+        "workspace_id": workspace_id,
+        "state": status.state,
+        "files_total": len(status.files),
+        "files_done": file_states["done"],
+        "files_failed": file_states["failed"],
+        "files_in_progress": file_states["pending"] + file_states["running"],
+        "files_with_findings": files_with_findings,
+        "files_clean": file_states["done"] - files_with_findings,
+        "failed_files": failed_files,
+        "integration_done": integ_states["done"],
+        "integration_failed": integ_states["failed"],
+        "integration_total": len(status.integration),
+        "is_complete": is_complete,
+        "is_ok": is_ok,
+        "error": status.error,
+        "started_at": status.started_at,
+        "finished_at": status.finished_at,
+    }
+
+
 def _set_status(status: PipelineStatus) -> None:
     with _STATUS_LOCK:
         _STATUS[status.workspace_id] = status

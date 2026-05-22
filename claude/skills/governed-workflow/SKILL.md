@@ -538,7 +538,8 @@ Watch progress on the Review Pipeline card on the workspace page, or poll `GET /
 
 1. Call `workspace_get_review_issues` to inspect findings.
 2. Call `workspace_update_progress("4.0", ...)` with a summary.
-3. Call `workspace_advance`.
+3. Before calling `workspace_advance`, call `workspace_review_pipeline_summary` (or `GET /api/workspaces/<id>/review-pipeline/summary`). Confirm `is_complete=true` and `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: re-trigger via the Run Review button (workspace page) or `POST /api/workspaces/<id>/review-pipeline/start`, OR proceed with the partial result if the failures are recoverable.
+4. Call `workspace_advance`.
 
 **Advance 4.0 → 4.1** requires: progress entry for phase `"4.0"`.
 

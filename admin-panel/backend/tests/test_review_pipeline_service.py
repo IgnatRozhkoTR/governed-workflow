@@ -372,3 +372,166 @@ def test_timeout_env_override(monkeypatch):
     monkeypatch.setenv("GOVERNED_WORKFLOW_REVIEW_TIMEOUT_S", "5")
     # minimum floor is 30
     assert review_pipeline_service._timeout_s() == 30
+
+
+def test_status_summary_returns_none_when_no_run_tracked():
+    assert review_pipeline_service.status_summary(987654) is None
+
+
+def test_status_summary_for_clean_done_run(repo_with_files):
+    ws = repo_with_files
+    reviewable = [
+        ReviewableFile(path="src/alpha.py", status="M"),
+        ReviewableFile(path="src/beta.py", status="M"),
+    ]
+    canned = {
+        "src/alpha.py": _file_envelope([]),
+        "src/beta.py": _file_envelope([]),
+        "architecture-reviewer": _envelope(""),
+        "correctness-reviewer": _envelope(""),
+    }
+
+    with patch.object(
+        review_pipeline_service.diff_filter, "list_reviewable_files",
+        return_value=reviewable,
+    ), _patch_spawn(canned):
+        review_pipeline_service.start_in_background(
+            workspace_id=ws["id"],
+            project_path=Path(ws["working_dir"]),
+            base_branch="develop",
+        )
+        _wait_for_state(ws["id"])
+
+    summary = review_pipeline_service.status_summary(ws["id"])
+    assert summary is not None
+    assert summary["workspace_id"] == ws["id"]
+    assert summary["state"] == "done"
+    assert summary["files_total"] == 2
+    assert summary["files_done"] == 2
+    assert summary["files_failed"] == 0
+    assert summary["files_in_progress"] == 0
+    assert summary["files_with_findings"] == 0
+    assert summary["files_clean"] == 2
+    assert summary["failed_files"] == []
+    assert summary["integration_done"] == 2
+    assert summary["integration_failed"] == 0
+    assert summary["integration_total"] == 2
+    assert summary["is_complete"] is True
+    assert summary["is_ok"] is True
+
+
+def test_status_summary_flags_file_and_integration_failures(repo_with_files):
+    ws = repo_with_files
+    reviewable = [
+        ReviewableFile(path="src/alpha.py", status="M"),
+        ReviewableFile(path="src/beta.py", status="M"),
+    ]
+
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
+        if "src/alpha.py" in prompt and agent == "file-reviewer":
+            return _file_envelope([
+                {"severity": "major", "type": "logic", "line": 1, "summary": "alpha issue"},
+            ])
+        if "src/beta.py" in prompt and agent == "file-reviewer":
+            raise RuntimeError("file-reviewer timeout after 300s")
+        if agent == "architecture-reviewer":
+            raise RuntimeError("architecture-reviewer exit 1: boom")
+        return _envelope("")
+
+    with patch.object(
+        review_pipeline_service.diff_filter, "list_reviewable_files",
+        return_value=reviewable,
+    ), patch.object(
+        review_pipeline_service, "_spawn_claude_agent", side_effect=fake_spawn
+    ):
+        review_pipeline_service.start_in_background(
+            workspace_id=ws["id"],
+            project_path=Path(ws["working_dir"]),
+            base_branch="develop",
+        )
+        _wait_for_state(ws["id"])
+
+    summary = review_pipeline_service.status_summary(ws["id"])
+    assert summary is not None
+    assert summary["state"] == "done"
+    assert summary["files_total"] == 2
+    assert summary["files_done"] == 1
+    assert summary["files_failed"] == 1
+    assert summary["files_with_findings"] == 1
+    assert summary["files_clean"] == 0
+    assert summary["failed_files"] == ["src/beta.py"]
+    assert summary["integration_failed"] == 1
+    assert summary["integration_done"] == 1
+    assert summary["is_complete"] is True
+    assert summary["is_ok"] is False
+
+
+def test_status_summary_for_in_progress_run():
+    workspace_id = 424242
+    status = review_pipeline_service.PipelineStatus(
+        workspace_id=workspace_id, state="file_stage"
+    )
+    status.files = {
+        "src/a.py": review_pipeline_service.FileResult(file="src/a.py", status="done", findings_count=2),
+        "src/b.py": review_pipeline_service.FileResult(file="src/b.py", status="running"),
+        "src/c.py": review_pipeline_service.FileResult(file="src/c.py", status="pending"),
+    }
+    status.integration = {
+        "architecture-reviewer": "pending",
+        "correctness-reviewer": "pending",
+    }
+    review_pipeline_service._set_status(status)
+    try:
+        summary = review_pipeline_service.status_summary(workspace_id)
+        assert summary is not None
+        assert summary["state"] == "file_stage"
+        assert summary["files_total"] == 3
+        assert summary["files_done"] == 1
+        assert summary["files_failed"] == 0
+        assert summary["files_in_progress"] == 2
+        assert summary["files_with_findings"] == 1
+        assert summary["files_clean"] == 0
+        assert summary["integration_total"] == 2
+        assert summary["integration_done"] == 0
+        assert summary["is_complete"] is False
+        assert summary["is_ok"] is False
+    finally:
+        _drop_status(workspace_id)
+
+
+def test_summary_endpoint_returns_summary(repo_with_files, client):
+    ws = repo_with_files
+
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
+        return _envelope("")
+
+    with patch.object(
+        review_pipeline_service.diff_filter, "list_reviewable_files",
+        return_value=[],
+    ), patch.object(
+        review_pipeline_service, "_spawn_claude_agent", side_effect=fake_spawn
+    ):
+        review_pipeline_service.start_in_background(
+            workspace_id=ws["id"],
+            project_path=Path(ws["working_dir"]),
+            base_branch="develop",
+        )
+        _wait_for_state(ws["id"])
+
+    response = client.get(f"/api/workspaces/{ws['id']}/review-pipeline/summary")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["workspace_id"] == ws["id"]
+    assert body["is_complete"] is True
+    assert body["is_ok"] is True
+    assert body["integration_total"] == 2
+
+
+def test_summary_endpoint_404_when_no_run(client):
+    response = client.get("/api/workspaces/99999/review-pipeline/summary")
+    assert response.status_code == 404
+
+
+def test_summary_endpoint_requires_auth(raw_client):
+    response = raw_client.get("/api/workspaces/99999/review-pipeline/summary")
+    assert response.status_code == 401

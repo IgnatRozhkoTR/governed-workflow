@@ -1262,6 +1262,7 @@ EXPECTED_ANNOTATIONS = {
     "rule_create": (False, False, False),
     "rule_update": (False, True, False),
     "rule_delete": (False, True, True),
+    "workspace_review_pipeline_summary": (True, True, False),
 }
 
 
@@ -1273,7 +1274,7 @@ class TestMcpToolContracts:
     def test_all_tools_have_annotations(self):
         from mcp.types import ToolAnnotations
         tools = self._tools()
-        assert len(tools) == 38, f"expected 38 registered tools, got {len(tools)}"
+        assert len(tools) == 39, f"expected 39 registered tools, got {len(tools)}"
         for name, tool in tools.items():
             ann = tool.annotations
             assert ann is not None, f"{name} missing annotations"
@@ -1715,3 +1716,48 @@ class TestNarrowExceptionPropagation:
         result = workspace_update_progress(phase="1.0", summary="OpError path.")
         assert result["errorCategory"] == "transient"
         assert result["isRetryable"] is True
+
+
+class TestReviewPipelineSummary:
+    def test_no_workspace_returns_not_found(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        from mcp_server import workspace_review_pipeline_summary
+        result = workspace_review_pipeline_summary()
+        assert result.get("errorCategory") == "not_found"
+
+    def test_no_run_tracked_returns_not_found(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from services import review_pipeline_service
+        review_pipeline_service._STATUS.pop(workspace["id"], None)
+        from mcp_server import workspace_review_pipeline_summary
+        result = workspace_review_pipeline_summary()
+        assert result.get("errorCategory") == "not_found"
+        assert result.get("workspace_id") == workspace["id"]
+
+    def test_returns_summary_when_run_tracked(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from services import review_pipeline_service
+        status = review_pipeline_service.PipelineStatus(
+            workspace_id=workspace["id"], state="done"
+        )
+        status.files = {
+            "src/a.py": review_pipeline_service.FileResult(
+                file="src/a.py", status="done", findings_count=0
+            ),
+        }
+        status.integration = {
+            "architecture-reviewer": "done",
+            "correctness-reviewer": "done",
+        }
+        review_pipeline_service._set_status(status)
+        try:
+            from mcp_server import workspace_review_pipeline_summary
+            result = workspace_review_pipeline_summary()
+            assert result["workspace_id"] == workspace["id"]
+            assert result["is_complete"] is True
+            assert result["is_ok"] is True
+            assert result["files_total"] == 1
+            assert result["files_done"] == 1
+            assert result["integration_total"] == 2
+        finally:
+            review_pipeline_service._STATUS.pop(workspace["id"], None)
