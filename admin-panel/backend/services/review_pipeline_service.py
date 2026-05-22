@@ -30,6 +30,7 @@ import asyncio
 import json
 import logging
 import os
+import subprocess
 import threading
 import time
 from dataclasses import asdict, dataclass, field
@@ -92,6 +93,7 @@ class FileResult:
     file: str
     status: FileState = "pending"
     findings_count: int = 0
+    submit_failures: int = 0
     error: str | None = None
 
 
@@ -187,7 +189,7 @@ async def _run_async(
     status.files = {rf.path: FileResult(file=rf.path) for rf in reviewable}
     status.integration = {name: "pending" for name in _INTEGRATION_AGENTS}
 
-    await _run_file_stage(workspace_id, project_path, reviewable, status)
+    await _run_file_stage(workspace_id, project_path, reviewable, status, base_branch)
     await _run_integration_stage(workspace_id, project_path, status)
 
     status.state = "done"
@@ -199,6 +201,7 @@ async def _run_file_stage(
     project_path: Path,
     reviewable: list,
     status: PipelineStatus,
+    base_ref: str,
 ) -> None:
     status.state = "file_stage"
     if not reviewable:
@@ -208,7 +211,7 @@ async def _run_file_stage(
 
     async def _bounded(rf) -> None:
         async with semaphore:
-            await _review_one_file(workspace_id, project_path, rf.path, status)
+            await _review_one_file(workspace_id, project_path, rf.path, status, base_ref)
 
     await asyncio.gather(*(_bounded(rf) for rf in reviewable))
 
@@ -235,11 +238,12 @@ async def _review_one_file(
     project_path: Path,
     file_path: str,
     status: PipelineStatus,
+    base_ref: str,
 ) -> None:
     result = status.files[file_path]
     result.status = "running"
     try:
-        findings = await _spawn_file_reviewer(project_path, file_path)
+        findings = await _spawn_file_reviewer(project_path, file_path, base_ref)
     except Exception as exc:  # noqa: BLE001 - failures recorded as issues, never propagate
         log.exception("file reviewer failed for %s", file_path)
         result.status = "failed"
@@ -249,16 +253,39 @@ async def _review_one_file(
         )
         return
 
-    for finding in findings:
-        _submit_finding(workspace_id, file_path, finding)
     result.findings_count = len(findings)
+    for finding in findings:
+        try:
+            _submit_finding(workspace_id, file_path, finding)
+        except Exception as submit_exc:  # noqa: BLE001 - per-finding DB errors are isolated
+            log.exception(
+                "failed to submit finding for ws=%s file=%s", workspace_id, file_path
+            )
+            result.submit_failures += 1
     result.status = "done"
 
 
-async def _spawn_file_reviewer(project_path: Path, file_path: str) -> list[dict]:
+def _get_file_diff(project_path: Path, file_path: str, base_ref: str) -> str:
+    """Get the diff for a single file vs base. Empty string on any failure."""
+    try:
+        result = subprocess.run(
+            ["git", "diff", f"{base_ref}..HEAD", "--", file_path],
+            cwd=project_path, capture_output=True, text=True, timeout=10,
+        )
+        return result.stdout if result.returncode == 0 else ""
+    except Exception:  # noqa: BLE001 - best-effort; missing diff degrades gracefully
+        return ""
+
+
+async def _spawn_file_reviewer(
+    project_path: Path, file_path: str, base_ref: str = "main"
+) -> list[dict]:
+    hunk = _get_file_diff(project_path, file_path, base_ref)
     prompt = (
-        f"Review the file: {file_path}\n\n"
-        "Report only LOCAL issues per your role spec."
+        f"Review this file's changes for LOCAL issues only.\n\n"
+        f"File: {file_path}\n\n"
+        f"Diff (against {base_ref}):\n```\n{hunk}\n```\n\n"
+        f"Output JSON per your role spec."
     )
     stdout = await _spawn_claude_agent(
         agent=_FILE_REVIEWER_AGENT,
@@ -284,11 +311,21 @@ async def _run_integration_agent(
         timeout_s=_timeout_s() * _INTEGRATION_TIMEOUT_MULTIPLIER,
     )
     if agent_name in _SELF_SUBMITTING_AGENTS:
+        envelope = json.loads(stdout) if stdout.strip() else {}
+        if envelope.get("is_error") or len(stdout.strip()) < 20:
+            log.warning(
+                "%s returned a suspect output (is_error=%s, len=%d); findings may be missing",
+                agent_name, envelope.get("is_error"), len(stdout.strip()),
+            )
         return
 
     text = _extract_envelope_result(stdout)
     if text.strip():
         _submit_text_finding(workspace_id, agent_name, text)
+    else:
+        log.warning(
+            "%s returned empty result; no integration finding recorded", agent_name
+        )
 
 
 async def _spawn_claude_agent(

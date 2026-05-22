@@ -87,11 +87,18 @@ def test_list_reviewable_files_includes_added():
     assert result[0].path == "src/feature.py"
 
 
-def test_list_reviewable_files_includes_deleted():
+def test_list_reviewable_files_excludes_deleted():
     with _mock_diff("D\tsrc/legacy.py\n"):
         result = list_reviewable_files(REPO, "main")
+    assert result == []
+
+
+def test_list_reviewable_files_deleted_mixed_with_others():
+    diff = "D\tsrc/old.py\nM\tsrc/new.py\n"
+    with _mock_diff(diff):
+        result = list_reviewable_files(REPO, "main")
     assert len(result) == 1
-    assert result[0].path == "src/legacy.py"
+    assert result[0].path == "src/new.py"
 
 
 def test_list_reviewable_files_excludes_pure_rename():
@@ -146,6 +153,13 @@ def test_list_reviewable_files_excludes_snap():
 
 def test_list_reviewable_files_excludes_lock_files():
     diff = "M\tpackage-lock.json\nM\tyarn.lock\nM\tPoetry.lock\n"
+    with _mock_diff(diff):
+        result = list_reviewable_files(REPO, "main")
+    assert result == []
+
+
+def test_list_reviewable_files_excludes_nested_package_lock():
+    diff = "M\tfrontend/package-lock.json\nM\tapps/client/yarn.lock\n"
     with _mock_diff(diff):
         result = list_reviewable_files(REPO, "main")
     assert result == []

@@ -24,8 +24,10 @@ GENERATED_PATTERNS: tuple[str, ...] = (
     "*_pb.py",
     "*.snap",
     "*.lock",
-    "package-lock.json",
-    "yarn.lock",
+    # fnmatch's * matches path separators, so these cover nested paths too:
+    # e.g. "frontend/package-lock.json" matches "*package-lock.json"
+    "*package-lock.json",
+    "*yarn.lock",
 )
 
 
@@ -57,6 +59,8 @@ def list_reviewable_files(
         if rf is None:
             continue
         if rf.status == "R100":  # pure rename — skip
+            continue
+        if rf.status == "D":  # deleted — file no longer exists on disk
             continue
         if _is_excluded(rf.path, excludes):
             continue

@@ -50,9 +50,7 @@ function renderFileList() {
       var unresolvedDot = fileHasUnresolvedComments(f.path) ? '<span class="file-unresolved-dot" title="Has unresolved comments"></span>' : '';
       var goToBtn = '<button class="btn btn-sm go-to-file-btn" data-filepath="' + escapeHtml(f.path) + '" title="' + t('buttons.goToFileViewer') + '" style="padding: 0 4px; font-size: 0.7rem; line-height: 1; flex-shrink: 0;">&#128196;</button>';
       var displayName = f.path.split('/').pop();
-      var renameLabel = '';
       if (f.old_path && f.old_path !== f.path) {
-        renameLabel = '<span style="font-size: 0.8rem; color: var(--text-muted); margin-right: 4px;">' + escapeHtml(t('diff.movedFrom')) + ' ' + escapeHtml(f.old_path.split('/').pop()) + '</span>';
         displayName = f.path.split('/').pop() + ' ← ' + f.old_path.split('/').pop();
       }
       div.innerHTML = `<span>${escapeHtml(displayName)}</span>${unresolvedDot}${renderCommentIcon('review', f.path)}${goToBtn}<div class="file-stat"><span class="file-stat-add">+${f.additions}</span><span class="file-stat-del">-${f.deletions}</span></div>`;
