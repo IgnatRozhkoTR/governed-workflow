@@ -396,9 +396,15 @@
   "buttons.hide": "Hide",
   "buttons.unhide": "Unhide",
 
-  "author.agent": "agent",
-  "author.user": "user",
-  "author.reviewer": "reviewer",
+  "author.agent": "Agent",
+  "author.user": "You",
+  "author.reviewer": "Reviewer",
+  "author.file-reviewer": "File reviewer (Haiku)",
+  "author.architecture-reviewer": "Architecture & Clean Code (Opus)",
+  "author.correctness-reviewer": "Correctness & Security (Opus)",
+  "author.code-reviewer": "Code reviewer (legacy)",
+  "author.senior-code-validator": "Senior validator",
+  "author.review-agent-failure": "Review agent failure",
 
   "research.viewLinked": "View linked research",
 

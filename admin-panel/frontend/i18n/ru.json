@@ -396,9 +396,15 @@
   "buttons.hide": "Скрыть",
   "buttons.unhide": "Показать",
 
-  "author.agent": "агент",
-  "author.user": "пользователь",
-  "author.reviewer": "ревьюер",
+  "author.agent": "Агент",
+  "author.user": "Вы",
+  "author.reviewer": "Ревьюер",
+  "author.file-reviewer": "Файловый ревьюер (Haiku)",
+  "author.architecture-reviewer": "Архитектура и чистый код (Opus)",
+  "author.correctness-reviewer": "Корректность и безопасность (Opus)",
+  "author.code-reviewer": "Ревьюер кода (legacy)",
+  "author.senior-code-validator": "Старший валидатор",
+  "author.review-agent-failure": "Сбой ревью-агента",
 
   "research.viewLinked": "Просмотреть связанное исследование",
 

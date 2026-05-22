@@ -391,6 +391,7 @@ async def _spawn_claude_agent(
     proc = await asyncio.create_subprocess_exec(
         *argv,
         cwd=str(project_path),
+        stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

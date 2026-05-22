@@ -13,6 +13,20 @@
  * }
  * @returns {HTMLElement} - the thread DOM element
  */
+function reviewAuthorLabel(author) {
+  var key = 'author.' + author;
+  var translated = t(key);
+  if (translated !== key) return translated;
+  return author
+    .split(/[-_]/)
+    .filter(function(part) { return part.length > 0; })
+    .map(function(part, idx) {
+      if (idx === 0) return part.charAt(0).toUpperCase() + part.slice(1);
+      return part;
+    })
+    .join(' ');
+}
+
 function renderReviewThread(comment, options) {
   var opts = options || {};
 
@@ -34,7 +48,7 @@ function buildReviewThreadHeader(comment, opts) {
   var author = comment.author || 'user';
   var authorBadge = document.createElement('span');
   authorBadge.className = 'review-author review-author-' + author;
-  authorBadge.textContent = t('author.' + author);
+  authorBadge.textContent = reviewAuthorLabel(author);
   header.appendChild(authorBadge);
 
   if (opts.showFileInfo && comment.file_path) {
@@ -120,7 +134,7 @@ function buildReviewReply(reply) {
   var author = reply.author || 'user';
   var authorBadge = document.createElement('span');
   authorBadge.className = 'review-author review-author-' + author;
-  authorBadge.textContent = t('author.' + author);
+  authorBadge.textContent = reviewAuthorLabel(author);
   meta.appendChild(authorBadge);
 
   if (reply.created_at) {
