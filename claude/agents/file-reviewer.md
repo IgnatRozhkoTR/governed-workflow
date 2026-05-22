@@ -84,7 +84,7 @@ Default to MAJOR when uncertain. Reserve CRITICAL for unambiguous correctness/se
 1. Read the file via the path passed to you.
 2. Identify what changed (diff context is in your prompt).
 3. For each issue you find that fits the LOCAL scope above, emit a finding.
-4. Return the JSON. Do not narrate. Do not summarize. Do not greet.
+4. ALWAYS conclude your turn with a final assistant text message containing the JSON envelope. Even after Read tool calls, you MUST emit the JSON as your final message — never end your turn with only tool calls. If you found no issues, your final message must be exactly `{"file": "<path>", "findings": []}`.
 
 # Discipline
 

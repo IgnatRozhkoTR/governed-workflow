@@ -29,7 +29,7 @@ On entry to 4.0 the admin panel **automatically launches** the headless review p
    - Before calling `workspace_advance`, call `workspace_review_pipeline_summary` (or `GET /api/workspaces/<id>/review-pipeline/summary`). Confirm `is_complete=true` and `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: re-trigger via the Run Review button (workspace page) or `POST /api/workspaces/<id>/review-pipeline/start`, OR proceed with the partial result if the failures are recoverable.
    - Call `workspace_advance` to move to 4.1.
 
-If the pipeline failed mid-run, the failure reason appears as a `review-agent-failure` typed issue. Inspect it via `workspace_get_review_issues` and decide whether to re-trigger or proceed.
+If the pipeline failed mid-run, the reason is exposed only via `workspace_review_pipeline_summary` (`failed_files_errors`, `integration_errors`, top-level `error`) — never as a discussion. Inspect those fields and decide whether to re-trigger or proceed.
 
 **Advance 4.0 → 4.1** requires: progress entry for phase `"4.0"`."""
 

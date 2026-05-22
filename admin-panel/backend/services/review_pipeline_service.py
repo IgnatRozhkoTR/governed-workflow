@@ -20,12 +20,14 @@ enters phase ``4.0``. The pipeline:
      secrets, sensitive data in logs, API contract leaks).
    Each one self-submits findings through MCP, so the pipeline only awaits
    their exit codes. A failure in one does not cancel the other — each
-   agent is wrapped in its own try/except and its failure is recorded as a
-   ``review-agent-failure`` typed issue.
+   agent is wrapped in its own try/except and its error is captured on the
+   in-memory ``PipelineStatus``.
 
-Agent failures (timeout, non-zero exit, JSON parse failure) are recorded as
-``review-agent-failure`` typed issues so the user can see them in the admin
-panel — the pipeline never raises out to the caller.
+Agent failures (timeout, non-zero exit, JSON parse failure) are surfaced
+only via the in-memory ``PipelineStatus`` and the
+``/api/workspaces/<id>/review-pipeline/summary`` endpoint — never written to
+the discussions table, so the review queue stays clean. The pipeline never
+raises out to the caller.
 
 Status is exposed via :func:`get_status` (in-memory, keyed by
 ``workspace_id``) and the ``/api/workspaces/<id>/review-pipeline-status``
@@ -66,10 +68,6 @@ _SELF_SUBMITTING_AGENTS: frozenset[str] = frozenset({
 })
 
 _STDERR_EXCERPT_CHARS = 500
-
-_PIPELINE_FILE_PATH = "(pipeline)"
-
-_FAILURE_PREFIX = "[review-agent-failure]"
 
 PipelineState = Literal[
     "queued", "filtering", "file_stage", "integration_stage", "done", "failed"
@@ -115,6 +113,7 @@ class PipelineStatus:
     state: PipelineState = "queued"
     files: dict[str, FileResult] = field(default_factory=dict)
     integration: dict[str, AgentState] = field(default_factory=dict)
+    integration_errors: dict[str, str] = field(default_factory=dict)
     started_at: float | None = None
     finished_at: float | None = None
     error: str | None = None
@@ -154,11 +153,14 @@ def status_summary(workspace_id: int) -> dict | None:
 
     file_states = {"pending": 0, "running": 0, "done": 0, "failed": 0}
     failed_files: list[str] = []
+    failed_files_errors: dict[str, str] = {}
     files_with_findings = 0
     for path, result in status.files.items():
         file_states[result.status] = file_states.get(result.status, 0) + 1
         if result.status == "failed":
             failed_files.append(path)
+            if result.error:
+                failed_files_errors[path] = result.error
         if result.findings_count > 0:
             files_with_findings += 1
 
@@ -183,9 +185,11 @@ def status_summary(workspace_id: int) -> dict | None:
         "files_with_findings": files_with_findings,
         "files_clean": file_states["done"] - files_with_findings,
         "failed_files": failed_files,
+        "failed_files_errors": failed_files_errors,
         "integration_done": integ_states["done"],
         "integration_failed": integ_states["failed"],
         "integration_total": len(status.integration),
+        "integration_errors": dict(status.integration_errors),
         "is_complete": is_complete,
         "is_ok": is_ok,
         "error": status.error,
@@ -250,9 +254,14 @@ def _run_thread(
         asyncio.run(_run_async(workspace_id, project_path, base_branch, status))
     except Exception as exc:  # noqa: BLE001 - top-level guard for the daemon thread
         log.exception("review pipeline crashed for workspace %s", workspace_id)
-        status.state = "failed"
         status.error = str(exc)
-        status.finished_at = time.time()
+    finally:
+        if status.state not in _TERMINAL_STATES:
+            status.state = "failed"
+            if not status.error:
+                status.error = "pipeline thread exited without reaching a terminal state"
+        if status.finished_at is None:
+            status.finished_at = time.time()
 
 
 async def _run_async(
@@ -319,7 +328,7 @@ async def _run_integration_stage(
         except Exception as exc:  # noqa: BLE001 - each agent isolated
             log.exception("integration agent %s failed", agent_name)
             status.integration[agent_name] = "failed"
-            _record_agent_failure(workspace_id, agent_name, str(exc))
+            status.integration_errors[agent_name] = str(exc)
 
     await asyncio.gather(
         *(_run_one(name) for name in _INTEGRATION_AGENTS),
@@ -338,13 +347,10 @@ async def _review_one_file(
     result.status = "running"
     try:
         findings = await _spawn_file_reviewer(project_path, file_path, base_ref)
-    except Exception as exc:  # noqa: BLE001 - failures recorded as issues, never propagate
+    except Exception as exc:  # noqa: BLE001 - failures captured on FileResult, never propagate
         log.exception("file reviewer failed for %s", file_path)
         result.status = "failed"
         result.error = str(exc)
-        _record_agent_failure(
-            workspace_id, _FILE_REVIEWER_AGENT, str(exc), file_path=file_path
-        )
         return
 
     result.findings_count = len(findings)
@@ -444,18 +450,17 @@ async def _spawn_claude_agent(
     argv.extend([
         "--output-format", "json",
         "--max-turns", str(max_turns),
-        prompt,
     ])
     proc = await asyncio.create_subprocess_exec(
         *argv,
         cwd=str(project_path),
-        stdin=asyncio.subprocess.DEVNULL,
+        stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
     try:
         stdout_bytes, stderr_bytes = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout_s
+            proc.communicate(input=prompt.encode("utf-8")), timeout=timeout_s
         )
     except asyncio.TimeoutError as exc:
         proc.kill()
@@ -476,15 +481,34 @@ async def _spawn_claude_agent(
 def _parse_file_reviewer_findings(stdout: str) -> list[dict]:
     result_str = _extract_envelope_result(stdout)
     if not result_str.strip():
+        log.warning("file-reviewer returned empty result — treating as no findings")
         return []
+    cleaned = _strip_markdown_fences(result_str.strip())
     try:
-        payload = json.loads(result_str)
+        payload = json.loads(cleaned)
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"file-reviewer returned invalid JSON: {exc}") from exc
     findings = payload.get("findings", [])
     if not isinstance(findings, list):
         raise RuntimeError("file-reviewer payload missing 'findings' list")
     return [f for f in findings if isinstance(f, dict)]
+
+
+def _strip_markdown_fences(text: str) -> str:
+    """Remove a single set of opening/closing ``` fences if present.
+
+    The file-reviewer agent is instructed to emit raw JSON, but haiku-class
+    models occasionally wrap output in ```json ... ``` blocks. Tolerate that
+    rather than failing the file.
+    """
+    if not text.startswith("```"):
+        return text
+    lines = text.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip().startswith("```"):
+        lines = lines[:-1]
+    return "\n".join(lines)
 
 
 def _extract_envelope_result(stdout: str) -> str:
@@ -536,37 +560,5 @@ def _submit_finding(workspace_id: int, file_path: str, finding: dict) -> None:
             author=_FILE_REVIEWER_AGENT,
         )
         db.commit()
-    finally:
-        db.close()
-
-
-def _record_agent_failure(
-    workspace_id: int,
-    agent_name: str,
-    error: str,
-    file_path: str | None = None,
-) -> None:
-    target = file_path or _PIPELINE_FILE_PATH
-    excerpt = error[:_STDERR_EXCERPT_CHARS]
-    description = f"{_FAILURE_PREFIX} {agent_name}: {excerpt}"
-
-    db = get_db()
-    try:
-        submit_review_issue(
-            db,
-            workspace_id=workspace_id,
-            file_path=target,
-            line_start=1,
-            line_end=1,
-            description=description,
-            author=agent_name,
-        )
-        db.commit()
-    except Exception:  # noqa: BLE001 - last-resort defensive
-        log.exception(
-            "failed to persist agent-failure issue for ws=%s agent=%s",
-            workspace_id,
-            agent_name,
-        )
     finally:
         db.close()

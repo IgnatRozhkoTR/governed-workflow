@@ -167,6 +167,8 @@ def test_file_reviewer_timeout_is_recorded_as_failure(repo_with_files):
     assert status.files["src/alpha.py"].status == "failed"
     assert "timeout" in (status.files["src/alpha.py"].error or "")
 
+    # Per-file failures must NOT be written to the discussions table — they
+    # surface only through the in-memory PipelineStatus and summary endpoint.
     from core.db import get_db
     db = get_db()
     try:
@@ -176,7 +178,8 @@ def test_file_reviewer_timeout_is_recorded_as_failure(repo_with_files):
         ).fetchall()
     finally:
         db.close()
-    assert any("[review-agent-failure]" in r["text"] for r in rows)
+    assert not any("review-agent-failure" in r["text"] for r in rows)
+    assert rows == []
 
 
 def test_integration_agent_failure_does_not_block_other_agent(repo_with_files):
@@ -205,6 +208,8 @@ def test_integration_agent_failure_does_not_block_other_agent(repo_with_files):
     assert status.state == "done"
     assert status.integration["architecture-reviewer"] == "failed"
     assert status.integration["correctness-reviewer"] == "done"
+    assert "boom" in status.integration_errors["architecture-reviewer"]
+    assert "correctness-reviewer" not in status.integration_errors
 
 
 def test_integration_agents_run_concurrently(repo_with_files):
@@ -460,8 +465,11 @@ def test_status_summary_flags_file_and_integration_failures(repo_with_files):
     assert summary["files_with_findings"] == 1
     assert summary["files_clean"] == 0
     assert summary["failed_files"] == ["src/beta.py"]
+    assert "timeout" in summary["failed_files_errors"]["src/beta.py"]
     assert summary["integration_failed"] == 1
     assert summary["integration_done"] == 1
+    assert "boom" in summary["integration_errors"]["architecture-reviewer"]
+    assert "correctness-reviewer" not in summary["integration_errors"]
     assert summary["is_complete"] is True
     assert summary["is_ok"] is False
 
