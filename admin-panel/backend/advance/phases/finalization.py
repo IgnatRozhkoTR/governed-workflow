@@ -9,23 +9,27 @@ class AgenticReviewPhase(Phase):
 
     def description_for_skill(self) -> str:
         return """\
-## 4.0 Blind Code Review
+## 4.0 Blind Code Review (automated)
 
-**Actors**: Fresh reviewer sub-agents (zero implementation context) | **Code edits: OFF**
+**Actors**: Headless review pipeline (background daemon) | **Code edits: OFF**
 
-Deploy **exactly 3** code-reviewer sub-agents **in parallel**, each assigned a distinct review perspective:
+On entry to 4.0 the admin panel **automatically launches** the headless review pipeline. Per-file reviewers fan out in parallel across the diff, then three specialised integration reviewers run concurrently:
 
-1. **Clean code & SOLID** — naming, method length, SRP violations, DRY, code smells
-2. **Architecture & data flow** — component boundaries, dependency direction, query patterns, transaction scope
-3. **Edge cases & error handling** — null paths, missing validation, error propagation, concurrency concerns
+- **architecture-reviewer** — SRP/OCP, coupling, layer boundaries, clean-code principles
+- **logic-reviewer** — business logic correctness, edge cases, error handling, contracts
+- **security-reviewer** — input validation, auth, injection, secrets, API contracts
 
-Do NOT brief reviewers with implementation context — they must review the code blind. Provide only the ticket description and branch name.
+**Do NOT manually dispatch reviewers.** The pipeline is already running. Manual dispatch would duplicate work and confuse findings.
 
-Reviewers submit findings via `workspace_submit_review_issue(file_path, line_start, line_end, severity, description)`. Only `critical` and `major` severity findings are accepted — lower severity is rejected by the server.
+### What you do at 4.0
 
-Each submitted finding creates a review discussion with `resolution='open'`.
+1. Watch the **Review Pipeline** card on the workspace page in the admin panel, or poll `GET /api/workspaces/<id>/review-pipeline-status`. States: `queued` → `filtering` → `file_stage` → `integration_stage` → `done` (or `failed`).
+2. When state is `done` or `failed`:
+   - Call `workspace_get_review_issues` to see the findings.
+   - Call `workspace_update_progress(phase="4.0", summary="Pipeline complete. N findings.")`.
+   - Call `workspace_advance` to move to 4.1.
 
-Call `workspace_advance`.
+If the pipeline failed mid-run, the failure reason appears as a `review-agent-failure` typed issue. Inspect it via `workspace_get_review_issues` and decide whether to re-trigger (currently manual) or proceed.
 
 **Advance 4.0 → 4.1** requires: progress entry for phase `"4.0"`."""
 
@@ -51,7 +55,7 @@ class AddressFixPhase(Phase):
 
 Active scope = union of all sub-phase scopes.
 
-1. Read review items via `workspace_get_review_issues`
+1. Read review items via `workspace_get_review_issues`. Findings from the headless pipeline are tagged in their description: `[severity/type]` for per-file findings, `[integration:agent-name]` for integration-reviewer findings. Use the tags to triage by lane.
 2. Address each finding — fix the code, or determine it's a false positive / out of scope
 3. Set resolution via `workspace_resolve_review_issue(issue_id, "fixed"|"false_positive"|"out_of_scope")`
 4. The user reviews resolutions in the admin panel and resolves each item
