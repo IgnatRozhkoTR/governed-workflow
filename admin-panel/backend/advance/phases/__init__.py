@@ -55,6 +55,11 @@ class Phase(ABC):
         """If not None, a progress entry with this key must exist before advancing."""
         return None
 
+    def description_for_skill(self) -> str:
+        """Markdown block for this phase, rendered into SKILL.md.
+        Empty string means omit from the rendered skill."""
+        return ""
+
     def success_message(self, ws, new_phase) -> str:
         """Message returned on successful advance. Override for custom messages."""
         from core.i18n import t

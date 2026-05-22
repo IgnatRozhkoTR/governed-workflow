@@ -133,14 +133,6 @@ async function initApp() {
   loadModulesCard();
   if (typeof renderNetworkMode === 'function') renderNetworkMode();
   if (typeof renderLspShortcutsConfig === 'function') renderLspShortcutsConfig();
-  var wsBody = document.getElementById('phaseSettingsWorkspaceBody');
-  if (wsBody && typeof renderPhaseToggleCard === 'function') {
-    renderPhaseToggleCard(
-      wsBody,
-      'workspace',
-      '/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/phase-settings'
-    );
-  }
 
   // Restore diff toggle states from localStorage
   document.querySelectorAll('#viewModeToggle .toggle-opt').forEach(function(b) {

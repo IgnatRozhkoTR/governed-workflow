@@ -78,6 +78,8 @@
   "buttons.setPhase": "Set Phase",
   "buttons.source": "Source",
   "buttons.preview": "Preview",
+  "buttons.savePhaseSettings": "Save",
+  "buttons.discardPhaseSettings": "Discard",
 
   "config.deviceSettings": "Device Settings",
   "config.commandLabel": "Command",
@@ -173,6 +175,8 @@
   "messages.ruleDeleted": "Rule deleted",
   "messages.ruleSaveFailed": "Rule save failed: {error}",
   "messages.gitSaveFailed": "Failed: {error}",
+  "messages.phaseSettingsSaved": "Settings saved",
+  "messages.phaseSettingsSaveFailed": "Failed to save settings: {error}",
   "messages.startCommandCopied": "Start command copied",
   "messages.resumeCommandCopied": "Resume command copied",
 

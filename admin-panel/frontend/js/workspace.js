@@ -228,7 +228,7 @@ async function openProject(projectId) {
   var projectBody = document.getElementById('phaseSettingsProjectBody');
   if (projectCard && projectBody && typeof renderPhaseToggleCard === 'function') {
     projectCard.style.display = '';
-    renderPhaseToggleCard(projectBody, 'project', '/api/projects/' + encodeURIComponent(projectId) + '/phase-settings');
+    renderPhaseToggleCard(projectBody, 'project', '/api/projects/' + encodeURIComponent(projectId) + '/phase-settings', { batchSave: true });
   }
 }
 

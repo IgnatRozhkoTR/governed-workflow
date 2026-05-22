@@ -20,6 +20,7 @@ class DeclarativePhase(Phase):
         self._approve_target = manifest.get("approve_target")
         self._reject_target = manifest.get("reject_target")
         self._validator_fn = validator_fn
+        self._description_for_skill = manifest.get("description_for_skill", "")
 
     @property
     def id(self):
@@ -40,6 +41,9 @@ class DeclarativePhase(Phase):
     @property
     def reject_target(self):
         return self._reject_target
+
+    def description_for_skill(self) -> str:
+        return self._description_for_skill
 
     def validate(self, ws, body, project_path):
         if self._validator_fn is None:

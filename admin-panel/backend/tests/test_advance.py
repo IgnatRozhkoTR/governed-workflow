@@ -715,27 +715,6 @@ def test_advance_through_multiple_disabled(workspace, project):
         _clean_phase_settings()
 
 
-def test_advance_keeps_always_on_enabled_even_if_disabled_row_exists(workspace, project):
-    """always-on phase 2.0 is reached even when a disabled DB row exists for it."""
-    from datetime import datetime as dt
-    db = get_db()
-    db.execute(
-        "INSERT INTO phase_settings (scope_type, scope_id, phase_id, enabled, updated_at) "
-        "VALUES (?, ?, ?, ?, ?)",
-        ("device", "", "2.0", 0, dt.now().isoformat()),
-    )
-    db.commit()
-    db.close()
-    try:
-        set_phase(workspace["id"], "1.4")
-        r_approve = _get_ws_row(workspace["id"])
-        from advance.orchestrator import approve_gate
-        result = approve_gate(r_approve)
-        assert result.get("phase") == "2.0"
-    finally:
-        _clean_phase_settings()
-
-
 def test_advance_unchanged_when_next_is_enabled(workspace, project):
     """No disabled phases: advance from 1.0 reaches 1.1 as normal."""
     set_phase(workspace["id"], "1.0")

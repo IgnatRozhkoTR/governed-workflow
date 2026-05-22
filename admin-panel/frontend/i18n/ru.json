@@ -78,6 +78,8 @@
   "buttons.setPhase": "Установить фазу",
   "buttons.source": "Исходный код",
   "buttons.preview": "Просмотр",
+  "buttons.savePhaseSettings": "Сохранить",
+  "buttons.discardPhaseSettings": "Отменить",
 
   "config.deviceSettings": "Настройки устройства",
   "config.commandLabel": "Команда",
@@ -173,6 +175,8 @@
   "messages.ruleDeleted": "Правило удалено",
   "messages.ruleSaveFailed": "Не удалось сохранить правило: {error}",
   "messages.gitSaveFailed": "Ошибка: {error}",
+  "messages.phaseSettingsSaved": "Настройки сохранены",
+  "messages.phaseSettingsSaveFailed": "Ошибка сохранения настроек: {error}",
   "messages.startCommandCopied": "Команда запуска скопирована",
   "messages.resumeCommandCopied": "Команда возобновления скопирована",
 

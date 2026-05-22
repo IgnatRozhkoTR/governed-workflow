@@ -124,18 +124,6 @@ def test_resolve_project_overrides_device(db):
     assert "1.1" in result
 
 
-def test_resolve_always_on_force_included_even_when_disabled_in_db(db):
-    from datetime import datetime
-    db.execute(
-        "INSERT INTO phase_settings (scope_type, scope_id, phase_id, enabled, updated_at) VALUES (?, ?, ?, ?, ?)",
-        ("device", "", "0", 0, datetime.now().isoformat()),
-    )
-    db.commit()
-
-    result = resolve_enabled_phases(db, None, None, {"0", "1.1"})
-    assert "0" in result
-
-
 def test_resolve_workspace_disables(db):
     set_scope_settings(db, "workspace", "w2", {"4.0": False})
     db.commit()

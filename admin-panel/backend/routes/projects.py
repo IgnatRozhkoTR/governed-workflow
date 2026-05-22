@@ -1,4 +1,5 @@
 """Project CRUD routes."""
+import logging
 import os
 import re
 from datetime import datetime
@@ -11,6 +12,9 @@ from core.db import get_db
 from core.helpers import run_git, write_json
 from core.i18n import t
 from core.paths import DEFAULT_GIT_RULES
+from services.configurator_service import ConfiguratorChain
+
+log = logging.getLogger(__name__)
 
 bp = Blueprint("projects", __name__)
 
@@ -64,6 +68,10 @@ def register_project():
         db.commit()
 
         _setup_project_configs(path)
+        try:
+            ConfiguratorChain.default().run(db, project_id, Path(path))
+        except Exception:
+            log.exception("Configurator chain failed at register_project; SKILL.md may be stale")
 
         project = {"id": project_id, "name": name, "path": path, "registered": registered}
         return jsonify(project), 201

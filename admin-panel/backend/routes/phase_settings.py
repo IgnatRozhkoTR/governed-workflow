@@ -1,10 +1,16 @@
 """Phase settings routes: device, project, and workspace level enablement."""
+import logging
+from pathlib import Path
+
 from flask import Blueprint, jsonify, request
 
 from core.db import get_db, get_db_ctx
 from core.decorators import with_project, with_workspace
 from core.phase import is_templated, phase_key
+from services.configurator_service import ConfiguratorChain
 from services.phase_settings import get_scope_settings, is_always_on, set_scope_settings
+
+log = logging.getLogger(__name__)
 
 bp = Blueprint("phase_settings", __name__)
 
@@ -91,6 +97,10 @@ def set_project_settings(db, project):
         updated = get_scope_settings(db, "project", str(project["id"]))
     except ValueError as err:
         return jsonify({"error": str(err)}), 400
+    try:
+        ConfiguratorChain.default().run(db, project["id"], Path(project["path"]))
+    except Exception:
+        log.exception("Configurator chain failed at set_project_settings; SKILL.md may be stale")
     return jsonify({"ok": True, "settings": updated})
 
 
@@ -114,6 +124,10 @@ def set_workspace_settings(db, ws, project):
         updated = get_scope_settings(db, "workspace", str(ws["id"]))
     except ValueError as err:
         return jsonify({"error": str(err)}), 400
+    try:
+        ConfiguratorChain.default().run(db, project["id"], Path(project["path"]))
+    except Exception:
+        log.exception("Configurator chain failed at set_workspace_settings; SKILL.md may be stale")
     return jsonify({"ok": True, "settings": updated})
 
 

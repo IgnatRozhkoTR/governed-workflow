@@ -386,6 +386,81 @@ _TEMPLATE_NAMES = {
 _TEMPLATE_GATE_STEPS = frozenset({3})
 
 
+_TEMPLATE_SKILL_DESCRIPTIONS = {
+    0: """\
+## 3.N.0 Implementation
+
+**Actors**: Engineer sub-agents, then test engineer sub-agents | **Code edits: ON (in sub-phase scope)**
+
+Deploy in two stages:
+
+**Stage 1 — Production code**: Deploy engineer sub-agent(s) for the implementation tasks.
+
+**Stage 2 — Tests**: After engineers complete, deploy test engineer sub-agent(s) to write tests for the new/changed code. Test engineers read the implementation but write tests independently — they are NOT briefed on "how the code works", only on "what it should do" (from the task description and scope).
+
+If during implementation an issue arises that requires changing the approach or scope, message the plan-advisor to discuss:
+
+```
+SendMessage(
+  to: "plan-advisor",
+  content: "Implementation issue in sub-phase {N}: {describe the problem}.
+            The original plan assumed {X} but we found {Y}. What's the best path forward?"
+)
+```
+
+If the user requests additional work or new requirements emerge, use `workspace_extend_plan` to add a new sub-phase rather than rewriting the entire plan. This preserves existing sub-phases and their progress.
+
+Call `workspace_advance` when both implementation and tests are complete.
+
+**Advance 3.N.0 → 3.N.1** requires: at least 1 file changed per `must`-scope entry.""",
+
+    1: """\
+## 3.N.1 Validation
+
+**Actors**: Validator sub-agents | **Code edits: OFF**
+
+Deploy validator sub-agents for compilation check + code quality review. Submit structured results via `workspace_submit_validation(phase="3.N.1", status="clean"|"dirty", findings=[...])`. Verification profiles assigned to the workspace also run automatically at this phase (configured via `workspace_assign_verification_profile`); blocking steps must pass.
+
+Call `workspace_advance`. Backend auto-routes:
+- Issues found or verification failed → `3.N.2` (Fixes)
+- Clean → `3.N.3` (Code Review)""",
+
+    2: """\
+## 3.N.2 Fixes
+
+**Actors**: Engineer sub-agents | **Code edits: ON (in sub-phase scope)**
+
+You arrive here from validation failures OR user gate rejections. Read `workspace_get_comments` for user feedback. Deploy engineer sub-agents to fix the issues. Call `workspace_advance` when done.""",
+
+    3: """\
+## 3.N.3 Code Review (USER GATE)
+
+User reviews the diff in the admin panel.
+
+- **Approve** (+ optional commit message) → `3.N.4`
+- **Reject** → back to `3.N.2` with comments
+
+Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+
+**After rejection**: the backend sets the phase to `3.N.2`. You are now in the fix phase — code edits are ON. Do NOT call `workspace_advance` immediately. Instead:
+1. Call `workspace_get_state` to confirm you're at `3.N.2`
+2. Call `workspace_get_comments` to read the rejection feedback
+3. Deploy engineer sub-agents to address the feedback
+4. Call `workspace_advance` only after fixes are complete""",
+
+    4: """\
+## 3.N.4 Commit
+
+**Actor**: Engineer sub-agent | **Commits: ON**
+
+Commit all changes. Use the commit message from `workspace_get_state` (`context.commit_message`) or generate one per git-rules.md.
+
+Call `workspace_advance(commit_hash="{hash}")`.
+
+**Advance 3.N.4 → next** requires: valid commit hash + progress entry `"3.N"`. Backend routes to `3.(N+1).0` or `4.0` if last sub-phase.""",
+}
+
+
 class _ExecutionTemplatePhase(Phase):
     """Structural placeholder for an execution sub-step parameterized by item.
 
@@ -408,6 +483,9 @@ class _ExecutionTemplatePhase(Phase):
     @property
     def is_user_gate(self) -> bool:
         return self._k in _TEMPLATE_GATE_STEPS
+
+    def description_for_skill(self) -> str:
+        return _TEMPLATE_SKILL_DESCRIPTIONS.get(self._k, "")
 
     def validate(self, ws, body, project_path):
         raise NotImplementedError(
