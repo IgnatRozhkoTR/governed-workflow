@@ -226,9 +226,22 @@ async function openProject(projectId) {
 
   var projectCard = document.getElementById('phaseSettingsProjectCard');
   var projectBody = document.getElementById('phaseSettingsProjectBody');
+  var advanceBody = document.getElementById('advanceModesProjectBody');
   if (projectCard && projectBody && typeof renderPhaseToggleCard === 'function') {
     projectCard.style.display = '';
-    renderPhaseToggleCard(projectBody, 'project', '/api/projects/' + encodeURIComponent(projectId) + '/phase-settings', { batchSave: true });
+    renderPhaseToggleCard(
+      projectBody,
+      'project',
+      '/api/projects/' + encodeURIComponent(projectId) + '/phase-settings',
+      { batchSave: true }
+    ).then(function() {
+      if (advanceBody && typeof renderAdvanceModeSection === 'function') {
+        renderAdvanceModeSection(advanceBody, projectId).then(function() {
+          advanceBody._amSharedPhaseContainer = projectBody;
+          projectBody._amLinked = advanceBody;
+        });
+      }
+    });
   }
 }
 
@@ -387,6 +400,8 @@ function _wsInitSelector() {
         <div class="ws-section" id="phaseSettingsProjectCard" style="display: none;">
           <div class="ws-section-title">${t('cards.phaseSettings')}</div>
           <div id="phaseSettingsProjectBody"></div>
+          <div class="advance-modes__section-title">${t('cards.advanceModes')}</div>
+          <div id="advanceModesProjectBody"></div>
         </div>
 
         <div class="ws-section">

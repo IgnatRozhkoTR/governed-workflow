@@ -5,6 +5,7 @@ token middleware enforces caller identity upstream of approve/reject, so no
 per-request nonce is consulted here.
 """
 import logging
+import os
 import re
 from datetime import datetime
 
@@ -15,12 +16,21 @@ from core.helpers import run_git
 from core.i18n import t
 from core.phase import is_templated
 from core.terminal import notify_workspace
+from services.advance_mode_service import get_mode
 from services.phase_sequencer import full_phase_sequence, plan_from_workspace, resolve_phase_sequence
 
 logger = logging.getLogger(__name__)
 
 _COMMIT_PHASE_RE = re.compile(r'^3\.\d+\.4$')
 _EXECUTION_START_RE = re.compile(r'^3\.\d+\.0$')
+_PENDING_ADVANCE_ACTION_PATH = ".claude/state/pending-advance-action"
+
+
+def _is_major_transition(old_phase: str, new_phase: str) -> bool:
+    try:
+        return int(new_phase.split('.')[0]) > int(old_phase.split('.')[0])
+    except (ValueError, AttributeError):
+        return False
 
 
 def _resolve_forward_target(ws, db, candidate: str) -> str | None:
@@ -101,6 +111,55 @@ def _lazy_init_execution_checkpoint(db, ws, new_phase: str) -> None:
     )
 
 
+def _maybe_write_advance_action(db, ws, new_phase: str) -> None:
+    """Write pending-advance-action file when crossing a major-phase boundary.
+
+    Only fires for compact/clear modes; none and missing rows are no-ops.
+    Write failures are swallowed so they never block a phase transition.
+    """
+    old_phase = ws["phase"]
+    if not _is_major_transition(old_phase, new_phase):
+        return
+
+    try:
+        major = int(new_phase.split('.')[0])
+    except (ValueError, AttributeError):
+        return
+
+    project_id = ws["project_id"]
+    mode = get_mode(db, project_id, major)
+    if mode not in ("compact", "clear"):
+        return
+
+    working_dir = ws.get("working_dir") if isinstance(ws, dict) else None
+    if not working_dir:
+        try:
+            working_dir = ws["working_dir"]
+        except (KeyError, TypeError):
+            working_dir = None
+
+    if not working_dir or not os.path.isdir(working_dir):
+        logger.warning(
+            "Cannot write pending-advance-action for workspace %s: working_dir %r is missing or not a directory.",
+            ws["id"],
+            working_dir,
+        )
+        return
+
+    action_path = os.path.join(working_dir, _PENDING_ADVANCE_ACTION_PATH)
+    try:
+        os.makedirs(os.path.dirname(action_path), exist_ok=True)
+        with open(action_path, "w") as fh:
+            fh.write(mode)
+    except Exception:
+        logger.warning(
+            "Failed to write pending-advance-action for workspace %s (mode=%s); phase transition continues.",
+            ws["id"],
+            mode,
+            exc_info=True,
+        )
+
+
 def transition_phase(db, ws, new_phase, commit_hash=None):
     """Shared phase transition: update phase and record history.
 
@@ -136,6 +195,7 @@ def transition_phase(db, ws, new_phase, commit_hash=None):
         )
 
     _lazy_init_execution_checkpoint(db, ws, new_phase)
+    _maybe_write_advance_action(db, ws, new_phase)
 
     return True
 

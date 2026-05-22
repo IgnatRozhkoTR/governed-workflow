@@ -112,7 +112,9 @@ function _phaseUpdateSaveBar(container) {
   var saveBtn = container.querySelector('.phase-settings__save-btn');
   var discardBtn = container.querySelector('.phase-settings__discard-btn');
   if (!saveBtn) return;
-  var hasPending = Object.keys(container._pendingSettings).length > 0;
+  var hasPhasesPending = Object.keys(container._pendingSettings).length > 0;
+  var hasAdvancePending = container._amLinked ? amHasPending(container._amLinked) : false;
+  var hasPending = hasPhasesPending || hasAdvancePending;
   saveBtn.disabled = !hasPending;
   if (discardBtn) discardBtn.disabled = !hasPending;
 }
@@ -121,18 +123,30 @@ async function _phaseSaveSettings(container) {
   var saveBtn = container.querySelector('.phase-settings__save-btn');
   if (saveBtn) saveBtn.disabled = true;
 
+  var saves = [];
+  if (Object.keys(container._pendingSettings).length > 0) {
+    saves.push(
+      apiPut(container._endpointBase, { settings: container._pendingSettings })
+        .then(function() {
+          return apiGet(container._endpointBase).then(function(refreshedData) {
+            var refreshed = refreshedData.settings || {};
+            container._pendingSettings = {};
+            container._enabledMap = {};
+            Object.keys(refreshed).forEach(function(id) {
+              container._enabledMap[id] = !!refreshed[id];
+            });
+            _phaseRefreshRows(container);
+          });
+        })
+    );
+  }
+
+  if (container._amLinked && amHasPending(container._amLinked)) {
+    saves.push(amSave(container._amLinked, container._amLinked._amProjectId));
+  }
+
   try {
-    await apiPut(container._endpointBase, { settings: container._pendingSettings });
-    container._pendingSettings = {};
-
-    var refreshedData = await apiGet(container._endpointBase);
-    var refreshed = refreshedData.settings || {};
-    container._enabledMap = {};
-    Object.keys(refreshed).forEach(function(id) {
-      container._enabledMap[id] = !!refreshed[id];
-    });
-
-    _phaseRefreshRows(container);
+    await Promise.all(saves);
     if (typeof showToast === 'function') {
       showToast(_t('messages.phaseSettingsSaved'));
     }
@@ -146,6 +160,7 @@ async function _phaseSaveSettings(container) {
 
 function _phaseDiscardSettings(container) {
   container._pendingSettings = {};
+  if (container._amLinked) amDiscard(container._amLinked);
   _phaseRefreshRows(container);
 }
 

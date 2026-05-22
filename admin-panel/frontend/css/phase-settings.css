@@ -145,3 +145,66 @@
   opacity: 0.4;
   cursor: default;
 }
+
+/* ═══════════════════════════════════════════════ */
+/*  ADVANCE MODES DROPDOWN SECTION                 */
+/* ═══════════════════════════════════════════════ */
+
+.advance-modes__section-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 18px;
+  margin-bottom: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.advance-modes__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.advance-modes__row--pending {
+  background: var(--warning-dim);
+  border-radius: var(--radius-sm);
+}
+
+.advance-modes__row--pending .advance-modes__label {
+  font-style: italic;
+}
+
+.advance-modes__label {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.advance-modes__select {
+  font-size: 0.78rem;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.advance-modes__select:hover {
+  border-color: var(--border-active);
+}
+
+.advance-modes__select:focus {
+  outline: none;
+  border-color: var(--accent);
+}

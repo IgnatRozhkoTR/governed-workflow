@@ -189,24 +189,32 @@ def kill_session(name):
 
 
 def build_claude_command(ws, resume=False, channels=None):
-    """Build the full claude command from workspace config."""
-    cmd = ws_field(ws, 'claude_command') or 'claude'
+    """Build the claude command wrapped in a respawn loop.
+
+    The loop restarts claude after each exit. A force-new-session flag skips
+    --continue for that one launch; a wrapper-stop flag exits the loop cleanly.
+    The resume parameter is kept for call-site compatibility but is no longer
+    used — --continue is always the default inside the loop.
+    """
+    base = ws_field(ws, 'claude_command') or 'claude'
     skip = ws_field(ws, 'skip_permissions', 1)
     if skip:
-        cmd += ' --dangerously-skip-permissions'
-    cmd += ' --agent orchestrator'
+        base += ' --dangerously-skip-permissions'
     ch = channels if channels is not None else ws_field(ws, 'channels', '')
     if ch:
-        cmd += f' --channels {ch}'
-    label = ws_field(ws, 'sanitized_branch')
-    session_id = ws_field(ws, 'session_id')
-    if resume and session_id:
-        cmd += f' -r {session_id}'
-    elif resume and label:
-        cmd += f' -r {label}'
-    elif label:
-        cmd += f' -n {label}'
-    return cmd
+        base += f' --channels {ch}'
+    working_dir = ws['working_dir']
+    return (
+        f"bash -c 'cd \"{working_dir}\" && mkdir -p .claude/state && while true; do "
+        f"if [ -e .claude/state/wrapper-stop ]; then rm -f .claude/state/wrapper-stop; break; fi; "
+        f"if [ -e .claude/state/force-new-session ]; then "
+        f"rm -f .claude/state/force-new-session; "
+        f"{base}; "
+        f"else "
+        f"{base} --continue; "
+        f"fi; "
+        f"done'"
+    )
 
 
 def list_sessions():
