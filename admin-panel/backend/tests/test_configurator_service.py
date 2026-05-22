@@ -1,22 +1,26 @@
 """Tests for services.configurator_service.
 
-Sub-phase 3.1: a Configurator chain renders project-level config files from
-DB state. SkillConfigurator is the only built-in configurator and is
-responsible for templating SKILL.md from SKILL.md.template plus every
-enabled phase's description_for_skill().
+A Configurator chain renders project-level config files from DB state.
+SkillConfigurator templates SKILL.md, AgentFilesConfigurator mirrors the
+canonical agent set into each active worktree, and StopHookConfigurator
+backfills the Stop hook into pre-existing worktree settings files.
 """
 
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from core.db import get_db
 from services.configurator_service import (
+    AgentFilesConfigurator,
     Configurator,
     ConfiguratorChain,
     SkillConfigurator,
+    StopHookConfigurator,
 )
 
 
@@ -193,6 +197,219 @@ def test_disabled_phase_is_absent_from_rendered_skill(db, project_row, project_r
 def test_default_chain_includes_skill_configurator():
     chain = ConfiguratorChain.default()
     assert any(isinstance(c, SkillConfigurator) for c in chain._configurators)
+
+
+def test_default_chain_includes_agent_and_stop_hook_configurators():
+    chain = ConfiguratorChain.default()
+    assert any(isinstance(c, AgentFilesConfigurator) for c in chain._configurators)
+    assert any(isinstance(c, StopHookConfigurator) for c in chain._configurators)
+
+
+# ── AgentFilesConfigurator ─────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def agent_source(tmp_path):
+    src = tmp_path / "agents-src"
+    src.mkdir()
+    (src / "file-reviewer.md").write_text("---\nname: file-reviewer\n---\nbody\n")
+    (src / "architecture-reviewer.md").write_text("---\nname: architecture-reviewer\n---\nbody\n")
+    (src / "correctness-reviewer.md").write_text("---\nname: correctness-reviewer\n---\nbody\n")
+    return src
+
+
+def test_agent_files_configurator_copies_files_into_each_worktree(
+    db, project_row, agent_source, tmp_path
+):
+    wt_a = tmp_path / "wt-a"
+    wt_b = tmp_path / "wt-b"
+    wt_a.mkdir(); wt_b.mkdir()
+    _insert_worktree(db, project_row, "feature/a", wt_a, status="active")
+    _insert_worktree(db, project_row, "feature/b", wt_b, status="active")
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", agent_source):
+        AgentFilesConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+
+    for wt in (wt_a, wt_b):
+        agents_dir = wt / ".claude" / "agents"
+        assert (agents_dir / "file-reviewer.md").exists()
+        assert (agents_dir / "architecture-reviewer.md").exists()
+        assert (agents_dir / "correctness-reviewer.md").exists()
+
+
+def test_agent_files_configurator_removes_stale_agents_in_worktree(
+    db, project_row, agent_source, tmp_path
+):
+    """A worktree with an old logic-reviewer.md should have it deleted on sync."""
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    stale_dir = wt / ".claude" / "agents"
+    stale_dir.mkdir(parents=True)
+    (stale_dir / "logic-reviewer.md").write_text("old\n")
+    (stale_dir / "security-reviewer.md").write_text("old\n")
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", agent_source):
+        AgentFilesConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+
+    assert not (stale_dir / "logic-reviewer.md").exists()
+    assert not (stale_dir / "security-reviewer.md").exists()
+    assert (stale_dir / "file-reviewer.md").exists()
+
+
+def test_agent_files_configurator_skips_archived_worktrees(
+    db, project_row, agent_source, tmp_path
+):
+    wt_archived = tmp_path / "archived"
+    wt_archived.mkdir()
+    _insert_worktree(db, project_row, "feature/old", wt_archived, status="archived")
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", agent_source):
+        AgentFilesConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+
+    assert not (wt_archived / ".claude" / "agents").exists()
+
+
+def test_agent_files_configurator_skips_when_source_missing(
+    db, project_row, tmp_path, caplog
+):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+    missing_src = tmp_path / "does-not-exist"
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", missing_src), \
+         caplog.at_level(logging.WARNING, logger="services.configurator_service"):
+        AgentFilesConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+
+    assert not (wt / ".claude" / "agents").exists()
+    assert any("source" in r.getMessage() and "missing" in r.getMessage()
+               for r in caplog.records)
+
+
+def test_agent_files_configurator_is_idempotent(
+    db, project_row, agent_source, tmp_path
+):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", agent_source):
+        AgentFilesConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+        AgentFilesConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+
+    agents = sorted((wt / ".claude" / "agents").glob("*.md"))
+    assert [a.name for a in agents] == [
+        "architecture-reviewer.md",
+        "correctness-reviewer.md",
+        "file-reviewer.md",
+    ]
+
+
+# ── StopHookConfigurator ───────────────────────────────────────────────────────
+
+
+def _settings_with_hooks(extra_hooks: dict | None = None) -> dict:
+    return {"hooks": extra_hooks or {}}
+
+
+def test_stop_hook_configurator_adds_entry_when_absent(
+    db, project_row, tmp_path
+):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    settings_path = wt / ".claude" / "settings.json"
+    settings_path.parent.mkdir(parents=True)
+    settings_path.write_text(json.dumps(_settings_with_hooks()))
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    StopHookConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+
+    body = json.loads(settings_path.read_text())
+    stop_entries = body["hooks"]["Stop"]
+    assert len(stop_entries) == 1
+    cmd = stop_entries[0]["hooks"][0]["command"]
+    assert "stop-advance-action.py" in cmd
+
+
+def test_stop_hook_configurator_skips_when_settings_missing(
+    db, project_row, tmp_path
+):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    StopHookConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+
+    assert not (wt / ".claude" / "settings.json").exists()
+
+
+def test_stop_hook_configurator_preserves_existing_hooks(
+    db, project_row, tmp_path
+):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    settings_path = wt / ".claude" / "settings.json"
+    settings_path.parent.mkdir(parents=True)
+    existing = {
+        "hooks": {
+            "PreToolUse": [
+                {"matcher": "Bash", "hooks": [{"type": "command", "command": "echo pre"}]}
+            ],
+            "Stop": [
+                {"hooks": [{"type": "command", "command": "echo other-stop"}]}
+            ],
+        }
+    }
+    settings_path.write_text(json.dumps(existing))
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    StopHookConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+
+    body = json.loads(settings_path.read_text())
+    assert body["hooks"]["PreToolUse"] == existing["hooks"]["PreToolUse"]
+    stop_commands = [
+        h["command"]
+        for entry in body["hooks"]["Stop"]
+        for h in entry["hooks"]
+    ]
+    assert "echo other-stop" in stop_commands
+    assert any("stop-advance-action.py" in c for c in stop_commands)
+
+
+def test_stop_hook_configurator_is_idempotent(db, project_row, tmp_path):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    settings_path = wt / ".claude" / "settings.json"
+    settings_path.parent.mkdir(parents=True)
+    settings_path.write_text(json.dumps(_settings_with_hooks()))
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    StopHookConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+    first = settings_path.read_text()
+    StopHookConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+    second = settings_path.read_text()
+
+    assert first == second
+    body = json.loads(second)
+    assert len(body["hooks"]["Stop"]) == 1
+
+
+def test_stop_hook_configurator_handles_invalid_json(
+    db, project_row, tmp_path, caplog
+):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    settings_path = wt / ".claude" / "settings.json"
+    settings_path.parent.mkdir(parents=True)
+    settings_path.write_text("{not valid json")
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    with caplog.at_level(logging.WARNING, logger="services.configurator_service"):
+        StopHookConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+
+    assert "{not valid json" == settings_path.read_text()
+    assert any("invalid JSON" in r.getMessage() for r in caplog.records)
 
 
 def test_chain_continues_when_a_configurator_raises(db, project_row, project_root, caplog):

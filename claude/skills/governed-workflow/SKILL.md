@@ -522,23 +522,23 @@ Call `workspace_advance(commit_hash="{hash}")`.
 
 ---
 
-## Phase 4.0: Blind Code Review
+## Phase 4.0: Blind Code Review (automated)
 
-**Actors**: Fresh reviewer sub-agents (zero implementation context) | **Code edits: OFF**
+**Actors**: Headless review pipeline (admin panel) | **Code edits: OFF**
 
-Deploy **exactly 3** code-reviewer sub-agents **in parallel**, each assigned a distinct review perspective:
+The admin panel auto-launches the headless review pipeline when the workspace enters phase `4.0`. Do NOT manually dispatch reviewer sub-agents — the pipeline owns this phase.
 
-1. **Clean code & SOLID** — naming, method length, SRP violations, DRY, code smells
-2. **Architecture & data flow** — component boundaries, dependency direction, query patterns, transaction scope
-3. **Edge cases & error handling** — null paths, missing validation, error propagation, concurrency concerns
+Pipeline structure:
+1. **File stage** — for every reviewable changed file, a haiku-class `file-reviewer` runs in parallel (capped by `GOVERNED_WORKFLOW_REVIEW_CONCURRENCY`, default 8). Each returns local findings (style, SRP-within-file, null handling, dead code, hardcoded values, placeholders, silent failures). Findings are persisted automatically.
+2. **Integration stage** — two opus-class reviewers run in parallel and self-submit findings via `workspace_submit_review_issue`:
+   - `architecture-reviewer` — architecture + clean code + SOLID (SRP, OCP, coupling, layer boundaries, naming, method/class size, DRY, code smells).
+   - `correctness-reviewer` — business-logic correctness + edge cases + error handling + security (input validation, injection, auth/authz, secrets, sensitive data in logs, API contract leaks).
 
-Do NOT brief reviewers with implementation context — they must review the code blind. Provide only the ticket description and branch name.
+Watch progress on the Review Pipeline card on the workspace page, or poll `GET /api/workspaces/<id>/review-pipeline-status`. When `state=done`:
 
-Reviewers submit findings via `workspace_submit_review_issue(file_path, line_start, line_end, severity, description)`. Only `critical` and `major` severity findings are accepted — lower severity is rejected by the server.
-
-Each submitted finding creates a review discussion with `resolution='open'`.
-
-Call `workspace_advance`.
+1. Call `workspace_get_review_issues` to inspect findings.
+2. Call `workspace_update_progress("4.0", ...)` with a summary.
+3. Call `workspace_advance`.
 
 **Advance 4.0 → 4.1** requires: progress entry for phase `"4.0"`.
 

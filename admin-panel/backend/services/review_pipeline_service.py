@@ -8,13 +8,20 @@ enters phase ``4.0``. The pipeline:
    capped by ``GOVERNED_WORKFLOW_REVIEW_CONCURRENCY`` (default 8). Each
    per-file agent returns JSON ``{file, findings: [...]}`` on stdout; the
    findings are written to the discussions table via
-   :func:`services.comment_service.submit_review_issue`.
-3. Runs the three integration reviewers ``architecture-reviewer``,
-   ``logic-reviewer``, and ``security-reviewer`` in parallel via
-   ``asyncio.gather``. Each one self-submits findings through MCP, so the
-   pipeline only awaits their exit codes. A failure in one does not cancel
-   the others — each agent is wrapped in its own try/except and its failure
-   is recorded as a ``review-agent-failure`` typed issue.
+   :func:`services.comment_service.submit_review_issue`. The file stage
+   is spawned with ``--strict-mcp-config`` so the haiku-class agent never
+   loads the workspace's full MCP tool schema (which would burn opus-class
+   cache-creation tokens per invocation).
+3. Runs the two integration reviewers in parallel via ``asyncio.gather``:
+   - ``architecture-reviewer`` — architecture + clean code + SOLID
+     (SRP/OCP, layer boundaries, naming, method/class size, DRY, code smells).
+   - ``correctness-reviewer`` — business-logic correctness + edge cases +
+     error handling + security (input validation, injection, auth/authz,
+     secrets, sensitive data in logs, API contract leaks).
+   Each one self-submits findings through MCP, so the pipeline only awaits
+   their exit codes. A failure in one does not cancel the other — each
+   agent is wrapped in its own try/except and its failure is recorded as a
+   ``review-agent-failure`` typed issue.
 
 Agent failures (timeout, non-zero exit, JSON parse failure) are recorded as
 ``review-agent-failure`` typed issues so the user can see them in the admin
@@ -51,10 +58,12 @@ _INTEGRATION_TIMEOUT_MULTIPLIER = 3
 _FILE_REVIEWER_AGENT = "file-reviewer"
 _INTEGRATION_AGENTS: tuple[str, ...] = (
     "architecture-reviewer",
-    "logic-reviewer",
-    "security-reviewer",
+    "correctness-reviewer",
 )
-_SELF_SUBMITTING_AGENTS: frozenset[str] = frozenset(_INTEGRATION_AGENTS)
+_SELF_SUBMITTING_AGENTS: frozenset[str] = frozenset({
+    "architecture-reviewer",
+    "correctness-reviewer",
+})
 
 _STDERR_EXCERPT_CHARS = 500
 
@@ -320,6 +329,7 @@ async def _spawn_file_reviewer(
         project_path=project_path,
         max_turns=1,
         timeout_s=_timeout_s(),
+        suppress_mcp=True,
     )
     return _parse_file_reviewer_findings(stdout)
 
@@ -358,17 +368,28 @@ async def _spawn_claude_agent(
     project_path: Path,
     max_turns: int,
     timeout_s: int,
+    suppress_mcp: bool = False,
 ) -> str:
-    proc = await asyncio.create_subprocess_exec(
-        "claude",
-        "-p",
-        "--agent",
-        agent,
-        "--output-format",
-        "json",
-        "--max-turns",
-        str(max_turns),
+    """Spawn ``claude -p --agent <agent>`` and return stdout.
+
+    When ``suppress_mcp`` is True, ``--strict-mcp-config`` is passed and no
+    ``--mcp-config`` files are supplied — this disables every MCP server for
+    that invocation. Used for the file-reviewer fan-out so each haiku-class
+    subprocess does not load the workspace's full opus-class MCP tool schema
+    (~20k cache-creation tokens per call). The integration reviewers must
+    keep MCP enabled because they self-submit findings via
+    ``workspace_submit_review_issue``.
+    """
+    argv = ["claude", "-p", "--agent", agent]
+    if suppress_mcp:
+        argv.append("--strict-mcp-config")
+    argv.extend([
+        "--output-format", "json",
+        "--max-turns", str(max_turns),
         prompt,
+    ])
+    proc = await asyncio.create_subprocess_exec(
+        *argv,
         cwd=str(project_path),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

@@ -77,7 +77,7 @@ def _patch_spawn(canned: dict[str, str]):
     the file's basename.
     """
 
-    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s):
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
         # First try exact agent match, then agent+file-path prompt match.
         if agent in canned and isinstance(canned[agent], str):
             return canned[agent]
@@ -105,8 +105,7 @@ def test_per_file_findings_are_submitted(repo_with_files):
             {"severity": "critical", "type": "security", "line": 1, "summary": "beta issue"},
         ]),
         "architecture-reviewer": _envelope(""),
-        "logic-reviewer": _envelope(""),
-        "security-reviewer": _envelope(""),
+        "correctness-reviewer": _envelope(""),
     }
 
     with patch.object(
@@ -125,8 +124,7 @@ def test_per_file_findings_are_submitted(repo_with_files):
     assert status.files["src/alpha.py"].findings_count == 1
     assert status.files["src/beta.py"].findings_count == 1
     assert status.integration["architecture-reviewer"] == "done"
-    assert status.integration["logic-reviewer"] == "done"
-    assert status.integration["security-reviewer"] == "done"
+    assert status.integration["correctness-reviewer"] == "done"
 
     from core.db import get_db
     db = get_db()
@@ -147,7 +145,7 @@ def test_file_reviewer_timeout_is_recorded_as_failure(repo_with_files):
     ws = repo_with_files
     reviewable = [ReviewableFile(path="src/alpha.py", status="M")]
 
-    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s):
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
         if agent == "file-reviewer":
             raise RuntimeError("file-reviewer timeout after 300s")
         return _envelope("")
@@ -184,10 +182,10 @@ def test_file_reviewer_timeout_is_recorded_as_failure(repo_with_files):
 def test_integration_agent_failure_does_not_block_other_agent(repo_with_files):
     ws = repo_with_files
 
-    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s):
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
         if agent == "architecture-reviewer":
             raise RuntimeError("architecture-reviewer exit 1: boom")
-        if agent in ("logic-reviewer", "security-reviewer"):
+        if agent == "correctness-reviewer":
             return _envelope("")
         return _envelope("")
 
@@ -206,8 +204,7 @@ def test_integration_agent_failure_does_not_block_other_agent(repo_with_files):
 
     assert status.state == "done"
     assert status.integration["architecture-reviewer"] == "failed"
-    assert status.integration["logic-reviewer"] == "done"
-    assert status.integration["security-reviewer"] == "done"
+    assert status.integration["correctness-reviewer"] == "done"
 
 
 def test_integration_agents_run_concurrently(repo_with_files):
@@ -222,7 +219,7 @@ def test_integration_agents_run_concurrently(repo_with_files):
     in_flight = 0
     peak_concurrency = 0
 
-    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s):
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
         nonlocal in_flight, peak_concurrency
         in_flight += 1
         peak_concurrency = max(peak_concurrency, in_flight)
@@ -254,7 +251,7 @@ def test_integration_agents_run_concurrently(repo_with_files):
 def test_empty_diff_runs_cleanly(repo_with_files):
     ws = repo_with_files
 
-    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s):
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
         return _envelope("")
 
     with patch.object(
@@ -278,7 +275,7 @@ def test_empty_diff_runs_cleanly(repo_with_files):
 def test_status_endpoint_returns_snapshot(repo_with_files, client):
     ws = repo_with_files
 
-    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s):
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
         return _envelope("")
 
     with patch.object(
@@ -328,7 +325,7 @@ def test_invalid_envelope_recorded_as_file_failure(repo_with_files):
     ws = repo_with_files
     reviewable = [ReviewableFile(path="src/alpha.py", status="M")]
 
-    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s):
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
         if agent == "file-reviewer":
             return "this is not json"
         return _envelope("")
