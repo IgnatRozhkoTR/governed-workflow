@@ -139,7 +139,7 @@ def _check_review_file_count(ws) -> None:
     working_dir = ws_field(ws, "working_dir")
     if not working_dir:
         return
-    base_ref = ws_field(ws, "base_branch") or "main"
+    base_ref = ws_field(ws, "source_branch") or "main"
     try:
         count = diff_filter.count_modified(
             repo_path=Path(working_dir),
@@ -273,7 +273,7 @@ def _start_review_pipeline(ws) -> None:
         review_pipeline_service.start_in_background(
             workspace_id=ws["id"],
             project_path=Path(working_dir),
-            base_branch=ws_field(ws, "base_branch") or "main",
+            base_branch=ws_field(ws, "source_branch") or "main",
         )
     except Exception:
         logger.exception(
