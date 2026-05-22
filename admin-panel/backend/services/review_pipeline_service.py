@@ -391,7 +391,11 @@ async def _spawn_file_reviewer(
         agent=_FILE_REVIEWER_AGENT,
         prompt=prompt,
         project_path=project_path,
-        max_turns=1,
+        # The file-reviewer agent uses one turn for the Read tool call and a
+        # second turn for the final JSON message. ``--max-turns 1`` exits with
+        # ``error_max_turns`` before the agent can emit its envelope. Three
+        # turns gives a small buffer for a follow-up Read on long files.
+        max_turns=3,
         timeout_s=_timeout_s(),
         suppress_mcp=True,
     )
