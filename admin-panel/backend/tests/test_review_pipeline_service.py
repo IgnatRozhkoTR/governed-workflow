@@ -364,6 +364,32 @@ def test_parse_file_reviewer_findings_filters_non_dict_entries():
     assert findings[1]["summary"] == "also ok"
 
 
+def test_parse_file_reviewer_findings_strips_markdown_fences():
+    fenced = '```json\n{"file": "x.py", "findings": [{"severity": "major", "summary": "s", "line": 3}]}\n```'
+    envelope = _envelope(fenced)
+    findings = review_pipeline_service._parse_file_reviewer_findings(envelope)
+    assert len(findings) == 1
+    assert findings[0]["summary"] == "s"
+
+
+def test_parse_file_reviewer_findings_extracts_json_from_prose():
+    prose_with_json = (
+        'Looking at the diff, I see one issue.\n\n'
+        '{"file": "x.py", "findings": [{"severity": "minor", "summary": "p", "line": 7}]}\n'
+        'That is my analysis.'
+    )
+    envelope = _envelope(prose_with_json)
+    findings = review_pipeline_service._parse_file_reviewer_findings(envelope)
+    assert len(findings) == 1
+    assert findings[0]["summary"] == "p"
+
+
+def test_parse_file_reviewer_findings_treats_unparseable_result_as_empty():
+    envelope = _envelope("just prose, no JSON envelope at all")
+    findings = review_pipeline_service._parse_file_reviewer_findings(envelope)
+    assert findings == []
+
+
 def test_concurrency_env_override(monkeypatch):
     monkeypatch.setenv("GOVERNED_WORKFLOW_REVIEW_CONCURRENCY", "2")
     assert review_pipeline_service._concurrency() == 2

@@ -385,17 +385,21 @@ async def _spawn_file_reviewer(
         f"Review this file's changes for LOCAL issues only.\n\n"
         f"File: {file_path}\n\n"
         f"Diff (against {base_ref}):\n```\n{hunk}\n```\n\n"
-        f"Output JSON per your role spec."
+        f"Your final assistant message MUST be a single JSON object matching "
+        f"this exact shape — no prose, no markdown, no fences:\n"
+        f'{{"file": "{file_path}", "findings": [{{"severity": "...", '
+        f'"type": "...", "line": <int>, "summary": "..."}}]}}\n'
+        f'If you find no issues, emit exactly {{"file": "{file_path}", "findings": []}}.'
     )
     stdout = await _spawn_claude_agent(
         agent=_FILE_REVIEWER_AGENT,
         prompt=prompt,
         project_path=project_path,
-        # The file-reviewer agent uses one turn for the Read tool call and a
-        # second turn for the final JSON message. ``--max-turns 1`` exits with
-        # ``error_max_turns`` before the agent can emit its envelope. Three
-        # turns gives a small buffer for a follow-up Read on long files.
-        max_turns=3,
+        # The file-reviewer needs turns for Read tool calls plus a final text
+        # turn for the JSON envelope. Empirically the haiku-class agent uses
+        # 2-4 turns on real files; ``--max-turns 5`` leaves headroom without
+        # ballooning latency.
+        max_turns=5,
         timeout_s=_timeout_s(),
         suppress_mcp=True,
     )
@@ -487,15 +491,62 @@ def _parse_file_reviewer_findings(stdout: str) -> list[dict]:
     if not result_str.strip():
         log.warning("file-reviewer returned empty result — treating as no findings")
         return []
-    cleaned = _strip_markdown_fences(result_str.strip())
-    try:
-        payload = json.loads(cleaned)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"file-reviewer returned invalid JSON: {exc}") from exc
+    payload = _decode_file_reviewer_payload(result_str)
+    if payload is None:
+        log.warning(
+            "file-reviewer result contained no parseable JSON envelope — "
+            "treating as no findings. First 200 chars: %r",
+            result_str[:200],
+        )
+        return []
     findings = payload.get("findings", [])
     if not isinstance(findings, list):
         raise RuntimeError("file-reviewer payload missing 'findings' list")
     return [f for f in findings if isinstance(f, dict)]
+
+
+def _decode_file_reviewer_payload(text: str) -> dict | None:
+    """Decode the file-reviewer JSON envelope, tolerating model quirks.
+
+    The agent is instructed to emit raw JSON, but haiku-class models
+    occasionally wrap output in ``` fences or prepend a prose preamble. This
+    helper:
+      1. Tries to parse the text as JSON directly (after fence-stripping).
+      2. Falls back to scanning for the first balanced ``{"file": ...,
+         "findings": [...]}`` object substring and parsing that.
+    Returns ``None`` if nothing parseable is found — the caller treats that
+    as a no-findings result and logs.
+    """
+    cleaned = _strip_markdown_fences(text.strip())
+    parsed = _try_json_dict(cleaned)
+    if parsed is not None:
+        return parsed
+    return _extract_first_findings_object(cleaned)
+
+
+def _try_json_dict(text: str) -> dict | None:
+    try:
+        decoded = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    return decoded if isinstance(decoded, dict) else None
+
+
+def _extract_first_findings_object(text: str) -> dict | None:
+    decoder = json.JSONDecoder()
+    cursor = 0
+    while True:
+        brace = text.find("{", cursor)
+        if brace == -1:
+            return None
+        try:
+            obj, end = decoder.raw_decode(text, brace)
+        except json.JSONDecodeError:
+            cursor = brace + 1
+            continue
+        if isinstance(obj, dict) and "findings" in obj:
+            return obj
+        cursor = end
 
 
 def _strip_markdown_fences(text: str) -> str:
