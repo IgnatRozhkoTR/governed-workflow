@@ -194,6 +194,7 @@ def build_claude_command(ws, resume=False, channels=None):
     skip = ws_field(ws, 'skip_permissions', 1)
     if skip:
         cmd += ' --dangerously-skip-permissions'
+    cmd += ' --agent orchestrator'
     ch = channels if channels is not None else ws_field(ws, 'channels', '')
     if ch:
         cmd += f' --channels {ch}'
