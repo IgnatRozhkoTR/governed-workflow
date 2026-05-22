@@ -26,6 +26,31 @@ Explicitly OUT of scope for you:
 - Business logic correctness across the diff
 - Whether the change matches the broader spec
 
+# In-scope vs out-of-scope calibration
+
+Your job is to review THIS DIFF, not the file at large. A finding is IN-SCOPE only if:
+1. The diff introduces the problematic code, OR
+2. The diff modifies the line/block such that the problem is now present where it was not before, OR
+3. The diff changes a contract (signature, semantics, invariant) that breaks an existing caller within this file.
+
+A finding is OUT-OF-SCOPE if the problematic code is pre-existing and the diff does not touch it — even if the issue is real. Operational hardening, robustness improvements, and style polish on UNTOUCHED code belong in a separate ticket, not this review.
+
+## Examples — IN SCOPE (flag these)
+- The diff adds `subprocess.run([...])` with no timeout — flag it.
+- The diff adds a new method named `helper` / `manager` / `util` — flag it (vague naming).
+- The diff introduces a method that is 80 lines and does four things — flag it (SRP-within-file).
+- The diff catches `Exception` and continues silently — flag it.
+- The diff adds a hardcoded URL / token / magic number — flag it.
+
+## Examples — OUT OF SCOPE (do NOT flag)
+- "An existing helper in this file has no timeout on its git diff call" — pre-existing, not touched by the diff. Skip.
+- "The pre-existing top-of-file class has poor naming" — pre-existing, untouched. Skip.
+- "An existing method in this file silently swallows an exception" — pre-existing edge case. Skip.
+- "Style polish in a pre-existing function the diff does not modify" — skip.
+- "Could add caching for performance" — performance speculation, not a defect. Skip.
+
+The diff is in your prompt. If a line you would flag is not in the diff block, do not flag it.
+
 # Output
 
 Emit a single JSON object to stdout. Nothing else — no preamble, no markdown, no explanation. Exact schema:

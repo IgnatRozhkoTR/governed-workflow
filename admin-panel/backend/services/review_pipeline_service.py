@@ -9,11 +9,12 @@ enters phase ``4.0``. The pipeline:
    per-file agent returns JSON ``{file, findings: [...]}`` on stdout; the
    findings are written to the discussions table via
    :func:`services.comment_service.submit_review_issue`.
-3. Runs the integration reviewers ``code-reviewer`` and
-   ``senior-code-validator`` sequentially. ``code-reviewer`` self-submits
-   findings through MCP, so the pipeline only awaits its exit code.
-   ``senior-code-validator`` returns prose; its full text is attached as a
-   single review issue against the synthetic ``(integration)`` path.
+3. Runs the three integration reviewers ``architecture-reviewer``,
+   ``logic-reviewer``, and ``security-reviewer`` in parallel via
+   ``asyncio.gather``. Each one self-submits findings through MCP, so the
+   pipeline only awaits their exit codes. A failure in one does not cancel
+   the others — each agent is wrapped in its own try/except and its failure
+   is recorded as a ``review-agent-failure`` typed issue.
 
 Agent failures (timeout, non-zero exit, JSON parse failure) are recorded as
 ``review-agent-failure`` typed issues so the user can see them in the admin
@@ -48,13 +49,15 @@ _DEFAULT_TIMEOUT_S = 300
 _INTEGRATION_TIMEOUT_MULTIPLIER = 3
 
 _FILE_REVIEWER_AGENT = "file-reviewer"
-_INTEGRATION_AGENTS: tuple[str, ...] = ("code-reviewer", "senior-code-validator")
-_SELF_SUBMITTING_AGENTS: frozenset[str] = frozenset({"code-reviewer"})
+_INTEGRATION_AGENTS: tuple[str, ...] = (
+    "architecture-reviewer",
+    "logic-reviewer",
+    "security-reviewer",
+)
+_SELF_SUBMITTING_AGENTS: frozenset[str] = frozenset(_INTEGRATION_AGENTS)
 
 _STDERR_EXCERPT_CHARS = 500
-_TEXT_FINDING_TRUNCATE_CHARS = 2000
 
-_INTEGRATION_FILE_PATH = "(integration)"
 _PIPELINE_FILE_PATH = "(pipeline)"
 
 _FAILURE_PREFIX = "[review-agent-failure]"
@@ -241,6 +244,8 @@ async def _run_integration_stage(
     status.state = "integration_stage"
     for agent_name in _INTEGRATION_AGENTS:
         status.integration[agent_name] = "running"
+
+    async def _run_one(agent_name: str) -> None:
         try:
             await _run_integration_agent(workspace_id, project_path, agent_name)
             status.integration[agent_name] = "done"
@@ -248,6 +253,11 @@ async def _run_integration_stage(
             log.exception("integration agent %s failed", agent_name)
             status.integration[agent_name] = "failed"
             _record_agent_failure(workspace_id, agent_name, str(exc))
+
+    await asyncio.gather(
+        *(_run_one(name) for name in _INTEGRATION_AGENTS),
+        return_exceptions=False,
+    )
 
 
 async def _review_one_file(
@@ -327,41 +337,18 @@ async def _run_integration_agent(
         max_turns=5,
         timeout_s=_timeout_s() * _INTEGRATION_TIMEOUT_MULTIPLIER,
     )
-    if agent_name in _SELF_SUBMITTING_AGENTS:
-        try:
-            envelope = json.loads(stdout) if stdout.strip() else {}
-            if envelope.get("is_error"):
-                log.warning(
-                    "%s returned is_error=True; findings may be missing",
-                    agent_name,
-                )
-        except json.JSONDecodeError:
+    try:
+        envelope = json.loads(stdout) if stdout.strip() else {}
+        if envelope.get("is_error"):
             log.warning(
-                "%s envelope malformed but findings may have been submitted via MCP; "
-                "check workspace_get_review_issues",
+                "%s returned is_error=True; findings may be missing",
                 agent_name,
             )
-        return
-
-    try:
-        text = _extract_envelope_result(stdout)
-    except RuntimeError:
+    except json.JSONDecodeError:
         log.warning(
-            "%s envelope malformed; attaching parse-failure finding",
+            "%s envelope malformed but findings may have been submitted via MCP; "
+            "check workspace_get_review_issues",
             agent_name,
-        )
-        _submit_text_finding(
-            workspace_id,
-            agent_name,
-            f"[{agent_name}] agent output could not be parsed — envelope was malformed.",
-        )
-        return
-
-    if text.strip():
-        _submit_text_finding(workspace_id, agent_name, text)
-    else:
-        log.warning(
-            "%s returned empty result; no integration finding recorded", agent_name
         )
 
 
@@ -467,26 +454,6 @@ def _submit_finding(workspace_id: int, file_path: str, finding: dict) -> None:
             line_end=line,
             description=description,
             author=_FILE_REVIEWER_AGENT,
-        )
-        db.commit()
-    finally:
-        db.close()
-
-
-def _submit_text_finding(workspace_id: int, source: str, text: str) -> None:
-    truncated = text.strip()[:_TEXT_FINDING_TRUNCATE_CHARS]
-    description = f"[integration:{source}] {truncated}"
-
-    db = get_db()
-    try:
-        submit_review_issue(
-            db,
-            workspace_id=workspace_id,
-            file_path=_INTEGRATION_FILE_PATH,
-            line_start=1,
-            line_end=1,
-            description=description,
-            author=source,
         )
         db.commit()
     finally:

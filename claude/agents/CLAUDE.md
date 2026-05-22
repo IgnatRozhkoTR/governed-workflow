@@ -1,6 +1,6 @@
 # agents
 
-16 specialized agent role definitions used by the governed workflow orchestrator. Each file is a Markdown spec that Claude Code loads as an agent.
+19 specialized agent role definitions used by the governed workflow orchestrator. Each file is a Markdown spec that Claude Code loads as an agent.
 
 ## Frontmatter Fields
 

@@ -6,6 +6,7 @@ envelope JSON, so no real subprocesses are spawned.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -103,8 +104,9 @@ def test_per_file_findings_are_submitted(repo_with_files):
         "src/beta.py": _file_envelope([
             {"severity": "critical", "type": "security", "line": 1, "summary": "beta issue"},
         ]),
-        "code-reviewer": _envelope(""),
-        "senior-code-validator": _envelope("integration summary text"),
+        "architecture-reviewer": _envelope(""),
+        "logic-reviewer": _envelope(""),
+        "security-reviewer": _envelope(""),
     }
 
     with patch.object(
@@ -122,8 +124,9 @@ def test_per_file_findings_are_submitted(repo_with_files):
     assert status.files["src/alpha.py"].status == "done"
     assert status.files["src/alpha.py"].findings_count == 1
     assert status.files["src/beta.py"].findings_count == 1
-    assert status.integration["code-reviewer"] == "done"
-    assert status.integration["senior-code-validator"] == "done"
+    assert status.integration["architecture-reviewer"] == "done"
+    assert status.integration["logic-reviewer"] == "done"
+    assert status.integration["security-reviewer"] == "done"
 
     from core.db import get_db
     db = get_db()
@@ -138,7 +141,6 @@ def test_per_file_findings_are_submitted(repo_with_files):
     paths = [r["file_path"] for r in rows]
     assert "src/alpha.py" in paths
     assert "src/beta.py" in paths
-    assert "(integration)" in paths
 
 
 def test_file_reviewer_timeout_is_recorded_as_failure(repo_with_files):
@@ -183,10 +185,10 @@ def test_integration_agent_failure_does_not_block_other_agent(repo_with_files):
     ws = repo_with_files
 
     async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s):
-        if agent == "code-reviewer":
-            raise RuntimeError("code-reviewer exit 1: boom")
-        if agent == "senior-code-validator":
-            return _envelope("validator findings")
+        if agent == "architecture-reviewer":
+            raise RuntimeError("architecture-reviewer exit 1: boom")
+        if agent in ("logic-reviewer", "security-reviewer"):
+            return _envelope("")
         return _envelope("")
 
     with patch.object(
@@ -203,8 +205,50 @@ def test_integration_agent_failure_does_not_block_other_agent(repo_with_files):
         status = _wait_for_state(ws["id"])
 
     assert status.state == "done"
-    assert status.integration["code-reviewer"] == "failed"
-    assert status.integration["senior-code-validator"] == "done"
+    assert status.integration["architecture-reviewer"] == "failed"
+    assert status.integration["logic-reviewer"] == "done"
+    assert status.integration["security-reviewer"] == "done"
+
+
+def test_integration_agents_run_concurrently(repo_with_files):
+    """All three integration agents must be in-flight at the same instant.
+
+    Each fake spawn registers itself as in-flight, then yields control. If
+    the stage ran sequentially the second/third agents would never see the
+    first counted as in-flight, so peak concurrency would equal 1. With
+    parallel ``asyncio.gather`` peak concurrency equals the agent count.
+    """
+    ws = repo_with_files
+    in_flight = 0
+    peak_concurrency = 0
+
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s):
+        nonlocal in_flight, peak_concurrency
+        in_flight += 1
+        peak_concurrency = max(peak_concurrency, in_flight)
+        await asyncio.sleep(0.05)
+        in_flight -= 1
+        return _envelope("")
+
+    with patch.object(
+        review_pipeline_service.diff_filter, "list_reviewable_files",
+        return_value=[],
+    ), patch.object(
+        review_pipeline_service, "_spawn_claude_agent", side_effect=fake_spawn
+    ):
+        review_pipeline_service.start_in_background(
+            workspace_id=ws["id"],
+            project_path=Path(ws["working_dir"]),
+            base_branch="develop",
+        )
+        status = _wait_for_state(ws["id"])
+
+    assert status.state == "done"
+    assert all(s == "done" for s in status.integration.values())
+    assert peak_concurrency == len(review_pipeline_service._INTEGRATION_AGENTS), (
+        f"expected all {len(review_pipeline_service._INTEGRATION_AGENTS)} integration "
+        f"agents to run concurrently; peak was {peak_concurrency}"
+    )
 
 
 def test_empty_diff_runs_cleanly(repo_with_files):
