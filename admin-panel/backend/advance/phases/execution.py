@@ -68,6 +68,10 @@ class ImplementationPhase(Phase):
     def id(self):
         return f"3.{self._n}.0"
 
+    @property
+    def boundary_key(self) -> str:
+        return f"3.{self._n}"
+
     def validate(self, ws, body, project_path):
         scope_map = json.loads(ws["scope_json"]) if ws["scope_json"] else {}
         phase = ws["phase"]
@@ -137,6 +141,10 @@ class VerificationPhase(Phase):
     def id(self):
         return f"3.{self._n}.1"
 
+    @property
+    def boundary_key(self) -> str:
+        return f"3.{self._n}"
+
     def validate(self, ws, body, project_path):
         """Run verification profiles at validation phase. Blocks advance if any blocking step fails."""
         self._project_path = project_path
@@ -192,6 +200,10 @@ class FixReviewPhase(Phase):
     def id(self):
         return f"3.{self._n}.2"
 
+    @property
+    def boundary_key(self) -> str:
+        return f"3.{self._n}"
+
     def validate(self, ws, body, project_path):
         return True, {}
 
@@ -210,6 +222,10 @@ class CommitApprovalPhase(Phase):
     @property
     def id(self):
         return f"3.{self._n}.3"
+
+    @property
+    def boundary_key(self) -> str:
+        return f"3.{self._n}"
 
     @property
     def approve_target(self):
@@ -244,6 +260,10 @@ class CommitPhase(Phase):
     @property
     def id(self):
         return f"3.{self._n}.4"
+
+    @property
+    def boundary_key(self) -> str:
+        return f"3.{self._n}"
 
     def progress_key(self, ws):
         return f"3.{self._n}"
@@ -479,6 +499,10 @@ class _ExecutionTemplatePhase(Phase):
     @property
     def name(self) -> str:
         return _TEMPLATE_NAMES[self._k]
+
+    @property
+    def boundary_key(self) -> str:
+        return "3.x"
 
     @property
     def is_user_gate(self) -> bool:

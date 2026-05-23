@@ -1,4 +1,4 @@
-"""HTTP endpoints for per-project advance-mode configuration (sub-phase 3.2)."""
+"""HTTP endpoints for per-project advance-mode configuration."""
 import logging
 
 from flask import Blueprint, jsonify, request
@@ -6,7 +6,6 @@ from flask import Blueprint, jsonify, request
 from core.decorators import with_project
 from services.advance_mode_service import (
     AdvanceModeServiceError,
-    VALID_MAJOR_PHASES,
     VALID_MODES,
     list_modes,
     set_modes,
@@ -17,7 +16,7 @@ log = logging.getLogger(__name__)
 bp = Blueprint("advance_modes", __name__)
 
 _STATUS_BY_CODE = {
-    "invalid_phase": 400,
+    "invalid_key": 400,
     "invalid_mode": 400,
 }
 
@@ -30,25 +29,21 @@ def _error_response(exc: AdvanceModeServiceError):
     return jsonify(body), status
 
 
-def _validate_modes_payload(raw_modes) -> tuple[dict[int, str] | None, str | None]:
+def _validate_modes_payload(raw_modes) -> tuple[dict[str, str] | None, str | None]:
     """Coerce and validate the modes dict from the request body.
 
     Returns ``(modes_dict, None)`` on success, or ``(None, error_message)``
-    on invalid input.
+    on invalid input. Keys are boundary_key strings; values are mode strings.
     """
     if not isinstance(raw_modes, dict):
         return None, "modes must be a JSON object"
-    coerced: dict[int, str] = {}
+    coerced: dict[str, str] = {}
     for key, value in raw_modes.items():
-        try:
-            phase = int(key)
-        except (TypeError, ValueError):
-            return None, f"modes key {key!r} must be an integer (1–5)"
-        if phase not in VALID_MAJOR_PHASES:
-            return None, f"modes key {phase} is not a valid major phase (1–5)"
+        if not isinstance(key, str) or not key.strip():
+            return None, f"modes key {key!r} must be a non-empty string"
         if not isinstance(value, str) or value not in VALID_MODES:
-            return None, f"modes[{phase}] must be one of {sorted(VALID_MODES)}, got {value!r}"
-        coerced[phase] = value
+            return None, f"modes[{key!r}] must be one of {sorted(VALID_MODES)}, got {value!r}"
+        coerced[key] = value
     return coerced, None
 
 

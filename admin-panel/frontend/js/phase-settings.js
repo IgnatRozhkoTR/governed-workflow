@@ -112,9 +112,7 @@ function _phaseUpdateSaveBar(container) {
   var saveBtn = container.querySelector('.phase-settings__save-btn');
   var discardBtn = container.querySelector('.phase-settings__discard-btn');
   if (!saveBtn) return;
-  var hasPhasesPending = Object.keys(container._pendingSettings).length > 0;
-  var hasAdvancePending = container._amLinked ? amHasPending(container._amLinked) : false;
-  var hasPending = hasPhasesPending || hasAdvancePending;
+  var hasPending = Object.keys(container._pendingSettings).length > 0;
   saveBtn.disabled = !hasPending;
   if (discardBtn) discardBtn.disabled = !hasPending;
 }
@@ -141,10 +139,6 @@ async function _phaseSaveSettings(container) {
     );
   }
 
-  if (container._amLinked && amHasPending(container._amLinked)) {
-    saves.push(amSave(container._amLinked, container._amLinked._amProjectId));
-  }
-
   try {
     await Promise.all(saves);
     if (typeof showToast === 'function') {
@@ -160,7 +154,6 @@ async function _phaseSaveSettings(container) {
 
 function _phaseDiscardSettings(container) {
   container._pendingSettings = {};
-  if (container._amLinked) amDiscard(container._amLinked);
   _phaseRefreshRows(container);
 }
 

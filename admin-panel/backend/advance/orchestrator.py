@@ -17,7 +17,7 @@ from core.helpers import run_git
 from core.i18n import t
 from core.phase import is_templated
 from core.terminal import notify_workspace
-from services.advance_mode_service import get_mode
+from services.advance_mode_service import get_mode_for_boundary
 from services.phase_sequencer import full_phase_sequence, plan_from_workspace, resolve_phase_sequence
 
 logger = logging.getLogger(__name__)
@@ -35,10 +35,11 @@ _PENDING_ADVANCE_ACTION_PATH = ".claude/state/pending-advance-action"
 
 
 def _is_major_transition(old_phase: str, new_phase: str) -> bool:
-    try:
-        return int(new_phase.split('.')[0]) > int(old_phase.split('.')[0])
-    except (ValueError, AttributeError):
+    old = get_phase(old_phase)
+    new = get_phase(new_phase)
+    if not old or not new:
         return False
+    return old.boundary_key != new.boundary_key
 
 
 def _resolve_forward_target(ws, db, candidate: str) -> str | None:
@@ -159,7 +160,7 @@ def _check_review_file_count(ws) -> None:
 
 
 def _maybe_write_advance_action(db, ws, new_phase: str) -> None:
-    """Write pending-advance-action file when crossing a major-phase boundary.
+    """Write pending-advance-action file when crossing a boundary_key boundary.
 
     Only fires for compact/clear modes; none and missing rows are no-ops.
     Write failures are swallowed so they never block a phase transition.
@@ -168,13 +169,12 @@ def _maybe_write_advance_action(db, ws, new_phase: str) -> None:
     if not _is_major_transition(old_phase, new_phase):
         return
 
-    try:
-        major = int(new_phase.split('.')[0])
-    except (ValueError, AttributeError):
+    new = get_phase(new_phase)
+    if not new:
         return
 
     project_id = ws["project_id"]
-    mode = get_mode(db, project_id, major)
+    mode = get_mode_for_boundary(db, project_id, new.boundary_key)
     if mode not in ("compact", "clear"):
         return
 

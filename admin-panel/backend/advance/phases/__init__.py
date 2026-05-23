@@ -25,6 +25,20 @@ class Phase(ABC):
         """Human-readable phase name."""
 
     @property
+    def boundary_key(self) -> str:
+        """The boundary group this phase belongs to.
+
+        Two phases share a boundary group when their boundary_key is equal.
+        Transitioning between different boundary groups is a major boundary
+        crossing — eligible for per-project compact/clear advance actions.
+
+        Default: the first dotted segment of id (e.g. "1", "2", "4", "5").
+        Execution sub-phases (3.N.K) override to return "3.N" so that
+        3.1.0→3.1.4 is internal but 3.1.4→3.2.0 crosses a boundary.
+        """
+        return self.id.split('.')[0]
+
+    @property
     def is_user_gate(self) -> bool:
         """Whether this phase requires explicit user approval to proceed."""
         return False

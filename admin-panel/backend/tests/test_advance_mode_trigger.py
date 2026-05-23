@@ -1,10 +1,10 @@
 """Tests for major-phase-boundary advance-action file writing in transition_phase."""
 import os
-import sqlite3
 
 import pytest
 
 from advance.orchestrator import transition_phase, _is_major_transition
+from core.db import get_db
 from services.advance_mode_service import set_modes
 
 
@@ -28,7 +28,7 @@ def test_is_major_transition_bad_input_is_safe():
     assert _is_major_transition("1.4", "") is False
 
 
-# ── Integration: file-write behaviour ─────────────────────────────────────────
+# ── Integration helpers ───────────────────────────────────────────────────────
 
 
 def _make_ws(ws_id, project_id, working_dir, phase):
@@ -41,156 +41,205 @@ def _make_ws(ws_id, project_id, working_dir, phase):
     }
 
 
-def _make_db(tmp_path):
-    """Minimal in-memory-style SQLite DB with the tables transition_phase touches."""
-    db = sqlite3.connect(str(tmp_path / "test.db"))
-    db.row_factory = sqlite3.Row
-    db.execute("""
-        CREATE TABLE projects (
-            id TEXT PRIMARY KEY,
-            name TEXT
-        )
-    """)
-    db.execute("""
-        CREATE TABLE workspaces (
-            id INTEGER PRIMARY KEY,
-            project_id TEXT,
-            phase TEXT,
-            last_confirmed_commit TEXT
-        )
-    """)
-    db.execute("""
-        CREATE TABLE phase_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            workspace_id INTEGER,
-            from_phase TEXT,
-            to_phase TEXT,
-            time TEXT,
-            commit_hash TEXT
-        )
-    """)
-    db.execute("""
-        CREATE TABLE project_advance_modes (
-            project_id TEXT NOT NULL,
-            major_phase INTEGER NOT NULL,
-            mode TEXT NOT NULL DEFAULT 'none',
-            PRIMARY KEY (project_id, major_phase)
-        )
-    """)
-    db.commit()
-    return db
-
-
-def _insert_workspace(db, ws):
-    db.execute(
-        "INSERT INTO workspaces (id, project_id, phase, last_confirmed_commit) VALUES (?, ?, ?, ?)",
-        (ws["id"], ws["project_id"], ws["phase"], ws["last_confirmed_commit"]),
-    )
-    db.execute(
-        "INSERT INTO projects (id, name) VALUES (?, ?)",
-        (ws["project_id"], "Test Project"),
-    )
-    db.commit()
-
-
 def _action_file(working_dir):
     return os.path.join(working_dir, ".claude", "state", "pending-advance-action")
 
 
+def _insert_workspace_and_project(db, ws):
+    db.execute(
+        "INSERT OR IGNORE INTO projects (id, name, path, registered) VALUES (?, ?, ?, ?)",
+        (ws["project_id"], "Test Project", ws["working_dir"], "2024-01-01T00:00:00"),
+    )
+    db.execute(
+        "INSERT INTO workspaces (id, project_id, branch, sanitized_branch, working_dir, "
+        "created, status, phase, scope_json, plan_json, source_branch, last_confirmed_commit) "
+        "VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)",
+        (
+            ws["id"],
+            ws["project_id"],
+            f"feature/test-{ws['id']}",
+            f"feature-test-{ws['id']}",
+            ws["working_dir"],
+            "2024-01-01T00:00:00",
+            ws["phase"],
+            '{"must":[],"may":[]}',
+            '{"description":"","systemDiagram":"","execution":[]}',
+            "develop",
+            ws["last_confirmed_commit"],
+        ),
+    )
+    db.commit()
+
+
+# ── Integration: file-write behaviour ─────────────────────────────────────────
+
+
 def test_major_transition_compact_mode_writes_file(tmp_path):
-    db = _make_db(tmp_path)
     working_dir = str(tmp_path / "repo")
     os.makedirs(working_dir)
-    project_id = "proj-1"
+    project_id = "proj-compact"
 
-    ws = _make_ws(1, project_id, working_dir, "1.4")
-    _insert_workspace(db, ws)
-    set_modes(db, project_id, {2: "compact"})
+    db = get_db()
+    try:
+        ws = _make_ws(9001, project_id, working_dir, "1.4")
+        _insert_workspace_and_project(db, ws)
+        set_modes(db, project_id, {"2": "compact"})
 
-    post_commit = transition_phase(db, ws, "2.0")
+        post_commit = transition_phase(db, ws, "2.0")
 
-    assert post_commit is not None
-    db.commit()
-    for callback in post_commit:
-        callback()
+        assert post_commit is not None
+        db.commit()
+        for callback in post_commit:
+            callback()
+    finally:
+        db.close()
+
     action_file = _action_file(working_dir)
     assert os.path.isfile(action_file), "pending-advance-action file must be written"
     assert open(action_file).read() == "compact"
 
 
 def test_major_transition_clear_mode_writes_file(tmp_path):
-    db = _make_db(tmp_path)
     working_dir = str(tmp_path / "repo")
     os.makedirs(working_dir)
-    project_id = "proj-2"
+    project_id = "proj-clear"
 
-    ws = _make_ws(2, project_id, working_dir, "2.1")
-    _insert_workspace(db, ws)
-    set_modes(db, project_id, {3: "clear"})
+    db = get_db()
+    try:
+        ws = _make_ws(9002, project_id, working_dir, "2.0")
+        _insert_workspace_and_project(db, ws)
+        set_modes(db, project_id, {"3.1": "clear"})
 
-    post_commit = transition_phase(db, ws, "3.1.0")
+        post_commit = transition_phase(db, ws, "3.1.0")
 
-    assert post_commit is not None
-    db.commit()
-    for callback in post_commit:
-        callback()
+        assert post_commit is not None
+        db.commit()
+        for callback in post_commit:
+            callback()
+    finally:
+        db.close()
+
     action_file = _action_file(working_dir)
     assert os.path.isfile(action_file)
     assert open(action_file).read() == "clear"
 
 
-def test_sub_phase_transition_writes_no_file(tmp_path):
-    db = _make_db(tmp_path)
+def test_sub_phase_transition_within_same_n_writes_no_file(tmp_path):
+    """3.1.0 → 3.1.2 stays within boundary '3.1'; no advance action file is written."""
     working_dir = str(tmp_path / "repo")
     os.makedirs(working_dir)
-    project_id = "proj-3"
+    project_id = "proj-same-n"
 
-    ws = _make_ws(3, project_id, working_dir, "3.1.0")
-    _insert_workspace(db, ws)
-    set_modes(db, project_id, {3: "compact"})
+    db = get_db()
+    try:
+        ws = _make_ws(9003, project_id, working_dir, "3.1.0")
+        _insert_workspace_and_project(db, ws)
+        set_modes(db, project_id, {"3.1": "clear", "3.x": "compact"})
 
-    post_commit = transition_phase(db, ws, "3.1.1")
+        post_commit = transition_phase(db, ws, "3.1.2")
 
-    assert post_commit is not None
-    db.commit()
-    for callback in post_commit:
-        callback()
+        assert post_commit is not None
+        db.commit()
+        for callback in post_commit:
+            callback()
+    finally:
+        db.close()
+
     assert not os.path.isfile(_action_file(working_dir))
 
 
-def test_major_transition_none_mode_writes_no_file(tmp_path):
-    db = _make_db(tmp_path)
+def test_sub_phase_transition_between_n_writes_file_via_template(tmp_path):
+    """3.1.4 → 3.2.0 crosses boundary '3.1' → '3.2'; template '3.x' provides the mode."""
     working_dir = str(tmp_path / "repo")
     os.makedirs(working_dir)
-    project_id = "proj-4"
+    project_id = "proj-template"
 
-    ws = _make_ws(4, project_id, working_dir, "1.4")
-    _insert_workspace(db, ws)
-    # mode defaults to 'none'; no explicit set_modes call needed
+    db = get_db()
+    try:
+        ws = _make_ws(9004, project_id, working_dir, "3.1.4")
+        _insert_workspace_and_project(db, ws)
+        set_modes(db, project_id, {"3.x": "compact"})
 
-    post_commit = transition_phase(db, ws, "2.0")
+        post_commit = transition_phase(db, ws, "3.2.0")
 
-    assert post_commit is not None
-    db.commit()
-    for callback in post_commit:
-        callback()
+        assert post_commit is not None
+        db.commit()
+        for callback in post_commit:
+            callback()
+    finally:
+        db.close()
+
+    action_file = _action_file(working_dir)
+    assert os.path.isfile(action_file)
+    assert open(action_file).read() == "compact"
+
+
+def test_sub_phase_transition_between_n_exact_match_wins_over_template(tmp_path):
+    """3.2.4 → 3.3.0: explicit '3.3' row beats the '3.x' template."""
+    working_dir = str(tmp_path / "repo")
+    os.makedirs(working_dir)
+    project_id = "proj-exact-win"
+
+    db = get_db()
+    try:
+        ws = _make_ws(9005, project_id, working_dir, "3.2.4")
+        _insert_workspace_and_project(db, ws)
+        set_modes(db, project_id, {"3.3": "clear", "3.x": "compact"})
+
+        post_commit = transition_phase(db, ws, "3.3.0")
+
+        assert post_commit is not None
+        db.commit()
+        for callback in post_commit:
+            callback()
+    finally:
+        db.close()
+
+    action_file = _action_file(working_dir)
+    assert os.path.isfile(action_file)
+    assert open(action_file).read() == "clear"
+
+
+def test_major_transition_none_mode_writes_no_file(tmp_path):
+    working_dir = str(tmp_path / "repo")
+    os.makedirs(working_dir)
+    project_id = "proj-none"
+
+    db = get_db()
+    try:
+        ws = _make_ws(9006, project_id, working_dir, "3.1.4")
+        _insert_workspace_and_project(db, ws)
+        set_modes(db, project_id, {"4": "none"})
+
+        post_commit = transition_phase(db, ws, "4.0")
+
+        assert post_commit is not None
+        db.commit()
+        for callback in post_commit:
+            callback()
+    finally:
+        db.close()
+
     assert not os.path.isfile(_action_file(working_dir))
 
 
 def test_missing_working_dir_is_graceful(tmp_path):
-    db = _make_db(tmp_path)
-    project_id = "proj-5"
+    project_id = "proj-missing-dir"
     non_existent_dir = str(tmp_path / "does_not_exist")
 
-    ws = _make_ws(5, project_id, non_existent_dir, "1.4")
-    _insert_workspace(db, ws)
-    set_modes(db, project_id, {2: "compact"})
+    db = get_db()
+    try:
+        ws = _make_ws(9007, project_id, non_existent_dir, "1.4")
+        _insert_workspace_and_project(db, ws)
+        set_modes(db, project_id, {"2": "compact"})
 
-    # Must not raise; transition still succeeds
-    post_commit = transition_phase(db, ws, "2.0")
+        post_commit = transition_phase(db, ws, "2.0")
 
-    assert post_commit is not None
-    db.commit()
-    for callback in post_commit:
-        callback()
+        assert post_commit is not None
+        db.commit()
+        for callback in post_commit:
+            callback()
+    finally:
+        db.close()
+
     assert not os.path.isfile(_action_file(non_existent_dir))

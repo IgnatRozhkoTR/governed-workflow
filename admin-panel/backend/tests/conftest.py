@@ -83,7 +83,7 @@ def clean_db(setup_db, admin_token):
         "project_verification_profiles",
         "device_settings",
         "phase_settings",
-        "project_advance_modes",
+        "project_boundary_modes",
     ]
 
     def _do_clean(db):

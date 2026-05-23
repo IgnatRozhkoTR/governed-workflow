@@ -12,6 +12,7 @@ from core.db import get_db
 from core.helpers import run_git, write_json
 from core.i18n import t
 from core.paths import DEFAULT_GIT_RULES
+from services.advance_mode_service import seed_default_modes
 from services.configurator_service import ConfiguratorChain
 
 log = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def register_project():
             "INSERT INTO projects (id, name, path, registered) VALUES (?, ?, ?, ?)",
             (project_id, name, path, registered)
         )
-        db.commit()
+        seed_default_modes(db, project_id)
 
         _setup_project_configs(path)
         try:
