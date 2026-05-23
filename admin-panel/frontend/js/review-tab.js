@@ -35,7 +35,7 @@ function renderReviewTab() {
     var filtered = showResolved ? allReview : allReview.filter(function(c) { return !c.resolved; });
     var roots = filtered.filter(function(c) { return !c.parent_id; });
 
-    renderReviewResolveAllBar(container, allReview);
+    updateReviewResolveAllButton(allReview);
 
     if (roots.length === 0) {
         var empty = document.createElement('div');
@@ -58,22 +58,19 @@ function renderReviewTab() {
     });
 }
 
-function renderReviewResolveAllBar(container, allReview) {
+function updateReviewResolveAllButton(allReview) {
+    var btn = document.getElementById('reviewResolveAllBtn');
+    if (!btn) return;
+
     var openCount = allReview.filter(function(c) { return !c.parent_id && !c.resolved; }).length;
-    if (openCount === 0) return;
+    if (openCount === 0) {
+        btn.style.display = 'none';
+        return;
+    }
 
-    var bar = document.createElement('div');
-    bar.className = 'review-resolve-all-bar';
-
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn btn-sm';
-    btn.id = 'reviewResolveAllBtn';
+    btn.style.display = '';
     btn.textContent = t('review.resolveAll', { count: openCount });
     btn.onclick = function() { resolveAllOpenReviewIssues(openCount); };
-
-    bar.appendChild(btn);
-    container.appendChild(bar);
 }
 
 async function resolveAllOpenReviewIssues(openCount) {
@@ -147,6 +144,8 @@ function toggleReviewResolved() {
     var showing = container.dataset.showResolved === 'true';
     container.dataset.showResolved = showing ? 'false' : 'true';
     btn.textContent = showing ? t('review.showResolved') : t('review.hideResolved');
+    var allReview = getReviewComments();
+    updateReviewResolveAllButton(allReview);
     renderReviewTab();
 }
 
