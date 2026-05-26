@@ -571,7 +571,7 @@ def test_summary_endpoint_requires_auth(raw_client):
     assert response.status_code == 401
 
 
-def test_get_branch_diff_returns_added_file_content(tmp_path):
+def test_get_branch_diff_includes_changed_lines(tmp_path):
     import subprocess
     from testing_utils import GIT_ENV
     from services.review_pipeline_service import _get_branch_diff
@@ -582,18 +582,20 @@ def test_get_branch_diff_returns_added_file_content(tmp_path):
     subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
     subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
     subprocess.run(["git", "checkout", "-b", "base"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
-    (repo / "base.py").write_text("x = 1\n")
+    (repo / "existing.py").write_text("x = 1\n")
     subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
     subprocess.run(["git", "commit", "-m", "base commit"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
 
     subprocess.run(["git", "checkout", "-b", "feature"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
-    (repo / "new_feature.py").write_text("def hello():\n    return 'world'\n")
+    (repo / "new_feature.py").write_text("MARKER_ADDED_LINE = 1\ndef hello():\n    return 'world'\n")
+    (repo / "existing.py").write_text("x = 1\ny = 2\n")
     subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
-    subprocess.run(["git", "commit", "-m", "add new feature"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
+    subprocess.run(["git", "commit", "-m", "add new feature and modify existing"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
 
     diff = _get_branch_diff(repo, "base")
 
     assert "new_feature.py" in diff
+    assert "MARKER_ADDED_LINE" in diff
     assert "+" in diff
 
 

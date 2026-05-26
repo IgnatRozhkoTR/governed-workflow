@@ -56,6 +56,7 @@ log = logging.getLogger(__name__)
 _DEFAULT_CONCURRENCY = 8
 _DEFAULT_TIMEOUT_S = 300
 _INTEGRATION_TIMEOUT_MULTIPLIER = 3
+_INTEGRATION_MAX_TURNS = 15
 
 _FILE_REVIEWER_AGENT = "file-reviewer"
 _INTEGRATION_AGENTS: tuple[str, ...] = (
@@ -382,18 +383,31 @@ def _get_file_diff(project_path: Path, file_path: str, base_ref: str) -> str:
 
 
 def _get_branch_diff(project_path: Path, base_ref: str) -> str:
-    """Full branch diff vs base for the integration reviewers. Empty string on any failure.
+    """Branch diff vs base for the integration reviewers: a --stat overview
+    followed by the full unified diff (the concrete changed lines, with file
+    paths, statuses, and @@ line numbers). Three-dot (merge-base) semantics.
+    Empty string on any failure. Bounded by the pre-flight file-count gate."""
+    stat = _git_text(
+        project_path, ["git", "diff", "--find-renames", "--stat", f"{base_ref}...HEAD"]
+    )
+    patch = _git_text(
+        project_path, ["git", "diff", "--find-renames", f"{base_ref}...HEAD"]
+    )
+    sections = []
+    if stat.strip():
+        sections.append("Summary:\n" + stat.strip())
+    if patch.strip():
+        sections.append("Diff:\n" + patch.strip())
+    return "\n\n".join(sections)
 
-    Uses three-dot (merge-base) semantics so the diff is exactly the branch's
-    own changes, matching the per-file reviewer base.
-    """
+
+def _git_text(project_path: Path, argv: list[str]) -> str:
     try:
         result = subprocess.run(
-            ["git", "diff", "--find-renames", f"{base_ref}...HEAD"],
-            cwd=project_path, capture_output=True, text=True, timeout=30,
+            argv, cwd=project_path, capture_output=True, text=True, timeout=30,
         )
         return result.stdout if result.returncode == 0 else ""
-    except Exception:  # noqa: BLE001 - best-effort; missing diff degrades gracefully
+    except Exception:  # noqa: BLE001 - best-effort; missing summary degrades gracefully
         return ""
 
 
@@ -434,14 +448,17 @@ async def _run_integration_agent(
 ) -> None:
     diff = await asyncio.to_thread(_get_branch_diff, project_path, base_ref)
     prompt = (
-        "Review the current branch diff for cross-file issues.\n\n"
-        f"Branch diff (against {base_ref}):\n```diff\n{diff}\n```\n"
+        "Review this branch's changes for cross-file issues.\n\n"
+        f"Branch diff (against {base_ref}):\n{diff}\n\n"
+        "The diff above shows exactly what changed. Use Read to open any changed file in full "
+        "and Grep to navigate the codebase when you need surrounding context. Submit only "
+        "critical and major issues via the MCP tool."
     )
     stdout = await _spawn_claude_agent(
         agent=agent_name,
         prompt=prompt,
         project_path=project_path,
-        max_turns=5,
+        max_turns=_INTEGRATION_MAX_TURNS,
         timeout_s=_timeout_s() * _INTEGRATION_TIMEOUT_MULTIPLIER,
     )
     try:
