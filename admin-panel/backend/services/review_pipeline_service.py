@@ -289,7 +289,7 @@ async def _run_async(
     status.integration = {name: "pending" for name in _INTEGRATION_AGENTS}
 
     await _run_file_stage(workspace_id, project_path, reviewable, status, base_branch)
-    await _run_integration_stage(workspace_id, project_path, status)
+    await _run_integration_stage(workspace_id, project_path, status, base_branch)
 
     status.state = "done"
     status.finished_at = time.time()
@@ -319,6 +319,7 @@ async def _run_integration_stage(
     workspace_id: int,
     project_path: Path,
     status: PipelineStatus,
+    base_ref: str,
 ) -> None:
     status.state = "integration_stage"
     for agent_name in _INTEGRATION_AGENTS:
@@ -326,7 +327,7 @@ async def _run_integration_stage(
 
     async def _run_one(agent_name: str) -> None:
         try:
-            await _run_integration_agent(workspace_id, project_path, agent_name)
+            await _run_integration_agent(workspace_id, project_path, agent_name, base_ref)
             status.integration[agent_name] = "done"
         except Exception as exc:  # noqa: BLE001 - each agent isolated
             log.exception("integration agent %s failed", agent_name)
@@ -380,6 +381,22 @@ def _get_file_diff(project_path: Path, file_path: str, base_ref: str) -> str:
         return ""
 
 
+def _get_branch_diff(project_path: Path, base_ref: str) -> str:
+    """Full branch diff vs base for the integration reviewers. Empty string on any failure.
+
+    Uses three-dot (merge-base) semantics so the diff is exactly the branch's
+    own changes, matching the per-file reviewer base.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--find-renames", f"{base_ref}...HEAD"],
+            cwd=project_path, capture_output=True, text=True, timeout=30,
+        )
+        return result.stdout if result.returncode == 0 else ""
+    except Exception:  # noqa: BLE001 - best-effort; missing diff degrades gracefully
+        return ""
+
+
 async def _spawn_file_reviewer(
     project_path: Path, file_path: str, base_ref: str = "main"
 ) -> list[dict]:
@@ -413,8 +430,13 @@ async def _run_integration_agent(
     workspace_id: int,
     project_path: Path,
     agent_name: str,
+    base_ref: str,
 ) -> None:
-    prompt = "Review the current branch diff for cross-file issues."
+    diff = await asyncio.to_thread(_get_branch_diff, project_path, base_ref)
+    prompt = (
+        "Review the current branch diff for cross-file issues.\n\n"
+        f"Branch diff (against {base_ref}):\n```diff\n{diff}\n```\n"
+    )
     stdout = await _spawn_claude_agent(
         agent=agent_name,
         prompt=prompt,

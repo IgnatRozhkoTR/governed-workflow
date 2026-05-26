@@ -569,3 +569,47 @@ def test_summary_endpoint_404_when_no_run(client):
 def test_summary_endpoint_requires_auth(raw_client):
     response = raw_client.get("/api/workspaces/99999/review-pipeline/summary")
     assert response.status_code == 401
+
+
+def test_get_branch_diff_returns_added_file_content(tmp_path):
+    import subprocess
+    from testing_utils import GIT_ENV
+    from services.review_pipeline_service import _get_branch_diff
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
+    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
+    subprocess.run(["git", "checkout", "-b", "base"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
+    (repo / "base.py").write_text("x = 1\n")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
+    subprocess.run(["git", "commit", "-m", "base commit"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
+
+    subprocess.run(["git", "checkout", "-b", "feature"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
+    (repo / "new_feature.py").write_text("def hello():\n    return 'world'\n")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
+    subprocess.run(["git", "commit", "-m", "add new feature"], cwd=repo, check=True, capture_output=True, env=GIT_ENV)
+
+    diff = _get_branch_diff(repo, "base")
+
+    assert "new_feature.py" in diff
+    assert "+" in diff
+
+
+def test_run_integration_agent_embeds_diff_in_prompt(tmp_path):
+    from services.review_pipeline_service import _run_integration_agent
+
+    captured_prompt: list[str] = []
+
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
+        captured_prompt.append(prompt)
+        return "{}"
+
+    with patch("services.review_pipeline_service._get_branch_diff", return_value="SENTINEL_DIFF"), \
+         patch("services.review_pipeline_service._spawn_claude_agent", side_effect=fake_spawn):
+        asyncio.run(_run_integration_agent(1, tmp_path, "architecture-reviewer", "origin/develop"))
+
+    assert len(captured_prompt) == 1
+    assert "SENTINEL_DIFF" in captured_prompt[0]
+    assert "origin/develop" in captured_prompt[0]
