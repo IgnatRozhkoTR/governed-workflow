@@ -140,7 +140,9 @@ def _check_review_file_count(ws) -> None:
     working_dir = ws_field(ws, "working_dir")
     if not working_dir:
         return
-    base_ref = ws_field(ws, "source_branch") or "main"
+    base_ref = diff_filter.resolve_review_base(
+        Path(working_dir), ws_field(ws, "source_branch") or "main"
+    )
     try:
         count = diff_filter.count_modified(
             repo_path=Path(working_dir),

@@ -30,6 +30,8 @@ GENERATED_PATTERNS: tuple[str, ...] = (
     "*yarn.lock",
 )
 
+_FETCH_TIMEOUT_S = 30
+
 
 @dataclass(frozen=True)
 class ReviewableFile:
@@ -44,9 +46,9 @@ def list_reviewable_files(
     head_ref: str = "HEAD",
     extra_excludes: tuple[str, ...] = (),
 ) -> list[ReviewableFile]:
-    """Return the files that should be reviewed in a diff <base_ref>..<head_ref>.
+    """Return the files that should be reviewed in a diff <base_ref>...<head_ref>.
 
-    Runs `git diff --find-renames --name-status base..head` under repo_path,
+    Runs `git diff --find-renames --name-status base...head` under repo_path,
     parses each line, applies the exclusion rules, returns the survivors.
 
     extra_excludes: per-project glob patterns to add to GENERATED_PATTERNS for this call.
@@ -74,9 +76,49 @@ def count_modified(repo_path: Path, base_ref: str, head_ref: str = "HEAD",
     return len(list_reviewable_files(repo_path, base_ref, head_ref, extra_excludes))
 
 
+def resolve_review_base(repo_path: Path, base_ref: str) -> str:
+    """Resolve the diff base for review, preferring a freshly-fetched remote branch.
+
+    Feature branches are cut from origin/<base>, but the local <base> ref is
+    typically stale in worktree setups — it is never pulled, so diffing against
+    it drags in every ticket merged since the branch was cut and inflates the
+    reviewable-file count. Fetch origin/<base> best-effort and prefer it; fall
+    back to the given ref when there is no remote (offline / local-only repos)
+    so a diff is still produced.
+    """
+    if "/" in base_ref:
+        return base_ref
+    _fetch_quietly(repo_path, base_ref)
+    remote_ref = f"origin/{base_ref}"
+    if _ref_exists(repo_path, remote_ref):
+        return remote_ref
+    return base_ref
+
+
+def _fetch_quietly(repo_path: Path, branch: str) -> None:
+    try:
+        subprocess.run(
+            ["git", "fetch", "origin", branch],
+            cwd=repo_path, capture_output=True, text=True, timeout=_FETCH_TIMEOUT_S,
+        )
+    except Exception:  # noqa: BLE001 - fetch is best-effort; a stale origin still beats local
+        pass
+
+
+def _ref_exists(repo_path: Path, ref: str) -> bool:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
+            cwd=repo_path, capture_output=True, text=True,
+        )
+    except Exception:  # noqa: BLE001 - bad/missing repo path → treat ref as absent
+        return False
+    return result.returncode == 0
+
+
 def _run_git_diff(repo_path: Path, base_ref: str, head_ref: str) -> str:
     result = subprocess.run(
-        ["git", "diff", "--find-renames", "--name-status", f"{base_ref}..{head_ref}"],
+        ["git", "diff", "--find-renames", "--name-status", f"{base_ref}...{head_ref}"],
         cwd=repo_path, check=True, capture_output=True, text=True,
     )
     return result.stdout

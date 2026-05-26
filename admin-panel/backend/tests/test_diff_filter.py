@@ -9,10 +9,13 @@ SERVER_DIR = str(Path(__file__).resolve().parent.parent)
 if SERVER_DIR not in sys.path:
     sys.path.insert(0, SERVER_DIR)
 
+import subprocess
+
 from services.diff_filter import (
     list_reviewable_files,
     count_modified,
     _parse_line,
+    resolve_review_base,
     ReviewableFile,
 )
 
@@ -202,14 +205,14 @@ def test_list_reviewable_files_malformed_lines_silently_skipped():
 
 
 def test_list_reviewable_files_passes_refs_to_git(tmp_path):
-    """Verifies the correct git command is issued."""
+    """Verifies the correct git command is issued with merge-base (three-dot) semantics."""
     mock_result = MagicMock()
     mock_result.stdout = ""
     with patch("services.diff_filter.subprocess.run", return_value=mock_result) as mock_run:
         list_reviewable_files(tmp_path, "main", "feature/x")
     call_args = mock_run.call_args
     cmd = call_args[0][0]
-    assert "main..feature/x" in cmd
+    assert "main...feature/x" in cmd
     assert call_args[1]["cwd"] == tmp_path
 
 
@@ -232,3 +235,96 @@ def test_count_modified_respects_extra_excludes():
     diff = "M\tsrc/a.py\nM\tdocs/api.md\n"
     with _mock_diff(diff):
         assert count_modified(REPO, "main", extra_excludes=("docs/*.md",)) == 1
+
+
+# ── resolve_review_base + three-dot integration tests (real git) ──────────────
+
+def _g(repo, *args):
+    subprocess.run(["git", *args], cwd=str(repo), check=True,
+                   capture_output=True, text=True)
+
+
+def _make_repo_with_origin(tmp_path):
+    """develop@X with a.py, pushed to a bare origin. Returns (repo, X_sha)."""
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True, text=True)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _g(repo, "init")
+    _g(repo, "config", "user.name", "Test")
+    _g(repo, "config", "user.email", "test@test.com")
+    _g(repo, "checkout", "-b", "develop")
+    (repo / "a.py").write_text("a = 1\n")
+    _g(repo, "add", ".")
+    _g(repo, "commit", "-m", "X: initial")
+    x_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(repo),
+                           check=True, capture_output=True, text=True).stdout.strip()
+    _g(repo, "remote", "add", "origin", str(origin))
+    _g(repo, "push", "-u", "origin", "develop")
+    return repo, x_sha
+
+
+def test_resolve_review_base_prefers_origin_when_remote_exists(tmp_path):
+    repo, _ = _make_repo_with_origin(tmp_path)
+
+    resolved = resolve_review_base(repo, "develop")
+
+    assert resolved == "origin/develop"
+
+
+def test_resolve_review_base_falls_back_to_local_without_remote(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _g(repo, "init")
+    _g(repo, "config", "user.name", "Test")
+    _g(repo, "config", "user.email", "test@test.com")
+    _g(repo, "checkout", "-b", "develop")
+    (repo / "a.py").write_text("a = 1\n")
+    _g(repo, "add", ".")
+    _g(repo, "commit", "-m", "init")
+
+    assert resolve_review_base(repo, "develop") == "develop"
+
+
+def test_resolve_review_base_passes_through_qualified_ref(tmp_path):
+    repo, _ = _make_repo_with_origin(tmp_path)
+
+    assert resolve_review_base(repo, "origin/develop") == "origin/develop"
+
+
+def test_count_modified_ignores_tickets_merged_into_base_after_branch_point(tmp_path):
+    """Reproduces MP-200: stale local base inflates the count; the fresh
+    origin base + three-dot merge-base counts only the branch's own files."""
+    repo, x_sha = _make_repo_with_origin(tmp_path)
+
+    # origin/develop advances with 5 unrelated tickets (then push).
+    for i in range(1, 6):
+        (repo / f"t{i}.py").write_text(f"t = {i}\n")
+    _g(repo, "add", ".")
+    _g(repo, "commit", "-m", "Y: five merged tickets")
+    _g(repo, "push", "origin", "develop")
+
+    # Local develop is reset BEHIND (stale), simulating a never-pulled worktree base.
+    # Detach HEAD first so git allows force-moving the currently checked-out branch.
+    _g(repo, "checkout", "--detach", "HEAD")
+    _g(repo, "branch", "-f", "develop", x_sha)
+
+    # Feature branch is cut from the *fresh* origin/develop, then adds one file.
+    _g(repo, "checkout", "-b", "feature", "origin/develop")
+    (repo / "b.py").write_text("b = 1\n")
+    _g(repo, "add", ".")
+    _g(repo, "commit", "-m", "feature: one file")
+
+    # Against the stale LOCAL base the count is inflated (the bug).
+    assert count_modified(repo, "develop") == 6
+
+    # resolve_review_base + count = only the branch's own file.
+    resolved = resolve_review_base(repo, "develop")
+    assert resolved == "origin/develop"
+    assert count_modified(repo, resolved) == 1
+
+
+def test_resolve_review_base_falls_back_when_repo_path_invalid(tmp_path):
+    missing = tmp_path / "does-not-exist"
+
+    assert resolve_review_base(missing, "develop") == "develop"

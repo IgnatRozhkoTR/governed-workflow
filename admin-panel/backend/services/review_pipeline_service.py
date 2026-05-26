@@ -272,6 +272,9 @@ async def _run_async(
 ) -> None:
     status.state = "filtering"
     try:
+        base_branch = await asyncio.to_thread(
+            diff_filter.resolve_review_base, project_path, base_branch
+        )
         reviewable = await asyncio.to_thread(
             diff_filter.list_reviewable_files, project_path, base_branch
         )
@@ -369,7 +372,7 @@ def _get_file_diff(project_path: Path, file_path: str, base_ref: str) -> str:
     """Get the diff for a single file vs base. Empty string on any failure."""
     try:
         result = subprocess.run(
-            ["git", "diff", f"{base_ref}..HEAD", "--", file_path],
+            ["git", "diff", f"{base_ref}...HEAD", "--", file_path],
             cwd=project_path, capture_output=True, text=True, timeout=10,
         )
         return result.stdout if result.returncode == 0 else ""
