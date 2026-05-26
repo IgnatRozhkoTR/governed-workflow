@@ -9,6 +9,12 @@ import pytest
 from testing_utils import _git
 
 
+def test_all_repo_default_asset_dirs_target_dotclaude():
+    from routes.workspaces import _REPO_DEFAULT_ASSET_DIRS
+    for _src, dst in _REPO_DEFAULT_ASSET_DIRS:
+        assert dst.parts[0] == ".claude", f"asset destination {dst} must live under .claude, not {dst.parts[0]}"
+
+
 def test_list_branches(client, project):
     r = client.get(f"/api/projects/{project['id']}/branches")
     assert r.status_code == 200

@@ -188,6 +188,22 @@ def kill_session(name):
     subprocess.run(['tmux', 'kill-session', '-t', name], capture_output=True)
 
 
+_STATE_DIR_REL = Path(".claude") / "state"
+_FORCE_NEW_SESSION_FLAG = "force-new-session"
+
+
+def mark_new_session(working_dir):
+    """Write the force-new-session flag so the next wrapper launch starts a
+    fresh Claude conversation instead of --continue.
+
+    A brand-new workspace has no conversation to continue, so the explicit
+    Start action must signal the respawn loop to skip --continue for one launch.
+    """
+    state_dir = Path(working_dir) / _STATE_DIR_REL
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / _FORCE_NEW_SESSION_FLAG).write_text("")
+
+
 def build_claude_command(ws, resume=False, channels=None):
     """Build the claude command wrapped in a respawn loop.
 

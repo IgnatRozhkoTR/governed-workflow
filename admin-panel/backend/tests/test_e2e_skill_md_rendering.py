@@ -21,7 +21,7 @@ from core.paths import REPO_ROOT
 from routes.workspaces import _fill_missing_repo_defaults
 
 
-SKILL_TEMPLATE_REL = "claude/skills/governed-workflow/SKILL.md.template"
+SKILL_TEMPLATE_REL = ".claude/skills/governed-workflow/SKILL.md.template"
 SKILL_OUTPUT_REL = ".claude/skills/governed-workflow/SKILL.md"
 
 

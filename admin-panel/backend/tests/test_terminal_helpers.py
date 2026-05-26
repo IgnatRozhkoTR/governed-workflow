@@ -6,7 +6,7 @@ SERVER_DIR = str(Path(__file__).resolve().parent.parent)
 if SERVER_DIR not in sys.path:
     sys.path.insert(0, SERVER_DIR)
 
-from core.terminal import _strip_ansi, _is_claude_ready
+from core.terminal import _strip_ansi, _is_claude_ready, mark_new_session
 
 
 REALISTIC_PANE = """claude --dangerously-skip-permissions
@@ -65,3 +65,19 @@ def test_is_claude_ready_realistic():
 
 def test_is_claude_ready_trust_prompt():
     assert _is_claude_ready(TRUST_PROMPT_PANE) is False
+
+
+def test_mark_new_session_writes_force_new_session_flag(tmp_path):
+    mark_new_session(str(tmp_path))
+
+    flag = tmp_path / ".claude" / "state" / "force-new-session"
+    assert flag.exists()
+
+
+def test_mark_new_session_creates_state_dir_when_missing(tmp_path):
+    target = tmp_path / "fresh-workspace"
+    target.mkdir()
+
+    mark_new_session(str(target))
+
+    assert (target / ".claude" / "state" / "force-new-session").exists()

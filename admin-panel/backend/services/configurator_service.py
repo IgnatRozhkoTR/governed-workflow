@@ -27,7 +27,7 @@ class Configurator(ABC):
 class SkillConfigurator(Configurator):
     """Renders SKILL.md from SKILL.md.template + each enabled phase's description_for_skill()."""
 
-    TEMPLATE_REL_PATH = "claude/skills/governed-workflow/SKILL.md.template"
+    TEMPLATE_REL_PATH = ".claude/skills/governed-workflow/SKILL.md.template"
     OUTPUT_REL_PATH = ".claude/skills/governed-workflow/SKILL.md"
     PLACEHOLDER = "{{PHASES}}"
 

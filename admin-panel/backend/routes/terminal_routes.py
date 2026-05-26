@@ -14,6 +14,7 @@ from core.terminal import (
     get_session_command,
     kill_session,
     list_sessions,
+    mark_new_session,
     run_pty_websocket,
     send_keys,
     send_prompt,
@@ -117,6 +118,7 @@ def terminal_start(project, branch):
 
         label = ws['sanitized_branch'] or branch
         create_session(name, working_dir, env={'WORKSPACE': label})
+        mark_new_session(working_dir)
         send_keys(name, build_claude_command(ws, channels=channels))
 
         return jsonify({

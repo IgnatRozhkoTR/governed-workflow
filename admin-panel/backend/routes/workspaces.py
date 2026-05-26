@@ -331,7 +331,7 @@ _REPO_DEFAULT_ASSET_DIRS = [
     (DEFAULT_HOOKS_DIR, Path(".claude") / "hooks"),
     (DEFAULT_RULES_DIR, Path(".claude") / "rules"),
     (DEFAULT_DEFAULTS_DIR, Path(".claude") / "defaults"),
-    (DEFAULT_SKILLS_DIR, Path("claude") / "skills"),
+    (DEFAULT_SKILLS_DIR, Path(".claude") / "skills"),
 ]
 
 
