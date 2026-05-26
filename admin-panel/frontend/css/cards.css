@@ -6,6 +6,13 @@
   user-select: none;
 }
 
+.card-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .card-header .card-collapse-chevron {
   font-size: 10px;
   color: var(--text-muted);
