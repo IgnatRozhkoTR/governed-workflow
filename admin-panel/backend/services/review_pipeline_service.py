@@ -56,7 +56,6 @@ log = logging.getLogger(__name__)
 _DEFAULT_CONCURRENCY = 8
 _DEFAULT_TIMEOUT_S = 300
 _INTEGRATION_TIMEOUT_MULTIPLIER = 3
-_INTEGRATION_MAX_TURNS = 15
 
 _FILE_REVIEWER_AGENT = "file-reviewer"
 _INTEGRATION_AGENTS: tuple[str, ...] = (
@@ -458,7 +457,7 @@ async def _run_integration_agent(
         agent=agent_name,
         prompt=prompt,
         project_path=project_path,
-        max_turns=_INTEGRATION_MAX_TURNS,
+        max_turns=None,
         timeout_s=_timeout_s() * _INTEGRATION_TIMEOUT_MULTIPLIER,
     )
     try:
@@ -480,7 +479,7 @@ async def _spawn_claude_agent(
     agent: str,
     prompt: str,
     project_path: Path,
-    max_turns: int,
+    max_turns: int | None,
     timeout_s: int,
     suppress_mcp: bool = False,
 ) -> str:
@@ -497,10 +496,9 @@ async def _spawn_claude_agent(
     argv = ["claude", "-p", "--agent", agent]
     if suppress_mcp:
         argv.append("--strict-mcp-config")
-    argv.extend([
-        "--output-format", "json",
-        "--max-turns", str(max_turns),
-    ])
+    argv.extend(["--output-format", "json"])
+    if max_turns is not None:
+        argv.extend(["--max-turns", str(max_turns)])
     proc = await asyncio.create_subprocess_exec(
         *argv,
         cwd=str(project_path),

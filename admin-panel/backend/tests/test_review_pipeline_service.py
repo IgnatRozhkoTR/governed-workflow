@@ -615,3 +615,20 @@ def test_run_integration_agent_embeds_diff_in_prompt(tmp_path):
     assert len(captured_prompt) == 1
     assert "SENTINEL_DIFF" in captured_prompt[0]
     assert "origin/develop" in captured_prompt[0]
+
+
+def test_run_integration_agent_passes_no_max_turns(tmp_path):
+    from services.review_pipeline_service import _run_integration_agent
+
+    recorded_kwargs: list[dict] = []
+
+    async def fake_spawn(**kwargs):
+        recorded_kwargs.append(kwargs)
+        return "{}"
+
+    with patch("services.review_pipeline_service._get_branch_diff", return_value=""), \
+         patch("services.review_pipeline_service._spawn_claude_agent", side_effect=fake_spawn):
+        asyncio.run(_run_integration_agent(1, tmp_path, "architecture-reviewer", "origin/main"))
+
+    assert len(recorded_kwargs) == 1
+    assert recorded_kwargs[0]["max_turns"] is None
