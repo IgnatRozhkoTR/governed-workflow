@@ -165,7 +165,7 @@ def test_scope_guard_skip_non_execution(workspace, project):
     from advance.guards import ScopeApprovedGuard
     guard = ScopeApprovedGuard()
     ws = _get_ws_row(workspace["id"])
-    for phase in ("0", "1.0", "1.1", "2.0", "2.1", "5"):
+    for phase in ("0", "1.0", "1.1", "2.0", "2.1", "5.1", "5.2", "6"):
         result = guard.evaluate(phase, ws, {})
         assert result["status"] == "skip", f"Expected skip at phase {phase}"
 

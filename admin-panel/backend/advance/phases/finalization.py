@@ -1,5 +1,6 @@
-"""Finalization workflow phases: 4.0 (agentic review) through 5 (done)."""
+"""Finalization workflow phases: 4.0 (agentic review) through 6 (done)."""
 from advance.phases import Phase
+from core.db import get_db_ctx
 from core.i18n import t
 
 
@@ -82,14 +83,14 @@ class FinalApprovalPhase(Phase):
     id = "4.2"
     name = "Final Approval"
     is_user_gate = True
-    approve_target = "5"
+    approve_target = "5.1"
     reject_target = "4.1"
 
     def description_for_skill(self) -> str:
         return """\
 ## 4.2 Final Approval (USER GATE)
 
-- **Approve** → `5`
+- **Approve** → `5.1`
 - **Reject** → back to `4.1`
 
 Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
@@ -104,16 +105,82 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
         return True, {}
 
     def next_phase(self, ws):
-        return "5"
+        return "5.1"
+
+
+class ReflectionPhase(Phase):
+    id = "5.1"
+    name = "Reflection"
+
+    def description_for_skill(self) -> str:
+        return """\
+## Phase 5.1: Reflection
+
+**Goal:** Reflect on the just-finished ticket and emit proposals — concrete improvements to rules, agent definitions, skills, memory, or workflow itself. Implement the easy ones directly; queue the rest for phase 5.2.
+
+**Steps:**
+
+1. Call `mcp__governed-workflow__workspace_get_reflection_context` — returns `{scope, branch_diff, review_findings, transcript}` for the ticket.
+2. Spawn the `reflector` sub-agent via the `Agent` tool with `subagent_type="reflector"`. Hand it the context as the prompt verbatim — the agent will submit zero or more proposals via `mcp__governed-workflow__workspace_submit_proposal`.
+3. Call `mcp__governed-workflow__workspace_list_proposals` to retrieve what the reflector submitted in this run.
+4. For each proposal with `implementation_kind="auto"`, apply it now:
+   - `memory_write` / `memory_delete` — write/delete the markdown file under `~/.claude/projects/<encoded-project-path>/memory/`. Encode the project path by replacing `/` and `.` with `-` (e.g. `/Users/me/Projects/foo` → `-Users-me-Projects-foo`). Update `MEMORY.md` index if it exists.
+   - `rule_new` / `rule_update` — use the `mcp__governed-workflow__rule_create` / `mcp__governed-workflow__rule_update` MCP tools.
+   - On success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=...)`.
+   - On failure, call the same tool with `status="failed"`.
+5. Leave proposals with `implementation_kind="manual"` alone — phase 5.2 picks them up.
+6. **Advance.** `workspace_advance` routes automatically: if any `manual` proposals remain in `status="proposed"`, you land in **5.2 Manual implementation**; otherwise you land in **6 Done**."""
+
+    def validate(self, ws, body, project_path):
+        return True, {}
+
+    def next_phase(self, ws):
+        with get_db_ctx() as db:
+            row = db.execute(
+                "SELECT 1 FROM proposals "
+                "WHERE workspace_id = ? AND implementation_kind = 'manual' AND status = 'proposed' "
+                "LIMIT 1",
+                (ws["id"],),
+            ).fetchone()
+        return "5.2" if row is not None else "6"
+
+
+class ManualImplementationPhase(Phase):
+    id = "5.2"
+    name = "Manual implementation"
+
+    def description_for_skill(self) -> str:
+        return """\
+## Phase 5.2: Manual implementation
+
+**Goal:** Implement the manual proposals the reflector emitted in phase 5.1.
+
+**Steps:**
+
+1. Call `mcp__governed-workflow__workspace_list_proposals` with `implementation_kind="manual"` and `status="proposed"` — that's the queue.
+2. For each proposal:
+   - Read its `title`, `body`, and `payload_json` to understand what's being asked.
+   - Spawn the appropriate sub-agent via the `Agent` tool:
+     - `agent_new` / `agent_update` / `skill_new` / `skill_update` — spawn `middle-backend-engineer` (or `junior-backend-engineer` if trivial) with a prompt that describes the new/updated agent or skill, including the proposal's payload as the source of truth.
+     - `workflow_improvement` — typically requires a multi-file change; spawn `senior-backend-engineer`.
+   - On the sub-agent's success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=<one-line summary>)`.
+   - On failure, call the same tool with `status="failed", result_json=<error summary>`.
+3. **Advance to 6 Done** when the queue is drained."""
+
+    def validate(self, ws, body, project_path):
+        return True, {}
+
+    def next_phase(self, ws):
+        return "6"
 
 
 class DonePhase(Phase):
-    id = "5"
+    id = "6"
     name = "Done"
 
     def description_for_skill(self) -> str:
         return """\
-## 5 Done
+## 6 Done
 
 Push and MR/PR creation allowed. Task complete."""
 
@@ -122,7 +189,14 @@ Push and MR/PR creation allowed. Task complete."""
         return False, {"error": t("phase.done.complete", locale)}
 
     def next_phase(self, ws):
-        return "5"
+        return "6"
 
 
-PHASES = [AgenticReviewPhase(), AddressFixPhase(), FinalApprovalPhase(), DonePhase()]
+PHASES = [
+    AgenticReviewPhase(),
+    AddressFixPhase(),
+    FinalApprovalPhase(),
+    ReflectionPhase(),
+    ManualImplementationPhase(),
+    DonePhase(),
+]

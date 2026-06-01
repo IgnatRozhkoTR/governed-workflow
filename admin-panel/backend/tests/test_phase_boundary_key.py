@@ -95,11 +95,38 @@ def test_finalization_phases_boundary_key_is_4(phase_id):
     assert phase.boundary_key == "4"
 
 
-# ── Done phase ────────────────────────────────────────────────────────────────
+# ── Reflection / manual implementation phases ─────────────────────────────────
 
 
-def test_done_phase_boundary_key_is_5():
-    phase = get_phase("5")
+@pytest.mark.parametrize("phase_id", ["5.1", "5.2"])
+def test_reflection_phases_boundary_key_is_5(phase_id):
+    phase = get_phase(phase_id)
     assert phase is not None
 
     assert phase.boundary_key == "5"
+
+
+# ── Done phase ────────────────────────────────────────────────────────────────
+
+
+def test_done_phase_boundary_key_is_6():
+    phase = get_phase("6")
+    assert phase is not None
+
+    assert phase.boundary_key == "6"
+
+
+# ── Registry coverage for renumbered finalization phases ─────────────────────
+
+
+@pytest.mark.parametrize("phase_id", ["5.1", "5.2", "6"])
+def test_finalization_phases_are_registered(phase_id):
+    assert phase_id in PHASE_REGISTRY
+
+
+def test_done_phase_id_is_6_not_5():
+    """DonePhase moved from id '5' to '6' to make room for reflection / manual implementation."""
+    from advance.phases.finalization import DonePhase
+
+    assert DonePhase.id == "6"
+    assert get_phase("5") is None

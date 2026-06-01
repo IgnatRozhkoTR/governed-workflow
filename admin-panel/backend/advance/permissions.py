@@ -346,10 +346,10 @@ def _check_bash(ws, command, cwd):
         return result
 
     if _GIT_PUSH_RE.search(command):
-        if phase != "5":
+        if phase != "6":
             result["allowed"] = False
             result["reason"] = (f"Push blocked: workspace is in phase {phase}. "
-                                "Push allowed only in phase 5 (Done).")
+                                "Push allowed only in phase 6 (Done).")
         else:
             result["allowed"] = True
         return result
@@ -362,10 +362,10 @@ def _check_bash(ws, command, cwd):
             return result
 
     if _GH_PR_CREATE_RE.search(command):
-        if phase != "5":
+        if phase != "6":
             result["allowed"] = False
             result["reason"] = (f"PR creation blocked: workspace is in phase {phase}. "
-                                "PR creation allowed only in phase 5 (Done).")
+                                "PR creation allowed only in phase 6 (Done).")
         else:
             result["allowed"] = True
         return result
@@ -460,10 +460,10 @@ def _check_mcp_tool(ws, tool_name):
     result = {"governed": True, "phase": phase}
 
     if _MCP_MR_CREATE_RE.search(tool_name):
-        if phase != "5":
+        if phase != "6":
             result["allowed"] = False
             result["reason"] = (f"MR creation blocked: workspace is in phase {phase}. "
-                                "MR creation allowed only in phase 5 (Done).")
+                                "MR creation allowed only in phase 6 (Done).")
             return result
 
     result["allowed"] = True

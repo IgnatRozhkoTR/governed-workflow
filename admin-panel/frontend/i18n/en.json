@@ -213,6 +213,8 @@
   "phase.agenticReview": "Agentic Review",
   "phase.addressFix": "Address & Fix",
   "phase.finalApproval": "Final Approval",
+  "phase.reflection": "Reflection",
+  "phase.manualImplementation": "Manual implementation",
   "phase.done": "Done",
   "phase.noActionRequired": "No user action required at phase {phase} ({name}).",
   "phase.noChangesRecorded": "No phase changes recorded yet.",

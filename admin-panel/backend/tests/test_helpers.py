@@ -57,7 +57,7 @@ def test_match_scope_pattern_returnsTrue_whenRootDoublestarMatchesPy():
 _STATIC_REGISTERED = [
     "0", "1.0", "1.1", "1.2", "1.3", "1.4",
     "2.0", "2.1",
-    "4.0", "4.1", "4.2", "5",
+    "4.0", "4.1", "4.2", "5.1", "5.2", "6",
 ]
 _TEMPLATE_REGISTERED = [f"3.x.{k}" for k in range(5)]
 _ALL_REGISTERED = _STATIC_REGISTERED + _TEMPLATE_REGISTERED
@@ -69,7 +69,7 @@ def _expected_with_execution(*item_numbers):
     return (
         ["0", "1.0", "1.1", "1.2", "1.3", "1.4", "2.0", "2.1"]
         + exec_ids
-        + ["4.0", "4.1", "4.2", "5"]
+        + ["4.0", "4.1", "4.2", "5.1", "5.2", "6"]
     )
 
 
@@ -97,7 +97,7 @@ def test_compute_phase_sequence_none_filter_returns_all():
 
 def test_compute_phase_sequence_filters_disabled():
     plan = _plan_with_items(1)
-    enabled = {"0", "1.0", "2.0", "4.2", "5"}
+    enabled = {"0", "1.0", "2.0", "4.2", "6"}
     result = compute_phase_sequence(plan, enabled, registered_phase_ids=_ALL_REGISTERED)
     assert set(result) == enabled
     assert "1.1" not in result
@@ -108,7 +108,7 @@ def test_compute_phase_sequence_filters_disabled():
 def test_compute_phase_sequence_preserves_order():
     plan = _plan_with_items(1, 2)
     full = compute_phase_sequence(plan, registered_phase_ids=_ALL_REGISTERED)
-    enabled = {"0", "1.0", "2.0", "3.1.0", "4.0", "5"}
+    enabled = {"0", "1.0", "2.0", "3.1.0", "4.0", "6"}
     filtered = compute_phase_sequence(plan, enabled, registered_phase_ids=_ALL_REGISTERED)
     full_positions = {phase: i for i, phase in enumerate(full)}
     filtered_positions = [full_positions[p] for p in filtered]
@@ -148,9 +148,9 @@ def test_compute_phase_sequence_expands_multiple_execution_items():
 
 
 @pytest.mark.parametrize("enabled", [
-    {"0", "1.0", "2.0", "4.2", "5"},
+    {"0", "1.0", "2.0", "4.2", "6"},
     {"0"},
-    {"5"},
+    {"6"},
 ])
 def test_compute_phase_sequence_filters_to_subset_parametrized(enabled):
     plan = _plan_with_items(1)

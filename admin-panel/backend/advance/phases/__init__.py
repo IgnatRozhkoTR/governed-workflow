@@ -32,7 +32,7 @@ class Phase(ABC):
         Transitioning between different boundary groups is a major boundary
         crossing — eligible for per-project compact/clear advance actions.
 
-        Default: the first dotted segment of id (e.g. "1", "2", "4", "5").
+        Default: the first dotted segment of id (e.g. "1", "2", "4", "5", "6").
         Execution sub-phases (3.N.K) override to return "3.N" so that
         3.1.0→3.1.4 is internal but 3.1.4→3.2.0 crosses a boundary.
         """
@@ -90,7 +90,9 @@ class Phase(ABC):
             "4.0": t("phase.guide.4_0", locale),
             "4.1": t("phase.guide.4_1", locale),
             "4.2": t("phase.guide.4_2", locale),
-            "5": t("phase.guide.5", locale),
+            "5.1": t("phase.guide.5_1", locale),
+            "5.2": t("phase.guide.5_2", locale),
+            "6": t("phase.guide.6", locale),
         }
         match = re.match(r'^3\.(\d+)\.(\d+)$', new_phase)
         if match:

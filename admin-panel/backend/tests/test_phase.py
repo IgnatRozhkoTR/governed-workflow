@@ -13,7 +13,8 @@ def test_inequality():
 def test_ordering_major():
     assert phase_key("0") < phase_key("1.0")
     assert phase_key("2.0") < phase_key("3.1.0")
-    assert phase_key("4.0") < phase_key("5")
+    assert phase_key("4.0") < phase_key("5.1")
+    assert phase_key("5.2") < phase_key("6")
 
 
 def test_ordering_minor():
@@ -33,7 +34,8 @@ def test_ordering_cross_depth():
 
 def test_ordering_full_sequence():
     ordered = ["0", "1.0", "1.1", "1.2", "1.3", "2.0", "2.1",
-               "3.1.0", "3.1.4", "3.2.0", "4.0", "4.1", "4.2", "5"]
+               "3.1.0", "3.1.4", "3.2.0", "4.0", "4.1", "4.2",
+               "5.1", "5.2", "6"]
     for i in range(len(ordered) - 1):
         assert phase_key(ordered[i]) < phase_key(ordered[i + 1]), \
             f"{ordered[i]} should be < {ordered[i + 1]}"
@@ -56,7 +58,7 @@ def test_gt():
 def test_numeric_components_sort_by_integer_value():
     assert phase_key("3.1.4") < phase_key("3.1.10")
     assert phase_key("1.0") < phase_key("1.1")
-    assert phase_key("5") > phase_key("4.2")
+    assert phase_key("6") > phase_key("4.2")
 
 
 def test_module_phase_id_does_not_crash():
@@ -79,7 +81,7 @@ def test_is_templated_rejects_concrete_ids():
     assert is_templated("1.0") is False
     assert is_templated("3.1.2") is False
     assert is_templated("0") is False
-    assert is_templated("5") is False
+    assert is_templated("6") is False
 
 
 def test_is_templated_empty_string_is_not_templated():

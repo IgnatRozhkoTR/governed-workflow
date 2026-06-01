@@ -194,6 +194,13 @@ def test_seed_default_modes_inserts_all_6_rows():
     assert rows == DEFAULT_MODES
 
 
+def test_default_mode_for_boundary_5_is_clear():
+    """Boundary '5' (Reflection / Manual implementation) defaults to a fresh session
+    so the 4.2 → 5.1 transition starts the reflection phase with no leftover context."""
+
+    assert DEFAULT_MODES["5"] == "clear"
+
+
 def test_seed_default_modes_is_idempotent():
     db = get_db()
     try:

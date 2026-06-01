@@ -93,13 +93,13 @@ def test_get_phases_available_includes_core_phases(client):
     response = client.get("/api/phases/available")
     assert response.status_code == 200
     ids = {p["id"] for p in response.get_json()["phases"]}
-    assert {"0", "1.0", "2.0", "4.2", "5"}.issubset(ids)
+    assert {"0", "1.0", "2.0", "4.2", "5.1", "5.2", "6"}.issubset(ids)
 
 
 def test_get_phases_available_marks_always_on(client):
     response = client.get("/api/phases/available")
     phases_by_id = {p["id"]: p for p in response.get_json()["phases"]}
-    for pid in ("0", "1.0", "2.0", "4.2", "5"):
+    for pid in ("0", "1.0", "2.0", "4.2", "6"):
         assert phases_by_id[pid]["always_on"] is True, f"phase {pid} should be always_on"
 
 

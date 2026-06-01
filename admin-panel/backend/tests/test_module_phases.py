@@ -139,7 +139,7 @@ def test_compute_phase_sequence_includes_module_finalization_phase(registered_fi
     seq = full_phase_sequence({})
     assert "4.5" in seq
     idx = seq.index("4.5")
-    assert seq.index("4.2") < idx < seq.index("5")
+    assert seq.index("4.2") < idx < seq.index("5.1")
 
 
 def test_compute_phase_sequence_respects_phase_key_ordering(two_prep_phases):

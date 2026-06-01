@@ -24,7 +24,7 @@ DEFAULT_MODES: dict[str, str] = {
     "3.1": "clear",
     "3.x": "compact",
     "4": "clear",
-    "5": "none",
+    "5": "clear",
 }
 
 _EXECUTION_BOUNDARY_RE = re.compile(r'^3\.(\d+)$')

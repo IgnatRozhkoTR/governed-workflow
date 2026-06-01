@@ -31,14 +31,14 @@ def test_approve_at_code_review(client, workspace):
 
 
 def test_approve_at_final_gate(client, workspace):
-    """Approve at 4.2 → phase 5."""
+    """Approve at 4.2 → phase 5.1 (Reflection)."""
     plan = make_plan_json(1)
     set_phase(workspace["id"], "4.2", plan_json=plan,
               plan_status="approved", scope_status="approved")
 
     r = client.post("/api/ws/test-project/feature/test/approve", json={})
     assert r.status_code == 200
-    assert r.json["phase"] == "5"
+    assert r.json["phase"] == "5.1"
 
 
 def test_approve_at_gate_no_token_field_needed(client, workspace):

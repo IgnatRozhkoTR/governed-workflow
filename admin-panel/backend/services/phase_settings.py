@@ -2,7 +2,7 @@
 import re
 from datetime import datetime
 
-ALWAYS_ON_PHASE_IDS = frozenset({"0", "1.0", "2.0", "4.2", "5"})
+ALWAYS_ON_PHASE_IDS = frozenset({"0", "1.0", "2.0", "4.2", "6"})
 # Commit gate: matches concrete 3.N.3 and the template id 3.x.3 so the
 # template cannot be toggled off from the phase-settings UI.
 COMMIT_GATE_PATTERN = re.compile(r"^3\.(\d+|x)\.3$")

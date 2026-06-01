@@ -60,7 +60,12 @@ from mcp_tools.rules import (
     rule_delete,
 )
 from mcp_tools.review_pipeline import workspace_review_pipeline_summary
-from mcp_tools.proposals import workspace_submit_proposal
+from mcp_tools.proposals import (
+    workspace_submit_proposal,
+    workspace_get_reflection_context,
+    workspace_list_proposals,
+    workspace_resolve_proposal,
+)
 
 if __name__ == "__main__":
     register_module_phases_from_disk()

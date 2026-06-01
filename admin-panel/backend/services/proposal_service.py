@@ -1,4 +1,4 @@
-"""Proposal CRUD: create, list, and fetch agent-submitted change proposals."""
+"""Proposal CRUD: create, list, fetch, and resolve agent-submitted change proposals."""
 from datetime import datetime
 
 
@@ -15,6 +15,12 @@ ALLOWED_TYPES = frozenset({
 })
 
 ALLOWED_IMPLEMENTATION_KINDS = frozenset({"auto", "manual"})
+
+ALLOWED_STATUSES = frozenset({
+    "proposed", "pending", "approved", "rejected", "executed", "failed",
+})
+
+TERMINAL_STATUSES = frozenset({"executed", "failed", "rejected"})
 
 
 class ProposalServiceError(Exception):
@@ -65,16 +71,41 @@ def create_proposal(
     return cursor.lastrowid
 
 
-def list_proposals(db, *, workspace_id: int) -> list[dict]:
-    rows = db.execute(
+def list_proposals(
+    db,
+    *,
+    workspace_id: int,
+    implementation_kind: str | None = None,
+    status: str | None = None,
+) -> list[dict]:
+    if implementation_kind is not None and implementation_kind not in ALLOWED_IMPLEMENTATION_KINDS:
+        raise ProposalServiceError(
+            code="invalid_argument",
+            message=f"Unknown implementation_kind: {implementation_kind!r}",
+        )
+    if status is not None and status not in ALLOWED_STATUSES:
+        raise ProposalServiceError(
+            code="invalid_argument",
+            message=f"Unknown status: {status!r}",
+        )
+
+    query = (
         "SELECT id, type, implementation_kind, status, title, body, payload_json, "
         "origin, workspace_id, project_id, reason, result_json, "
         "created_at, reviewed_at, executed_at "
-        "FROM proposals "
-        "WHERE workspace_id = ? "
-        "ORDER BY created_at DESC, id DESC",
-        (workspace_id,),
-    ).fetchall()
+        "FROM proposals WHERE workspace_id = ?"
+    )
+    params: list = [workspace_id]
+
+    if implementation_kind is not None:
+        query += " AND implementation_kind = ?"
+        params.append(implementation_kind)
+    if status is not None:
+        query += " AND status = ?"
+        params.append(status)
+
+    query += " ORDER BY created_at DESC, id DESC"
+    rows = db.execute(query, params).fetchall()
     return [dict(row) for row in rows]
 
 
@@ -87,3 +118,42 @@ def get_proposal(db, proposal_id: int) -> dict | None:
         (proposal_id,),
     ).fetchone()
     return dict(row) if row is not None else None
+
+
+def resolve_proposal(
+    db,
+    proposal_id: int,
+    *,
+    status: str,
+    result_json: str | None = None,
+) -> dict:
+    if status not in TERMINAL_STATUSES:
+        raise ProposalServiceError(
+            code="invalid_argument",
+            message=f"status must be one of {sorted(TERMINAL_STATUSES)}, got {status!r}",
+        )
+
+    existing = get_proposal(db, proposal_id)
+    if existing is None:
+        raise ProposalServiceError(code="proposal_not_found")
+
+    now = datetime.now().isoformat()
+    executed_at = now if status in {"executed", "failed"} else None
+    reviewed_at = now if status == "rejected" else None
+
+    db.execute(
+        "UPDATE proposals SET status = ?, executed_at = ?, reviewed_at = ?, "
+        "result_json = COALESCE(?, result_json) WHERE id = ?",
+        (status, executed_at, reviewed_at, result_json, proposal_id),
+    )
+
+    return get_proposal(db, proposal_id)
+
+
+def count_pending_manual_proposals(db, workspace_id: int) -> int:
+    row = db.execute(
+        "SELECT COUNT(*) AS cnt FROM proposals "
+        "WHERE workspace_id = ? AND implementation_kind = 'manual' AND status = 'proposed'",
+        (workspace_id,),
+    ).fetchone()
+    return row["cnt"] if row else 0

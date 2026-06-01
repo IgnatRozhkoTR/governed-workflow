@@ -213,6 +213,8 @@
   "phase.agenticReview": "Агентная проверка",
   "phase.addressFix": "Устранение замечаний",
   "phase.finalApproval": "Финальное одобрение",
+  "phase.reflection": "Рефлексия",
+  "phase.manualImplementation": "Ручная реализация",
   "phase.done": "Готово",
   "phase.noActionRequired": "На фазе {phase} ({name}) действия пользователя не требуются.",
   "phase.noChangesRecorded": "Изменения фаз ещё не зафиксированы.",

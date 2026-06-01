@@ -91,7 +91,7 @@ def test_static_phase_count_have_descriptions():
     expected_static_ids = {
         "0", "1.0", "1.1", "1.2", "1.3", "1.4",
         "2.0",
-        "4.0", "4.1", "4.2", "5",
+        "4.0", "4.1", "4.2", "5.1", "5.2", "6",
     }
     missing = []
     for phase_id in expected_static_ids:

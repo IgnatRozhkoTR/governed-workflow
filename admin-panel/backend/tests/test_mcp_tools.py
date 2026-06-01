@@ -1265,6 +1265,9 @@ EXPECTED_ANNOTATIONS = {
     "workspace_review_pipeline_summary": (True, True, False),
     "workspace_wait_for_review": (True, False, False),
     "workspace_submit_proposal": (False, False, False),
+    "workspace_get_reflection_context": (True, True, False),
+    "workspace_list_proposals": (True, True, False),
+    "workspace_resolve_proposal": (False, True, False),
 }
 
 
@@ -1276,7 +1279,7 @@ class TestMcpToolContracts:
     def test_all_tools_have_annotations(self):
         from mcp.types import ToolAnnotations
         tools = self._tools()
-        assert len(tools) == 41, f"expected 41 registered tools, got {len(tools)}"
+        assert len(tools) == 44, f"expected 44 registered tools, got {len(tools)}"
         for name, tool in tools.items():
             ann = tool.annotations
             assert ann is not None, f"{name} missing annotations"

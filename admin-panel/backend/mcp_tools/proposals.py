@@ -1,4 +1,6 @@
+import dataclasses
 import json
+from pathlib import Path
 from typing import Annotated, Literal
 
 from pydantic import Field
@@ -7,6 +9,7 @@ from mcp.types import ToolAnnotations
 from mcp_tools import mcp, with_mcp_workspace, mcp_error
 from services import proposal_service
 from services.proposal_service import ProposalServiceError
+from services.reflection_context import gather_reflection_context
 
 _VALID_TYPES = frozenset({
     "memory_write", "memory_delete",
@@ -17,6 +20,10 @@ _VALID_TYPES = frozenset({
 })
 
 _VALID_IMPLEMENTATION_KINDS = frozenset({"auto", "manual"})
+
+_VALID_STATUSES = frozenset({
+    "proposed", "pending", "approved", "rejected", "executed", "failed",
+})
 
 _SERVICE_ERROR_TO_CATEGORY = {
     "invalid_proposal_type": ("validation", False),
@@ -121,3 +128,139 @@ def workspace_submit_proposal(
 
     db.commit()
     return {"id": proposal_id, "status": "proposed"}
+
+
+@mcp.tool(annotations=ToolAnnotations(
+    readOnlyHint=True,
+    idempotentHint=True,
+    destructiveHint=False,
+    openWorldHint=False,
+))
+@with_mcp_workspace
+def workspace_get_reflection_context(ws, project, db, locale) -> dict:
+    """Return the reflection context bundle for this workspace.
+
+    Purpose:
+        Provides the four context blobs the reflection agent reads at phase 5.1:
+        scope, branch diff, review findings, and session transcript.
+
+    Returns:
+        Dict with keys: workspace_id, project_id, branch, base_branch, scope,
+        branch_diff, review_findings, transcript, transcript_truncated.
+    """
+    project_path = Path(project["path"])
+    ctx = gather_reflection_context(db, ws, project_path=project_path)
+    return dataclasses.asdict(ctx)
+
+
+@mcp.tool(annotations=ToolAnnotations(
+    readOnlyHint=True,
+    idempotentHint=True,
+    destructiveHint=False,
+    openWorldHint=False,
+))
+@with_mcp_workspace
+def workspace_list_proposals(
+    ws,
+    project,
+    db,
+    locale,
+    implementation_kind: Annotated[Literal["auto", "manual"] | None, Field(description="Optional filter by implementation kind.")] = None,
+    status: Annotated[Literal["proposed", "pending", "approved", "rejected", "executed", "failed"] | None, Field(description="Optional filter by status.")] = None,
+) -> dict:
+    """List proposals for this workspace, newest first. Filter optionally by implementation_kind and/or status.
+
+    Returns:
+        {"proposals": [...]} where each entry is the full proposal row.
+    """
+    if implementation_kind is not None and implementation_kind not in _VALID_IMPLEMENTATION_KINDS:
+        return mcp_error(
+            "validation",
+            f"Unknown implementation_kind: {implementation_kind!r}. Allowed: {sorted(_VALID_IMPLEMENTATION_KINDS)}",
+            retryable=False,
+            details={"implementation_kind": implementation_kind},
+        )
+
+    if status is not None and status not in _VALID_STATUSES:
+        return mcp_error(
+            "validation",
+            f"Unknown status: {status!r}. Allowed: {sorted(_VALID_STATUSES)}",
+            retryable=False,
+            details={"status": status},
+        )
+
+    try:
+        proposals = proposal_service.list_proposals(
+            db,
+            workspace_id=ws["id"],
+            implementation_kind=implementation_kind,
+            status=status,
+        )
+    except ProposalServiceError as exc:
+        return mcp_error("validation", exc.code, retryable=False, details={"code": exc.code})
+
+    return {"proposals": proposals}
+
+
+@mcp.tool(annotations=ToolAnnotations(
+    readOnlyHint=False,
+    idempotentHint=True,
+    destructiveHint=False,
+    openWorldHint=False,
+))
+@with_mcp_workspace
+def workspace_resolve_proposal(
+    ws,
+    project,
+    db,
+    locale,
+    proposal_id: Annotated[int, Field(description="The proposal id returned by submit_proposal.")],
+    status: Annotated[Literal["executed", "failed", "rejected"], Field(description="The final state of the proposal.")],
+    result_json: Annotated[str | None, Field(description="Optional JSON-encoded result blob — e.g. a short summary, the path of the applied file, or the error message.")] = None,
+) -> dict:
+    """Mark a proposal executed/failed/rejected.
+
+    Parameters:
+        proposal_id: The integer id returned by workspace_submit_proposal.
+        status: One of executed, failed, or rejected.
+        result_json: Optional JSON string with a result summary or error detail.
+
+    Returns:
+        The updated proposal row as a dict.
+
+    Errors:
+        not_found — proposal_id does not exist or belongs to a different workspace.
+        validation — result_json is not valid JSON, or status is invalid.
+    """
+    if result_json is not None:
+        try:
+            json.loads(result_json)
+        except (json.JSONDecodeError, ValueError):
+            return mcp_error(
+                "validation",
+                "result_json must be valid JSON",
+                retryable=False,
+                details={"result_json_preview": result_json[:120]},
+            )
+
+    existing = proposal_service.get_proposal(db, proposal_id)
+    if existing is None or existing["workspace_id"] != ws["id"]:
+        return mcp_error(
+            "not_found",
+            f"proposal {proposal_id} not found in this workspace",
+            retryable=False,
+            details={"proposal_id": proposal_id},
+        )
+
+    try:
+        updated = proposal_service.resolve_proposal(
+            db,
+            proposal_id,
+            status=status,
+            result_json=result_json,
+        )
+    except ProposalServiceError as exc:
+        return mcp_error("validation", exc.code, retryable=False, details={"code": exc.code})
+
+    db.commit()
+    return updated

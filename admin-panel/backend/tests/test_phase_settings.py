@@ -27,7 +27,7 @@ def db(clean_phase_settings):
     conn.close()
 
 
-@pytest.mark.parametrize("phase_id", ["0", "1.0", "2.0", "4.2", "5"])
+@pytest.mark.parametrize("phase_id", ["0", "1.0", "2.0", "4.2", "6"])
 def test_is_always_on_core_phases(phase_id):
     assert is_always_on(phase_id) is True
 

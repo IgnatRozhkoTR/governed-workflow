@@ -79,7 +79,9 @@ const PHASE_NAMES = {
   "4.0": "phase.agenticReview",
   "4.1": "phase.addressFix",
   "4.2": "phase.finalApproval",
-  "5": "phase.done"
+  "5.1": "phase.reflection",
+  "5.2": "phase.manualImplementation",
+  "6": "phase.done"
 };
 
 function getPhaseName(phase) {
