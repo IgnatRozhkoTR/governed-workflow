@@ -49,6 +49,7 @@ from typing import Literal
 
 from core.db import get_db
 from services import diff_filter
+from services._claude_runner import spawn_claude_agent
 from services.comment_service import submit_review_issue
 
 log = logging.getLogger(__name__)
@@ -67,7 +68,10 @@ _SELF_SUBMITTING_AGENTS: frozenset[str] = frozenset({
     "correctness-reviewer",
 })
 
-_STDERR_EXCERPT_CHARS = 500
+# Test seam: existing tests monkey-patch this private name. Keep it as a
+# module-level alias so ``patch.object(review_pipeline_service, "_spawn_claude_agent", ...)``
+# continues to substitute the implementation used internally.
+_spawn_claude_agent = spawn_claude_agent
 
 PipelineState = Literal[
     "queued", "filtering", "file_stage", "integration_stage", "done", "failed"
@@ -382,22 +386,7 @@ def _get_file_diff(project_path: Path, file_path: str, base_ref: str) -> str:
 
 
 def _get_branch_diff(project_path: Path, base_ref: str) -> str:
-    """Branch diff vs base for the integration reviewers: a --stat overview
-    followed by the full unified diff (the concrete changed lines, with file
-    paths, statuses, and @@ line numbers). Three-dot (merge-base) semantics.
-    Empty string on any failure. Bounded by the pre-flight file-count gate."""
-    stat = _git_text(
-        project_path, ["git", "diff", "--find-renames", "--stat", f"{base_ref}...HEAD"]
-    )
-    patch = _git_text(
-        project_path, ["git", "diff", "--find-renames", f"{base_ref}...HEAD"]
-    )
-    sections = []
-    if stat.strip():
-        sections.append("Summary:\n" + stat.strip())
-    if patch.strip():
-        sections.append("Diff:\n" + patch.strip())
-    return "\n\n".join(sections)
+    return diff_filter.get_branch_diff(project_path, base_ref)
 
 
 def _git_text(project_path: Path, argv: list[str]) -> str:
@@ -473,57 +462,6 @@ async def _run_integration_agent(
             "check workspace_get_review_issues",
             agent_name,
         )
-
-
-async def _spawn_claude_agent(
-    agent: str,
-    prompt: str,
-    project_path: Path,
-    max_turns: int | None,
-    timeout_s: int,
-    suppress_mcp: bool = False,
-) -> str:
-    """Spawn ``claude -p --agent <agent>`` and return stdout.
-
-    When ``suppress_mcp`` is True, ``--strict-mcp-config`` is passed and no
-    ``--mcp-config`` files are supplied — this disables every MCP server for
-    that invocation. Used for the file-reviewer fan-out so each haiku-class
-    subprocess does not load the workspace's full opus-class MCP tool schema
-    (~20k cache-creation tokens per call). The integration reviewers must
-    keep MCP enabled because they self-submit findings via
-    ``workspace_submit_review_issue``.
-    """
-    argv = ["claude", "-p", "--agent", agent]
-    if suppress_mcp:
-        argv.append("--strict-mcp-config")
-    argv.extend(["--output-format", "json"])
-    if max_turns is not None:
-        argv.extend(["--max-turns", str(max_turns)])
-    proc = await asyncio.create_subprocess_exec(
-        *argv,
-        cwd=str(project_path),
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    try:
-        stdout_bytes, stderr_bytes = await asyncio.wait_for(
-            proc.communicate(input=prompt.encode("utf-8")), timeout=timeout_s
-        )
-    except asyncio.TimeoutError as exc:
-        proc.kill()
-        try:
-            await proc.wait()
-        except Exception:  # noqa: BLE001 - best-effort cleanup
-            pass
-        raise RuntimeError(f"{agent} timeout after {timeout_s}s") from exc
-
-    if proc.returncode != 0:
-        stderr_excerpt = stderr_bytes.decode(errors="replace")[:_STDERR_EXCERPT_CHARS]
-        raise RuntimeError(
-            f"{agent} exit {proc.returncode}: {stderr_excerpt}"
-        )
-    return stdout_bytes.decode(errors="replace")
 
 
 def _parse_file_reviewer_findings(stdout: str) -> list[dict]:

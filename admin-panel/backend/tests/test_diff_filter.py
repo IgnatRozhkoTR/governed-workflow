@@ -16,6 +16,7 @@ from services.diff_filter import (
     count_modified,
     _parse_line,
     resolve_review_base,
+    get_branch_diff,
     ReviewableFile,
 )
 
@@ -328,3 +329,54 @@ def test_resolve_review_base_falls_back_when_repo_path_invalid(tmp_path):
     missing = tmp_path / "does-not-exist"
 
     assert resolve_review_base(missing, "develop") == "develop"
+
+
+# ── get_branch_diff tests (real git) ─────────────────────────────────────────
+
+
+def _make_two_branch_repo(tmp_path):
+    """base branch with existing.py, feature branch adds new_feature.py and modifies existing.py."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _g(repo, "init")
+    _g(repo, "config", "user.name", "Test")
+    _g(repo, "config", "user.email", "test@test.com")
+    _g(repo, "checkout", "-b", "base")
+    (repo / "existing.py").write_text("x = 1\n")
+    _g(repo, "add", ".")
+    _g(repo, "commit", "-m", "base commit")
+
+    _g(repo, "checkout", "-b", "feature")
+    (repo / "new_feature.py").write_text("MARKER_ADDED_LINE = 1\ndef hello():\n    return 'world'\n")
+    (repo / "existing.py").write_text("x = 1\ny = 2\n")
+    _g(repo, "add", ".")
+    _g(repo, "commit", "-m", "add new feature and modify existing")
+    return repo
+
+
+def test_get_branch_diff_returns_stat_and_patch_for_real_repo(tmp_path):
+    repo = _make_two_branch_repo(tmp_path)
+
+    result = get_branch_diff(repo, "base")
+
+    assert result.startswith("Summary:\n")
+    assert "Diff:\n" in result
+    assert "new_feature.py" in result
+    assert "MARKER_ADDED_LINE" in result
+    assert "+" in result
+
+
+def test_get_branch_diff_returns_empty_string_when_base_ref_missing(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _g(repo, "init")
+    _g(repo, "config", "user.name", "Test")
+    _g(repo, "config", "user.email", "test@test.com")
+    _g(repo, "checkout", "-b", "main")
+    (repo / "a.py").write_text("a = 1\n")
+    _g(repo, "add", ".")
+    _g(repo, "commit", "-m", "init")
+
+    result = get_branch_diff(repo, "nonexistent-ref")
+
+    assert result == ""

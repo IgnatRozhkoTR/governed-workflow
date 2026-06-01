@@ -23,11 +23,12 @@ from .history import bp as history_bp
 from .phase_settings import bp as phase_settings_bp
 from .work_modes import bp as work_modes_bp
 from .advance_modes import bp as advance_modes_bp
+from .reflection import reflection_bp
 from .review_pipeline import bp as review_pipeline_bp
 
 
 def register_blueprints(app):
-    for bp_module in [auth_bp, projects_bp, workspaces_bp, state_bp, comments_bp, files_bp, hooks_bp, hook_api_bp, context_bp, criteria_bp, static_bp, git_config_bp, rules_bp, advance_bp, terminal_bp, improvements_bp, verification_bp, modules_bp, setup_bp, lsp_bp, history_bp, phase_settings_bp, work_modes_bp, advance_modes_bp, review_pipeline_bp]:
+    for bp_module in [auth_bp, projects_bp, workspaces_bp, state_bp, comments_bp, files_bp, hooks_bp, hook_api_bp, context_bp, criteria_bp, static_bp, git_config_bp, rules_bp, advance_bp, terminal_bp, improvements_bp, verification_bp, modules_bp, setup_bp, lsp_bp, history_bp, phase_settings_bp, work_modes_bp, advance_modes_bp, reflection_bp, review_pipeline_bp]:
         app.register_blueprint(bp_module)
     register_terminal_ws(app)
     register_setup_ws(app)

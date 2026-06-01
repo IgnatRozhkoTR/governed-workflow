@@ -76,6 +76,21 @@ def count_modified(repo_path: Path, base_ref: str, head_ref: str = "HEAD",
     return len(list_reviewable_files(repo_path, base_ref, head_ref, extra_excludes))
 
 
+def get_branch_diff(repo_path: Path, base_ref: str, head_ref: str = "HEAD") -> str:
+    """Branch diff vs base: a --stat overview followed by the full unified diff.
+
+    Three-dot (merge-base) semantics. Empty string on any git failure.
+    """
+    stat = _run_git_text(repo_path, ["git", "diff", "--find-renames", "--stat", f"{base_ref}...{head_ref}"])
+    patch = _run_git_text(repo_path, ["git", "diff", "--find-renames", f"{base_ref}...{head_ref}"])
+    sections = []
+    if stat.strip():
+        sections.append("Summary:\n" + stat.strip())
+    if patch.strip():
+        sections.append("Diff:\n" + patch.strip())
+    return "\n\n".join(sections)
+
+
 def resolve_review_base(repo_path: Path, base_ref: str) -> str:
     """Resolve the diff base for review, preferring a freshly-fetched remote branch.
 
@@ -122,6 +137,16 @@ def _run_git_diff(repo_path: Path, base_ref: str, head_ref: str) -> str:
         cwd=repo_path, check=True, capture_output=True, text=True,
     )
     return result.stdout
+
+
+def _run_git_text(repo_path: Path, argv: list[str]) -> str:
+    try:
+        result = subprocess.run(
+            argv, cwd=repo_path, capture_output=True, text=True, timeout=30,
+        )
+        return result.stdout if result.returncode == 0 else ""
+    except Exception:  # noqa: BLE001 - best-effort; missing diff degrades gracefully
+        return ""
 
 
 def _parse_line(line: str) -> ReviewableFile | None:
