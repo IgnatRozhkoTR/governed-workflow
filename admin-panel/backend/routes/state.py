@@ -235,7 +235,7 @@ def set_phase(db, ws, project):
 
 @bp.route("/api/progress", methods=["GET"])
 def query_progress():
-    """Query progress entries by date range. For daily reflection.
+    """Query progress entries by date range.
 
     Query params:
         date: single date (YYYY-MM-DD) -- returns entries created/updated on that day

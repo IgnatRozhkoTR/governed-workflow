@@ -1,4 +1,4 @@
-"""Create proposals table for approval-gated changes from reflection and memory promotion."""
+"""Create proposals table for approval-gated changes."""
 from yoyo import step
 
 step("""

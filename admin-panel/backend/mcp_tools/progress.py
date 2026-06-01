@@ -48,9 +48,9 @@ def workspace_update_progress(
 
     Purpose
       Called by the orchestrator after completing phase work. The entry is used for:
-      phase gate validation (summary must be non-empty to advance), session recovery
-      after compaction (details reconstructs what happened), and daily reflection queries
-      (entries are date-stamped). Calling with the same phase key is a no-op upsert.
+      phase gate validation (summary must be non-empty to advance) and session recovery
+      after compaction (details reconstructs what happened). Calling with the same
+      phase key is a no-op upsert.
 
     Parameters
       phase:   Phase key, e.g. '1.0', '1', '2', '3.1', '4'.
