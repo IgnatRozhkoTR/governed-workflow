@@ -12,6 +12,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 
 # ─── Logging ────────────────────────────────────────────────────────────────
 
@@ -91,6 +92,8 @@ if action == "compact":
         sys.exit(0)
 
     send_tmux_keys(pane, "/compact")
+    time.sleep(0.5)
+    send_tmux_keys(pane, "Continue with the next phase.")
     delete_action_file()
     sys.exit(0)
 
