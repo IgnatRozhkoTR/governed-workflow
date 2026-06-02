@@ -6,7 +6,7 @@ The system ships as a set of Claude Code extensions: agent definitions, hook scr
 
 ## How It Works
 
-The workflow moves through assessment, research, planning, execution, review, and delivery. Four transitions are **user gates** that halt progress until a human approves or rejects via the admin panel.
+The workflow moves through assessment, research, planning, execution, review, reflection, and delivery. Four transitions are **user gates** that halt progress until a human approves or rejects via the admin panel.
 
 ```mermaid
 flowchart TD
@@ -30,7 +30,9 @@ flowchart TD
     P40["4.0: Blind Code Review"]
     P41["4.1: Address & Validate"]
     P42{{"4.2: Final Approval — USER GATE"}}
-    P5["5: Done"]
+    P51["5.1: Reflection"]
+    P52["5.2: Manual Implementation"]
+    P6["6: Done"]
 
     P0 --> P10
     P10 --> P11
@@ -62,8 +64,12 @@ flowchart TD
     P40 --> P41
     P41 --> P42
 
-    P42 -- "Approve" --> P5
+    P42 -- "Approve" --> P51
     P42 -- "Reject" --> P41
+
+    P51 -- "Manual proposals" --> P52
+    P51 -- "No manual proposals" --> P6
+    P52 --> P6
 ```
 
 Hexagonal nodes are **user gates** — the workflow pauses until a human approves or rejects. Diamond nodes are validation checkpoints. Rectangular nodes advance automatically when their criteria are met.
@@ -72,7 +78,7 @@ Hexagonal nodes are **user gates** — the workflow pauses until a human approve
 
 **Phase advancement.** The agent calls `workspace_advance` — the backend decides the next phase. Each phase has an advancer that validates prerequisites (progress documented, research proven, scope changes present, commit hash valid). Failures return specific errors explaining what's missing.
 
-**User gates.** Preparation Review (1.4), Plan Review (2.1), Code Review (3.N.3), and Final Approval (4.2) generate cryptographic nonces. Only the admin panel UI can present them, ensuring the agent cannot self-approve.
+**User gates.** Preparation Review (1.4), Plan Review (2.1), Code Review (3.N.3), and Final Approval (4.2) generate cryptographic nonces. Only the admin panel UI can present them, ensuring the agent cannot self-approve. Phases 5.1 and 5.2 advance automatically — no user gate.
 
 **Scope locking.** Each execution sub-phase defines `must` (required changes) and `may` (permitted boundary) file patterns. Pre-tool hooks enforce these at edit time — the agent physically cannot write outside its scope. Scope and plan carry separate approval statuses. Updating either one auto-revokes its approval, requiring the user to re-approve before execution can continue.
 
@@ -89,6 +95,8 @@ Hexagonal nodes are **user gates** — the workflow pauses until a human approve
 **Execution sub-phases.** The plan defines N sub-phases (3.1, 3.2, ...), each cycling through Implementation, Validation, Fixes, Code Review, and Commit. Production code and tests are always written by separate agents to maintain objectivity.
 
 **Agent roles.** The orchestrator coordinates 16 specialized agent roles. A plan-advisor runs as a persistent teammate across the entire session. Production code and tests are always written by separate agents — engineers never write tests, test engineers never write production code. Phase 4.0 reviewers work blind with zero implementation context.
+
+**Reflection.** After Final Approval the workflow enters phase 5.1 (Reflection) in a fresh session. The orchestrator calls `workspace_get_reflection_context` — which packages scope, branch diff, open review findings, and the session transcript with sub-agent transcripts inlined and `tool_use` noise stripped — then spawns the `reflector` agent. The reflector submits proposals (nine types: memory writes/deletes, rule creates/updates, agent creates/updates, skill creates/updates, workflow improvements) each marked `auto` or `manual`. Auto proposals are applied immediately by the orchestrator; manual ones route to phase 5.2, where per-type sub-agents implement them. Done is phase 6.
 
 **Review system.** All review feedback — user comments, agent findings, and blind reviewer issues — lives in a single `discussions` table with `scope='review'`. Each review item carries a `resolution` status (`open`, `fixed`, `false_positive`, `out_of_scope`). Agents set the resolution after addressing feedback; users resolve items in the admin panel. A cross-cutting `ReviewGuard` blocks phase advancement until all review items are user-resolved. This applies to execution phases (3.N.K), address & fix (4.1), and final approval (4.2).
 
@@ -111,7 +119,7 @@ Governed Workflow is a workflow-governance layer for Claude Code. It is designed
 - **cwd-escape.** Because the block above runs before workspace lookup, an agent that does `cd /tmp` to land outside any registered workspace cannot reach governed-workflow files either.
 - **Direct admin-API access.** Bash commands containing `curl/wget/python/ruby/node/fetch` to `localhost:5111` are denied — agents must use MCP workspace tools.
 - **Per-workspace scope.** During execution sub-phases, edits are restricted to the `must`/`may` patterns of the current sub-phase scope. Plan and scope each carry an approval status; updating either revokes its approval.
-- **User gates.** Phases 1.4, 2.1, 3.N.3, and 4.2 halt until the user clicks Approve in the admin panel. The agent has no way to self-approve.
+- **User gates.** Phases 1.4, 2.1, 3.N.3, and 4.2 halt until the user clicks Approve in the admin panel. The agent has no way to self-approve. Phases 5.1, 5.2, and 6 advance automatically.
 - **DB file permissions.** The SQLite database and its WAL/SHM sidecars are `chmod 0600` on `init_db()` so other local users on the machine cannot read them.
 - **Fail-closed hook.** When the admin API is unreachable, the pre-tool hook denies every tool — no local guesses about which tools are safe.
 

@@ -137,7 +137,7 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 
 ## MCP Tools
 
-38 tools total — 33 `workspace_*` and 5 `rule_*`.
+42 tools total — 37 `workspace_*` and 5 `rule_*`.
 
 ### Plan & Scope
 
@@ -219,6 +219,15 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 | `rule_create` | Create a new project-scoped rule file |
 | `rule_update` | Update an existing rule file |
 | `rule_delete` | Delete a rule file |
+
+### Reflection
+
+| Tool | Description | Gated to |
+|------|-------------|----------|
+| `workspace_get_reflection_context` | Returns scope, branch diff, open review findings, and filtered session transcript for the reflector | `orchestrator` |
+| `workspace_submit_proposal` | Submit a reflection proposal (nine types: memory/rule/agent/skill writes, workflow improvement; `auto` or `manual` implementation) | `reflector` |
+| `workspace_list_proposals` | List all proposals with status | `orchestrator` |
+| `workspace_resolve_proposal` | Mark a proposal `executed` or `skipped` | `orchestrator`, implementation sub-agents |
 
 ### State & Advance
 
