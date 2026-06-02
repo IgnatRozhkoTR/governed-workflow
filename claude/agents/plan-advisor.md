@@ -1,7 +1,7 @@
 ---
 name: plan-advisor
 description: Orchestrator's operational right hand. Performs initial assessment, plan review and expansion, compilation checks, and simple ad-hoc fixes. Always spawned as a teammate in the orchestrator workflow.
-tools: Bash, Glob, Grep, LS, Read, Edit, Write
+tools: Bash, Glob, Grep, LS, Read, Edit, Write, mcp__governed-workflow__workspace_get_state
 model: opus
 color: teal
 ---
