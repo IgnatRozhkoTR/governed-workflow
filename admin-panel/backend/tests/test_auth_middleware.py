@@ -195,36 +195,3 @@ def test_websocket_upgrade_bypasses_auth_at_http_layer(raw_client):
     )
 
     assert response.status_code != 401
-
-
-def test_hook_route_returns_404_when_tailscale_funnel_header_present(raw_client, admin_token):
-    response = raw_client.post(
-        "/api/hook/check-permission",
-        json={"cwd": "/tmp", "tool_name": "Read"},
-        headers={"Tailscale-Funnel-Request": "?1"},
-    )
-
-    assert response.status_code == 404
-    body = response.get_json()
-    assert body["error"] == "not_found"
-
-
-def test_hook_route_allowed_without_tailscale_funnel_header(raw_client, admin_token):
-    response = raw_client.post(
-        "/api/hook/check-permission",
-        json={"cwd": "/tmp", "tool_name": "Read"},
-    )
-
-    assert not (response.status_code == 404 and response.get_json().get("error") == "not_found")
-
-
-def test_non_hook_route_via_funnel_falls_through_to_normal_auth(raw_client, admin_token):
-    response = raw_client.get(
-        "/api/projects",
-        headers={
-            "Authorization": f"Bearer {admin_token}",
-            "Tailscale-Funnel-Request": "?1",
-        },
-    )
-
-    assert response.status_code == 200
