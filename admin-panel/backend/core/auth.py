@@ -13,6 +13,10 @@ The whitelist is kept intentionally small: static assets needed to render the
 token-entry screen, the auth status/check endpoints, and WebSocket upgrades
 (which authenticate differently via a query param because browsers cannot set
 custom headers on the initial WS handshake).
+
+Requests arriving via Tailscale Funnel (identified by the ``Tailscale-Funnel-Request``
+header) are denied on ``/api/hook/*`` so the unauthenticated hook routes are only
+reachable from localhost.
 """
 from flask import g, jsonify, request
 
@@ -21,6 +25,8 @@ from core.device_settings import (
     get_admin_token_hash,
     verify_token,
 )
+
+TAILSCALE_FUNNEL_HEADER = "Tailscale-Funnel-Request"
 
 UNPROTECTED_PREFIXES = (
     "/css/",
@@ -44,6 +50,10 @@ UNPROTECTED_EXACT = frozenset({
 WEBSOCKET_PATH_PREFIXES = (
     "/ws/",
 )
+
+
+def _is_via_funnel(req) -> bool:
+    return req.headers.get(TAILSCALE_FUNNEL_HEADER) == "?1"
 
 
 def _is_websocket_upgrade(req) -> bool:
@@ -83,6 +93,9 @@ def register_auth_guard(app):
 
         if request.method == "OPTIONS":
             return None
+
+        if path.startswith("/api/hook/") and _is_via_funnel(request):
+            return jsonify({"error": "not_found"}), 404
 
         if _should_bypass(path):
             return None
