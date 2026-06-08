@@ -9,67 +9,49 @@ The system ships as a set of Claude Code extensions: agent definitions, hook scr
 The workflow moves through assessment, research, planning, execution, review, reflection, and delivery. Four transitions are **user gates** that halt progress until a human approves or rejects via the admin panel.
 
 ```mermaid
-flowchart TD
-    P0["0: Init"]
-    P10["1.0: Assessment<br/>Post research questions"]
-    P11["1.1: Research<br/>Answer questions with findings"]
-    P12["1.2: Research Proving"]
-    P13["1.3: Impact Analysis"]
-    P14{{"1.4: Preparation Review — USER GATE"}}
-    AC["Criteria proposed"]
-    P20["2.0: Planning"]
-    P21{{"2.1: Plan Review — USER GATE<br/>All criteria must be accepted"}}
+flowchart TB
+    Start([Init])
 
-    P3N0["3.N.0: Implementation"]
-    P3N1["3.N.1: Validation"]
-    P3N2["3.N.2: Fixes"]
-    P3N3{{"3.N.3: Code Review — USER GATE"}}
-    P3N4["3.N.4: Commit"]
+    subgraph P1["Phase 1 — Pre-planning"]
+        direction LR
+        A[Assessment] --> R[Research] --> RP[Research Proving] --> IA[Impact Analysis] --> G1{{Preparation Review}}
+        G1 -.->|reject| R
+    end
 
-    CV{"Criteria<br/>validated?"}
-    P40["4.0: Blind Code Review"]
-    P41["4.1: Address & Validate"]
-    P42{{"4.2: Final Approval — USER GATE"}}
-    P51["5.1: Reflection"]
-    P52["5.2: Manual Implementation"]
-    P6["6: Done"]
+    subgraph P2["Phase 2 — Planning"]
+        direction LR
+        PL[Planning] --> G2{{Plan Review}}
+        G2 -.->|reject| PL
+    end
 
-    P0 --> P10
-    P10 --> P11
-    P11 --> P12
-    P12 --> P13
-    P13 -.-> AC
-    P13 --> P14
-    P14 -- "Approve" --> P20
-    P14 -- "Reject" --> P11
-    P20 --> P21
+    subgraph P3["Phase 3 — Execution (per sub-phase, loops)"]
+        direction LR
+        IM[Implementation] --> V[Validation] --> F[Fixes] --> G3{{Code Review}} --> C[Commit]
+        G3 -.->|reject| F
+        C -.->|loop sub-phases| IM
+    end
 
-    P21 -- "Approve" --> P3N0
-    P21 -- "Reject" --> P20
+    subgraph P4["Phase 4 — Final Review"]
+        direction LR
+        BR[Blind Review] --> AV[Address & Validate] --> G4{{Final Approval}}
+        G4 -.->|reject| AV
+    end
 
-    P3N0 --> P3N1
-    P3N1 -- "Clean" --> P3N3
-    P3N1 -- "Issues found" --> P3N2
-    P3N2 --> P3N3
+    subgraph P5["Phase 5 — Reflection (auto)"]
+        direction LR
+        REF["5.1 Reflection"] --> Q{{any manual proposals?}}
+        Q -->|yes| MAN["5.2 Manual Implementation"]
+        Q -.->|no| SKIP([skip])
+    end
 
-    P3N3 -- "Approve" --> P3N4
-    P3N3 -- "Reject" --> P3N2
+    Finish([Done])
 
-    P3N4 -- "More sub-phases" --> P3N0
-    P3N4 -- "Last sub-phase" --> CV
-
-    CV -- "Pass" --> P40
-    CV -- "Fail" --> P3N2
-
-    P40 --> P41
-    P41 --> P42
-
-    P42 -- "Approve" --> P51
-    P42 -- "Reject" --> P41
-
-    P51 -- "Manual proposals" --> P52
-    P51 -- "No manual proposals" --> P6
-    P52 --> P6
+    Start --> P1
+    P1 --> P2
+    P2 --> P3
+    P3 --> P4
+    P4 --> P5
+    P5 --> Finish
 ```
 
 Hexagonal nodes are **user gates** — the workflow pauses until a human approves or rejects. Diamond nodes are validation checkpoints. Rectangular nodes advance automatically when their criteria are met.
