@@ -10,47 +10,52 @@ The workflow moves through assessment, research, planning, execution, review, re
 
 ```mermaid
 flowchart TB
-    Start([Init])
+    Start([0: Init])
 
     subgraph P1["Phase 1 — Pre-planning"]
         direction LR
-        A[Assessment] --> R[Research] --> RP[Research Proving] --> IA[Impact Analysis] --> G1{{Preparation Review}}
-        G1 -.->|reject| R
+        A["1.0: Assessment<br/>Post research questions"] --> R["1.1: Research<br/>Answer questions with findings"] --> RP["1.2: Research Proving"] --> IA["1.3: Impact Analysis"] --> G1{{"1.4: Preparation Review<br/>USER GATE"}}
+        A -.-> AC["Criteria proposed"]
+        G1 -.->|Reject| R
     end
 
     subgraph P2["Phase 2 — Planning"]
         direction LR
-        PL[Planning] --> G2{{Plan Review}}
-        G2 -.->|reject| PL
+        PL["2.0: Planning"] --> G2{{"2.1: Plan Review<br/>USER GATE<br/>All criteria must be accepted"}}
+        G2 -.->|Reject| PL
     end
 
     subgraph P3["Phase 3 — Execution (per sub-phase, loops)"]
         direction LR
-        IM[Implementation] --> V[Validation] --> F[Fixes] --> G3{{Code Review}} --> C[Commit]
-        G3 -.->|reject| F
-        C -.->|loop sub-phases| IM
+        IM["3.N.0: Implementation"] --> V["3.N.1: Validation"]
+        V -->|Clean| G3{{"3.N.3: Code Review<br/>USER GATE"}}
+        V -->|Issues found| F["3.N.2: Fixes"]
+        F --> G3
+        G3 -->|Approve| C["3.N.4: Commit"]
+        G3 -.->|Reject| F
+        C -.->|More sub-phases| IM
+        C -->|Last sub-phase| CV{"Criteria<br/>validated?"}
+        CV -.->|Fail| F
     end
 
     subgraph P4["Phase 4 — Final Review"]
         direction LR
-        BR[Blind Review] --> AV[Address & Validate] --> G4{{Final Approval}}
-        G4 -.->|reject| AV
+        BR["4.0: Blind Code Review"] --> AV["4.1: Address & Validate"] --> G4{{"4.2: Final Approval<br/>USER GATE"}}
+        G4 -.->|Reject| AV
     end
 
-    subgraph P5["Phase 5 — Reflection (auto)"]
+    subgraph P5["Phase 5 — Reflection"]
         direction LR
-        REF["5.1 Reflection"] --> Q{{any manual proposals?}}
-        Q -->|yes| MAN["5.2 Manual Implementation"]
-        Q -.->|no| SKIP([skip])
+        REF["5.1: Reflection"] -.->|Manual proposals| MI["5.2: Manual Implementation"]
     end
 
-    Finish([Done])
+    Finish([6: Done])
 
     Start --> P1
-    P1 --> P2
-    P2 --> P3
-    P3 --> P4
-    P4 --> P5
+    P1 -->|Approve| P2
+    P2 -->|Approve| P3
+    P3 -->|Pass| P4
+    P4 -->|Approve| P5
     P5 --> Finish
 ```
 
