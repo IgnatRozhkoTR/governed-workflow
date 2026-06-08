@@ -14,8 +14,7 @@ flowchart TB
 
     subgraph P1["Phase 1 — Pre-planning"]
         direction LR
-        A["1.0: Assessment<br/>Post research questions"] --> R["1.1: Research<br/>Answer questions with findings"] --> RP["1.2: Research Proving"] --> IA["1.3: Impact Analysis"] --> G1{{"1.4: Preparation Review<br/>USER GATE"}}
-        A -.-> AC["Criteria proposed"]
+        A["1.0: Assessment<br/>Post research questions<br/>Propose criteria"] --> R["1.1: Research<br/>Answer questions with findings"] --> RP["1.2: Research Proving"] --> IA["1.3: Impact Analysis"] --> G1{{"1.4: Preparation Review<br/>USER GATE"}}
         G1 -.->|Reject| R
     end
 
