@@ -133,7 +133,6 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 | `workspace_extend_plan` | Appends a sub-phase to an already-approved plan. Use instead of `workspace_set_plan` when execution surfaces new work — avoids invalidating prior sub-phases. |
 | `workspace_propose_criteria` | Records acceptance criteria the user reviews at the preparation gate. Phase 1.0; required before advancing past 2.0. |
 | `workspace_post_discussion` | Raises an architectural or research question the user resolves in the admin panel. Required by some advance guards (e.g. open research discussion at 1.0). |
-| `workspace_submit_validation` | Validator agents report results here at 3.N.1; status drives the routing into 3.N.2 vs 3.N.3. |
 | `workspace_resolve_review_issue` | Agents set resolution (`fixed` / `false_positive` / `out_of_scope`) on review findings. The user still has to mark each one resolved in the panel — this only records what was done. |
 | `workspace_get_reflection_context` | Returns the scope, branch diff, review findings, and filtered transcript fed to the reflector at 5.1. Call once on entry. |
 | `workspace_list_proposals` | Reads what the reflector emitted. Filter by `implementation_kind` (`auto` to apply now, `manual` to queue for 5.2). |

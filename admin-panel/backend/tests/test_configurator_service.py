@@ -232,6 +232,37 @@ def test_disabled_phase_is_absent_from_rendered_skill(db, project_row, project_r
     assert "## 1.0 Assessment" in body
 
 
+def test_declarative_module_phase_appears_in_rendered_skill(db, project_row, tmp_path):
+    """A DeclarativePhase registered into PHASE_REGISTRY renders into SKILL.md.
+
+    Regression guard: when WorkModes was removed, the resolver started reading
+    from PHASE_REGISTRY directly, so module-contributed phases must flow
+    through to the rendered SKILL.md (both the phase block and the Phase Map)
+    without any extra wiring.
+    """
+    from advance.phases import PHASE_REGISTRY, register_phase
+    from advance.phases.declarative import DeclarativePhase
+
+    root = tmp_path / "with-module-phase"
+    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
+    (root / SKILL_TEMPLATE_REL).write_text(SAMPLE_TEMPLATE_WITH_MAP)
+
+    manifest = {
+        "id": "4.5",
+        "name": "Module Phase",
+        "description_for_skill": "## 4.5 Module Phase\n\nDeclarative module-contributed phase body.",
+        "short_description": "Module-contributed step",
+    }
+    register_phase(DeclarativePhase(manifest))
+    try:
+        SkillConfigurator().configure(db, project_row, root)
+        body = (root / SKILL_OUTPUT_REL).read_text()
+        assert "## 4.5 Module Phase" in body
+        assert "| `4.5` | Module Phase |" in body
+    finally:
+        PHASE_REGISTRY.pop("4.5", None)
+
+
 # ── ConfiguratorChain ──────────────────────────────────────────────────────────
 
 

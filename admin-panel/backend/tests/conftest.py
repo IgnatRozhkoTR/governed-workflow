@@ -78,7 +78,7 @@ def clean_db(setup_db, admin_token):
         "acceptance_criteria", "review_issues", "discussions",
         "research_entries", "progress_entries", "session_history",
         "phase_history", "proposals", "workspaces", "projects",
-        "modules_enabled", "improvements",
+        "modules_enabled",
         "verification_step_results", "verification_runs",
         "project_verification_profiles",
         "device_settings",

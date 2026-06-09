@@ -5,20 +5,6 @@ from datetime import datetime
 from pathlib import Path
 
 
-class VerificationServiceError(Exception):
-    """Raised when a service-layer precondition fails (e.g. unknown workspace).
-
-    Carries a stable ``code`` attribute so callers can categorize the error
-    without sniffing the translated message string. Known codes:
-      - ``workspace_not_found``  — workspace_id does not reference a workspace
-      - ``invalid_status``       — overall_status was not 'passed' or 'failed'
-    """
-
-    def __init__(self, message, code="unknown"):
-        super().__init__(message)
-        self.code = code
-
-
 def _load_profile_with_steps(db, profile):
     """Return profile as dict with its steps appended."""
     result = dict(profile)
@@ -357,50 +343,3 @@ def get_verification_results(db, workspace_id, phase=None, run_id=None):
     return _load_run_with_steps(db, run)
 
 
-def record_run(db, workspace_id, phase, overall_status, findings=None, notes=None):
-    """Record an externally-produced verification run (e.g. from a validator agent).
-
-    Inserts a completed verification_run and one step result per finding.
-    Commits the transaction before returning.
-
-    - workspace_id: must reference an existing workspace row.
-    - phase: phase string (e.g. "3.1.1").
-    - overall_status: "passed" or "failed".
-    - findings: optional list of finding strings; each becomes one step result row.
-    - notes: reserved for future use (not yet persisted).
-
-    Returns a dict with the new run's id: {"ok": True, "run_id": <int>}.
-    Raises VerificationServiceError if workspace_id does not exist.
-    """
-    workspace = db.execute("SELECT id FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
-    if not workspace:
-        raise VerificationServiceError(
-            f"workspace {workspace_id} not found", code="workspace_not_found"
-        )
-
-    if overall_status not in ("passed", "failed"):
-        raise VerificationServiceError(
-            f"overall_status must be 'passed' or 'failed', got {overall_status!r}",
-            code="invalid_status",
-        )
-
-    now = datetime.now().isoformat()
-    run_cursor = db.execute(
-        "INSERT INTO verification_runs (workspace_id, phase, status, started_at, completed_at) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (workspace_id, phase, overall_status, now, now)
-    )
-    run_id = run_cursor.lastrowid
-
-    for finding in (findings or []):
-        step_status = "failed" if overall_status == "failed" else "passed"
-        db.execute(
-            "INSERT INTO verification_step_results "
-            "(run_id, step_name, profile_name, status, output, duration_ms) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (run_id, "Code Review", "Agent Validation", step_status,
-             finding if isinstance(finding, str) else str(finding), 0)
-        )
-
-    db.commit()
-    return {"ok": True, "run_id": run_id}

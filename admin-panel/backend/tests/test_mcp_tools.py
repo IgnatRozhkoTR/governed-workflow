@@ -951,67 +951,23 @@ class TestSetImpactAnalysis:
         assert "error" in result
 
 
-class TestReportImprovement:
-    def test_report_improvement_happy_path(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_report_improvement
-        result = workspace_report_improvement(
-            scope="workflow",
-            title="Improve phase log",
-            description="Add timings per phase.",
-            context="Observed during phase 3.1 execution.",
-        )
-        assert result["ok"] is True
-        assert result["id"] >= 1
+def _insert_verification_run(workspace_id, phase, status):
+    """Insert a completed verification_run row directly, bypassing the MCP layer."""
+    from datetime import datetime
+    from core.db import get_db
 
-    def test_report_improvement_blank_title(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_report_improvement
-        result = workspace_report_improvement(
-            scope="workflow",
-            title="   ",
-            description="desc",
+    db = get_db()
+    try:
+        now = datetime.now().isoformat()
+        cursor = db.execute(
+            "INSERT INTO verification_runs (workspace_id, phase, status, started_at, completed_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (workspace_id, phase, status, now, now),
         )
-        assert "error" in result
-        assert result["errorCategory"] == "validation"
-        assert result["isRetryable"] is False
-
-    def test_report_improvement_blank_description(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_report_improvement
-        result = workspace_report_improvement(
-            scope="workflow", title="title", description=""
-        )
-        assert "error" in result
-        assert result["errorCategory"] == "validation"
-
-
-class TestGetImprovements:
-    def test_get_improvements_lists_reported(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_report_improvement, workspace_get_improvements
-        workspace_report_improvement(
-            scope="tooling", title="Use X", description="Description here"
-        )
-        workspace_report_improvement(
-            scope="project", title="Restructure Y", description="More details"
-        )
-        lst = workspace_get_improvements()
-        assert len(lst) >= 2
-        assert any(i["scope"] == "tooling" for i in lst)
-
-    def test_get_improvements_filtered_by_scope(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_report_improvement, workspace_get_improvements
-        workspace_report_improvement(
-            scope="tooling", title="A", description="aaa"
-        )
-        workspace_report_improvement(
-            scope="documentation", title="B", description="bbb"
-        )
-        lst = workspace_get_improvements(scope="tooling")
-        assert all(i["scope"] == "tooling" for i in lst)
-        assert len(lst) >= 1
+        db.commit()
+        return cursor.lastrowid
+    finally:
+        db.close()
 
 
 class TestGetVerificationResults:
@@ -1023,75 +979,20 @@ class TestGetVerificationResults:
 
     def test_returns_latest_run(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_submit_validation, workspace_get_verification_results
-        submit = workspace_submit_validation(phase="3.1.1", status="clean")
-        assert submit["ok"]
+        from mcp_server import workspace_get_verification_results
+        _insert_verification_run(workspace["id"], "3.1.1", "passed")
         result = workspace_get_verification_results()
         assert result.get("phase") == "3.1.1"
         assert result.get("status") == "passed"
 
     def test_filters_by_phase(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_submit_validation, workspace_get_verification_results
-        workspace_submit_validation(phase="3.1.1", status="clean")
-        workspace_submit_validation(phase="3.2.1", status="dirty", findings=["bug"])
+        from mcp_server import workspace_get_verification_results
+        _insert_verification_run(workspace["id"], "3.1.1", "passed")
+        _insert_verification_run(workspace["id"], "3.2.1", "failed")
         result = workspace_get_verification_results(phase="3.2.1")
         assert result.get("phase") == "3.2.1"
         assert result.get("status") == "failed"
-
-
-class TestSubmitValidation:
-    def test_submit_validation_clean(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_submit_validation
-        result = workspace_submit_validation(phase="3.1.1", status="clean")
-        assert result["ok"] is True
-        assert result["run_id"] >= 1
-
-    def test_submit_validation_dirty_with_findings(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_submit_validation
-        result = workspace_submit_validation(
-            phase="3.1.1", status="dirty", findings=["bad pattern", "lint failure"]
-        )
-        assert result["ok"] is True
-
-    def test_submit_validation_invalid_status_returns_validation_error(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_submit_validation
-        result = workspace_submit_validation(phase="3.1.1", status="bogus")
-        assert "error" in result
-        assert result["errorCategory"] == "validation"
-        assert result["isRetryable"] is False
-        assert result.get("allowed") == ["clean", "dirty"]
-
-    def test_submit_validation_workspace_not_found_uses_code(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from services.verification_service import VerificationServiceError
-        from mcp_server import workspace_submit_validation
-        from services import verification_service as vs
-
-        def fake_record_run(*args, **kwargs):
-            raise VerificationServiceError("workspace 999 not found", code="workspace_not_found")
-
-        monkeypatch.setattr(vs, "record_run", fake_record_run)
-        result = workspace_submit_validation(phase="3.1.1", status="clean")
-        assert "error" in result
-        assert result["errorCategory"] == "not_found"
-
-    def test_submit_validation_service_invalid_status_code_maps_to_validation(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from services.verification_service import VerificationServiceError
-        from mcp_server import workspace_submit_validation
-        from services import verification_service as vs
-
-        def fake_record_run(*args, **kwargs):
-            raise VerificationServiceError("bad status", code="invalid_status")
-
-        monkeypatch.setattr(vs, "record_run", fake_record_run)
-        result = workspace_submit_validation(phase="3.1.1", status="clean")
-        assert "error" in result
-        assert result["errorCategory"] == "validation"
 
 
 class TestGetVerificationResultsNotFound:
@@ -1133,13 +1034,6 @@ class TestI18nBlankChecks:
         from core.i18n import t
         result = workspace_create_verification_profile(name="", language="go")
         assert result["error"] == t("mcp.error.profileNameRequired")
-
-    def test_report_improvement_blank_title_message_is_i18n(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_report_improvement
-        from core.i18n import t
-        result = workspace_report_improvement(scope="workflow", title="", description="d")
-        assert result["error"] == t("mcp.error.titleRequired")
 
     def test_update_progress_blank_summary_message_is_i18n(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
@@ -1248,22 +1142,18 @@ EXPECTED_ANNOTATIONS = {
     "workspace_propose_criteria": (False, False, False),
     "workspace_get_criteria": (True, True, False),
     "workspace_update_criteria": (False, True, False),
-    "workspace_report_improvement": (False, False, False),
-    "workspace_get_improvements": (True, True, False),
     "workspace_get_verification_results": (True, True, False),
     "workspace_get_verification_profiles": (True, True, False),
     "workspace_create_verification_profile": (False, False, False),
     "workspace_update_verification_profile": (False, True, False),
     "workspace_add_verification_step": (False, False, False),
     "workspace_assign_verification_profile": (False, True, False),
-    "workspace_submit_validation": (False, False, False),
     "rule_list": (True, True, False),
     "rule_get": (True, True, False),
     "rule_create": (False, False, False),
     "rule_update": (False, True, False),
     "rule_delete": (False, True, True),
     "workspace_review_pipeline_summary": (True, True, False),
-    "workspace_wait_for_review": (True, False, False),
     "workspace_submit_proposal": (False, False, False),
     "workspace_get_reflection_context": (True, True, False),
     "workspace_list_proposals": (True, True, False),
@@ -1279,7 +1169,7 @@ class TestMcpToolContracts:
     def test_all_tools_have_annotations(self):
         from mcp.types import ToolAnnotations
         tools = self._tools()
-        assert len(tools) == 44, f"expected 44 registered tools, got {len(tools)}"
+        assert len(tools) == 40, f"expected 40 registered tools, got {len(tools)}"
         for name, tool in tools.items():
             ann = tool.annotations
             assert ann is not None, f"{name} missing annotations"
@@ -1437,13 +1327,6 @@ class TestErrorEnvelopeContract:
         from mcp_server import workspace_assign_verification_profile
         self._assert_envelope(workspace_assign_verification_profile(
             profile_id=999999
-        ))
-
-    def test_report_improvement_blank_title(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_report_improvement
-        self._assert_envelope(workspace_report_improvement(
-            scope="workflow", title="", description="d"
         ))
 
     def test_create_verification_profile_blank(self, workspace, monkeypatch):
@@ -1640,8 +1523,8 @@ class TestWithGlobalDbNoAutoCommit:
         @with_global_db
         def insert_without_commit(db):
             db.execute(
-                "INSERT INTO improvements (scope, title, description, context, status, created_at) "
-                "VALUES ('workflow', 'no-commit-test', 'desc', NULL, 'open', '2026-04-22T00:00:00')"
+                "INSERT INTO verification_profiles (name, language, origin, created_at) "
+                "VALUES ('no-commit-test', 'go', 'user', '2026-04-22T00:00:00')"
             )
             return {"ok": True}
 
@@ -1650,7 +1533,7 @@ class TestWithGlobalDbNoAutoCommit:
 
         fresh = get_db()
         row = fresh.execute(
-            "SELECT id FROM improvements WHERE title = 'no-commit-test'"
+            "SELECT id FROM verification_profiles WHERE name = 'no-commit-test'"
         ).fetchone()
         fresh.close()
         assert row is None, "row must NOT be visible — the decorator must not auto-commit"
@@ -1662,8 +1545,8 @@ class TestWithGlobalDbNoAutoCommit:
         @with_global_db
         def insert_with_commit(db):
             db.execute(
-                "INSERT INTO improvements (scope, title, description, context, status, created_at) "
-                "VALUES ('workflow', 'explicit-commit', 'desc', NULL, 'open', '2026-04-22T00:00:00')"
+                "INSERT INTO verification_profiles (name, language, origin, created_at) "
+                "VALUES ('explicit-commit', 'go', 'user', '2026-04-22T00:00:00')"
             )
             db.commit()
             return {"ok": True}
@@ -1673,7 +1556,7 @@ class TestWithGlobalDbNoAutoCommit:
 
         fresh = get_db()
         row = fresh.execute(
-            "SELECT id FROM improvements WHERE title = 'explicit-commit'"
+            "SELECT id FROM verification_profiles WHERE name = 'explicit-commit'"
         ).fetchone()
         fresh.close()
         assert row is not None

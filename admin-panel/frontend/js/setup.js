@@ -17,10 +17,8 @@ function showSetupPage() {
   var listView = document.getElementById('ws-project-list-view');
   var workspaceView = document.getElementById('ws-workspace-view');
   var setupView = document.getElementById('ws-setup-view');
-  var improvementsView = document.getElementById('ws-improvements-view');
   if (listView) listView.style.display = 'none';
   if (workspaceView) workspaceView.style.display = 'none';
-  if (improvementsView) improvementsView.style.display = 'none';
   if (setupView) {
     setupView.style.display = 'block';
   } else {
@@ -450,142 +448,6 @@ function _setupUpdateTerminalStatus(status) {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  IMPROVEMENTS PAGE (global, no workspace required)
-// ═══════════════════════════════════════════════
-
-// ─── Navigation ───
-
-function showImprovementsPage() {
-  var listView = document.getElementById('ws-project-list-view');
-  var workspaceView = document.getElementById('ws-workspace-view');
-  var setupView = document.getElementById('ws-setup-view');
-  var improvementsView = document.getElementById('ws-improvements-view');
-  if (listView) listView.style.display = 'none';
-  if (workspaceView) workspaceView.style.display = 'none';
-  if (setupView) setupView.style.display = 'none';
-  if (improvementsView) {
-    improvementsView.style.display = 'block';
-  } else {
-    _improvementsInjectView();
-  }
-  if (!_navigatingBack) {
-    history.pushState({ view: 'improvements' }, '', '?view=improvements');
-  }
-  loadGlobalImprovements();
-}
-
-function hideImprovementsPage() {
-  var improvementsView = document.getElementById('ws-improvements-view');
-  var listView = document.getElementById('ws-project-list-view');
-  if (improvementsView) improvementsView.style.display = 'none';
-  if (listView) listView.style.display = 'block';
-  if (!_navigatingBack) {
-    history.pushState({ view: 'projects' }, '', '/');
-  }
-}
-
-// ─── View injection ───
-
-function _improvementsInjectView() {
-  var container = document.querySelector('.ws-selector-container');
-  if (!container) return;
-  var view = document.createElement('div');
-  view.id = 'ws-improvements-view';
-  view.innerHTML = _renderImprovementsPage();
-  container.appendChild(view);
-}
-
-function _renderImprovementsPage() {
-  return '<div class="setup-container">'
-    + '<button class="ws-back-btn" onclick="hideImprovementsPage()">'
-    + '<span class="ws-back-arrow">&larr;</span> ' + t('setup.backToProjects')
-    + '</button>'
-    + '<h2 style="margin: 16px 0 4px;">' + t('improvements.globalTitle') + '</h2>'
-    + '<p style="color: var(--text-muted); margin: 0 0 20px; font-size: 0.875rem;">' + t('improvements.globalSubtitle') + '</p>'
-
-    + '<div style="display: flex; gap: 8px; margin-bottom: 16px;">'
-    + '<select id="globalImprovementScopeFilter" class="ws-select" onchange="loadGlobalImprovements()">'
-    + '<option value="">' + t('improvements.allScopes') + '</option>'
-    + '<option value="workflow">workflow</option>'
-    + '<option value="project">project</option>'
-    + '<option value="tooling">tooling</option>'
-    + '<option value="process">process</option>'
-    + '</select>'
-    + '<select id="globalImprovementStatusFilter" class="ws-select" onchange="loadGlobalImprovements()">'
-    + '<option value="">' + t('improvements.allStatuses') + '</option>'
-    + '<option value="open">' + t('improvements.open') + '</option>'
-    + '<option value="resolved">' + t('improvements.resolved') + '</option>'
-    + '</select>'
-    + '</div>'
-
-    + '<div id="globalImprovementsList"></div>'
-    + '</div>';
-}
-
-// ─── Data loading ───
-
-async function loadGlobalImprovements() {
-  var container = document.getElementById('globalImprovementsList');
-  if (!container) return;
-  container.innerHTML = '<div style="color: var(--text-muted); padding: 12px;">' + t('research.loading') + '</div>';
-
-  var scopeFilter = document.getElementById('globalImprovementScopeFilter');
-  var statusFilter = document.getElementById('globalImprovementStatusFilter');
-  var params = new URLSearchParams();
-  if (scopeFilter && scopeFilter.value) params.set('scope', scopeFilter.value);
-  if (statusFilter && statusFilter.value) params.set('status', statusFilter.value);
-
-  try {
-    var data = await apiGet('/api/improvements' + (params.toString() ? '?' + params.toString() : ''));
-    renderGlobalImprovements(data.improvements || []);
-  } catch (e) {
-    container.innerHTML = '<div class="no-items-msg">' + t('improvements.noItems') + '</div>';
-  }
-}
-
-// ─── Rendering ───
-
-function renderGlobalImprovements(items) {
-  var container = document.getElementById('globalImprovementsList');
-  if (!container) return;
-
-  if (items.length === 0) {
-    container.innerHTML = '<div class="no-items-msg">' + t('improvements.noItems') + '</div>';
-    return;
-  }
-
-  container.innerHTML = items.map(function(item) {
-    return renderImprovementItem(item, {
-      escapeFn: _wsEscape,
-      onResolve: 'resolveGlobalImprovement',
-      onReopen: 'reopenGlobalImprovement'
-    });
-  }).join('');
-}
-
-// ─── Actions ───
-
-async function resolveGlobalImprovement(id) {
-  var note = prompt(t('improvements.resolvePrompt'));
-  if (note === null) return;
-  try {
-    await apiPut('/api/improvements/' + id + '/resolve', {note: note});
-    await loadGlobalImprovements();
-  } catch (e) {
-    if (typeof showToast === 'function') showToast('Failed to resolve: ' + e.message);
-  }
-}
-
-async function reopenGlobalImprovement(id) {
-  try {
-    await apiPut('/api/improvements/' + id + '/reopen');
-    await loadGlobalImprovements();
-  } catch (e) {
-    if (typeof showToast === 'function') showToast('Failed to reopen: ' + e.message);
-  }
-}
-
 // ─── Browser history navigation ───
 
 window.addEventListener('popstate', function(event) {
@@ -593,14 +455,10 @@ window.addEventListener('popstate', function(event) {
   var state = event.state;
   if (state && state.view === 'setup') {
     showSetupPage();
-  } else if (state && state.view === 'improvements') {
-    showImprovementsPage();
   } else {
     var setupView = document.getElementById('ws-setup-view');
-    var improvementsView = document.getElementById('ws-improvements-view');
     var listView = document.getElementById('ws-project-list-view');
     if (setupView) setupView.style.display = 'none';
-    if (improvementsView) improvementsView.style.display = 'none';
     if (listView) listView.style.display = 'block';
   }
   _navigatingBack = false;

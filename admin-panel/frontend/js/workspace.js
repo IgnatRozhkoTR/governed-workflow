@@ -384,14 +384,9 @@ function _wsInitSelector() {
         </div>
 
         <div class="ws-section" style="border-top: 1px solid var(--border); padding-top: 16px;">
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-sm btn-outline" onclick="showSetupPage()" style="flex: 1; justify-content: center;">
-              ${t('setup.openSetupBtn')}
-            </button>
-            <button class="btn btn-sm btn-outline" onclick="showImprovementsPage()" style="flex: 1; justify-content: center;">
-              ${t('improvements.openBtn')}
-            </button>
-          </div>
+          <button class="btn btn-sm btn-outline" onclick="showSetupPage()" style="width: 100%; justify-content: center;">
+            ${t('setup.openSetupBtn')}
+          </button>
         </div>
       </div>
 

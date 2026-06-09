@@ -2,8 +2,7 @@
 /*  SETUP PAGE                                     */
 /* ═══════════════════════════════════════════════ */
 
-#ws-setup-view,
-#ws-improvements-view {
+#ws-setup-view {
   width: 100vw;
   max-width: 960px;
   margin-left: calc(50% - min(50vw, 480px));

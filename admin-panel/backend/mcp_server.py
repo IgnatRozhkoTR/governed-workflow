@@ -21,10 +21,6 @@ from mcp_tools.research import (
     workspace_prove_research,
     workspace_delete_research,
 )
-from mcp_tools.improvements import (
-    workspace_report_improvement,
-    workspace_get_improvements,
-)
 from mcp_tools.comments import (
     workspace_get_comments,
     workspace_post_comment,
@@ -50,7 +46,6 @@ from mcp_tools.verification import (
     workspace_update_verification_profile,
     workspace_add_verification_step,
     workspace_assign_verification_profile,
-    workspace_submit_validation,
 )
 from mcp_tools.rules import (
     rule_list,

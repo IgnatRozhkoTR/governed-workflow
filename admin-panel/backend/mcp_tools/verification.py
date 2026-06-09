@@ -13,16 +13,8 @@ from mcp_tools import (
 )
 from core.i18n import t
 from services import verification_service
-from services.verification_service import VerificationServiceError
 
 _FAIL_SEVERITY = Literal["blocking", "warning"]
-_SUBMIT_STATUS = Literal["clean", "dirty"]
-_VALID_SUBMIT_STATUSES = ("clean", "dirty")
-
-_VERIFICATION_ERROR_CATEGORIES = {
-    "workspace_not_found": ("not_found", False),
-    "invalid_status": ("validation", False),
-}
 
 _PROFILE_ERROR_MAPPING = {
     "profile_not_found": ("not_found", False),
@@ -418,70 +410,3 @@ def workspace_assign_verification_profile(
         return translate_service_error(result, _ASSIGN_ERROR_MAPPING)
     db.commit()
     return result
-
-
-@mcp.tool(
-    annotations=ToolAnnotations(
-        title="Submit validation results",
-        readOnlyHint=False,
-        idempotentHint=False,
-        destructiveHint=False,
-    )
-)
-@with_mcp_workspace
-def workspace_submit_validation(
-    ws,
-    project,
-    db,
-    locale,
-    phase: Annotated[str, Field(description="Current phase string, e.g. '3.1.1'.", min_length=1)],
-    status: Annotated[
-        _SUBMIT_STATUS,
-        Field(description="'clean' when no issues found, 'dirty' when issues were found."),
-    ],
-    findings: Annotated[
-        Optional[list],
-        Field(description="Per-step findings list. Each element is a string describing an issue found. Optional."),
-    ] = None,
-) -> dict:
-    """Submit validation results from a validator agent. Records a new verification run.
-
-    Purpose
-      Replaces file-based validation/3.N.json. Each call records a new run row —
-      not idempotent. 'clean' maps to overall_status='passed'; 'dirty' maps to
-      'failed'. Each entry in findings becomes one step result row.
-
-    Parameters
-      phase:    Phase string, e.g. '3.1.1'.
-      status:   'clean' (no issues) or 'dirty' (issues found).
-      findings: Optional list of finding strings; each becomes a step result.
-
-    Returns
-      {ok: True, run_id: <int>}
-
-    Errors
-      validation — status is not 'clean' or 'dirty'.
-      not_found  — workspace referenced by this session no longer exists.
-      transient  — DB failure; caller should retry.
-    """
-    if status not in _VALID_SUBMIT_STATUSES:
-        return mcp_error(
-            "validation",
-            t("mcp.error.invalidValidationStatus", locale),
-            retryable=False,
-            details={"allowed": list(_VALID_SUBMIT_STATUSES)},
-        )
-
-    overall_status = "passed" if status == "clean" else "failed"
-
-    try:
-        return verification_service.record_run(
-            db, ws["id"], phase, overall_status, findings=findings or None
-        )
-    except VerificationServiceError as exc:
-        category, retryable = _VERIFICATION_ERROR_CATEGORIES.get(
-            getattr(exc, "code", "unknown"), ("business", False)
-        )
-        return mcp_error(category, str(exc), retryable=retryable)
-    except TRANSIENT_DB_EXCEPTIONS as exc:
-        return mcp_error("transient", str(exc), retryable=True)

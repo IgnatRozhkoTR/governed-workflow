@@ -437,16 +437,6 @@
   "terminal.detached": "detached",
   "terminal.killSession": "Kill session",
 
-  "improvements.noItems": "No improvements reported yet",
-  "improvements.resolve": "Resolve",
-  "improvements.reopen": "Reopen",
-  "improvements.resolvePrompt": "Add a note about what was done (optional):",
-  "improvements.resolvedNote": "Resolution",
-  "improvements.allScopes": "All scopes",
-  "improvements.allStatuses": "All",
-  "improvements.open": "Open",
-  "improvements.resolved": "Resolved",
-  "tabs.improvements": "Improvements",
   "cards.verificationProfiles": "Verification Profiles",
   "cards.verificationResults": "Verification Results",
   "verification.noProfiles": "No verification profiles assigned. Select one below to get started.",
@@ -487,10 +477,6 @@
   "setup.lspCommandPlaceholder": "LSP binary (e.g. gopls, jdtls)",
   "setup.lspInstallCommandPlaceholder": "Install command (e.g. go install golang.org/x/tools/gopls@latest)",
   "setup.deviceFeaturesTitle": "Device Features",
-
-  "improvements.openBtn": "Improvements",
-  "improvements.globalTitle": "Improvements",
-  "improvements.globalSubtitle": "Track workflow and process improvements across all projects.",
 
   "history.rename": "Rename",
   "history.undo": "Undo",

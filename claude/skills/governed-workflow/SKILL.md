@@ -70,6 +70,8 @@ Only the phases listed below are enabled for this project. The Edits, Commits, P
 | `4.0` | Agentic Review | Headless review pipeline runs file and integration reviewers | OFF | OFF | OFF | — |
 | `4.1` | Address Fix | Engineers address review findings across the merged scope | ON | ON | OFF | — |
 | `4.2` | Final Approval | User reviews the resolved findings and approves delivery | OFF | OFF | OFF | USER |
+| `5.1` | Reflection | Reflector sub-agent emits proposals; auto-apply easy ones | OFF | OFF | OFF | — |
+| `5.2` | Manual implementation | Implement the manual proposals queued by 5.1 | OFF | OFF | OFF | — |
 | `6` | Done | Push and open the MR/PR; task complete | OFF | OFF | ON | — |
 
 Phases stored as strings: `"0"`, `"1.2"`, `"3.2.3"`. Execution items `3.N.K` expand at plan-validation time; the row labelled `3.x.K` describes every concrete `N` in that family.
@@ -409,6 +411,41 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
 ---
 
+## Phase 5.1: Reflection
+
+**Goal:** Reflect on the just-finished ticket and emit proposals — concrete improvements to rules, agent definitions, skills, memory, or workflow itself. Implement the easy ones directly; queue the rest for phase 5.2.
+
+**Steps:**
+
+1. Call `mcp__governed-workflow__workspace_get_reflection_context` — returns `{scope, branch_diff, review_findings, transcript}` for the ticket.
+2. Spawn the `reflector` sub-agent via the `Agent` tool with `subagent_type="reflector"`. Hand it the context as the prompt verbatim — the agent will submit zero or more proposals via `mcp__governed-workflow__workspace_submit_proposal`.
+3. Call `mcp__governed-workflow__workspace_list_proposals` to retrieve what the reflector submitted in this run.
+4. For each proposal with `implementation_kind="auto"`, apply it now:
+   - `memory_write` / `memory_delete` — write/delete the markdown file under `~/.claude/projects/<encoded-project-path>/memory/`. Encode the project path by replacing `/` and `.` with `-` (e.g. `/Users/me/Projects/foo` → `-Users-me-Projects-foo`). Update `MEMORY.md` index if it exists.
+   - `rule_new` / `rule_update` — use the `mcp__governed-workflow__rule_create` / `mcp__governed-workflow__rule_update` MCP tools.
+   - On success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=...)`; on tool failure, call with `status="failed"`; on conscious skip, call with `status="rejected"`.
+5. Leave proposals with `implementation_kind="manual"` alone — phase 5.2 picks them up.
+6. **Advance.** `workspace_advance` routes automatically: if any `manual` proposals remain in `status="proposed"`, you land in **5.2 Manual implementation**; otherwise you land in **6 Done**.
+
+---
+
+## Phase 5.2: Manual implementation
+
+**Goal:** Implement the manual proposals the reflector emitted in phase 5.1.
+
+**Steps:**
+
+1. Call `mcp__governed-workflow__workspace_list_proposals` with `implementation_kind="manual"` and `status="proposed"` — that's the queue.
+2. For each proposal:
+   - Read its `title`, `body`, and `payload_json` to understand what's being asked.
+   - Spawn the appropriate sub-agent via the `Agent` tool:
+     - `agent_new` / `agent_update` / `skill_new` / `skill_update` — spawn `middle-backend-engineer` (or `junior-backend-engineer` if trivial) with a prompt that describes the new/updated agent or skill, including the proposal's payload as the source of truth.
+     - `workflow_improvement` — typically requires a multi-file change; spawn `senior-backend-engineer`.
+   - On the sub-agent's success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=<one-line summary>)`; on failure, call with `status="failed", result_json=<error summary>`; on conscious skip, call with `status="rejected"`.
+3. **Advance to 6 Done** when the queue is drained.
+
+---
+
 ## 6 Done
 
 Push and MR/PR creation allowed. Task complete.
@@ -430,7 +467,6 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 | `workspace_extend_plan` | Appends a sub-phase to an already-approved plan. Use instead of `workspace_set_plan` when execution surfaces new work — avoids invalidating prior sub-phases. |
 | `workspace_propose_criteria` | Records acceptance criteria the user reviews at the preparation gate. Phase 1.0; required before advancing past 2.0. |
 | `workspace_post_discussion` | Raises an architectural or research question the user resolves in the admin panel. Required by some advance guards (e.g. open research discussion at 1.0). |
-| `workspace_submit_validation` | Validator agents report results here at 3.N.1; status drives the routing into 3.N.2 vs 3.N.3. |
 | `workspace_resolve_review_issue` | Agents set resolution (`fixed` / `false_positive` / `out_of_scope`) on review findings. The user still has to mark each one resolved in the panel — this only records what was done. |
 | `workspace_get_reflection_context` | Returns the scope, branch diff, review findings, and filtered transcript fed to the reflector at 5.1. Call once on entry. |
 | `workspace_list_proposals` | Reads what the reflector emitted. Filter by `implementation_kind` (`auto` to apply now, `manual` to queue for 5.2). |

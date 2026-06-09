@@ -327,16 +327,16 @@ def test_agentic_review_passes_with_progress(workspace, project):
 
 
 def _add_review_issue_row(ws_id, file_path="src/main.py", code_snippet="def main():",
-                          resolution="open", validated=0):
-    """Insert a review issue with full control over resolution and validated fields."""
+                          resolution="open"):
+    """Insert a review issue with full control over resolution."""
     from datetime import datetime
     now = datetime.now().isoformat()
     db = get_db()
     cursor = db.execute(
         "INSERT INTO review_issues (workspace_id, file_path, line_start, line_end, "
-        "severity, description, code_snippet, resolution, validated, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (ws_id, file_path, 1, 5, "major", "Test issue", code_snippet, resolution, validated, now)
+        "severity, description, code_snippet, resolution, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (ws_id, file_path, 1, 5, "major", "Test issue", code_snippet, resolution, now)
     )
     issue_id = cursor.lastrowid
     db.commit()
@@ -395,8 +395,8 @@ def test_address_fix_advances_with_unresolved_review(workspace, project):
     assert result["phase"] == "4.2"
 
 
-def test_address_fix_passes_all_fixed_validated(workspace, project):
-    """Phase 4.1 advances when all issues are fixed, validated, and code changed."""
+def test_address_fix_passes_all_fixed(workspace, project):
+    """Phase 4.1 advances when all issues are fixed and code changed."""
     plan = make_plan_json(1)
     set_phase(
         workspace["id"], "4.1",
@@ -411,7 +411,6 @@ def test_address_fix_passes_all_fixed_validated(workspace, project):
         file_path="src/main.py",
         code_snippet="old buggy code that was removed",
         resolution="fixed",
-        validated=1,
     )
 
     ws = _get_ws_row(workspace["id"])

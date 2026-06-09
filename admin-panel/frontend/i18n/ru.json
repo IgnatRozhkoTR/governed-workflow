@@ -437,16 +437,6 @@
   "terminal.detached": "отключена",
   "terminal.killSession": "Завершить сессию",
 
-  "improvements.noItems": "Улучшения пока не зафиксированы",
-  "improvements.resolve": "Закрыть",
-  "improvements.reopen": "Открыть",
-  "improvements.resolvePrompt": "Добавьте заметку о том, что было сделано (необязательно):",
-  "improvements.resolvedNote": "Решение",
-  "improvements.allScopes": "Все области",
-  "improvements.allStatuses": "Все",
-  "improvements.open": "Открытые",
-  "improvements.resolved": "Закрытые",
-  "tabs.improvements": "Улучшения",
   "cards.verificationProfiles": "Профили верификации",
   "cards.verificationResults": "Результаты верификации",
   "verification.noProfiles": "Профили верификации не назначены. Выберите один ниже для начала.",
@@ -487,10 +477,6 @@
   "setup.lspCommandPlaceholder": "Исполняемый файл LSP (например gopls, jdtls)",
   "setup.lspInstallCommandPlaceholder": "Команда установки (например go install golang.org/x/tools/gopls@latest)",
   "setup.deviceFeaturesTitle": "Функции устройства",
-
-  "improvements.openBtn": "Улучшения",
-  "improvements.globalTitle": "Улучшения",
-  "improvements.globalSubtitle": "Отслеживайте улучшения рабочего процесса и инструментов по всем проектам.",
 
   "history.rename": "Переименовать",
   "history.undo": "Отменить",

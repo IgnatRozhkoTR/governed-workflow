@@ -96,7 +96,6 @@ Add to your `.mcp.json` (use absolute expanded paths — no `~` or `$HOME`):
 | Code Changes | Sidebar | Git diff viewer |
 | Configuration | Sidebar | Claude command, Git configuration, Git Rules, Rules, LSP Shortcuts, Modules, Verification Profiles, Task Context |
 | Review | Sidebar | Blind code review findings and resolution workflow |
-| Improvements | Sidebar | Reported process improvements with scope filtering and resolve |
 | Terminal | Sidebar | Built-in terminal (tmux + xterm.js) |
 | Setup | Project selector | Module selection, verification profile configuration, embedded terminal to run the setup skill |
 
@@ -128,7 +127,6 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 | Command | `GET/PUT .../command` |
 | Progress | `GET /api/progress` |
 | Modify Check | `POST .../can-modify` |
-| Improvements | `GET /api/improvements`, `PUT /api/improvements/<id>/resolve`, `PUT /api/improvements/<id>/reopen` |
 | Verification | `GET /api/verification/profiles`, `POST /api/verification/profiles`, `POST .../profiles/<id>/steps`, `PUT/DELETE /api/verification/steps/<id>`, `GET/POST .../verification/assign`, `DELETE .../verification/unassign/<id>`, `GET .../verification/results` |
 | LSP | `GET .../lsp/profiles`, `GET .../lsp/status`, `POST .../lsp/start`, `POST .../lsp/stop`, `POST .../lsp/check-installed`, `PUT .../lsp/profiles/<id>/toggle`, `WS /ws/lsp/<project>/<branch>` |
 | Phase Settings | `GET/PUT /api/phase-settings/device`, `GET/PUT /api/projects/<pid>/phase-settings`, `GET/PUT .../phase-settings`, `GET /api/phases/available` |
@@ -137,7 +135,7 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 
 ## MCP Tools
 
-42 tools total — 37 `workspace_*` and 5 `rule_*`.
+40 tools total — 35 `workspace_*` and 5 `rule_*`.
 
 ### Plan & Scope
 
@@ -201,14 +199,6 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 | `workspace_update_verification_profile` | Update an existing verification profile |
 | `workspace_add_verification_step` | Add a step to a verification profile |
 | `workspace_assign_verification_profile` | Assign a profile to the current workspace |
-| `workspace_submit_validation` | Submit validation results from a validator sub-agent |
-
-### Improvements
-
-| Tool | Description |
-|------|-------------|
-| `workspace_report_improvement` | Report a process improvement (global — not workspace-bound) |
-| `workspace_get_improvements` | Get reported improvements, optionally filtered by scope/status |
 
 ### Rules (project-scoped)
 

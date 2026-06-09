@@ -23,7 +23,6 @@ from core.i18n import t
 from services import comment_service
 from services import criteria_service
 from services import discussion_service
-from services import improvement_service
 from services import plan_service
 from services import progress_service
 from services import research_service
@@ -266,7 +265,6 @@ from mcp_tools import research  # noqa: F401, E402
 from mcp_tools import comments  # noqa: F401, E402
 from mcp_tools import progress  # noqa: F401, E402
 from mcp_tools import criteria  # noqa: F401, E402
-from mcp_tools import improvements  # noqa: F401, E402
 from mcp_tools import verification  # noqa: F401, E402
 from mcp_tools import rules  # noqa: F401, E402
 from mcp_tools import review_pipeline  # noqa: F401, E402
