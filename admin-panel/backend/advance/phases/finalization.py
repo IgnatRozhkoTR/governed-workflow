@@ -126,8 +126,7 @@ class ReflectionPhase(Phase):
 4. For each proposal with `implementation_kind="auto"`, apply it now:
    - `memory_write` / `memory_delete` — write/delete the markdown file under `~/.claude/projects/<encoded-project-path>/memory/`. Encode the project path by replacing `/` and `.` with `-` (e.g. `/Users/me/Projects/foo` → `-Users-me-Projects-foo`). Update `MEMORY.md` index if it exists.
    - `rule_new` / `rule_update` — use the `mcp__governed-workflow__rule_create` / `mcp__governed-workflow__rule_update` MCP tools.
-   - On success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=...)`.
-   - On failure, call the same tool with `status="failed"`.
+   - On success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=...)`; on tool failure, call with `status="failed"`; on conscious skip, call with `status="rejected"`.
 5. Leave proposals with `implementation_kind="manual"` alone — phase 5.2 picks them up.
 6. **Advance.** `workspace_advance` routes automatically: if any `manual` proposals remain in `status="proposed"`, you land in **5.2 Manual implementation**; otherwise you land in **6 Done**."""
 
@@ -163,8 +162,7 @@ class ManualImplementationPhase(Phase):
    - Spawn the appropriate sub-agent via the `Agent` tool:
      - `agent_new` / `agent_update` / `skill_new` / `skill_update` — spawn `middle-backend-engineer` (or `junior-backend-engineer` if trivial) with a prompt that describes the new/updated agent or skill, including the proposal's payload as the source of truth.
      - `workflow_improvement` — typically requires a multi-file change; spawn `senior-backend-engineer`.
-   - On the sub-agent's success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=<one-line summary>)`.
-   - On failure, call the same tool with `status="failed", result_json=<error summary>`.
+   - On the sub-agent's success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=<one-line summary>)`; on failure, call with `status="failed", result_json=<error summary>`; on conscious skip, call with `status="rejected"`.
 3. **Advance to 6 Done** when the queue is drained."""
 
     def validate(self, ws, body, project_path):

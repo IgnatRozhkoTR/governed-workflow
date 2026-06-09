@@ -227,7 +227,7 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 | `workspace_get_reflection_context` | Returns scope, branch diff, open review findings, and filtered session transcript for the reflector | `orchestrator` |
 | `workspace_submit_proposal` | Submit a reflection proposal (nine types: memory/rule/agent/skill writes, workflow improvement; `auto` or `manual` implementation) | `reflector` |
 | `workspace_list_proposals` | List all proposals with status | `orchestrator` |
-| `workspace_resolve_proposal` | Mark a proposal `executed` or `skipped` | `orchestrator`, implementation sub-agents |
+| `workspace_resolve_proposal` | Mark a proposal `executed`, `failed`, or `rejected` | `orchestrator`, implementation sub-agents |
 
 ### State & Advance
 
