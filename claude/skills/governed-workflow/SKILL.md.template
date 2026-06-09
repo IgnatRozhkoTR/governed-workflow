@@ -73,7 +73,9 @@ Agents execute their task and return. The orchestrator continues them for follow
 4.0       Blind Code Review                    code edits OFF
 4.1       Address & Fix                        code edits ON, commits ON
 4.2       Final Approval                       USER GATE
-5         Done                                 push + MR allowed
+5.1       Reflection (reflector sub-agent)     code edits OFF
+5.2       Manual implementation (skipped if no manual proposals)  code edits ON (full repo)
+6         Done                                 push + MR allowed
 ```
 
 Phases stored as strings: `"0"`, `"1.2"`, `"3.2.3"`. N = 1, 2, 3... from the approved plan.
@@ -136,7 +138,7 @@ When planning tasks in phase 2.0, structure each sub-phase with separate tasks f
 
 ## MCP Tools
 
-The admin panel exposes 38 MCP tools: 33 `workspace_*` plus 5 `rule_*`.
+The admin panel exposes 44 MCP tools: 39 `workspace_*` plus 5 `rule_*`.
 
 ### State & Advance
 
@@ -216,6 +218,16 @@ The admin panel exposes 38 MCP tools: 33 `workspace_*` plus 5 `rule_*`.
 | `workspace_report_improvement` | Report a process improvement |
 | `workspace_get_improvements` | List improvements (optionally filtered by scope/status) |
 
+### Reflection & Proposals
+
+| Tool | Description |
+|------|-------------|
+| `workspace_get_reflection_context` | Returns scope, branch_diff, review_findings, and filtered transcript for the just-finished ticket. Called once at phase 5.1 entry by the orchestrator. |
+| `workspace_list_proposals` | Lists proposals for this workspace, newest first; optional `implementation_kind` and `status` filters. |
+| `workspace_resolve_proposal` | Marks a proposal `executed`, `failed`, or `rejected`; accepts `result_json` for the outcome summary. |
+
+Note: `workspace_submit_proposal` is reflector-only — the reflector sub-agent calls it to record proposals; the orchestrator does not call it directly.
+
 ### Project Rules
 
 | Tool | Description |
@@ -239,7 +251,9 @@ The admin panel exposes 38 MCP tools: 33 `workspace_*` plus 5 `rule_*`.
 | 4.0 | OFF | OFF | OFF |
 | **4.1** | **ON (merged scope)** | **ON** | OFF |
 | 4.2 | OFF | OFF | OFF |
-| **5** | OFF | OFF | **ON** |
+| **5.1** | OFF | OFF | OFF |
+| **5.2** | **ON (full repo)** | **ON** | OFF |
+| **6** | OFF | OFF | **ON** |
 
 ---
 
