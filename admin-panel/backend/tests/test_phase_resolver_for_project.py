@@ -1,12 +1,10 @@
-"""Tests for phase_resolver.resolve_for_project (sub-phase 3.1).
+"""Tests for phase_resolver.resolve_for_project.
 
-The project-level resolver applies the basic mode baseline and layers device-
-then project-scope overrides on top. Workspace-scope overrides are explicitly
-excluded — they would render the wrong skill for projects without a workspace
-in scope.
+The project-level resolver starts from the registered canonical phase set and
+layers device- then project-scope overrides on top. Workspace-scope overrides
+are explicitly excluded — they would render the wrong skill for projects
+without a workspace in scope.
 """
-
-from datetime import datetime
 
 import pytest
 
@@ -22,7 +20,7 @@ def db(clean_db):
     conn.close()
 
 
-def _basic_canonical_ids():
+def _canonical_registered_ids():
     from advance.phases import PHASE_REGISTRY
     from core.phase import is_templated
 
@@ -32,20 +30,18 @@ def _basic_canonical_ids():
 # ── Baseline ───────────────────────────────────────────────────────────────────
 
 
-def test_returns_basic_baseline_when_no_overrides(db, project):
-    """With no scope overrides, the resolver returns the full basic-mode sequence."""
+def test_returns_canonical_baseline_when_no_overrides(db, project):
+    """With no scope overrides, the resolver returns every canonical phase."""
     phases = resolve_for_project(db, project["id"])
-    assert set(phases) == _basic_canonical_ids()
+    assert set(phases) == _canonical_registered_ids()
 
 
-def test_returns_phases_in_position_order(db, project):
-    """The resolver preserves the ``position`` order recorded on the basic mode."""
+def test_returns_phases_in_canonical_order(db, project):
+    """The resolver returns phases sorted by phase_key."""
     from core.phase import phase_key
 
     phases = resolve_for_project(db, project["id"])
 
-    # The basic mode is seeded with canonical ids in canonical order; the
-    # returned list must already be sorted by phase_key.
     assert phases == sorted(phases, key=phase_key)
 
 
@@ -103,35 +99,3 @@ def test_workspace_override_is_ignored(db, project, workspace):
 
     phases = resolve_for_project(db, project["id"])
     assert "1.1" in phases
-
-
-# ── Failure modes ──────────────────────────────────────────────────────────────
-
-
-def test_returns_empty_when_basic_mode_missing(db, project):
-    """If the seeded basic mode is removed, the resolver returns []."""
-    db.execute("DELETE FROM work_mode_phases WHERE work_mode_id IN "
-               "(SELECT id FROM work_modes WHERE name = 'basic')")
-    db.execute("DELETE FROM work_modes WHERE name = 'basic'")
-    db.commit()
-
-    assert resolve_for_project(db, project["id"]) == []
-
-    # Restore the basic mode so other tests don't see a dirty registry.
-    from services import work_mode_service
-    from advance.phases import PHASE_REGISTRY
-    from core.phase import is_templated, phase_key
-
-    canonical_ids = sorted(
-        [pid for pid in PHASE_REGISTRY.keys() if not is_templated(pid)],
-        key=phase_key,
-    )
-    work_mode_service.create(
-        db,
-        name="basic",
-        phases=[{"phase_id": pid, "enabled": True, "position": i}
-                for i, pid in enumerate(canonical_ids)],
-    )
-    # Mark as system origin so clean_db doesn't try to delete it.
-    db.execute("UPDATE work_modes SET origin = 'system' WHERE name = 'basic'")
-    db.commit()

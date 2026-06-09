@@ -26,7 +26,7 @@ from core.paths import (
 )
 from core.terminal import session_name
 from services.git_rules_service import migrate_legacy_git_rules
-from services import comment_service, review_pipeline_service, work_mode_service
+from services import comment_service, review_pipeline_service
 from services.configurator_service import ConfiguratorChain
 
 bp = Blueprint("workspaces", __name__)
@@ -664,35 +664,19 @@ def _install_git_hooks(dst_claude, working_dir):
 
 def _register_workspace(
     db, project_id, branch, sanitized, working_dir, source, locale, project_path,
-    work_mode_id=None,
 ):
-    """Insert workspace into DB and return the creation response.
-
-    When ``work_mode_id`` is provided the workspace is bound to that mode
-    immediately at creation time. When omitted the seeded ``basic`` system mode
-    is resolved by name and used as the default so the canonical phase sequence
-    applies. Pass an explicit ``work_mode_id`` to override that default without
-    any post-creation assign call.
-    """
+    """Insert workspace into DB and return the creation response."""
     ws_path = workspace_dir(project_path, branch)
     ws_path.mkdir(parents=True, exist_ok=True)
 
     created = datetime.now().isoformat()
 
-    if work_mode_id is None:
-        basic_row = db.execute(
-            "SELECT id FROM work_modes WHERE name = 'basic'"
-        ).fetchone()
-        work_mode_id = basic_row["id"] if basic_row is not None else None
-
     db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, session_id, "
-        "working_dir, created, status, phase, scope_json, plan_json, source_branch, locale, "
-        "work_mode_id) "
-        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?, ?)",
+        "working_dir, created, status, phase, scope_json, plan_json, source_branch, locale) "
+        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?)",
         (project_id, branch, sanitized, str(working_dir), created,
-         '{}', '{"description":"","systemDiagram":"","execution":[]}', source, locale,
-         work_mode_id)
+         '{}', '{"description":"","systemDiagram":"","execution":[]}', source, locale)
     )
     db.commit()
 
@@ -719,16 +703,9 @@ def create_workspace(project_id):
         source = body.get("source", DEFAULT_SOURCE_BRANCH).strip()
         use_worktree = body.get("worktree", True)
         locale = body.get("locale", "en").strip()
-        work_mode_id = body.get("work_mode_id")
 
         if not branch:
             return jsonify({"error": t("api.error.branchNameRequired")}), 400
-
-        if work_mode_id is not None:
-            try:
-                work_mode_service.get(db, work_mode_id)
-            except work_mode_service.WorkModeServiceError:
-                return jsonify({"error": t("api.error.workModeNotFound")}), 400
 
         project_path = project["path"]
         sanitized = sanitize_branch(branch)
@@ -770,7 +747,7 @@ def create_workspace(project_id):
 
         response = _register_workspace(
             db, project_id, branch, sanitized, working_dir, source, locale,
-            project_path, work_mode_id=work_mode_id,
+            project_path,
         )
         try:
             ConfiguratorChain.default().run(db, project_id, project_path)
