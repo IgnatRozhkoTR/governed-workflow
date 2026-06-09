@@ -8,6 +8,7 @@ from services import plan_service
 class PlanningPhase(Phase):
     id = "2.0"
     name = "Planning"
+    short_description = "Orchestrator and plan-advisor draft the execution plan and scope"
 
     def description_for_skill(self) -> str:
         return """\

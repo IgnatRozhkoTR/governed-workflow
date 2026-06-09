@@ -16,6 +16,10 @@ from core.paths import DEFAULT_AGENTS_DIR, hook_command
 log = logging.getLogger(__name__)
 
 
+def _on_off(flag: bool) -> str:
+    return "ON" if flag else "OFF"
+
+
 class Configurator(ABC):
     """Renders one piece of project/worktree configuration from current DB state."""
 
@@ -29,7 +33,8 @@ class SkillConfigurator(Configurator):
 
     TEMPLATE_REL_PATH = ".claude/skills/governed-workflow/SKILL.md.template"
     OUTPUT_REL_PATH = ".claude/skills/governed-workflow/SKILL.md"
-    PLACEHOLDER = "{{PHASES}}"
+    PLACEHOLDER_PHASES = "{{PHASES}}"
+    PLACEHOLDER_PHASE_MAP = "{{PHASE_MAP}}"
 
     def configure(self, db: sqlite3.Connection, project_id: int, project_path: Path) -> None:
         template_path = project_path / self.TEMPLATE_REL_PATH
@@ -38,16 +43,20 @@ class SkillConfigurator(Configurator):
             return
 
         template = template_path.read_text()
-        if self.PLACEHOLDER not in template:
+        if self.PLACEHOLDER_PHASES not in template:
             log.warning(
                 "SkillConfigurator: template at %s lacks %s placeholder, skipping",
                 template_path,
-                self.PLACEHOLDER,
+                self.PLACEHOLDER_PHASES,
             )
             return
 
-        phase_block = self._build_phase_block(db, project_id)
-        rendered = template.replace(self.PLACEHOLDER, phase_block)
+        phase_ids = self._resolve_phase_ids(db, project_id)
+        rendered = template.replace(
+            self.PLACEHOLDER_PHASES, self._build_phase_block(phase_ids)
+        ).replace(
+            self.PLACEHOLDER_PHASE_MAP, self._build_phase_map(phase_ids)
+        )
 
         # Write to project-level path (so newly-created worktrees inherit via install merge).
         project_output = project_path / self.OUTPUT_REL_PATH
@@ -58,17 +67,19 @@ class SkillConfigurator(Configurator):
             worktree_output = Path(working_dir) / self.OUTPUT_REL_PATH
             self._write(worktree_output, rendered)
 
-    def _build_phase_block(self, db: sqlite3.Connection, project_id: int) -> str:
-        """Concatenate each enabled phase's description_for_skill() in resolved order.
-
-        Uses basic-mode baseline + device/project scope overrides via
-        phase_resolver.resolve_for_project. Skips phases without a registered
-        instance or with an empty description.
-        """
-        from advance.phases import get_phase  # avoid circular import at module load
+    def _resolve_phase_ids(self, db: sqlite3.Connection, project_id: int) -> list[str]:
+        """Resolved phase ids for the project (basic mode + device/project overrides)."""
         from services import phase_resolver
 
-        phase_ids = phase_resolver.resolve_for_project(db, project_id)
+        return phase_resolver.resolve_for_project(db, project_id)
+
+    def _build_phase_block(self, phase_ids: list[str]) -> str:
+        """Concatenate each enabled phase's description_for_skill() in resolved order.
+
+        Skips phases without a registered instance or with an empty description.
+        """
+        from advance.phases import get_phase  # avoid circular import at module load
+
         blocks = []
         for pid in phase_ids:
             phase = get_phase(pid)
@@ -78,6 +89,38 @@ class SkillConfigurator(Configurator):
             if block:
                 blocks.append(block)
         return "\n\n---\n\n".join(blocks)
+
+    def _build_phase_map(self, phase_ids: list[str]) -> str:
+        """Render the Phase Map as a Markdown table.
+
+        Columns: Phase, Name, What happens, Edits, Commits, Push, Gate.
+        Permission columns are sourced from
+        ``advance.permissions.get_phase_permissions`` so the table cannot drift
+        from the runtime permission policy. Phases without a registered
+        instance or without a ``short_description`` are omitted.
+        """
+        from advance.permissions import get_phase_permissions
+        from advance.phases import get_phase
+
+        header = (
+            "| Phase | Name | What happens | Edits | Commits | Push | Gate |\n"
+            "|-------|------|--------------|-------|---------|------|------|"
+        )
+        rows = [header]
+        for pid in phase_ids:
+            phase = get_phase(pid)
+            if phase is None:
+                continue
+            summary = phase.short_description.strip()
+            if not summary:
+                continue
+            edits, commits, push = get_phase_permissions(pid)
+            gate = "USER" if phase.is_user_gate else "—"
+            rows.append(
+                f"| `{pid}` | {phase.name} | {summary} | "
+                f"{_on_off(edits)} | {_on_off(commits)} | {_on_off(push)} | {gate} |"
+            )
+        return "\n".join(rows)
 
     def _list_active_worktree_paths(self, db: sqlite3.Connection, project_id: int) -> list[str]:
         cur = db.execute(

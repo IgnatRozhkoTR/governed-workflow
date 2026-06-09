@@ -405,6 +405,14 @@ _TEMPLATE_NAMES = {
 
 _TEMPLATE_GATE_STEPS = frozenset({3})
 
+_TEMPLATE_SHORT_DESCRIPTIONS = {
+    0: "Engineers implement sub-phase tasks (in-scope edits)",
+    1: "Validators run; backend routes to fixes or review",
+    2: "Engineers address validation or review failures",
+    3: "User reviews the diff and approves the commit message",
+    4: "Engineer commits the staged changes",
+}
+
 
 _TEMPLATE_SKILL_DESCRIPTIONS = {
     0: """\
@@ -507,6 +515,10 @@ class _ExecutionTemplatePhase(Phase):
     @property
     def is_user_gate(self) -> bool:
         return self._k in _TEMPLATE_GATE_STEPS
+
+    @property
+    def short_description(self) -> str:
+        return _TEMPLATE_SHORT_DESCRIPTIONS.get(self._k, "")
 
     def description_for_skill(self) -> str:
         return _TEMPLATE_SKILL_DESCRIPTIONS.get(self._k, "")

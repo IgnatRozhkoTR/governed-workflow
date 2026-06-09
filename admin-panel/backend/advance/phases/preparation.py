@@ -9,6 +9,7 @@ from core.i18n import t
 class InitPhase(Phase):
     id = "0"
     name = "Init"
+    short_description = "Spawn plan-advisor"
 
     def description_for_skill(self) -> str:
         return """\
@@ -49,6 +50,7 @@ Agent(
 class AssessmentPhase(Phase):
     id = "1.0"
     name = "Assessment"
+    short_description = "plan-advisor surveys the codebase and raises research topics"
 
     def description_for_skill(self) -> str:
         return """\
@@ -101,6 +103,7 @@ When assessment is complete:
 class ResearchPhase(Phase):
     id = "1.1"
     name = "Research"
+    short_description = "Parallel researcher sub-agents investigate each topic"
 
     def description_for_skill(self) -> str:
         return """\
@@ -224,6 +227,7 @@ Call `workspace_advance(no_further_research_needed=true)` when all researchers c
 class ProverPhase(Phase):
     id = "1.2"
     name = "Research Proving"
+    short_description = "Prover sub-agent verifies every research entry"
 
     def description_for_skill(self) -> str:
         return """\
@@ -289,6 +293,7 @@ When all research is proven (prover confirms):
 class ImpactAnalysisPhase(Phase):
     id = "1.3"
     name = "Impact Analysis"
+    short_description = "Document cross-cutting effects before planning"
 
     def description_for_skill(self) -> str:
         return """\
@@ -331,6 +336,7 @@ class PreparationReviewPhase(Phase):
     is_user_gate = True
     approve_target = "2.0"
     reject_target = "1.1"
+    short_description = "User reviews assessment, research, impact analysis, and criteria"
 
     def description_for_skill(self) -> str:
         return """\

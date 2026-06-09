@@ -74,6 +74,12 @@ class Phase(ABC):
         Empty string means omit from the rendered skill."""
         return ""
 
+    @property
+    def short_description(self) -> str:
+        """One-line summary of what this phase does, rendered into the Phase Map row.
+        Empty string means the phase is omitted from the Phase Map even when enabled."""
+        return ""
+
     def success_message(self, ws, new_phase) -> str:
         """Message returned on successful advance. Override for custom messages."""
         from core.i18n import t

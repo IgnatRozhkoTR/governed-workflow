@@ -30,6 +30,10 @@ SAMPLE_TEMPLATE = (
     "---\nname: governed-workflow\ndescription: x\n---\n\n"
     "# Top heading\n\nPreamble.\n\n{{PHASES}}\n\nFooter.\n"
 )
+SAMPLE_TEMPLATE_WITH_MAP = (
+    "---\nname: governed-workflow\ndescription: x\n---\n\n"
+    "# Top heading\n\n## Phase Map\n\n{{PHASE_MAP}}\n\n{{PHASES}}\n"
+)
 
 
 @pytest.fixture
@@ -173,6 +177,43 @@ def test_configure_is_idempotent(db, project_row, project_root):
     second = (project_root / SKILL_OUTPUT_REL).read_text()
 
     assert first == second
+
+
+def test_phase_map_placeholder_is_replaced_with_markdown_table(db, project_row, tmp_path):
+    """The {{PHASE_MAP}} placeholder is replaced with a Markdown table for enabled phases."""
+    root = tmp_path / "with-map"
+    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
+    (root / SKILL_TEMPLATE_REL).write_text(SAMPLE_TEMPLATE_WITH_MAP)
+
+    SkillConfigurator().configure(db, project_row, root)
+
+    body = (root / SKILL_OUTPUT_REL).read_text()
+    assert "{{PHASE_MAP}}" not in body
+    assert "| Phase | Name | What happens | Edits | Commits | Push | Gate |" in body
+    assert "| `0` | Init |" in body
+    assert "| `1.4` | Preparation Review |" in body and "USER" in body
+    # 4.1 is the only basic-mode phase where edits and commits are both ON.
+    assert "| `4.1` | Address Fix" in body
+    # The push column flips ON only at phase 6.
+    assert "| `6` | Done |" in body
+
+
+def test_phase_map_omits_phases_disabled_at_project_scope(db, project_row, tmp_path):
+    """A project-level toggle drops the phase row from the rendered Phase Map."""
+    from services.phase_settings import set_scope_settings
+
+    root = tmp_path / "with-map-toggle"
+    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
+    (root / SKILL_TEMPLATE_REL).write_text(SAMPLE_TEMPLATE_WITH_MAP)
+
+    set_scope_settings(db, "project", project_row, {"1.1": False})
+    db.commit()
+
+    SkillConfigurator().configure(db, project_row, root)
+
+    body = (root / SKILL_OUTPUT_REL).read_text()
+    assert "| `1.1` |" not in body
+    assert "| `1.0` |" in body
 
 
 def test_disabled_phase_is_absent_from_rendered_skill(db, project_row, project_root):

@@ -7,6 +7,7 @@ from core.i18n import t
 class AgenticReviewPhase(Phase):
     id = "4.0"
     name = "Agentic Review"
+    short_description = "Headless review pipeline runs file and integration reviewers"
 
     def description_for_skill(self) -> str:
         return """\
@@ -47,6 +48,7 @@ If the pipeline failed mid-run, the reason is exposed only via `workspace_review
 class AddressFixPhase(Phase):
     id = "4.1"
     name = "Address Fix"
+    short_description = "Engineers address review findings across the merged scope"
 
     def description_for_skill(self) -> str:
         return """\
@@ -85,6 +87,7 @@ class FinalApprovalPhase(Phase):
     is_user_gate = True
     approve_target = "5.1"
     reject_target = "4.1"
+    short_description = "User reviews the resolved findings and approves delivery"
 
     def description_for_skill(self) -> str:
         return """\
@@ -111,6 +114,7 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 class ReflectionPhase(Phase):
     id = "5.1"
     name = "Reflection"
+    short_description = "Reflector sub-agent emits proposals; auto-apply easy ones"
 
     def description_for_skill(self) -> str:
         return """\
@@ -147,6 +151,7 @@ class ReflectionPhase(Phase):
 class ManualImplementationPhase(Phase):
     id = "5.2"
     name = "Manual implementation"
+    short_description = "Implement the manual proposals queued by 5.1"
 
     def description_for_skill(self) -> str:
         return """\
@@ -175,6 +180,7 @@ class ManualImplementationPhase(Phase):
 class DonePhase(Phase):
     id = "6"
     name = "Done"
+    short_description = "Push and open the MR/PR; task complete"
 
     def description_for_skill(self) -> str:
         return """\

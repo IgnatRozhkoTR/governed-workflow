@@ -56,133 +56,23 @@ Agents execute their task and return. The orchestrator continues them for follow
 
 ## Phase Map
 
-```
-0         Init — spawn plan-advisor
-1.0       Assessment (plan-advisor sub-agent)
-1.1       Research (researcher sub-agents, parallel)
-1.2       Research Proving (prover sub-agent)
-1.3       Impact Analysis (orchestrator + plan-advisor)
-1.4       Preparation Review                   USER GATE
-2.0       Planning (orchestrator + plan-advisor sub-agent)
-2.1       Plan Review                          USER GATE
-3.N.0     Implementation                       code edits ON (in scope)
-3.N.1     Validation                           code edits OFF
-3.N.2     Fixes (skipped if clean)             code edits ON (in scope)
-3.N.3     Code Review                          USER GATE
-3.N.4     Commit
-4.0       Blind Code Review                    code edits OFF
-4.1       Address & Fix                        code edits ON, commits ON
-4.2       Final Approval                       USER GATE
-5.1       Reflection (reflector sub-agent)     code edits OFF
-5.2       Manual implementation (skipped if no manual proposals)  code edits ON (full repo)
-6         Done                                 push + MR allowed
-```
+Only the phases listed below are enabled for this project. The Edits, Commits, Push, and Gate columns reflect the runtime permission policy — anything OFF here is blocked server-side.
 
-Phases stored as strings: `"0"`, `"1.2"`, `"3.2.3"`. N = 1, 2, 3... from the approved plan.
+| Phase | Name | What happens | Edits | Commits | Push | Gate |
+|-------|------|--------------|-------|---------|------|------|
+| `0` | Init | Spawn plan-advisor | OFF | OFF | OFF | — |
+| `1.0` | Assessment | plan-advisor surveys the codebase and raises research topics | OFF | OFF | OFF | — |
+| `1.1` | Research | Parallel researcher sub-agents investigate each topic | OFF | OFF | OFF | — |
+| `1.2` | Research Proving | Prover sub-agent verifies every research entry | OFF | OFF | OFF | — |
+| `1.3` | Impact Analysis | Document cross-cutting effects before planning | OFF | OFF | OFF | — |
+| `1.4` | Preparation Review | User reviews assessment, research, impact analysis, and criteria | OFF | OFF | OFF | USER |
+| `2.0` | Planning | Orchestrator and plan-advisor draft the execution plan and scope | OFF | OFF | OFF | — |
+| `4.0` | Agentic Review | Headless review pipeline runs file and integration reviewers | OFF | OFF | OFF | — |
+| `4.1` | Address Fix | Engineers address review findings across the merged scope | ON | ON | OFF | — |
+| `4.2` | Final Approval | User reviews the resolved findings and approves delivery | OFF | OFF | OFF | USER |
+| `6` | Done | Push and open the MR/PR; task complete | OFF | OFF | ON | — |
 
----
-
-## MCP Tools
-
-The admin panel exposes 44 MCP tools: 39 `workspace_*` plus 5 `rule_*`.
-
-### State & Advance
-
-| Tool | Description |
-|------|-------------|
-| `workspace_get_state` | Full state: phase, scope, plan, context, research, discussions, comments, previous_sessions |
-| `workspace_advance` | Request phase advancement (backend picks next phase; commit_hash for 3.N.4) |
-
-### Plan & Scope
-
-| Tool | Description |
-|------|-------------|
-| `workspace_set_scope` | Write scope (must/may) — planning phase only |
-| `workspace_set_plan` | Write or replace execution plan — planning phase only |
-| `workspace_get_plan` | Read the full execution plan |
-| `workspace_extend_plan` | Append a new sub-phase to the plan without rewriting existing ones (auto-assigns ID, optional scope) |
-
-### Research & Discussion
-
-| Tool | Description |
-|------|-------------|
-| `workspace_post_discussion` | Raise an open discussion point (architectural decisions, research questions) |
-| `workspace_save_research` | Save research findings — called by researcher sub-agents |
-| `workspace_list_research` | List all research entries (id, topic, count, proven status) |
-| `workspace_get_research` | Get full research entries by IDs (findings + proofs) |
-| `workspace_prove_research` | Mark a research entry proven or rejected — called by prover |
-| `workspace_delete_research` | Delete a research entry |
-
-### Progress & Impact
-
-| Tool | Description |
-|------|-------------|
-| `workspace_update_progress` | Document phase completion (required before certain advances) |
-| `workspace_get_progress` | Read progress entries (optionally filtered by phase) |
-| `workspace_set_impact_analysis` | Save structured impact analysis (affected flows, API changes, data flow, dependencies, ticket gaps, questions) — Phase 1.3 |
-
-### Acceptance Criteria
-
-| Tool | Description |
-|------|-------------|
-| `workspace_propose_criteria` | Propose acceptance criteria (unit_test, integration_test, bdd_scenario, custom) |
-| `workspace_update_criteria` | Update criteria description or details |
-| `workspace_get_criteria` | Get all acceptance criteria with statuses |
-
-### Comments
-
-| Tool | Description |
-|------|-------------|
-| `workspace_get_comments` | Read review comments (optionally filtered by scope) |
-| `workspace_post_comment` | Post a review comment on a file/line |
-| `workspace_resolve_comment` | Mark a review comment resolved |
-
-### Review Issues
-
-| Tool | Description |
-|------|-------------|
-| `workspace_submit_review_issue` | Submit a review finding with file/line location (critical/major only) |
-| `workspace_get_review_issues` | Get all review items, optionally filtered by resolution status |
-| `workspace_resolve_review_issue` | Set resolution (fixed, false_positive, out_of_scope) |
-
-### Verification
-
-| Tool | Description |
-|------|-------------|
-| `workspace_get_verification_profiles` | List all available verification profiles |
-| `workspace_create_verification_profile` | Create a new verification profile |
-| `workspace_update_verification_profile` | Update a verification profile |
-| `workspace_add_verification_step` | Add a step to a verification profile |
-| `workspace_assign_verification_profile` | Assign a profile to the current workspace |
-| `workspace_get_verification_results` | Get verification run results for current/specific phase |
-| `workspace_submit_validation` | Submit validation results from a validator agent |
-
-### Improvements (global, not workspace-bound)
-
-| Tool | Description |
-|------|-------------|
-| `workspace_report_improvement` | Report a process improvement |
-| `workspace_get_improvements` | List improvements (optionally filtered by scope/status) |
-
-### Reflection & Proposals
-
-| Tool | Description |
-|------|-------------|
-| `workspace_get_reflection_context` | Returns scope, branch_diff, review_findings, and filtered transcript for the just-finished ticket. Called once at phase 5.1 entry by the orchestrator. |
-| `workspace_list_proposals` | Lists proposals for this workspace, newest first; optional `implementation_kind` and `status` filters. |
-| `workspace_resolve_proposal` | Marks a proposal `executed`, `failed`, or `rejected`; accepts `result_json` for the outcome summary. |
-
-Note: `workspace_submit_proposal` is reflector-only — the reflector sub-agent calls it to record proposals; the orchestrator does not call it directly.
-
-### Project Rules
-
-| Tool | Description |
-|------|-------------|
-| `rule_list` | List rule files for the current project |
-| `rule_get` | Get the Markdown body of a named rule |
-| `rule_create` | Create a new project-scoped rule file |
-| `rule_update` | Update an existing rule file |
-| `rule_delete` | Delete a rule file |
+Phases stored as strings: `"0"`, `"1.2"`, `"3.2.3"`. Execution items `3.N.K` expand at plan-validation time; the row labelled `3.x.K` describes every concrete `N` in that family.
 
 ---
 
@@ -213,7 +103,30 @@ Note: `workspace_submit_proposal` is reflector-only — the reflector sub-agent 
 
 ---
 
-## Phase 0: Init — Spawn Plan-Advisor
+## Agent Selection Matrix
+
+When assigning tasks to agents, use this decision matrix:
+
+| Task type | Agent | Never assign to |
+|-----------|-------|-----------------|
+| Production code (CRUD, services, configs) | `middle-backend-engineer` | test engineers |
+| Complex production code (vague specs, unknown root cause) | `senior-backend-engineer` | test engineers |
+| Tests for new/changed code | `middle-backend-test-engineer` | backend engineers |
+| Complex test scenarios (edge cases, integration) | `senior-backend-test-engineer` | backend engineers |
+| Code quality review | `middle-code-validator` or `senior-code-validator` | — |
+
+**Critical rule: Tests MUST be written by a separate test engineer agent, NEVER by the same agent that implemented the production code.** The implementing agent is not objective — they will test what they think the code does, not what it should do. Test engineers review the implementation with fresh eyes and write tests that validate behavior independently.
+
+**Execution order within a sub-phase:**
+1. Deploy backend engineer(s) for production code
+2. Deploy test engineer(s) for tests — AFTER the production code is written
+3. Both share the same sub-phase scope; test engineer reads the implementation to understand what to test
+
+When planning tasks in phase 2.0, structure each sub-phase with separate tasks for implementation and testing, assigned to the appropriate agent types. Never create a single task that asks an engineer to "implement + write tests".
+
+---
+
+## 0 Init — Spawn Plan-Advisor
 
 **Actors**: Orchestrator
 
@@ -242,7 +155,7 @@ Agent(
 
 ---
 
-## Phase 1.0: Assessment
+## 1.0 Assessment
 
 **Actor**: plan-advisor (messaged — NOT a new sub-agent)
 
@@ -268,7 +181,7 @@ When assessment is complete:
 
 ---
 
-## Phase 1.1: Research
+## 1.1 Research
 
 **Actors**: Researcher sub-agents (parallel, one-shot)
 
@@ -301,7 +214,7 @@ Call `workspace_advance(no_further_research_needed=true)` when all researchers c
 
 ---
 
-## Phase 1.2: Research Proving
+## 1.2 Research Proving
 
 **Actor**: Prover sub-agent (Opus, one-shot)
 
@@ -327,7 +240,7 @@ When all research is proven (prover confirms):
 
 ---
 
-## Phase 1.3: Impact Analysis
+## 1.3 Impact Analysis
 
 **Actors**: Orchestrator + plan-advisor
 
@@ -352,7 +265,7 @@ When complete:
 
 ---
 
-## Phase 1.4: Preparation Review (USER GATE)
+## 1.4 Preparation Review (USER GATE)
 
 The user reviews the full preparation package in the Pre-planning tab: assessment summary, research findings, impact analysis, proposed acceptance criteria.
 
@@ -369,7 +282,7 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
 ---
 
-## Phase 2.0: Planning
+## 2.0 Planning
 
 **Actors**: Orchestrator + plan-advisor
 
@@ -416,7 +329,7 @@ When plan is agreed:
 
 ---
 
-## Phase 2.1: Plan Review (USER GATE)
+## 2.1 Plan Review (USER GATE)
 
 User reviews the plan, scope, and system diagram in the admin panel.
 
@@ -434,136 +347,39 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
 ---
 
-## Agent Selection Matrix
+## 4.0 Blind Code Review (automated)
 
-When assigning tasks to agents, use this decision matrix:
+**Actors**: Headless review pipeline (background daemon) | **Code edits: OFF**
 
-| Task type | Agent | Never assign to |
-|-----------|-------|-----------------|
-| Production code (CRUD, services, configs) | `middle-backend-engineer` | test engineers |
-| Complex production code (vague specs, unknown root cause) | `senior-backend-engineer` | test engineers |
-| Tests for new/changed code | `middle-backend-test-engineer` | backend engineers |
-| Complex test scenarios (edge cases, integration) | `senior-backend-test-engineer` | backend engineers |
-| Code quality review | `middle-code-validator` or `senior-code-validator` | — |
+On entry to 4.0 the admin panel **automatically launches** the headless review pipeline. Per-file reviewers fan out in parallel across the diff, then two specialised integration reviewers run concurrently:
 
-**Critical rule: Tests MUST be written by a separate test engineer agent, NEVER by the same agent that implemented the production code.** The implementing agent is not objective — they will test what they think the code does, not what it should do. Test engineers review the implementation with fresh eyes and write tests that validate behavior independently.
+- **architecture-reviewer** — SRP/OCP, coupling, layer boundaries, clean-code principles, naming, method/class size, DRY
+- **correctness-reviewer** — business-logic correctness, edge cases, error handling, security (input validation, injection, auth/authz, secrets, sensitive data in logs, API contract leaks)
 
-**Execution order within a sub-phase:**
-1. Deploy backend engineer(s) for production code
-2. Deploy test engineer(s) for tests — AFTER the production code is written
-3. Both share the same sub-phase scope; test engineer reads the implementation to understand what to test
+**Do NOT manually dispatch reviewers.** The pipeline is already running. Manual dispatch would duplicate work and confuse findings.
 
-When planning tasks in phase 2.0, structure each sub-phase with separate tasks for implementation and testing, assigned to the appropriate agent types. Never create a single task that asks an engineer to "implement + write tests".
+### What you do at 4.0
 
----
+1. Watch the **Review Pipeline** card on the workspace page in the admin panel, or poll `GET /api/workspaces/<id>/review-pipeline-status`. States: `queued` → `filtering` → `file_stage` → `integration_stage` → `done` (or `failed`).
+2. When state is `done` or `failed`:
+   - Call `workspace_get_review_issues` to see the findings.
+   - Call `workspace_update_progress(phase="4.0", summary="Pipeline complete. N findings.")`.
+   - Before calling `workspace_advance`, call `workspace_review_pipeline_summary` (or `GET /api/workspaces/<id>/review-pipeline/summary`). Confirm `is_complete=true` and `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: re-trigger via the Run Review button (workspace page) or `POST /api/workspaces/<id>/review-pipeline/start`, OR proceed with the partial result if the failures are recoverable.
+   - Call `workspace_advance` to move to 4.1.
 
-## Phase 3.N.0: Implementation
-
-**Actors**: Engineer sub-agents, then test engineer sub-agents | **Code edits: ON (in sub-phase scope)**
-
-Deploy in two stages:
-
-**Stage 1 — Production code**: Deploy engineer sub-agent(s) for the implementation tasks.
-
-**Stage 2 — Tests**: After engineers complete, deploy test engineer sub-agent(s) to write tests for the new/changed code. Test engineers read the implementation but write tests independently — they are NOT briefed on "how the code works", only on "what it should do" (from the task description and scope).
-
-If during implementation an issue arises that requires changing the approach or scope, message the plan-advisor to discuss:
-
-```
-SendMessage(
-  to: "plan-advisor",
-  content: "Implementation issue in sub-phase {N}: {describe the problem}.
-            The original plan assumed {X} but we found {Y}. What's the best path forward?"
-)
-```
-
-If the user requests additional work or new requirements emerge, use `workspace_extend_plan` to add a new sub-phase rather than rewriting the entire plan. This preserves existing sub-phases and their progress.
-
-Call `workspace_advance` when both implementation and tests are complete.
-
-**Advance 3.N.0 → 3.N.1** requires: at least 1 file changed per `must`-scope entry.
-
----
-
-## Phase 3.N.1: Validation
-
-**Actors**: Validator sub-agents | **Code edits: OFF**
-
-Deploy validator sub-agents for compilation check + code quality review. Submit structured results via `workspace_submit_validation(phase="3.N.1", status="clean"|"dirty", findings=[...])`. Verification profiles assigned to the workspace also run automatically at this phase (configured via `workspace_assign_verification_profile`); blocking steps must pass.
-
-Call `workspace_advance`. Backend auto-routes:
-- Issues found or verification failed → `3.N.2` (Fixes)
-- Clean → `3.N.3` (Code Review)
-
----
-
-## Phase 3.N.2: Fixes
-
-**Actors**: Engineer sub-agents | **Code edits: ON (in sub-phase scope)**
-
-You arrive here from validation failures OR user gate rejections. Read `workspace_get_comments` for user feedback. Deploy engineer sub-agents to fix the issues. Call `workspace_advance` when done.
-
----
-
-## Phase 3.N.3: Code Review (USER GATE)
-
-User reviews the diff in the admin panel.
-
-- **Approve** (+ optional commit message) → `3.N.4`
-- **Reject** → back to `3.N.2` with comments
-
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
-
-**After rejection**: the backend sets the phase to `3.N.2`. You are now in the fix phase — code edits are ON. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to confirm you're at `3.N.2`
-2. Call `workspace_get_comments` to read the rejection feedback
-3. Deploy engineer sub-agents to address the feedback
-4. Call `workspace_advance` only after fixes are complete
-
----
-
-## Phase 3.N.4: Commit
-
-**Actor**: Engineer sub-agent | **Commits: ON**
-
-Commit all changes. Use the commit message from `workspace_get_state` (`context.commit_message`) or generate one per git-rules.md.
-
-Call `workspace_advance(commit_hash="{hash}")`.
-
-**Advance 3.N.4 → next** requires: valid commit hash + progress entry `"3.N"`. Backend routes to `3.(N+1).0` or `4.0` if last sub-phase.
-
----
-
-## Phase 4.0: Blind Code Review (automated)
-
-**Actors**: Headless review pipeline (admin panel) | **Code edits: OFF**
-
-The admin panel auto-launches the headless review pipeline when the workspace enters phase `4.0`. Do NOT manually dispatch reviewer sub-agents — the pipeline owns this phase.
-
-Pipeline structure:
-1. **File stage** — for every reviewable changed file, a haiku-class `file-reviewer` runs in parallel (capped by `GOVERNED_WORKFLOW_REVIEW_CONCURRENCY`, default 8). Each returns local findings (style, SRP-within-file, null handling, dead code, hardcoded values, placeholders, silent failures). Findings are persisted automatically.
-2. **Integration stage** — two opus-class reviewers run in parallel and self-submit findings via `workspace_submit_review_issue`:
-   - `architecture-reviewer` — architecture + clean code + SOLID (SRP, OCP, coupling, layer boundaries, naming, method/class size, DRY, code smells).
-   - `correctness-reviewer` — business-logic correctness + edge cases + error handling + security (input validation, injection, auth/authz, secrets, sensitive data in logs, API contract leaks).
-
-Watch progress on the Review Pipeline card on the workspace page, or poll `GET /api/workspaces/<id>/review-pipeline-status`. When `state=done`:
-
-1. Call `workspace_get_review_issues` to inspect findings.
-2. Call `workspace_update_progress("4.0", ...)` with a summary.
-3. Before calling `workspace_advance`, call `workspace_review_pipeline_summary` (or `GET /api/workspaces/<id>/review-pipeline/summary`). Confirm `is_complete=true` and `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: re-trigger via the Run Review button (workspace page) or `POST /api/workspaces/<id>/review-pipeline/start`, OR proceed with the partial result if the failures are recoverable.
-4. Call `workspace_advance`.
+If the pipeline failed mid-run, the reason is exposed only via `workspace_review_pipeline_summary` (`failed_files_errors`, `integration_errors`, top-level `error`) — never as a discussion. Inspect those fields and decide whether to re-trigger or proceed.
 
 **Advance 4.0 → 4.1** requires: progress entry for phase `"4.0"`.
 
 ---
 
-## Phase 4.1: Address & Fix
+## 4.1 Address & Fix
 
 **Actors**: Engineer sub-agents | **Code edits: ON (merged scope), Commits: ON**
 
 Active scope = union of all sub-phase scopes.
 
-1. Read review items via `workspace_get_review_issues`
+1. Read review items via `workspace_get_review_issues`. Findings from the headless pipeline are tagged in their description: `[severity/type]` for per-file findings, `[integration:agent-name]` for integration-reviewer findings. Use the tags to triage by lane.
 2. Address each finding — fix the code, or determine it's a false positive / out of scope
 3. Set resolution via `workspace_resolve_review_issue(issue_id, "fixed"|"false_positive"|"out_of_scope")`
 4. The user reviews resolutions in the admin panel and resolves each item
@@ -593,61 +409,34 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
 ---
 
-## Phase 5.1: Reflection
-
-**Goal:** Reflect on the just-finished ticket and emit proposals — concrete improvements to rules, agent definitions, skills, memory, or workflow itself. Implement the easy ones directly; queue the rest for phase 5.2.
-
-**Steps:**
-
-1. Call `mcp__governed-workflow__workspace_get_reflection_context` — returns `{scope, branch_diff, review_findings, transcript}` for the ticket.
-2. Spawn the `reflector` sub-agent via the `Agent` tool with `subagent_type="reflector"`. Hand it the context as the prompt verbatim — the agent will submit zero or more proposals via `mcp__governed-workflow__workspace_submit_proposal`.
-3. Call `mcp__governed-workflow__workspace_list_proposals` to retrieve what the reflector submitted in this run.
-4. For each proposal with `implementation_kind="auto"`, apply it now:
-   - `memory_write` / `memory_delete` — write/delete the markdown file under `~/.claude/projects/<encoded-project-path>/memory/`. Encode the project path by replacing `/` and `.` with `-` (e.g. `/Users/me/Projects/foo` → `-Users-me-Projects-foo`). Update `MEMORY.md` index if it exists.
-   - `rule_new` / `rule_update` — use the `mcp__governed-workflow__rule_create` / `mcp__governed-workflow__rule_update` MCP tools.
-   - On success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=...)`; on tool failure, call with `status="failed"`; on conscious skip, call with `status="rejected"`.
-5. Leave proposals with `implementation_kind="manual"` alone — phase 5.2 picks them up.
-6. **Advance.** `workspace_advance` routes automatically: if any `manual` proposals remain in `status="proposed"`, you land in **5.2 Manual implementation**; otherwise you land in **6 Done**.
-
----
-
-## Phase 5.2: Manual implementation
-
-**Goal:** Implement the manual proposals the reflector emitted in phase 5.1.
-
-**Steps:**
-
-1. Call `mcp__governed-workflow__workspace_list_proposals` with `implementation_kind="manual"` and `status="proposed"` — that's the queue.
-2. For each proposal:
-   - Read its `title`, `body`, and `payload_json` to understand what's being asked.
-   - Spawn the appropriate sub-agent via the `Agent` tool:
-     - `agent_new` / `agent_update` / `skill_new` / `skill_update` — spawn `middle-backend-engineer` (or `junior-backend-engineer` if trivial) with a prompt that describes the new/updated agent or skill, including the proposal's payload as the source of truth.
-     - `workflow_improvement` — typically requires a multi-file change; spawn `senior-backend-engineer`.
-   - On the sub-agent's success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=<one-line summary>)`; on failure, call with `status="failed", result_json=<error summary>`; on conscious skip, call with `status="rejected"`.
-3. **Advance to 6 Done** when the queue is drained.
-
----
-
 ## 6 Done
 
 Push and MR/PR creation allowed. Task complete.
 
 ---
 
-## Edits & Commits Matrix
+## MCP Tools
 
-| Phase | Code Edits | Commits | Push/MR |
-|-------|-----------|---------|---------|
-| 0, 1.0–1.4, 2.0–2.1 | OFF | OFF | OFF |
-| 3.N.1, 3.N.3 | OFF | OFF | OFF |
-| **3.N.0, 3.N.2** | **ON (in scope)** | OFF | OFF |
-| **3.N.4** | OFF | **ON** | OFF |
-| 4.0 | OFF | OFF | OFF |
-| **4.1** | **ON (merged scope)** | **ON** | OFF |
-| 4.2 | OFF | OFF | OFF |
-| **5.1** | OFF | OFF | OFF |
-| **5.2** | **ON (full repo)** | **ON** | OFF |
-| **6** | OFF | OFF | **ON** |
+The orchestrator only needs to understand the workflow-shaping tools below. The rest are granted via this agent's frontmatter and self-describe through their own `description` strings and parameter annotations — consult them inline when you reach for one.
+
+### Core tools you must understand
+
+| Tool | Why it needs explanation |
+|------|--------------------------|
+| `workspace_get_state` | Single source of truth for `phase`, `scope`, `plan`, `context`, `previous_sessions`. Call at session start and after every gate event. |
+| `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules; for `3.N.4` pass `commit_hash`; for `1.1` pass `no_further_research_needed=true`. |
+| `workspace_set_scope` | Writes must/may scope. Planning-phase only — call alongside `workspace_set_plan`. |
+| `workspace_set_plan` | Writes or replaces the execution plan. Planning-phase only; switches `plan_status` back to `pending`. |
+| `workspace_extend_plan` | Appends a sub-phase to an already-approved plan. Use instead of `workspace_set_plan` when execution surfaces new work — avoids invalidating prior sub-phases. |
+| `workspace_propose_criteria` | Records acceptance criteria the user reviews at the preparation gate. Phase 1.0; required before advancing past 2.0. |
+| `workspace_post_discussion` | Raises an architectural or research question the user resolves in the admin panel. Required by some advance guards (e.g. open research discussion at 1.0). |
+| `workspace_submit_validation` | Validator agents report results here at 3.N.1; status drives the routing into 3.N.2 vs 3.N.3. |
+| `workspace_resolve_review_issue` | Agents set resolution (`fixed` / `false_positive` / `out_of_scope`) on review findings. The user still has to mark each one resolved in the panel — this only records what was done. |
+| `workspace_get_reflection_context` | Returns the scope, branch diff, review findings, and filtered transcript fed to the reflector at 5.1. Call once on entry. |
+| `workspace_list_proposals` | Reads what the reflector emitted. Filter by `implementation_kind` (`auto` to apply now, `manual` to queue for 5.2). |
+| `workspace_resolve_proposal` | Marks a proposal `executed`, `failed`, or `rejected` after acting on it. Pass `result_json` with the outcome summary. |
+
+Full tool roster is granted via this agent's frontmatter; consult tool descriptions inline.
 
 ---
 

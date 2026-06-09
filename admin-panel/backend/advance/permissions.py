@@ -14,6 +14,27 @@ from core.paths import REPO_ROOT, STATE_DIR
 
 _EDIT_PHASE_RE = re.compile(r'^3\.\d+\.[02]$|^4\.1$')
 _COMMIT_PHASE_RE = re.compile(r'^3\.\d+\.4$|^4\.1$|^5$')
+_PUSH_PHASE = "6"
+
+
+def get_phase_permissions(phase_id: str) -> tuple[bool, bool, bool]:
+    """Return ``(edits, commits, push)`` for a phase id.
+
+    Sourced from the same regex rules the runtime permission checker uses so
+    the rendered Phase Map cannot drift from the enforced policy. Templated
+    execution ids (``3.x.K``) are resolved against ``3.1.K``: the regexes are
+    written against concrete runtime ids but every concrete ``3.N.K`` in the
+    family shares the same permission profile, so any ``N`` answers the same.
+    """
+    from core.phase import is_templated
+
+    concrete = phase_id
+    if is_templated(phase_id):
+        concrete = phase_id.replace(".x.", ".1.")
+    edits = _is_edit_phase(concrete)
+    commits = _is_commit_phase(concrete)
+    push = concrete == _PUSH_PHASE
+    return edits, commits, push
 
 _EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
 

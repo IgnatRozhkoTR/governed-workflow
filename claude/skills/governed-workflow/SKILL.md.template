@@ -56,29 +56,11 @@ Agents execute their task and return. The orchestrator continues them for follow
 
 ## Phase Map
 
-```
-0         Init — spawn plan-advisor
-1.0       Assessment (plan-advisor sub-agent)
-1.1       Research (researcher sub-agents, parallel)
-1.2       Research Proving (prover sub-agent)
-1.3       Impact Analysis (orchestrator + plan-advisor)
-1.4       Preparation Review                   USER GATE
-2.0       Planning (orchestrator + plan-advisor sub-agent)
-2.1       Plan Review                          USER GATE
-3.N.0     Implementation                       code edits ON (in scope)
-3.N.1     Validation                           code edits OFF
-3.N.2     Fixes (skipped if clean)             code edits ON (in scope)
-3.N.3     Code Review                          USER GATE
-3.N.4     Commit
-4.0       Blind Code Review                    code edits OFF
-4.1       Address & Fix                        code edits ON, commits ON
-4.2       Final Approval                       USER GATE
-5.1       Reflection (reflector sub-agent)     code edits OFF
-5.2       Manual implementation (skipped if no manual proposals)  code edits ON (full repo)
-6         Done                                 push + MR allowed
-```
+Only the phases listed below are enabled for this project. The Edits, Commits, Push, and Gate columns reflect the runtime permission policy — anything OFF here is blocked server-side.
 
-Phases stored as strings: `"0"`, `"1.2"`, `"3.2.3"`. N = 1, 2, 3... from the approved plan.
+{{PHASE_MAP}}
+
+Phases stored as strings: `"0"`, `"1.2"`, `"3.2.3"`. Execution items `3.N.K` expand at plan-validation time; the row labelled `3.x.K` describes every concrete `N` in that family.
 
 ---
 
@@ -138,122 +120,26 @@ When planning tasks in phase 2.0, structure each sub-phase with separate tasks f
 
 ## MCP Tools
 
-The admin panel exposes 44 MCP tools: 39 `workspace_*` plus 5 `rule_*`.
+The orchestrator only needs to understand the workflow-shaping tools below. The rest are granted via this agent's frontmatter and self-describe through their own `description` strings and parameter annotations — consult them inline when you reach for one.
 
-### State & Advance
+### Core tools you must understand
 
-| Tool | Description |
-|------|-------------|
-| `workspace_get_state` | Full state: phase, scope, plan, context, research, discussions, comments, previous_sessions |
-| `workspace_advance` | Request phase advancement (backend picks next phase; commit_hash for 3.N.4) |
+| Tool | Why it needs explanation |
+|------|--------------------------|
+| `workspace_get_state` | Single source of truth for `phase`, `scope`, `plan`, `context`, `previous_sessions`. Call at session start and after every gate event. |
+| `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules; for `3.N.4` pass `commit_hash`; for `1.1` pass `no_further_research_needed=true`. |
+| `workspace_set_scope` | Writes must/may scope. Planning-phase only — call alongside `workspace_set_plan`. |
+| `workspace_set_plan` | Writes or replaces the execution plan. Planning-phase only; switches `plan_status` back to `pending`. |
+| `workspace_extend_plan` | Appends a sub-phase to an already-approved plan. Use instead of `workspace_set_plan` when execution surfaces new work — avoids invalidating prior sub-phases. |
+| `workspace_propose_criteria` | Records acceptance criteria the user reviews at the preparation gate. Phase 1.0; required before advancing past 2.0. |
+| `workspace_post_discussion` | Raises an architectural or research question the user resolves in the admin panel. Required by some advance guards (e.g. open research discussion at 1.0). |
+| `workspace_submit_validation` | Validator agents report results here at 3.N.1; status drives the routing into 3.N.2 vs 3.N.3. |
+| `workspace_resolve_review_issue` | Agents set resolution (`fixed` / `false_positive` / `out_of_scope`) on review findings. The user still has to mark each one resolved in the panel — this only records what was done. |
+| `workspace_get_reflection_context` | Returns the scope, branch diff, review findings, and filtered transcript fed to the reflector at 5.1. Call once on entry. |
+| `workspace_list_proposals` | Reads what the reflector emitted. Filter by `implementation_kind` (`auto` to apply now, `manual` to queue for 5.2). |
+| `workspace_resolve_proposal` | Marks a proposal `executed`, `failed`, or `rejected` after acting on it. Pass `result_json` with the outcome summary. |
 
-### Plan & Scope
-
-| Tool | Description |
-|------|-------------|
-| `workspace_set_scope` | Write scope (must/may) — planning phase only |
-| `workspace_set_plan` | Write or replace execution plan — planning phase only |
-| `workspace_get_plan` | Read the full execution plan |
-| `workspace_extend_plan` | Append a new sub-phase to the plan without rewriting existing ones (auto-assigns ID, optional scope) |
-
-### Research & Discussion
-
-| Tool | Description |
-|------|-------------|
-| `workspace_post_discussion` | Raise an open discussion point (architectural decisions, research questions) |
-| `workspace_save_research` | Save research findings — called by researcher sub-agents |
-| `workspace_list_research` | List all research entries (id, topic, count, proven status) |
-| `workspace_get_research` | Get full research entries by IDs (findings + proofs) |
-| `workspace_prove_research` | Mark a research entry proven or rejected — called by prover |
-| `workspace_delete_research` | Delete a research entry |
-
-### Progress & Impact
-
-| Tool | Description |
-|------|-------------|
-| `workspace_update_progress` | Document phase completion (required before certain advances) |
-| `workspace_get_progress` | Read progress entries (optionally filtered by phase) |
-| `workspace_set_impact_analysis` | Save structured impact analysis (affected flows, API changes, data flow, dependencies, ticket gaps, questions) — Phase 1.3 |
-
-### Acceptance Criteria
-
-| Tool | Description |
-|------|-------------|
-| `workspace_propose_criteria` | Propose acceptance criteria (unit_test, integration_test, bdd_scenario, custom) |
-| `workspace_update_criteria` | Update criteria description or details |
-| `workspace_get_criteria` | Get all acceptance criteria with statuses |
-
-### Comments
-
-| Tool | Description |
-|------|-------------|
-| `workspace_get_comments` | Read review comments (optionally filtered by scope) |
-| `workspace_post_comment` | Post a review comment on a file/line |
-| `workspace_resolve_comment` | Mark a review comment resolved |
-
-### Review Issues
-
-| Tool | Description |
-|------|-------------|
-| `workspace_submit_review_issue` | Submit a review finding with file/line location (critical/major only) |
-| `workspace_get_review_issues` | Get all review items, optionally filtered by resolution status |
-| `workspace_resolve_review_issue` | Set resolution (fixed, false_positive, out_of_scope) |
-
-### Verification
-
-| Tool | Description |
-|------|-------------|
-| `workspace_get_verification_profiles` | List all available verification profiles |
-| `workspace_create_verification_profile` | Create a new verification profile |
-| `workspace_update_verification_profile` | Update a verification profile |
-| `workspace_add_verification_step` | Add a step to a verification profile |
-| `workspace_assign_verification_profile` | Assign a profile to the current workspace |
-| `workspace_get_verification_results` | Get verification run results for current/specific phase |
-| `workspace_submit_validation` | Submit validation results from a validator agent |
-
-### Improvements (global, not workspace-bound)
-
-| Tool | Description |
-|------|-------------|
-| `workspace_report_improvement` | Report a process improvement |
-| `workspace_get_improvements` | List improvements (optionally filtered by scope/status) |
-
-### Reflection & Proposals
-
-| Tool | Description |
-|------|-------------|
-| `workspace_get_reflection_context` | Returns scope, branch_diff, review_findings, and filtered transcript for the just-finished ticket. Called once at phase 5.1 entry by the orchestrator. |
-| `workspace_list_proposals` | Lists proposals for this workspace, newest first; optional `implementation_kind` and `status` filters. |
-| `workspace_resolve_proposal` | Marks a proposal `executed`, `failed`, or `rejected`; accepts `result_json` for the outcome summary. |
-
-Note: `workspace_submit_proposal` is reflector-only — the reflector sub-agent calls it to record proposals; the orchestrator does not call it directly.
-
-### Project Rules
-
-| Tool | Description |
-|------|-------------|
-| `rule_list` | List rule files for the current project |
-| `rule_get` | Get the Markdown body of a named rule |
-| `rule_create` | Create a new project-scoped rule file |
-| `rule_update` | Update an existing rule file |
-| `rule_delete` | Delete a rule file |
-
----
-
-## Edits & Commits Matrix
-
-| Phase | Code Edits | Commits | Push/MR |
-|-------|-----------|---------|---------|
-| 0, 1.0–1.4, 2.0–2.1 | OFF | OFF | OFF |
-| 3.N.1, 3.N.3 | OFF | OFF | OFF |
-| **3.N.0, 3.N.2** | **ON (in scope)** | OFF | OFF |
-| **3.N.4** | OFF | **ON** | OFF |
-| 4.0 | OFF | OFF | OFF |
-| **4.1** | **ON (merged scope)** | **ON** | OFF |
-| 4.2 | OFF | OFF | OFF |
-| **5.1** | OFF | OFF | OFF |
-| **5.2** | **ON (full repo)** | **ON** | OFF |
-| **6** | OFF | OFF | **ON** |
+Full tool roster is granted via this agent's frontmatter; consult tool descriptions inline.
 
 ---
 
