@@ -181,6 +181,60 @@ function renderApprovalStatus() {
 // ═══════════════════════════════════════════════
 //  PHASE ACTIONS (USER GATES)
 // ═══════════════════════════════════════════════
+
+var _PHASE_GATE_CONFIGS = [
+  {
+    matches: function(p) { return p === '1.4'; },
+    titleKey: 'phaseAction.preplanningReview',
+    descKey: 'phaseAction.preplanningReviewDesc',
+    approveKey: 'preplanning.approvePreplanning',
+    rejectKey: 'preplanning.rejectPreplanning',
+    showCommitInput: false
+  },
+  {
+    matches: function(p) { return p === '2.1'; },
+    titleKey: 'phaseAction.planReview',
+    descKey: 'phaseAction.planReviewDesc',
+    approveKey: 'buttons.approvePlan',
+    rejectKey: 'buttons.requestChanges',
+    showCommitInput: false
+  },
+  {
+    matches: function(p) { return /^3\.\d+\.3$/.test(p); },
+    titleKey: 'phaseAction.codeReview',
+    descKey: 'phaseAction.codeReviewDesc',
+    approveKey: 'buttons.approveChanges',
+    rejectKey: 'buttons.requestChanges',
+    showCommitInput: true
+  },
+  {
+    matches: function(p) { return p === '4.2'; },
+    titleKey: 'phaseAction.finalApproval',
+    descKey: 'phaseAction.finalApprovalDesc',
+    approveKey: 'buttons.approveFinish',
+    rejectKey: 'buttons.requestChanges',
+    showCommitInput: false
+  }
+];
+
+function _renderGateHtml(config, phase) {
+  var titleText = config.titleKey === 'phaseAction.codeReview'
+    ? t(config.titleKey, {phase: getPhaseName(phase)})
+    : t(config.titleKey);
+  var feedbackTopMargin = config.showCommitInput ? '6px' : '8px';
+  var commitInput = config.showCommitInput
+    ? '<input type="text" id="commitMessageInput" class="ws-input" placeholder="' + t('placeholders.commitMessage') + '" style="margin-top: 8px;">'
+    : '';
+  return '<div class="phase-action-title">' + titleText + '</div>' +
+    '<div class="phase-action-desc">' + t(config.descKey) + '</div>' +
+    commitInput +
+    '<textarea id="rejectFeedbackInput" class="ws-input" placeholder="' + t('placeholders.feedbackForChanges') + '" style="margin-top: ' + feedbackTopMargin + '; min-height: 50px; resize: vertical;"></textarea>' +
+    '<div style="display: flex; gap: 8px; margin-top: 8px;">' +
+    '<button class="btn btn-primary" onclick="handleApprove()">' + t(config.approveKey) + '</button>' +
+    '<button class="btn btn-danger" onclick="handleRejectWithInput()">' + t(config.rejectKey) + '</button>' +
+    '</div>';
+}
+
 function renderPhaseActions() {
   var container = document.getElementById('phaseActions');
   if (!container) return;
@@ -192,44 +246,18 @@ function renderPhaseActions() {
     return;
   }
 
+  var config = null;
+  for (var i = 0; i < _PHASE_GATE_CONFIGS.length; i++) {
+    if (_PHASE_GATE_CONFIGS[i].matches(phase)) {
+      config = _PHASE_GATE_CONFIGS[i];
+      break;
+    }
+  }
+  if (!config) return;
+
   var div = document.createElement('div');
   div.className = 'phase-action';
-
-  if (phase === "1.4") {
-    div.innerHTML = '<div class="phase-action-title">' + t('phaseAction.preplanningReview') + '</div>' +
-      '<div class="phase-action-desc">' + t('phaseAction.preplanningReviewDesc') + '</div>' +
-      '<textarea id="rejectFeedbackInput" class="ws-input" placeholder="' + t('placeholders.feedbackForChanges') + '" style="margin-top: 8px; min-height: 50px; resize: vertical;"></textarea>' +
-      '<div style="display: flex; gap: 8px; margin-top: 8px;">' +
-      '<button class="btn btn-primary" onclick="handleApprove()">' + t('preplanning.approvePreplanning') + '</button>' +
-      '<button class="btn btn-danger" onclick="handleRejectWithInput()">' + t('preplanning.rejectPreplanning') + '</button>' +
-      '</div>';
-  } else if (phase === "2.1") {
-    div.innerHTML = '<div class="phase-action-title">' + t('phaseAction.planReview') + '</div>' +
-      '<div class="phase-action-desc">' + t('phaseAction.planReviewDesc') + '</div>' +
-      '<textarea id="rejectFeedbackInput" class="ws-input" placeholder="' + t('placeholders.feedbackForChanges') + '" style="margin-top: 8px; min-height: 50px; resize: vertical;"></textarea>' +
-      '<div style="display: flex; gap: 8px; margin-top: 8px;">' +
-      '<button class="btn btn-primary" onclick="handleApprove()">' + t('buttons.approvePlan') + '</button>' +
-      '<button class="btn btn-danger" onclick="handleRejectWithInput()">' + t('buttons.requestChanges') + '</button>' +
-      '</div>';
-  } else if (/^3\.\d+\.3$/.test(phase)) {
-    div.innerHTML = '<div class="phase-action-title">' + t('phaseAction.codeReview', {phase: getPhaseName(phase)}) + '</div>' +
-      '<div class="phase-action-desc">' + t('phaseAction.codeReviewDesc') + '</div>' +
-      '<input type="text" id="commitMessageInput" class="ws-input" placeholder="' + t('placeholders.commitMessage') + '" style="margin-top: 8px;">' +
-      '<textarea id="rejectFeedbackInput" class="ws-input" placeholder="' + t('placeholders.feedbackForChanges') + '" style="margin-top: 6px; min-height: 50px; resize: vertical;"></textarea>' +
-      '<div style="display: flex; gap: 8px; margin-top: 8px;">' +
-      '<button class="btn btn-primary" onclick="handleApprove()">' + t('buttons.approveChanges') + '</button>' +
-      '<button class="btn btn-danger" onclick="handleRejectWithInput()">' + t('buttons.requestChanges') + '</button>' +
-      '</div>';
-  } else if (phase === "4.2") {
-    div.innerHTML = '<div class="phase-action-title">' + t('phaseAction.finalApproval') + '</div>' +
-      '<div class="phase-action-desc">' + t('phaseAction.finalApprovalDesc') + '</div>' +
-      '<textarea id="rejectFeedbackInput" class="ws-input" placeholder="' + t('placeholders.feedbackForChanges') + '" style="margin-top: 8px; min-height: 50px; resize: vertical;"></textarea>' +
-      '<div style="display: flex; gap: 8px; margin-top: 8px;">' +
-      '<button class="btn btn-primary" onclick="handleApprove()">' + t('buttons.approveFinish') + '</button>' +
-      '<button class="btn btn-danger" onclick="handleRejectWithInput()">' + t('buttons.requestChanges') + '</button>' +
-      '</div>';
-  }
-
+  div.innerHTML = _renderGateHtml(config, phase);
   container.appendChild(div);
 }
 

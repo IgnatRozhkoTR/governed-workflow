@@ -17,19 +17,13 @@ var _ADVANCE_MODE_OPTIONS = [
   { value: 'clear',   labelKey: 'advanceModes.modeClear',   title: 'advanceModes.modeClearTitle' }
 ];
 
-function _amEscape(str) {
-  var el = document.createElement('span');
-  el.textContent = String(str);
-  return el.innerHTML;
-}
-
 function _amRenderOptions(selectedValue) {
   return _ADVANCE_MODE_OPTIONS.map(function(opt) {
     var selected = opt.value === selectedValue ? ' selected' : '';
     var label = typeof t === 'function' ? t(opt.labelKey) : opt.labelKey;
     var title = typeof t === 'function' ? t(opt.title) : opt.title;
-    return '<option value="' + _amEscape(opt.value) + '"' + selected + ' title="' + _amEscape(title) + '">'
-      + _amEscape(label) + '</option>';
+    return '<option value="' + escapeHtml(opt.value) + '"' + selected + ' title="' + escapeHtml(title) + '">'
+      + escapeHtml(label) + '</option>';
   }).join('');
 }
 
@@ -47,12 +41,12 @@ function _amRenderRows(container) {
     return '<div class="' + rowClass + '">'
       + '<div class="advance-modes__label-group">'
       + '<label class="advance-modes__label">'
-      + _amEscape(boundaryName)
+      + escapeHtml(boundaryName)
       + (isPending ? '<span class="phase-settings__pending-dot" title="Unsaved"></span>' : '')
       + '</label>'
-      + '<span class="advance-modes__desc">' + _amEscape(boundaryDesc) + '</span>'
+      + '<span class="advance-modes__desc">' + escapeHtml(boundaryDesc) + '</span>'
       + '</div>'
-      + '<select class="advance-modes__select" data-boundary-key="' + _amEscape(boundary.key) + '"'
+      + '<select class="advance-modes__select" data-boundary-key="' + escapeHtml(boundary.key) + '"'
       + ' onchange="_amOnChange(this)">'
       + _amRenderOptions(currentValue)
       + '</select>'
@@ -115,12 +109,12 @@ async function renderAdvanceModeSection(container, projectId) {
     var data = await apiGet(endpoint);
     container._amCanonical = data || {};
   } catch (e) {
-    container.innerHTML = '<div class="phase-settings__error">Failed to load advance modes: ' + _amEscape(e.message) + '</div>';
+    container.innerHTML = '<div class="phase-settings__error">Failed to load advance modes: ' + escapeHtml(e.message) + '</div>';
     return;
   }
 
   var desc = typeof t === 'function' ? t('advanceModes.desc') : '';
-  container.innerHTML = '<div class="phase-settings__desc">' + _amEscape(desc) + '</div>'
+  container.innerHTML = '<div class="phase-settings__desc">' + escapeHtml(desc) + '</div>'
     + '<div class="advance-modes__rows">'
     + _amRenderRows(container)
     + '</div>'

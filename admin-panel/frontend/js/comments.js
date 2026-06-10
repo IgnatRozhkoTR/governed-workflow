@@ -148,26 +148,35 @@ function toggleCommentThread(scope, target, event) {
   if (input) input.focus();
 }
 
+function _renderCommentItems(comments, scope, target, options) {
+  if (comments.length === 0) return '';
+  var currentHash = options && options.currentHash;
+  var resolveIconVariant = options && options.resolveIconVariant === 'circle';
+
+  var html = '<div class="comment-thread-list">';
+  comments.forEach(function(c) {
+    var resolvedClass = c.resolved ? ' comment-resolved' : '';
+    var resolveIcon = c.id ? (
+      '<button class="comment-resolve-btn' + (c.resolved ? ' resolved' : '') + '" onclick="onResolveClick(\'' + escapeAttr(scope) + '\', \'' + escapeAttr(target || '') + '\', ' + c.id + ', ' + c.resolved + ', event)" title="' + (c.resolved ? t('comments.unresolve') : t('buttons.resolve')) + '">' +
+      (resolveIconVariant ? (c.resolved ? '\u2713' : '\u25cb') : '\u2713') + '</button>'
+    ) : '';
+    var outdatedBadge = '';
+    if (currentHash && c.line_hash && c.line_hash !== currentHash) {
+      outdatedBadge = '<span class="comment-outdated">' + t('comments.outdated') + '</span>';
+    }
+    html += '<div class="comment-thread-item' + resolvedClass + '">' +
+      resolveIcon +
+      '<span class="comment-thread-text">' + escapeHtml(c.text) + outdatedBadge + '</span>' +
+      '<span class="comment-thread-time">' + formatCommentTime(c.created_at) + '</span>' +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
 function renderCommentThread(scope, target) {
   var comments = getComments(scope, target);
-  var html = '';
-
-  if (comments.length > 0) {
-    html += '<div class="comment-thread-list">';
-    comments.forEach(function(c) {
-      var resolvedClass = c.resolved ? ' comment-resolved' : '';
-      var resolveIcon = c.id ? (
-        '<button class="comment-resolve-btn' + (c.resolved ? ' resolved' : '') + '" onclick="onResolveClick(\'' + escapeAttr(scope) + '\', \'' + escapeAttr(target || '') + '\', ' + c.id + ', ' + c.resolved + ', event)" title="' + (c.resolved ? t('comments.unresolve') : t('buttons.resolve')) + '">' +
-        '\u2713' + '</button>'
-      ) : '';
-      html += '<div class="comment-thread-item' + resolvedClass + '">' +
-        resolveIcon +
-        '<span class="comment-thread-text">' + escapeHtml(c.text) + '</span>' +
-        '<span class="comment-thread-time">' + formatCommentTime(c.created_at) + '</span>' +
-        '</div>';
-    });
-    html += '</div>';
-  }
+  var html = _renderCommentItems(comments, scope, target, null);
 
   html += '<div class="comment-thread-form">' +
     '<input type="text" class="comment-thread-input" placeholder="' + t('comments.addComment') + '" ' +
@@ -292,28 +301,7 @@ function submitLineComment(scope, target, filePath, lineNum, lHash, btn) {
 
 function renderLineCommentThread(scope, target, lineNum, currentHash) {
   var comments = getLineComments(scope, target, lineNum);
-  var html = '';
-
-  if (comments.length > 0) {
-    html += '<div class="comment-thread-list">';
-    comments.forEach(function(c) {
-      var resolvedClass = c.resolved ? ' comment-resolved' : '';
-      var resolveIcon = c.id ? (
-        '<button class="comment-resolve-btn' + (c.resolved ? ' resolved' : '') + '" onclick="onResolveClick(\'' + escapeAttr(scope) + '\', \'' + escapeAttr(target || '') + '\', ' + c.id + ', ' + c.resolved + ', event)" title="' + (c.resolved ? t('comments.unresolve') : t('buttons.resolve')) + '">' +
-        (c.resolved ? '\u2713' : '\u25CB') + '</button>'
-      ) : '';
-      var outdatedBadge = '';
-      if (c.line_hash && currentHash && c.line_hash !== currentHash) {
-        outdatedBadge = '<span class="comment-outdated">' + t('comments.outdated') + '</span>';
-      }
-      html += '<div class="comment-thread-item' + resolvedClass + '">' +
-        resolveIcon +
-        '<span class="comment-thread-text">' + escapeHtml(c.text) + outdatedBadge + '</span>' +
-        '<span class="comment-thread-time">' + formatCommentTime(c.created_at) + '</span>' +
-        '</div>';
-    });
-    html += '</div>';
-  }
+  var html = _renderCommentItems(comments, scope, target, { currentHash: currentHash, resolveIconVariant: 'circle' });
 
   html += '<div class="comment-thread-form">' +
     '<input type="text" class="comment-thread-input" placeholder="' + t('comments.addComment') + '" ' +

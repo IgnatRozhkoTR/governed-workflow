@@ -46,9 +46,7 @@ function _wsCopyCommand(codeId, btn) {
 }
 
 function _wsEscape(str) {
-  const el = document.createElement('span');
-  el.textContent = str;
-  return el.innerHTML.replace(/'/g, '&#39;');
+  return escapeHtml(String(str)).replace(/'/g, '&#39;');
 }
 
 function _wsToggleSessions(id, event) {

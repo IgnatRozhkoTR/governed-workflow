@@ -94,8 +94,7 @@ function _apiError(res, payload) {
   return err;
 }
 
-async function apiGet(path) {
-  const res = await fetch(API_BASE + path, { headers: _authHeaders() });
+async function _checkAndParseResponse(res) {
   if (res.status === 401) {
     await _handleAuthFailure();
     const err = new Error('Unauthorized');
@@ -107,6 +106,11 @@ async function apiGet(path) {
     throw _apiError(res, payload);
   }
   return res.json();
+}
+
+async function apiGet(path) {
+  const res = await fetch(API_BASE + path, { headers: _authHeaders() });
+  return _checkAndParseResponse(res);
 }
 
 // GET with ETag revalidation. Returns { notModified: true, etag } when the
@@ -119,17 +123,7 @@ async function apiGetWithEtag(path, lastEtag) {
   if (res.status === 304) {
     return { notModified: true, etag: res.headers.get('ETag') || lastEtag || null, data: null };
   }
-  if (res.status === 401) {
-    await _handleAuthFailure();
-    const err = new Error('Unauthorized');
-    err.status = 401;
-    throw err;
-  }
-  if (!res.ok) {
-    const payload = await res.json().catch(() => ({ error: res.statusText }));
-    throw _apiError(res, payload);
-  }
-  const data = await res.json();
+  const data = await _checkAndParseResponse(res);
   return { notModified: false, etag: res.headers.get('ETag') || null, data };
 }
 
@@ -139,17 +133,7 @@ async function apiPost(path, body) {
     headers: _authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body)
   });
-  if (res.status === 401) {
-    await _handleAuthFailure();
-    const err = new Error('Unauthorized');
-    err.status = 401;
-    throw err;
-  }
-  if (!res.ok) {
-    const payload = await res.json().catch(() => ({ error: res.statusText }));
-    throw _apiError(res, payload);
-  }
-  return res.json();
+  return _checkAndParseResponse(res);
 }
 
 async function apiPut(path, body) {
@@ -158,32 +142,12 @@ async function apiPut(path, body) {
     headers: _authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body)
   });
-  if (res.status === 401) {
-    await _handleAuthFailure();
-    const err = new Error('Unauthorized');
-    err.status = 401;
-    throw err;
-  }
-  if (!res.ok) {
-    const payload = await res.json().catch(() => ({ error: res.statusText }));
-    throw _apiError(res, payload);
-  }
-  return res.json();
+  return _checkAndParseResponse(res);
 }
 
 async function apiDelete(path) {
   const res = await fetch(API_BASE + path, { method: 'DELETE', headers: _authHeaders() });
-  if (res.status === 401) {
-    await _handleAuthFailure();
-    const err = new Error('Unauthorized');
-    err.status = 401;
-    throw err;
-  }
-  if (!res.ok) {
-    const payload = await res.json().catch(() => ({ error: res.statusText }));
-    throw _apiError(res, payload);
-  }
-  return res.json();
+  return _checkAndParseResponse(res);
 }
 
 // ─── Project endpoints ───

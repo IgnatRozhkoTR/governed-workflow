@@ -6,12 +6,6 @@ var _rpPollingTimers = {};
 
 var _RP_ACTIVE_STATES = new Set(['queued', 'filtering', 'file_stage', 'integration_stage']);
 
-function _rpEscape(str) {
-  var el = document.createElement('span');
-  el.textContent = String(str || '');
-  return el.innerHTML;
-}
-
 function _rpStateBadgeClass(state) {
   switch (state) {
     case 'done':               return 'rp-badge--done';
@@ -60,14 +54,14 @@ function _rpFilesHtml(files) {
 
   var rows = entries.map(function(f) {
     var findingsHtml = (f.status === 'done' && f.findings_count != null)
-      ? ' <span class="rp-findings-count">(' + _rpEscape(f.findings_count) + ')</span>'
+      ? ' <span class="rp-findings-count">(' + escapeHtml(f.findings_count) + ')</span>'
       : '';
     var errorHtml = f.error
-      ? '<div class="rp-file-error">' + _rpEscape(f.error) + '</div>'
+      ? '<div class="rp-file-error">' + escapeHtml(f.error) + '</div>'
       : '';
     return '<div class="rp-file-row">'
       + _rpFileStatusIcon(f.status)
-      + '<span class="rp-file-path">' + _rpEscape(f.file) + '</span>'
+      + '<span class="rp-file-path">' + escapeHtml(f.file) + '</span>'
       + findingsHtml
       + errorHtml
       + '</div>';
@@ -76,7 +70,7 @@ function _rpFilesHtml(files) {
   return '<div class="rp-section">'
     + '<div class="rp-section-header">'
     + '<span class="rp-section-label">' + t('reviewPipeline.filesSection') + '</span>'
-    + '<span class="rp-progress-label">' + _rpEscape(progressLabel) + '</span>'
+    + '<span class="rp-progress-label">' + escapeHtml(progressLabel) + '</span>'
     + '</div>'
     + '<div class="rp-files-list">' + rows + '</div>'
     + '</div>';
@@ -91,8 +85,8 @@ function _rpIntegrationHtml(integration) {
     var statusLabel = t('reviewPipeline.fileStatus.' + status) || status;
     return '<div class="rp-integration-row">'
       + _rpReviewerStatusIcon(status)
-      + '<span class="rp-reviewer-name">' + _rpEscape(reviewer) + '</span>'
-      + '<span class="rp-reviewer-status">' + _rpEscape(statusLabel) + '</span>'
+      + '<span class="rp-reviewer-name">' + escapeHtml(reviewer) + '</span>'
+      + '<span class="rp-reviewer-status">' + escapeHtml(statusLabel) + '</span>'
       + '</div>';
   }).join('');
 
@@ -106,17 +100,17 @@ function _rpIntegrationHtml(integration) {
 
 function _rpRenderStatus(container, data) {
   var elapsedHtml = data.started_at
-    ? '<div class="rp-elapsed">' + _rpEscape(_rpElapsed(data.started_at, data.finished_at)) + '</div>'
+    ? '<div class="rp-elapsed">' + escapeHtml(_rpElapsed(data.started_at, data.finished_at)) + '</div>'
     : '';
 
   var errorHtml = data.error
-    ? '<div class="rp-pipeline-error">' + _rpEscape(data.error) + '</div>'
+    ? '<div class="rp-pipeline-error">' + escapeHtml(data.error) + '</div>'
     : '';
 
   container.innerHTML = '<div class="rp-card-body">'
     + '<div class="rp-state-row">'
     + '<span class="rp-badge ' + _rpStateBadgeClass(data.state) + '">'
-    + _rpEscape(_rpStateLabel(data.state))
+    + escapeHtml(_rpStateLabel(data.state))
     + '</span>'
     + elapsedHtml
     + '</div>'

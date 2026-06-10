@@ -4,15 +4,9 @@
 
 var _t = typeof t === 'function' ? t : function(k) { return k; };
 
-function _phaseEscape(str) {
-  var el = document.createElement('span');
-  el.textContent = String(str);
-  return el.innerHTML;
-}
-
 function _phaseLabel(phaseObj) {
-  var id = _phaseEscape(phaseObj.id);
-  var name = _phaseEscape(phaseObj.name || phaseObj.id);
+  var id = escapeHtml(phaseObj.id);
+  var name = escapeHtml(phaseObj.name || phaseObj.id);
   return name + (name !== id ? ' <span class="phase-settings__id">(' + id + ')</span>' : '');
 }
 
@@ -49,9 +43,9 @@ function _renderPhaseRows(phases, enabledMap, endpointBase, scope, pendingSettin
 
     return '<div class="phase-settings__row' + rowPendingClass + '">'
       + '<input type="checkbox" class="phase-settings__checkbox" id="' + checkboxId + '"'
-      + ' data-phase-id="' + _phaseEscape(phase.id) + '"'
-      + ' data-scope="' + _phaseEscape(scope) + '"'
-      + ' data-endpoint="' + _phaseEscape(endpointBase) + '"'
+      + ' data-phase-id="' + escapeHtml(phase.id) + '"'
+      + ' data-scope="' + escapeHtml(scope) + '"'
+      + ' data-endpoint="' + escapeHtml(endpointBase) + '"'
       + ' ' + checkedAttr
       + ' ' + disabledAttr
       + ' onchange="_onPhaseToggleChange(this)">'
@@ -171,7 +165,7 @@ async function renderPhaseToggleCard(container, scope, endpointBase, options) {
     var availableData = await apiGet('/api/phases/available');
     phases = availableData.phases || [];
   } catch (e) {
-    container.innerHTML = '<div class="phase-settings__error">Failed to load phases: ' + _phaseEscape(e.message) + '</div>';
+    container.innerHTML = '<div class="phase-settings__error">Failed to load phases: ' + escapeHtml(e.message) + '</div>';
     return;
   }
 
@@ -194,7 +188,7 @@ async function renderPhaseToggleCard(container, scope, endpointBase, options) {
     container._endpointBase = endpointBase;
     container._scope = scope;
 
-    container.innerHTML = '<div class="phase-settings__desc">' + _phaseEscape(_t('config.phaseSettingsDesc')) + '</div>'
+    container.innerHTML = '<div class="phase-settings__desc">' + escapeHtml(_t('config.phaseSettingsDesc')) + '</div>'
       + '<div class="phase-settings__rows">'
       + _renderPhaseRows(phases, enabledMap, endpointBase, scope, {})
       + '</div>'
@@ -207,7 +201,7 @@ async function renderPhaseToggleCard(container, scope, endpointBase, options) {
       + '</button>'
       + '</div>';
   } else {
-    container.innerHTML = '<div class="phase-settings__desc">' + _phaseEscape(_t('config.phaseSettingsDesc')) + '</div>'
+    container.innerHTML = '<div class="phase-settings__desc">' + escapeHtml(_t('config.phaseSettingsDesc')) + '</div>'
       + _renderPhaseRows(phases, enabledMap, endpointBase, scope, null);
   }
 }
