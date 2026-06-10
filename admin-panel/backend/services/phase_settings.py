@@ -3,14 +3,17 @@ import re
 from datetime import datetime
 
 ALWAYS_ON_PHASE_IDS = frozenset({"0", "1.0", "2.0", "4.2", "6"})
-# Commit gate: matches concrete 3.N.3 and the template id 3.x.3 so the
-# template cannot be toggled off from the phase-settings UI.
-COMMIT_GATE_PATTERN = re.compile(r"^3\.(\d+|x)\.3$")
+# Implementation (K=0) and Commit (K=4) steps are always-on; they form the
+# mandatory skeleton of every execution sub-phase.
+EXECUTION_ALWAYS_ON_PATTERN = re.compile(r"^3\.(\d+|x)\.(0|4)$")
+# Whenever verification (K=1) is toggled, fix-review (K=2) must mirror it
+# because K=2 is only reachable via K=1.
+_VERIFICATION_STEP_PATTERN = re.compile(r"^3\.(\d+|x)\.1$")
 VALID_SCOPE_TYPES = frozenset({"device", "project", "workspace"})
 
 
 def is_always_on(phase_id: str) -> bool:
-    return phase_id in ALWAYS_ON_PHASE_IDS or bool(COMMIT_GATE_PATTERN.match(phase_id))
+    return phase_id in ALWAYS_ON_PHASE_IDS or bool(EXECUTION_ALWAYS_ON_PATTERN.match(phase_id))
 
 
 def _validate_scope_type(scope_type: str) -> None:
@@ -27,14 +30,30 @@ def get_scope_settings(db, scope_type: str, scope_id: str = "") -> dict:
     return {row["phase_id"]: bool(row["enabled"]) for row in rows}
 
 
+def _with_verification_mirror(settings: dict) -> dict:
+    """Return a copy of settings with 3.x.2 / 3.N.2 mirroring any 3.x.1 / 3.N.1 entries.
+
+    Fix-review (K=2) is only reachable when verification (K=1) is enabled,
+    so they must always share the same enabled flag.
+    """
+    merged = dict(settings)
+    for phase_id, enabled in settings.items():
+        match = _VERIFICATION_STEP_PATTERN.match(phase_id)
+        if match:
+            sibling = f"3.{match.group(1)}.2"
+            merged[sibling] = enabled
+    return merged
+
+
 def set_scope_settings(db, scope_type: str, scope_id: str, settings: dict) -> None:
     _validate_scope_type(scope_type)
     for phase_id, enabled in settings.items():
         if not enabled and is_always_on(phase_id):
             raise ValueError(f"Phase {phase_id} is always-on and cannot be disabled")
+    effective = _with_verification_mirror(settings)
     now = datetime.now().isoformat()
     try:
-        for phase_id, enabled in settings.items():
+        for phase_id, enabled in effective.items():
             db.execute(
                 "INSERT INTO phase_settings (scope_type, scope_id, phase_id, enabled, updated_at) "
                 "VALUES (?, ?, ?, ?, ?) "

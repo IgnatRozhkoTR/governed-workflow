@@ -105,6 +105,7 @@
   "labels.command": "Command",
   "labels.alwaysOn": "Always on",
   "labels.userGate": "User gate",
+  "labels.perSubPhase": "Per sub-phase",
   "labels.file": "File",
   "labels.testMethods": "Test Methods",
   "labels.scenarios": "Scenarios",

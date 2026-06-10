@@ -32,17 +32,17 @@ def test_is_always_on_core_phases(phase_id):
     assert is_always_on(phase_id) is True
 
 
-@pytest.mark.parametrize("phase_id", ["3.1.3", "3.2.3", "3.99.3"])
-def test_is_always_on_commit_gate_pattern(phase_id):
+@pytest.mark.parametrize("phase_id", ["3.1.0", "3.2.0", "3.99.0", "3.x.0"])
+def test_is_always_on_execution_implementation(phase_id):
     assert is_always_on(phase_id) is True
 
 
-def test_is_always_on_commit_gate_template():
-    """The template id 3.x.3 must also be always-on so the template cannot be disabled."""
-    assert is_always_on("3.x.3") is True
+@pytest.mark.parametrize("phase_id", ["3.1.4", "3.2.4", "3.99.4", "3.x.4"])
+def test_is_always_on_execution_commit(phase_id):
+    assert is_always_on(phase_id) is True
 
 
-@pytest.mark.parametrize("phase_id", ["1.1", "1.2", "1.3", "1.4", "4.0", "4.1", "3.1.0", "3.1.4"])
+@pytest.mark.parametrize("phase_id", ["1.1", "1.2", "1.3", "1.4", "4.0", "4.1", "3.1.1", "3.x.1", "3.1.3", "3.x.3"])
 def test_is_always_on_toggleable_phases(phase_id):
     assert is_always_on(phase_id) is False
 
@@ -131,3 +131,50 @@ def test_resolve_workspace_disables(db):
     result = resolve_enabled_phases(db, "w2", None, {"0", "1.0", "4.0"})
     assert "4.0" not in result
     assert "0" in result
+
+
+@pytest.mark.parametrize("phase_id", ["3.x.0", "3.1.0", "3.x.4", "3.2.4"])
+def test_set_scope_settings_rejects_execution_always_on_disable(db, phase_id):
+    with pytest.raises(ValueError):
+        set_scope_settings(db, "device", "", {phase_id: False})
+
+
+@pytest.mark.parametrize("verification_id,expected_sibling", [
+    ("3.x.1", "3.x.2"),
+    ("3.1.1", "3.1.2"),
+    ("3.99.1", "3.99.2"),
+])
+def test_set_scope_settings_mirrors_verification_to_fix_review_when_disabled(
+    db, verification_id, expected_sibling
+):
+    set_scope_settings(db, "device", "", {verification_id: False})
+    db.commit()
+
+    result = get_scope_settings(db, "device", "")
+    assert result[verification_id] is False
+    assert result[expected_sibling] is False
+
+
+@pytest.mark.parametrize("verification_id,expected_sibling", [
+    ("3.x.1", "3.x.2"),
+    ("3.1.1", "3.1.2"),
+])
+def test_set_scope_settings_mirrors_verification_to_fix_review_when_enabled(
+    db, verification_id, expected_sibling
+):
+    set_scope_settings(db, "device", "", {verification_id: True})
+    db.commit()
+
+    result = get_scope_settings(db, "device", "")
+    assert result[verification_id] is True
+    assert result[expected_sibling] is True
+
+
+def test_set_scope_settings_mirror_from_verification_wins_over_explicit_fix_review(db):
+    """When both 3.x.1 and 3.x.2 are in the payload, the mirror from 3.x.1 wins for 3.x.2."""
+    set_scope_settings(db, "device", "", {"3.x.1": False, "3.x.2": True})
+    db.commit()
+
+    result = get_scope_settings(db, "device", "")
+    assert result["3.x.1"] is False
+    assert result["3.x.2"] is False

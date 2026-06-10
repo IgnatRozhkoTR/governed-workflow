@@ -92,22 +92,53 @@ def test_get_phases_available_sorted_by_phase_key(client):
     assert static_ids == sorted(static_ids, key=phase_key)
 
 
-def test_get_phases_available_excludes_templated_ids(client):
-    """Templates like ``3.x.K`` must not leak to the UI — they describe a family, not a phase."""
+def test_get_phases_available_includes_execution_templates(client):
+    """Execution template ids 3.x.0/1/3/4 must appear; 3.x.2 is hidden (implicit via 3.x.1)."""
     response = client.get("/api/phases/available")
-    ids = {p["id"] for p in response.get_json()["phases"]}
-    assert not any("x" in pid.split(".") for pid in ids), (
-        f"Templated ids should be excluded from /api/phases/available; got {ids}"
-    )
+    phases_by_id = {p["id"]: p for p in response.get_json()["phases"]}
+
+    for pid in ("3.x.0", "3.x.1", "3.x.3", "3.x.4"):
+        assert pid in phases_by_id, f"{pid} missing from /api/phases/available"
+        assert phases_by_id[pid]["templated"] is True, f"{pid} should have templated=true"
+
+    assert "3.x.2" not in phases_by_id, "3.x.2 should be hidden from /api/phases/available"
+
+    assert phases_by_id["3.x.0"]["always_on"] is True
+    assert phases_by_id["3.x.4"]["always_on"] is True
+    assert phases_by_id["3.x.1"]["always_on"] is False
+    assert phases_by_id["3.x.3"]["always_on"] is False
 
 
-# ── Commit-gate regex enforcement ─────────────────────────────────────────────
+def test_get_phases_available_non_templated_phases_have_templated_false(client):
+    response = client.get("/api/phases/available")
+    phases_by_id = {p["id"]: p for p in response.get_json()["phases"]}
 
-def test_put_project_rejects_3_1_3_disable(client, project):
+    for pid in ("0", "1.0", "2.0", "4.2", "6"):
+        assert phases_by_id[pid]["templated"] is False, f"{pid} should have templated=false"
+
+
+# ── Execution always-on enforcement ──────────────────────────────────────────
+
+def test_put_project_rejects_3_1_0_disable(client, project):
     pid = project["id"]
-    response = client.put(f"/api/projects/{pid}/phase-settings", json={"settings": {"3.1.3": False}})
+    response = client.put(f"/api/projects/{pid}/phase-settings", json={"settings": {"3.1.0": False}})
     assert response.status_code == 400
     assert "error" in response.get_json()
+
+
+def test_put_project_rejects_3_1_4_disable(client, project):
+    pid = project["id"]
+    response = client.put(f"/api/projects/{pid}/phase-settings", json={"settings": {"3.1.4": False}})
+    assert response.status_code == 400
+    assert "error" in response.get_json()
+
+
+def test_put_project_allows_3_1_3_disable(client, project):
+    """Commit approval gate (3.1.3) is now freely toggleable."""
+    pid = project["id"]
+    response = client.put(f"/api/projects/{pid}/phase-settings", json={"settings": {"3.1.3": False}})
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
 
 
 # ── Input shape validation (issue #767) ──────────────────────────────────────

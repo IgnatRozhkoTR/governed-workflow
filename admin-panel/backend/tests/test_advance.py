@@ -900,3 +900,22 @@ def test_advance_to_done_rejects_leftover_proposal_from_5_2(workspace, project):
     row = _proposal_row(proposal_id)
     assert row["status"] == "rejected"
     assert row["reason"] == "Workspace completed"
+
+
+# ── Disabled 3.x.3 skips commit-approval gate ─────────────────────────────────
+
+
+def test_advance_skips_disabled_commit_approval_gate(workspace, project):
+    """With project-scope 3.x.3=False, advancing from 3.1.1 (passing verification)
+    skips the disabled 3.1.3 gate and lands directly at 3.1.4 (commit)."""
+    _disable_phases("project", str(project["id"]), "3.x.3")
+    try:
+        _setup_execution_phase(workspace["id"], "3.1.1")
+        _assign_verification_profile(project["id"], "exit 0")
+
+        ws = _get_ws_row(workspace["id"])
+        result, code = perform_advance(ws, project["path"])
+        assert code in (200, 202)
+        assert result["phase"] == "3.1.4"
+    finally:
+        _clean_phase_settings()

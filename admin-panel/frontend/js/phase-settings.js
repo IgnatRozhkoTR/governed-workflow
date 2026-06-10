@@ -20,6 +20,10 @@ function _phaseBadges(phaseObj) {
     badges += '<span class="badge phase-settings__badge phase-settings__badge--user-gate">'
       + _t('labels.userGate') + '</span>';
   }
+  if (phaseObj.templated) {
+    badges += '<span class="badge phase-settings__badge phase-settings__badge--per-sub-phase">'
+      + _t('labels.perSubPhase') + '</span>';
+  }
   return badges;
 }
 

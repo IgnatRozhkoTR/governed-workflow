@@ -55,6 +55,7 @@ def workspace_get_state(ws, project, db, locale) -> dict:
         "ticket_name": ws["ticket_name"] or "",
         "context": ws["context_text"] or "",
         "file_references": json.loads(ws["context_refs_json"] or "[]"),
+        "commit_message": ws_field(ws, "commit_message") or "",
     }
 
     execution = plan.get("execution", [])

@@ -38,17 +38,21 @@ def _validate_settings_body(body: dict) -> tuple[dict | None, str | None]:
     return settings, None
 
 
+_HIDDEN_TEMPLATE_IDS = frozenset({"3.x.2"})
+
+
 def _build_phases_list():
     from advance.phases import PHASE_REGISTRY
     phases = []
     for phase_id, phase in PHASE_REGISTRY.items():
-        if is_templated(phase_id):
+        if is_templated(phase_id) and phase_id in _HIDDEN_TEMPLATE_IDS:
             continue
         phases.append({
             "id": phase_id,
             "name": phase.name,
             "always_on": is_always_on(phase_id),
             "is_user_gate": phase.is_user_gate,
+            "templated": is_templated(phase_id),
         })
     phases.sort(key=lambda p: phase_key(p["id"]))
     return phases
