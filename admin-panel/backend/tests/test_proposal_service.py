@@ -7,6 +7,7 @@ from services.proposal_service import (
     create_proposal,
     get_proposal,
     list_proposals,
+    reject_open_proposals,
 )
 
 
@@ -261,6 +262,103 @@ def test_count_pending_manual_proposals_returns_zero_when_none(workspace):
     db = get_db()
     try:
         count = count_pending_manual_proposals(db, workspace["id"])
+    finally:
+        db.close()
+
+    assert count == 0
+
+
+# ---------------------------------------------------------------------------
+# ALLOWED_STATUSES tightening — 'pending' and 'approved' are no longer valid
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("removed_status", ["pending", "approved"])
+def test_list_proposals_raises_when_status_is_scaffolding_value(workspace, removed_status):
+    db = get_db()
+    try:
+        with pytest.raises(ProposalServiceError) as exc_info:
+            list_proposals(db, workspace_id=workspace["id"], status=removed_status)
+    finally:
+        db.close()
+
+    assert exc_info.value.code == "invalid_argument"
+
+
+# ---------------------------------------------------------------------------
+# reject_open_proposals
+# ---------------------------------------------------------------------------
+
+def test_reject_open_proposals_returns_count_of_affected_rows(workspace):
+    _create(workspace, title="Proposal A")
+    _create(workspace, title="Proposal B")
+
+    db = get_db()
+    try:
+        count = reject_open_proposals(db, workspace["id"])
+        db.commit()
+    finally:
+        db.close()
+
+    assert count == 2
+
+
+def test_reject_open_proposals_sets_status_reason_and_reviewed_at(workspace):
+    proposal_id = _create(workspace, title="Open proposal")
+
+    db = get_db()
+    try:
+        reject_open_proposals(db, workspace["id"])
+        db.commit()
+        row = db.execute(
+            "SELECT status, reason, reviewed_at FROM proposals WHERE id = ?",
+            (proposal_id,),
+        ).fetchone()
+    finally:
+        db.close()
+
+    assert row["status"] == "rejected"
+    assert row["reason"] == "Workspace archived"
+    assert row["reviewed_at"] is not None
+
+
+def test_reject_open_proposals_does_not_affect_other_workspace(workspace, second_workspace):
+    _create(workspace, title="Workspace 1 proposal")
+    _create(second_workspace, title="Workspace 2 proposal")
+
+    db = get_db()
+    try:
+        count = reject_open_proposals(db, workspace["id"])
+        db.commit()
+        remaining = list_proposals(db, workspace_id=second_workspace["id"])
+    finally:
+        db.close()
+
+    assert count == 1
+    assert len(remaining) == 1
+    assert remaining[0]["status"] == "proposed"
+
+
+def test_reject_open_proposals_skips_already_terminal_rows(workspace):
+    from services.proposal_service import resolve_proposal
+    proposal_id = _create(workspace, title="Already done")
+
+    db = get_db()
+    try:
+        resolve_proposal(db, proposal_id, status="executed")
+        db.commit()
+        count = reject_open_proposals(db, workspace["id"])
+        db.commit()
+    finally:
+        db.close()
+
+    assert count == 0
+
+
+def test_reject_open_proposals_returns_zero_when_no_open_proposals(workspace):
+    db = get_db()
+    try:
+        count = reject_open_proposals(db, workspace["id"])
+        db.commit()
     finally:
         db.close()
 

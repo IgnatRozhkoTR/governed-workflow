@@ -8,22 +8,14 @@ from mcp.types import ToolAnnotations
 
 from mcp_tools import mcp, with_mcp_workspace, mcp_error
 from services import proposal_service
-from services.proposal_service import ProposalServiceError
+from services.proposal_service import (
+    ALLOWED_STATUSES as _VALID_STATUSES,
+    ALLOWED_TYPES as _VALID_TYPES,
+    ProposalServiceError,
+)
 from services.reflection_context import gather_reflection_context
 
-_VALID_TYPES = frozenset({
-    "memory_write", "memory_delete",
-    "rule_new", "rule_update",
-    "agent_new", "agent_update",
-    "skill_new", "skill_update",
-    "workflow_improvement",
-})
-
 _VALID_IMPLEMENTATION_KINDS = frozenset({"auto", "manual"})
-
-_VALID_STATUSES = frozenset({
-    "proposed", "pending", "approved", "rejected", "executed", "failed",
-})
 
 _SERVICE_ERROR_TO_CATEGORY = {
     "invalid_proposal_type": ("validation", False),
@@ -41,7 +33,7 @@ _SERVICE_ERROR_TO_CATEGORY = {
 def workspace_submit_proposal(
     ws, project, db, locale,
     type: Annotated[Literal["memory_write", "memory_delete", "rule_new", "rule_update", "agent_new", "agent_update", "skill_new", "skill_update", "workflow_improvement"], Field(description="The kind of change being proposed.")],
-    implementation_kind: Annotated[Literal["auto", "manual"], Field(description="'auto' = the panel applies this proposal directly when approved. 'manual' = the orchestrator picks it up and runs a sub-agent to implement it. Memory writes / rule changes are auto; agent / skill / workflow proposals are manual.")],
+    implementation_kind: Annotated[Literal["auto", "manual"], Field(description="'auto' = the orchestrator applies it directly during phase 5.1. 'manual' = the orchestrator picks it up and runs a sub-agent to implement it. Memory writes / rule changes are auto; agent / skill / workflow proposals are manual.")],
     title: Annotated[str, Field(description="One-line summary of the proposal.")],
     body: Annotated[str, Field(description="Markdown body — the rationale, the suggested content, the affected scope.")],
     payload_json: Annotated[str | None, Field(description="Optional JSON-encoded structured payload (e.g. the rule content, the memory note, the agent diff). Pass a JSON string, not an object.")] = None,
@@ -166,7 +158,7 @@ def workspace_list_proposals(
     db,
     locale,
     implementation_kind: Annotated[Literal["auto", "manual"] | None, Field(description="Optional filter by implementation kind.")] = None,
-    status: Annotated[Literal["proposed", "pending", "approved", "rejected", "executed", "failed"] | None, Field(description="Optional filter by status.")] = None,
+    status: Annotated[Literal["proposed", "rejected", "executed", "failed"] | None, Field(description="Optional filter by status.")] = None,
 ) -> dict:
     """List proposals for this workspace, newest first. Filter optionally by implementation_kind and/or status.
 

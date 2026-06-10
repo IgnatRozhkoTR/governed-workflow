@@ -1,8 +1,8 @@
 """Drop the CHECK constraint on proposals.type.
 
-Python-layer validation in services.proposal_types.ProposalType is now the
+Python-layer validation in services.proposal_service.ALLOWED_TYPES is now the
 single authoritative gate. Adding a new proposal type requires only adding a
-value to the ProposalType enum — no migration needed.
+value to ALLOWED_TYPES — no migration needed.
 
 SQLite cannot ALTER a CHECK constraint in place. This migration uses the
 standard SQLite rebuild idiom: rename the old table, create an identical one

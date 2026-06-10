@@ -16,9 +16,7 @@ ALLOWED_TYPES = frozenset({
 
 ALLOWED_IMPLEMENTATION_KINDS = frozenset({"auto", "manual"})
 
-ALLOWED_STATUSES = frozenset({
-    "proposed", "pending", "approved", "rejected", "executed", "failed",
-})
+ALLOWED_STATUSES = frozenset({"proposed", "rejected", "executed", "failed"})
 
 TERMINAL_STATUSES = frozenset({"executed", "failed", "rejected"})
 
@@ -157,3 +155,13 @@ def count_pending_manual_proposals(db, workspace_id: int) -> int:
         (workspace_id,),
     ).fetchone()
     return row["cnt"] if row else 0
+
+
+def reject_open_proposals(db, workspace_id: int) -> int:
+    cursor = db.execute(
+        "UPDATE proposals SET status='rejected', reason='Workspace archived', "
+        "reviewed_at=datetime('now') "
+        "WHERE workspace_id=? AND status='proposed'",
+        (workspace_id,),
+    )
+    return cursor.rowcount
