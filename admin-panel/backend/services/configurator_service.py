@@ -71,11 +71,17 @@ class Configurator(ABC):
 
 
 class SkillConfigurator(Configurator):
-    """Renders SKILL.md from SKILL.md.template + each enabled phase's description_for_skill().
+    """Renders SKILL.md from the engine's SKILL.md.template + each enabled phase's
+    description_for_skill().
 
     Unlike the other configurators this also writes the project root so a fresh
     install seeds the canonical SKILL.md before any worktree exists; active
     worktrees additionally receive their own copy.
+
+    The template is always read from the shipped engine default. Project-local
+    template copies are never customizations — they are installer-seeded snapshots
+    that go stale — so rendering off the engine template is the single source of
+    truth and prevents stale gates from re-materializing on every render.
     """
 
     TEMPLATE_REL_PATH = ".claude/skills/governed-workflow/SKILL.md.template"
@@ -85,20 +91,18 @@ class SkillConfigurator(Configurator):
     PLACEHOLDER_PHASE_MAP = "{{PHASE_MAP}}"
 
     def configure(self, db: sqlite3.Connection, project_id: int, project_path: Path) -> list[dict]:
-        template_path = self._resolve_template_path(project_path)
-        if template_path is None:
+        if not self.DEFAULT_TEMPLATE_PATH.exists():
             log.warning(
-                "SkillConfigurator: template missing in project %s and default %s, skipping",
-                project_path,
+                "SkillConfigurator: engine template missing at %s, skipping",
                 self.DEFAULT_TEMPLATE_PATH,
             )
             return [_skipped("SKILL.md", "template missing")]
 
-        template = template_path.read_text()
+        template = self.DEFAULT_TEMPLATE_PATH.read_text()
         if self.PLACEHOLDER_PHASES not in template:
             log.warning(
                 "SkillConfigurator: template at %s lacks %s placeholder, skipping",
-                template_path,
+                self.DEFAULT_TEMPLATE_PATH,
                 self.PLACEHOLDER_PHASES,
             )
             return [_skipped("SKILL.md", "template missing placeholder")]
@@ -106,21 +110,20 @@ class SkillConfigurator(Configurator):
         phase_ids = self._resolve_phase_ids(db, project_id)
         rendered = self.render(template, phase_ids)
 
-        results = [self._write_target(project_path / self.OUTPUT_REL_PATH, rendered)]
+        results = []
+        if project_path.exists():
+            results.append(self._write_target(project_path / self.OUTPUT_REL_PATH, rendered))
+        else:
+            log.warning(
+                "SkillConfigurator: project path %s missing, skipping project-root render",
+                project_path,
+            )
+            results.append(_skipped(str(project_path / self.OUTPUT_REL_PATH), "project path missing"))
         for working_dir in _active_worktree_paths(db, project_id):
             results.append(
                 self._write_target(Path(working_dir) / self.OUTPUT_REL_PATH, rendered)
             )
         return results
-
-    def _resolve_template_path(self, project_path: Path) -> Path | None:
-        """Project-level template if present, else the shipped default, else None."""
-        project_template = project_path / self.TEMPLATE_REL_PATH
-        if project_template.exists():
-            return project_template
-        if self.DEFAULT_TEMPLATE_PATH.exists():
-            return self.DEFAULT_TEMPLATE_PATH
-        return None
 
     @classmethod
     def render(cls, template: str, phase_ids: list[str]) -> str:
@@ -407,3 +410,26 @@ class ConfiguratorChain:
     @classmethod
     def default(cls) -> "ConfiguratorChain":
         return cls()
+
+
+def rerender_all_projects(db: sqlite3.Connection) -> list[dict]:
+    """Re-render every registered project's payload from current DB state.
+
+    Used by the device-scope phase-settings save, the module-toggle save, and
+    startup — each of which changes config that affects every project's render.
+    Per-project failures are logged and do not abort the sweep. Returns the
+    aggregated non-rendered result entries (skipped/failed) so callers can
+    surface them as configurator warnings.
+    """
+    chain = ConfiguratorChain.default()
+    warnings: list[dict] = []
+    for project_row in db.execute("SELECT id, path FROM projects").fetchall():
+        try:
+            results = chain.run(db, project_row["id"], Path(project_row["path"]))
+            warnings.extend(r for r in results if r["action"] != "rendered")
+        except Exception:
+            log.exception(
+                "Configurator chain failed for project %s; SKILL.md may be stale",
+                project_row["id"],
+            )
+    return warnings

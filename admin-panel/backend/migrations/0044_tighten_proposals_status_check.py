@@ -5,8 +5,10 @@ starts at 'proposed' and ends at 'rejected', 'executed', or 'failed'. Removes
 the two dead values so the constraint matches actual usage.
 
 Uses the standard SQLite table-rebuild idiom (same pattern as
-0037_proposals_status_proposed.py). Live DB has zero proposal rows so the
-INSERT SELECT is safe, but the full rebuild is written correctly regardless.
+0037_proposals_status_proposed.py). The INSERT...SELECT rewrites any legacy
+'pending'/'approved' rows to the nearest live status 'proposed' so the copy
+never violates the new CHECK and no rows are dropped, regardless of what the
+live DB happens to contain.
 """
 from yoyo import step
 
@@ -39,7 +41,9 @@ step("""
          workspace_id, project_id, reason, result_json,
          created_at, reviewed_at, executed_at)
     SELECT
-        id, type, implementation_kind, status, title, body, payload_json, origin,
+        id, type, implementation_kind,
+        CASE WHEN status IN ('pending','approved') THEN 'proposed' ELSE status END,
+        title, body, payload_json, origin,
         workspace_id, project_id, reason, result_json,
         created_at, reviewed_at, executed_at
     FROM proposals

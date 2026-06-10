@@ -30,8 +30,8 @@ def test_project_phase_settings_put_invokes_configurator(client, project):
 
 
 def test_device_phase_settings_put_invokes_configurator_per_project(client, project):
-    """A device-scope save re-renders every registered project."""
-    with patch("routes.phase_settings.ConfiguratorChain") as MockChain:
+    """A device-scope save re-renders every registered project via rerender_all_projects."""
+    with patch("services.configurator_service.ConfiguratorChain") as MockChain:
         chain_instance = MagicMock()
         chain_instance.run.return_value = []
         MockChain.default.return_value = chain_instance

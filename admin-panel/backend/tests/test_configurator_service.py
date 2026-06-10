@@ -45,11 +45,34 @@ def db(clean_db):
 
 
 @pytest.fixture
-def project_root(tmp_path):
-    """Temp project directory with the SKILL.md.template placed at the canonical path."""
+def default_template(tmp_path):
+    """Point ``SkillConfigurator.DEFAULT_TEMPLATE_PATH`` at a temp SAMPLE_TEMPLATE.
+
+    The configurator always renders from the engine default; tests patch that
+    path rather than seeding a (now-ignored) project-local template.
+    """
+    template = tmp_path / "default-skills" / "governed-workflow" / "SKILL.md.template"
+    template.parent.mkdir(parents=True)
+    template.write_text(SAMPLE_TEMPLATE)
+    with patch("services.configurator_service.SkillConfigurator.DEFAULT_TEMPLATE_PATH", template):
+        yield template
+
+
+@pytest.fixture
+def default_template_with_map(tmp_path):
+    """Point the engine template at a temp SAMPLE_TEMPLATE_WITH_MAP for Phase Map tests."""
+    template = tmp_path / "default-skills-map" / "governed-workflow" / "SKILL.md.template"
+    template.parent.mkdir(parents=True)
+    template.write_text(SAMPLE_TEMPLATE_WITH_MAP)
+    with patch("services.configurator_service.SkillConfigurator.DEFAULT_TEMPLATE_PATH", template):
+        yield template
+
+
+@pytest.fixture
+def project_root(tmp_path, default_template):
+    """Temp project directory that exists on disk (template comes from the engine default)."""
     root = tmp_path / "proj"
-    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
-    (root / SKILL_TEMPLATE_REL).write_text(SAMPLE_TEMPLATE)
+    root.mkdir()
     return root
 
 
@@ -80,10 +103,10 @@ def _insert_worktree(db, project_id: str, branch: str, working_dir: Path, status
 # ── SkillConfigurator: template discovery ──────────────────────────────────────
 
 
-def test_template_missing_everywhere_logs_warning_and_writes_nothing(
+def test_engine_template_missing_logs_warning_and_writes_nothing(
     db, project_row, tmp_path, caplog
 ):
-    """When neither the project nor the default template exists, the configurator skips."""
+    """When the engine template does not exist, the configurator skips."""
     empty_root = tmp_path / "no-template"
     empty_root.mkdir()
     missing_default = tmp_path / "no-default" / "SKILL.md.template"
@@ -97,40 +120,59 @@ def test_template_missing_everywhere_logs_warning_and_writes_nothing(
     assert results == [{"target": "SKILL.md", "action": "skipped", "reason": "template missing"}]
 
 
-def test_falls_back_to_default_template_when_project_template_absent(
-    db, project_row, tmp_path
+def test_renders_from_engine_template_ignoring_stale_project_local_copy(
+    db, project_row, tmp_path, default_template
 ):
-    """A project with no SKILL.md.template renders from the shipped default template."""
-    empty_root = tmp_path / "no-project-template"
-    empty_root.mkdir()
-    default_template = tmp_path / "default-skills" / "governed-workflow" / "SKILL.md.template"
-    default_template.parent.mkdir(parents=True)
-    default_template.write_text(SAMPLE_TEMPLATE)
+    """A stale project-local template is ignored; rendering uses the engine default."""
+    root = tmp_path / "with-stale-local"
+    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
+    (root / SKILL_TEMPLATE_REL).write_text("# Stale local copy\n\n{{PHASES}}\n")
 
-    with patch("services.configurator_service.SkillConfigurator.DEFAULT_TEMPLATE_PATH", default_template):
-        results = SkillConfigurator().configure(db, project_row, empty_root)
+    results = SkillConfigurator().configure(db, project_row, root)
 
-    rendered = empty_root / SKILL_OUTPUT_REL
-    assert rendered.exists()
-    body = rendered.read_text()
+    body = (root / SKILL_OUTPUT_REL).read_text()
     assert "{{PHASES}}" not in body
     assert "Preamble." in body and "Footer." in body
+    assert "Stale local copy" not in body
     assert all(r["action"] == "rendered" for r in results)
 
 
-def test_template_lacking_placeholder_logs_warning_and_writes_nothing(
+def test_engine_template_lacking_placeholder_logs_warning_and_writes_nothing(
     db, project_row, tmp_path, caplog
 ):
-    """A template without the {{PHASES}} marker is left untouched."""
+    """An engine template without the {{PHASES}} marker leaves the output untouched."""
     root = tmp_path / "no-placeholder"
-    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
-    (root / SKILL_TEMPLATE_REL).write_text("# No placeholder here\n")
+    root.mkdir()
+    bad_template = tmp_path / "bad-default" / "SKILL.md.template"
+    bad_template.parent.mkdir(parents=True)
+    bad_template.write_text("# No placeholder here\n")
 
-    with caplog.at_level(logging.WARNING, logger="services.configurator_service"):
+    with patch("services.configurator_service.SkillConfigurator.DEFAULT_TEMPLATE_PATH", bad_template), \
+         caplog.at_level(logging.WARNING, logger="services.configurator_service"):
         SkillConfigurator().configure(db, project_row, root)
 
     assert not (root / SKILL_OUTPUT_REL).exists()
     assert any("placeholder" in r.getMessage() for r in caplog.records)
+
+
+def test_missing_project_path_skips_root_but_still_renders_worktrees(
+    db, project_row, project_root, tmp_path, caplog
+):
+    """A deleted project root is skipped (not recreated); active worktrees still render."""
+    deleted_root = tmp_path / "deleted-proj"
+    wt = tmp_path / "wt-live"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/live", wt, status="active")
+
+    with caplog.at_level(logging.WARNING, logger="services.configurator_service"):
+        results = SkillConfigurator().configure(db, project_row, deleted_root)
+
+    assert not deleted_root.exists()
+    assert (wt / SKILL_OUTPUT_REL).exists()
+    root_target = str(deleted_root / SKILL_OUTPUT_REL)
+    assert {"target": root_target, "action": "skipped", "reason": "project path missing"} in results
+    assert any("project path" in r.getMessage() and "missing" in r.getMessage()
+               for r in caplog.records)
 
 
 # ── SkillConfigurator: rendering ───────────────────────────────────────────────
@@ -206,11 +248,12 @@ def test_configure_is_idempotent(db, project_row, project_root):
     assert first == second
 
 
-def test_phase_map_placeholder_is_replaced_with_markdown_table(db, project_row, tmp_path):
+def test_phase_map_placeholder_is_replaced_with_markdown_table(
+    db, project_row, tmp_path, default_template_with_map
+):
     """The {{PHASE_MAP}} placeholder is replaced with a Markdown table for enabled phases."""
     root = tmp_path / "with-map"
-    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
-    (root / SKILL_TEMPLATE_REL).write_text(SAMPLE_TEMPLATE_WITH_MAP)
+    root.mkdir()
 
     SkillConfigurator().configure(db, project_row, root)
 
@@ -225,11 +268,12 @@ def test_phase_map_placeholder_is_replaced_with_markdown_table(db, project_row, 
     assert "| `6` | Done |" in body
 
 
-def test_phase_map_includes_templated_execution_rows(db, project_row, tmp_path):
+def test_phase_map_includes_templated_execution_rows(
+    db, project_row, tmp_path, default_template_with_map
+):
     """The templated 3.x.K execution rows render in the Phase Map, 3.x.3 as a USER gate."""
     root = tmp_path / "with-exec-map"
-    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
-    (root / SKILL_TEMPLATE_REL).write_text(SAMPLE_TEMPLATE_WITH_MAP)
+    root.mkdir()
 
     SkillConfigurator().configure(db, project_row, root)
 
@@ -250,13 +294,14 @@ def test_phases_block_includes_execution_descriptions(db, project_row, project_r
     assert "## 3.N.4 Commit" in body
 
 
-def test_phase_map_omits_phases_disabled_at_project_scope(db, project_row, tmp_path):
+def test_phase_map_omits_phases_disabled_at_project_scope(
+    db, project_row, tmp_path, default_template_with_map
+):
     """A project-level toggle drops the phase row from the rendered Phase Map."""
     from services.phase_settings import set_scope_settings
 
     root = tmp_path / "with-map-toggle"
-    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
-    (root / SKILL_TEMPLATE_REL).write_text(SAMPLE_TEMPLATE_WITH_MAP)
+    root.mkdir()
 
     set_scope_settings(db, "project", project_row, {"1.1": False})
     db.commit()
@@ -284,7 +329,9 @@ def test_disabled_phase_is_absent_from_rendered_skill(db, project_row, project_r
     assert "## 1.0 Assessment" in body
 
 
-def test_declarative_module_phase_appears_in_rendered_skill(db, project_row, tmp_path):
+def test_declarative_module_phase_appears_in_rendered_skill(
+    db, project_row, tmp_path, default_template_with_map
+):
     """A DeclarativePhase registered into PHASE_REGISTRY renders into SKILL.md.
 
     Regression guard: when WorkModes was removed, the resolver started reading
@@ -296,8 +343,7 @@ def test_declarative_module_phase_appears_in_rendered_skill(db, project_row, tmp
     from advance.phases.declarative import DeclarativePhase
 
     root = tmp_path / "with-module-phase"
-    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
-    (root / SKILL_TEMPLATE_REL).write_text(SAMPLE_TEMPLATE_WITH_MAP)
+    root.mkdir()
 
     manifest = {
         "id": "4.5",

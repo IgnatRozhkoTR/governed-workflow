@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Workspace Control -- Flask backend for admin panel."""
-import logging
 import os
 import subprocess
 import sys
@@ -149,19 +148,10 @@ def _rerender_all_projects_on_startup():
     Run only from the __main__ entry point — create_app() stays free of this so
     pytest never triggers filesystem writes when it imports the app factory.
     """
-    from services.configurator_service import ConfiguratorChain
+    from services.configurator_service import rerender_all_projects
 
-    chain = ConfiguratorChain.default()
     with get_db_ctx() as db:
-        projects = db.execute("SELECT id, path FROM projects").fetchall()
-        for project_row in projects:
-            try:
-                chain.run(db, project_row["id"], Path(project_row["path"]))
-            except Exception:
-                logging.getLogger(__name__).exception(
-                    "Configurator chain failed at startup for project %s; SKILL.md may be stale",
-                    project_row["id"],
-                )
+        rerender_all_projects(db)
 
 
 if __name__ == "__main__":

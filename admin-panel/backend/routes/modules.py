@@ -1,13 +1,11 @@
 """Modules discovery and enabled-state endpoints."""
 import logging
-import os
-from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
 from core.db import get_db_ctx
 from core.paths import DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR
-from services.configurator_service import ConfiguratorChain
+from services.configurator_service import rerender_all_projects
 from services.modules_discovery import iter_module_dirs
 
 log = logging.getLogger(__name__)
@@ -86,17 +84,7 @@ def set_enabled_modules():
                 (module_id,),
             )
         db.commit()
-        projects = db.execute("SELECT id, path FROM projects").fetchall()
-        warnings = []
-        for project_row in projects:
-            try:
-                results = ConfiguratorChain.default().run(db, project_row["id"], Path(project_row["path"]))
-                warnings.extend(r for r in results if r["action"] != "rendered")
-            except Exception:
-                log.exception(
-                    "Configurator chain failed at set_enabled_modules for project %s; SKILL.md may be stale",
-                    project_row["id"],
-                )
+        warnings = rerender_all_projects(db)
         body = {"status": "saved"}
         if warnings:
             body["configurator_warnings"] = warnings

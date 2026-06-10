@@ -123,14 +123,7 @@ def _validate_file_contains(details, working_dir, file_key, names_key, file_labe
     return True, f"All {len(names)} {names_label.lower()} found in {file_path}"
 
 
-def _validate_unit_test(details, working_dir):
-    cmd = details.get("verification_command")
-    if cmd:
-        return _run_verification_command(working_dir, cmd)
-    return _validate_file_contains(details, working_dir, "file", "test_names", "Test file", "Tests")
-
-
-def _validate_integration_test(details, working_dir):
+def _validate_test_file(details, working_dir):
     cmd = details.get("verification_command")
     if cmd:
         return _run_verification_command(working_dir, cmd)
@@ -145,7 +138,7 @@ def _validate_bdd_scenario(details, working_dir):
 
 
 _VALIDATORS = {
-    "unit_test": _validate_unit_test,
-    "integration_test": _validate_integration_test,
+    "unit_test": _validate_test_file,
+    "integration_test": _validate_test_file,
     "bdd_scenario": _validate_bdd_scenario,
 }
