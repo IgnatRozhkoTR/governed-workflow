@@ -147,6 +147,31 @@
 }
 
 /* ═══════════════════════════════════════════════ */
+/*  SIMPLE PLANNING TOGGLE                         */
+/* ═══════════════════════════════════════════════ */
+
+.simple-planning__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.simple-planning__label {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.simple-planning__desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════ */
 /*  ADVANCE MODES DROPDOWN SECTION                 */
 /* ═══════════════════════════════════════════════ */
 

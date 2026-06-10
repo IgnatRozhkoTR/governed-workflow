@@ -43,7 +43,7 @@ class DeclarativePhase(Phase):
     def reject_target(self):
         return self._reject_target
 
-    def description_for_skill(self) -> str:
+    def description_for_skill(self, simple_planning: bool = False) -> str:
         return self._description_for_skill
 
     @property

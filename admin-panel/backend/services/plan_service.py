@@ -52,17 +52,32 @@ def _validate_execution_scope(execution):
     return None
 
 
-def set_plan(db, ws, plan_data):
+def set_plan(db, ws, plan_data, simple_mode: bool = False):
     """Set execution plan on workspace. Resets plan_status and adjusts phase if needed.
 
-    Every execution item must embed its own scope (must list required). Returns
-    a result dict with ok/error keys.
+    Every execution item must embed its own scope (must list required). When
+    simple_mode is True, the plan must contain exactly one execution item and
+    no system diagrams. Returns a result dict with ok/error keys.
     """
     locale = ws["locale"] or "en"
     phase = ws["phase"]
 
     if phase_key(phase) < phase_key("2.0"):
         return {"error": t("mcp.error.planPhase", locale)}
+
+    if simple_mode:
+        execution = plan_data.get("execution", [])
+        if len(execution) > 1:
+            return {
+                "error": "Simple planning mode allows exactly one execution sub-phase (3.1).",
+                "errorCode": "simple_multiple_subphases",
+            }
+        diagram = plan_data.get("systemDiagram")
+        if diagram and diagram != [] and diagram != "":
+            return {
+                "error": "System diagrams are not used in simple planning mode.",
+                "errorCode": "simple_no_diagrams",
+            }
 
     scope_error = _validate_execution_scope(plan_data.get("execution", []))
     if scope_error:

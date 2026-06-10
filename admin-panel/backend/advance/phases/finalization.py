@@ -10,7 +10,7 @@ class AgenticReviewPhase(Phase):
     name = "Agentic Review"
     short_description = "Headless review pipeline runs file and integration reviewers"
 
-    def description_for_skill(self) -> str:
+    def description_for_skill(self, simple_planning: bool = False) -> str:
         return """\
 ## 4.0 Blind Code Review (automated)
 
@@ -51,7 +51,7 @@ class AddressFixPhase(Phase):
     name = "Address Fix"
     short_description = "Engineers address review findings across the merged scope"
 
-    def description_for_skill(self) -> str:
+    def description_for_skill(self, simple_planning: bool = False) -> str:
         return """\
 ## 4.1 Address & Fix
 
@@ -91,7 +91,7 @@ class FinalApprovalPhase(Phase):
     reject_target = "4.1"
     short_description = "User reviews the resolved findings and approves delivery"
 
-    def description_for_skill(self) -> str:
+    def description_for_skill(self, simple_planning: bool = False) -> str:
         return """\
 ## 4.2 Final Approval (USER GATE)
 
@@ -118,7 +118,7 @@ class ReflectionPhase(Phase):
     name = "Reflection"
     short_description = "Reflector sub-agent emits proposals; auto-apply easy ones"
 
-    def description_for_skill(self) -> str:
+    def description_for_skill(self, simple_planning: bool = False) -> str:
         return """\
 ## Phase 5.1: Reflection
 
@@ -152,7 +152,7 @@ class ManualImplementationPhase(Phase):
     name = "Manual implementation"
     short_description = "Implement the manual proposals queued by 5.1"
 
-    def description_for_skill(self) -> str:
+    def description_for_skill(self, simple_planning: bool = False) -> str:
         return """\
 ## Phase 5.2: Manual implementation
 
@@ -183,7 +183,7 @@ class DonePhase(Phase):
     name = "Done"
     short_description = "Push and open the MR/PR; task complete"
 
-    def description_for_skill(self) -> str:
+    def description_for_skill(self, simple_planning: bool = False) -> str:
         return """\
 ## 6 Done
 

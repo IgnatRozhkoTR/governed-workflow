@@ -9,11 +9,13 @@ from urllib.parse import urlparse
 from flask import Blueprint, jsonify, request
 
 from core.db import get_db
+from core.decorators import with_project
 from core.helpers import run_git, write_json
 from core.i18n import t
 from core.paths import DEFAULT_GIT_RULES
 from services.advance_mode_service import seed_default_modes
 from services.configurator_service import ConfiguratorChain
+from services.project_settings_service import ProjectSettingsError, get_simple_planning, set_simple_planning
 
 log = logging.getLogger(__name__)
 
@@ -153,6 +155,41 @@ def _ensure_git_rules_symlink(project_path):
 
     rules_path.parent.mkdir(parents=True, exist_ok=True)
     rules_path.symlink_to(system_default)
+
+
+@bp.route("/api/projects/<project_id>/settings", methods=["GET"])
+@with_project
+def get_project_settings(db, project):
+    simple_planning = get_simple_planning(db, project["id"])
+    return jsonify({"simple_planning": simple_planning})
+
+
+@bp.route("/api/projects/<project_id>/settings", methods=["PUT"])
+@with_project
+def put_project_settings(db, project):
+    body = request.get_json(silent=True) or {}
+    if "simple_planning" not in body:
+        return jsonify({"error": "simple_planning field is required"}), 400
+    if not isinstance(body["simple_planning"], bool):
+        return jsonify({"error": "simple_planning must be a boolean"}), 400
+
+    try:
+        set_simple_planning(db, project["id"], body["simple_planning"])
+        db.commit()
+    except ProjectSettingsError as exc:
+        return jsonify({"error": str(exc)}), 404
+
+    warnings = []
+    try:
+        results = ConfiguratorChain.default().run(db, project["id"], Path(project["path"]))
+        warnings = [r for r in results if r["action"] != "rendered"]
+    except Exception:
+        log.exception("Configurator chain failed at put_project_settings; SKILL.md may be stale")
+
+    response = {"ok": True, "simple_planning": body["simple_planning"]}
+    if warnings:
+        response["configurator_warnings"] = warnings
+    return jsonify(response)
 
 
 @bp.route("/api/projects/<project_id>", methods=["DELETE"])

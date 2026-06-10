@@ -107,8 +107,9 @@ class SkillConfigurator(Configurator):
             )
             return [_skipped("SKILL.md", "template missing placeholder")]
 
+        simple_planning = self._fetch_simple_planning(db, project_id)
         phase_ids = self._resolve_phase_ids(db, project_id)
-        rendered = self.render(template, phase_ids)
+        rendered = self.render(template, phase_ids, simple_planning=simple_planning)
 
         results = []
         if project_path.exists():
@@ -126,13 +127,29 @@ class SkillConfigurator(Configurator):
         return results
 
     @classmethod
-    def render(cls, template: str, phase_ids: list[str]) -> str:
-        """Substitute the {{PHASES}} and {{PHASE_MAP}} placeholders for *phase_ids*."""
-        return template.replace(
-            cls.PLACEHOLDER_PHASES, cls._build_phase_block(phase_ids)
+    def render(cls, template: str, phase_ids: list[str], simple_planning: bool = False) -> str:
+        """Substitute the {{PHASES}} and {{PHASE_MAP}} placeholders for *phase_ids*.
+
+        When simple_planning is True, {{#FULL_PLANNING}}...{{/FULL_PLANNING}} blocks
+        are removed entirely. When False, the markers are stripped and the inner
+        content is kept (full-mode rendering).
+        """
+        rendered = template.replace(
+            cls.PLACEHOLDER_PHASES, cls._build_phase_block(phase_ids, simple_planning)
         ).replace(
             cls.PLACEHOLDER_PHASE_MAP, cls._build_phase_map(phase_ids)
         )
+        return cls._apply_full_planning_blocks(rendered, simple_planning)
+
+    @staticmethod
+    def _fetch_simple_planning(db: sqlite3.Connection, project_id: int | str | None) -> bool:
+        """Read the simple_planning flag for the project; returns False when not found."""
+        if project_id is None:
+            return False
+        row = db.execute(
+            "SELECT simple_planning FROM projects WHERE id = ?", (project_id,)
+        ).fetchone()
+        return bool(row["simple_planning"]) if row else False
 
     def _resolve_phase_ids(self, db: sqlite3.Connection, project_id: int) -> list[str]:
         """Resolved phase ids for the project, including templated execution rows."""
@@ -141,7 +158,7 @@ class SkillConfigurator(Configurator):
         return phase_resolver.resolve_for_project(db, project_id, include_templated=True)
 
     @staticmethod
-    def _build_phase_block(phase_ids: list[str]) -> str:
+    def _build_phase_block(phase_ids: list[str], simple_planning: bool = False) -> str:
         """Concatenate each enabled phase's description_for_skill() in resolved order.
 
         Skips phases without a registered instance or with an empty description.
@@ -153,10 +170,28 @@ class SkillConfigurator(Configurator):
             phase = get_phase(pid)
             if phase is None:
                 continue
-            block = phase.description_for_skill().strip()
+            block = phase.description_for_skill(simple_planning=simple_planning).strip()
             if block:
                 blocks.append(block)
         return "\n\n---\n\n".join(blocks)
+
+    @staticmethod
+    def _apply_full_planning_blocks(content: str, simple_planning: bool) -> str:
+        """Strip {{#FULL_PLANNING}}...{{/FULL_PLANNING}} conditional blocks.
+
+        When simple_planning is False (full mode): strip the markers and keep the
+        inner content. When True (simple mode): remove the entire block including
+        the markers and their enclosed content.
+        """
+        import re
+
+        if simple_planning:
+            pattern = r'\{\{#FULL_PLANNING\}\}.*?\{\{/FULL_PLANNING\}\}'
+            return re.sub(pattern, '', content, flags=re.DOTALL)
+
+        content = content.replace('{{#FULL_PLANNING}}', '')
+        content = content.replace('{{/FULL_PLANNING}}', '')
+        return content
 
     @staticmethod
     def _build_phase_map(phase_ids: list[str]) -> str:

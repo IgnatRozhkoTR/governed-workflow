@@ -482,6 +482,32 @@ Call `workspace_advance(commit_hash="{hash}")`.
 }
 
 
+_IMPLEMENTATION_SIMPLE_DESCRIPTION = """\
+## 3.N.0 Implementation
+
+**Actors**: Engineer sub-agents, then test engineer sub-agents | **Code edits: ON (in sub-phase scope)**
+
+Deploy in two stages:
+
+**Stage 1 — Production code**: Deploy engineer sub-agent(s) for the implementation tasks.
+
+**Stage 2 — Tests**: After engineers complete, deploy test engineer sub-agent(s) to write tests for the new/changed code. Test engineers read the implementation but write tests independently — they are NOT briefed on "how the code works", only on "what it should do" (from the task description and scope).
+
+If during implementation an issue arises that requires changing the approach or scope, message the plan-advisor to discuss:
+
+```
+SendMessage(
+  to: "plan-advisor",
+  content: "Implementation issue in sub-phase {N}: {describe the problem}.
+            The original plan assumed {X} but we found {Y}. What's the best path forward?"
+)
+```
+
+Call `workspace_advance` when both implementation and tests are complete.
+
+**Advance 3.N.0 → 3.N.1** requires: at least 1 file changed per `must`-scope entry."""
+
+
 class _ExecutionTemplatePhase(Phase):
     """Structural placeholder for an execution sub-step parameterized by item.
 
@@ -513,8 +539,11 @@ class _ExecutionTemplatePhase(Phase):
     def short_description(self) -> str:
         return _TEMPLATE_SHORT_DESCRIPTIONS.get(self._k, "")
 
-    def description_for_skill(self) -> str:
-        return _TEMPLATE_SKILL_DESCRIPTIONS.get(self._k, "")
+    def description_for_skill(self, simple_planning: bool = False) -> str:
+        description = _TEMPLATE_SKILL_DESCRIPTIONS.get(self._k, "")
+        if simple_planning and self._k == 0:
+            return _IMPLEMENTATION_SIMPLE_DESCRIPTION
+        return description
 
     def validate(self, ws, body, project_path):
         raise NotImplementedError(

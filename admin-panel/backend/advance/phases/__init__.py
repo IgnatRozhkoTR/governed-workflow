@@ -69,7 +69,7 @@ class Phase(ABC):
         """If not None, a progress entry with this key must exist before advancing."""
         return None
 
-    def description_for_skill(self) -> str:
+    def description_for_skill(self, simple_planning: bool = False) -> str:
         """Markdown block for this phase, rendered into SKILL.md.
         Empty string means omit from the rendered skill."""
         return ""

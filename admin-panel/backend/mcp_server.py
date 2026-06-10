@@ -61,6 +61,44 @@ from mcp_tools.proposals import (
     workspace_resolve_proposal,
 )
 
+_SIMPLE_MODE_HIDDEN_TOOLS = (
+    "workspace_propose_criteria",
+    "workspace_update_criteria",
+    "workspace_get_criteria",
+    "workspace_extend_plan",
+)
+
+
+def _deregister_simple_mode_tools() -> None:
+    """Remove simple-planning-incompatible tools from the FastMCP registry.
+
+    This is a best-effort optimisation — the runtime guards in each tool handler
+    are the actual enforcement. If detection fails the server still starts normally.
+    """
+    import logging
+
+    log = logging.getLogger(__name__)
+    try:
+        ws, project = _detect_workspace()
+        if project is None or not project["simple_planning"]:
+            return
+        for tool_name in _SIMPLE_MODE_HIDDEN_TOOLS:
+            try:
+                mcp.remove_tool(tool_name)
+                log.info("Simple planning mode: deregistered tool %s", tool_name)
+            except Exception:
+                log.info(
+                    "Simple planning mode: could not deregister %s; runtime guards remain active",
+                    tool_name,
+                )
+    except Exception:
+        log.info(
+            "Simple planning mode tool-hiding: workspace detection failed; "
+            "runtime guards remain active"
+        )
+
+
 if __name__ == "__main__":
     register_module_phases_from_disk()
+    _deregister_simple_mode_tools()
     mcp.run(transport="stdio")

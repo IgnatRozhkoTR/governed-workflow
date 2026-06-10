@@ -44,7 +44,7 @@ def workspace_set_plan(
 
     Tasks with the same "group" name run in parallel. Tasks without a group run
     sequentially."""
-    result = plan_service.set_plan(db, ws, plan)
+    result = plan_service.set_plan(db, ws, plan, simple_mode=bool(project["simple_planning"]))
     if "error" in result:
         return mcp_error("business", result["error"], retryable=False)
     db.commit()
@@ -85,6 +85,13 @@ def workspace_extend_plan(
       set replace_diagrams=True to replace the entire diagram list instead.
 
     plan_status is set to 'pending'. Existing sub-phases are unchanged."""
+    if project["simple_planning"]:
+        return mcp_error(
+            "business",
+            "Extending the plan is not available in simple planning mode.",
+            retryable=False,
+        )
+
     result = plan_service.extend_plan(db, ws, subphase, scope, diagrams, replace_diagrams)
     if "error" in result:
         return mcp_error("validation", result["error"], retryable=False)

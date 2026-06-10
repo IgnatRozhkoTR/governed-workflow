@@ -88,6 +88,8 @@
   "config.channels": "Channels",
   "config.yoloMode": "YOLO",
   "config.phaseSettingsDesc": "Enable or disable phases for this scope. Always-on phases cannot be disabled.",
+  "config.simplePlanning": "Simple planning",
+  "config.simplePlanningDesc": "Plans use a single sub-phase with no diagrams and no acceptance criteria. Best for large but conceptually simple projects.",
 
   "labels.provider": "Provider",
   "labels.host": "Host",

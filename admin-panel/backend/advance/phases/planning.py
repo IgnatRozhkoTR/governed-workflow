@@ -1,8 +1,18 @@
 """Planning workflow phase: 2.0 (plan validation and approval)."""
+import sqlite3
+
 from advance.phases import Phase
 from core.db import get_db_ctx
 from core.i18n import t
 from services import plan_service
+
+
+def _is_simple_planning(db: sqlite3.Connection, project_id: str) -> bool:
+    """Return the simple_planning flag for the given project."""
+    row = db.execute(
+        "SELECT simple_planning FROM projects WHERE id = ?", (project_id,)
+    ).fetchone()
+    return bool(row["simple_planning"]) if row else False
 
 
 class PlanningPhase(Phase):
@@ -10,7 +20,52 @@ class PlanningPhase(Phase):
     name = "Planning"
     short_description = "Orchestrator and plan-advisor draft the execution plan and scope"
 
-    def description_for_skill(self) -> str:
+    def description_for_skill(self, simple_planning: bool = False) -> str:
+        if simple_planning:
+            return self._simple_description()
+        return self._full_description()
+
+    def _simple_description(self) -> str:
+        return """\
+## 2.0 Planning
+
+**Actors**: Orchestrator + plan-advisor
+
+Message the plan-advisor teammate to collaborate on the execution plan:
+
+```
+SendMessage(
+  to: "plan-advisor",
+  content: "We are in the planning phase. Review the research findings and impact analysis
+            via workspace_get_state. Help me design the execution plan for this task.
+            We need exactly ONE sub-phase (3.1) with its scope and tasks."
+)
+```
+
+When the plan is agreed:
+1. Call `workspace_set_plan` with the full plan JSON — exactly ONE execution item with `"id": "3.1"`:
+```json
+{
+  "description": "High-level description of what this plan achieves",
+  "systemDiagram": [],
+  "execution": [
+    {
+      "id": "3.1",
+      "name": "Sub-phase name",
+      "scope": {"must": ["src/models/"], "may": ["src/config/"]},
+      "tasks": [{"title": "...", "files": ["..."], "agent": "..."}]
+    }
+  ]
+}
+```
+2. Call `workspace_update_progress` for phase `"2"`
+3. Call `workspace_advance`
+
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0`.
+
+**Advance 2.0 → 3.1.0** requires: a single execution sub-phase `3.1` with a non-empty `scope.must`, plan_status='approved', and progress entry `"2"`."""
+
+    def _full_description(self) -> str:
         return """\
 ## 2.0 Planning
 
@@ -74,6 +129,24 @@ When plan is agreed:
         if not execution:
             return False, {"message": t("advance.error.noPlanExecution", locale)}
 
+        with get_db_ctx() as db:
+            is_simple = _is_simple_planning(db, ws["project_id"])
+
+        if is_simple and len(execution) > 1:
+            return False, {"message": "Simple planning mode requires exactly one execution sub-phase."}
+
+        issues = self._validate_execution_items(execution, locale)
+        if issues:
+            return False, {"message": t("advance.error.planValidationFailed", locale), "issues": issues}
+
+        if not is_simple:
+            ok, detail = self._validate_criteria(ws, locale)
+            if not ok:
+                return False, detail
+
+        return True, {}
+
+    def _validate_execution_items(self, execution: list, locale: str) -> list:
         issues = []
         expected_index = 1
         for i, item in enumerate(execution):
@@ -102,10 +175,9 @@ When plan is agreed:
                         issues.append(t("advance.error.planTaskMissingAgent", locale, i=i, ti=ti))
 
             expected_index += 1
+        return issues
 
-        if issues:
-            return False, {"message": t("advance.error.planValidationFailed", locale), "issues": issues}
-
+    def _validate_criteria(self, ws, locale: str) -> tuple:
         with get_db_ctx() as db:
             count = db.execute(
                 "SELECT COUNT(*) as cnt FROM acceptance_criteria WHERE workspace_id = ?",
@@ -119,10 +191,8 @@ When plan is agreed:
 
         if count == 0:
             return False, {"message": t("advance.error.noCriteria", locale)}
-
         if pending > 0:
             return False, {"error": t("gate.error.pendingCriteria", locale, count=pending)}
-
         return True, {}
 
     def next_phase(self, ws):
