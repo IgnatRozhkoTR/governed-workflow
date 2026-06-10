@@ -87,7 +87,7 @@ def workspace_post_comment(
     """Post a review comment on specific file lines.
 
     Purpose:
-        Called by code-reviewer agents during review phases to annotate
+        Called by reviewer agents during review phases to annotate
         a line range in a specific file. Each call creates a new comment row
         (not idempotent — duplicate calls produce duplicate comments).
 

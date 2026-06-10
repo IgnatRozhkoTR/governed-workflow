@@ -1,7 +1,7 @@
 """MCP stdio server — governed workflow admin panel.
 
 All tool implementations live in mcp_tools/.
-Importing mcp_tools triggers @mcp.tool registration for all 39 tools.
+Importing mcp_tools triggers @mcp.tool registration for all tools.
 """
 from advance.phases import register_module_phases_from_disk
 from mcp_tools import mcp

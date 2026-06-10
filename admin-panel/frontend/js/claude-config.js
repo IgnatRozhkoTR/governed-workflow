@@ -63,10 +63,6 @@ function loadChannelsPreference() {
   localStorage.setItem('channels_value', value);
 }
 
-function saveChannelsPreference() {
-  // No-op — channels preference is now managed via modules
-}
-
 // ═══════════════════════════════════════════════
 //  MODULES CARD (dashboard)
 // ═══════════════════════════════════════════════

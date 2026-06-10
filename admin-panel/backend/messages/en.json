@@ -68,7 +68,7 @@
 
   "mcp.tool.updateCriteria.desc": "Update an existing acceptance criterion's description and/or details. Use this to fill in\n    file paths, test names, and refined descriptions for criteria created by the user.\n\n    - criterion_id: ID of the criterion to update\n    - description: updated description (optional, keeps existing if empty)\n    - details_json: updated details JSON (optional, keeps existing if empty)",
 
-  "mcp.tool.postComment.desc": "Post a review comment on specific file lines. Used by code-reviewer agents.\n\n    - file_path: path relative to workspace root\n    - line_start/line_end: line range being commented on\n    - text: the review comment\n    - parent_id: reply to existing comment (0 = new root comment)",
+  "mcp.tool.postComment.desc": "Post a review comment on specific file lines. Used by reviewer agents.\n\n    - file_path: path relative to workspace root\n    - line_start/line_end: line range being commented on\n    - text: the review comment\n    - parent_id: reply to existing comment (0 = new root comment)",
 
   "mcp.error.textRequired": "text is required",
   "mcp.error.filePathRequired": "file_path is required",

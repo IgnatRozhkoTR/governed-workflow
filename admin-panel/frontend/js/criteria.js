@@ -230,7 +230,7 @@ function deleteCriterion(id) {
 async function validateCriterionManual(id) {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
-  await apiPost('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/criteria/' + id + '/validate', {});
+  await apiPut('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/criteria/' + id + '/validate', { passed: true });
   loadCriteria();
 }
 

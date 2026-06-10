@@ -111,27 +111,3 @@ def reply_to_comment(db, ws, project, comment_id):
     return jsonify({"ok": True, "id": result["id"]})
 
 
-@bp.route("/api/ws/<project_id>/<path:branch>/discussions", methods=["POST"])
-@with_workspace
-def add_discussion(db, ws, project):
-    body = request.get_json(silent=True) or {}
-    text = body.get("text", "").strip()
-    disc_type = body.get("type", "general")
-    parent_id = body.get("parent_id")
-
-    if not text:
-        return jsonify({"error": t("api.error.textRequired")}), 400
-    if disc_type not in ("general", "research"):
-        return jsonify({"error": t("api.error.invalidDiscussionType")}), 400
-
-    result = discussion_service.post_discussion(
-        db, ws["id"], text,
-        author="user",
-        disc_type=disc_type,
-        parent_id=parent_id,
-    )
-    if "error" in result:
-        return jsonify({"error": t("api.error.discussionNotFound")}), 404
-    db.commit()
-
-    return jsonify({"ok": True, "id": result["id"]})

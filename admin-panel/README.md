@@ -125,8 +125,6 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 | Hooks API | `POST /api/hook/check-permission`, `GET /api/hook/session-context` |
 | Terminal | `POST .../terminal/start`, `POST .../terminal/resume`, `GET .../terminal/status`, `POST .../terminal/kill`, `POST .../terminal/notify`, `WS /ws/terminal/<project>/<branch>` |
 | Command | `GET/PUT .../command` |
-| Progress | `GET /api/progress` |
-| Modify Check | `POST .../can-modify` |
 | Verification | `GET /api/verification/profiles`, `POST /api/verification/profiles`, `POST .../profiles/<id>/steps`, `PUT/DELETE /api/verification/steps/<id>`, `GET/POST .../verification/assign`, `DELETE .../verification/unassign/<id>`, `GET .../verification/results` |
 | LSP | `GET .../lsp/profiles`, `GET .../lsp/status`, `POST .../lsp/start`, `POST .../lsp/stop`, `POST .../lsp/check-installed`, `PUT .../lsp/profiles/<id>/toggle`, `WS /ws/lsp/<project>/<branch>` |
 | Phase Settings | `GET/PUT /api/phase-settings/device`, `GET/PUT /api/projects/<pid>/phase-settings`, `GET/PUT .../phase-settings`, `GET /api/phases/available` |
@@ -217,7 +215,13 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 | `workspace_get_reflection_context` | Returns scope, branch diff, open review findings, and filtered session transcript for the reflector | `orchestrator` |
 | `workspace_submit_proposal` | Submit a reflection proposal (nine types: memory/rule/agent/skill writes, workflow improvement; `auto` or `manual` implementation) | `reflector` |
 | `workspace_list_proposals` | List all proposals with status | `orchestrator` |
-| `workspace_resolve_proposal` | Mark a proposal `executed`, `failed`, or `rejected` | `orchestrator`, implementation sub-agents |
+| `workspace_resolve_proposal` | Mark a proposal `executed`, `failed`, or `rejected` | `orchestrator` |
+
+### Review pipeline
+
+| Tool | Description | Gated to |
+|------|-------------|----------|
+| `workspace_review_pipeline_summary` | Returns pipeline completion/success state so the orchestrator can gate `workspace_advance` at 4.0 | `orchestrator` |
 
 ### State & Advance
 

@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 from mcp.types import ToolAnnotations
 
-from mcp_tools import mcp, with_mcp_workspace, mcp_error
+from mcp_tools import mcp, with_mcp_workspace, mcp_error, translate_service_error
 from core.i18n import t
 from services import discussion_service
 from services import research_service
@@ -98,7 +98,11 @@ def workspace_save_research(
         summary=summary,
     )
     if "error" in result:
-        return mcp_error("validation", result["error"], retryable=False)
+        return translate_service_error(
+            result,
+            {"not_found": "not_found"},
+            default_category="validation",
+        )
     db.commit()
     return result
 

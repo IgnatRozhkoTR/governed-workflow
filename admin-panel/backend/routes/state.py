@@ -9,7 +9,7 @@ from flask import Blueprint, Response, jsonify, request
 
 logger = logging.getLogger(__name__)
 
-from core.db import get_db, get_db_ctx, ws_field
+from core.db import ws_field
 from services import comment_service
 from services import discussion_service
 from core.decorators import with_workspace
@@ -233,66 +233,6 @@ def set_phase(db, ws, project):
     return jsonify({"phase": new_phase, "previous_phase": old_phase})
 
 
-@bp.route("/api/progress", methods=["GET"])
-def query_progress():
-    """Query progress entries by date range.
-
-    Query params:
-        date: single date (YYYY-MM-DD) -- returns entries created/updated on that day
-        from: start date (YYYY-MM-DD)
-        to: end date (YYYY-MM-DD)
-        project_id: optional filter by project
-    """
-    date = request.args.get("date")
-    date_from = request.args.get("from", date)
-    date_to = request.args.get("to", date)
-    project_id = request.args.get("project_id")
-
-    if not date_from or not date_to:
-        return jsonify({"error": t("api.error.provideDateParams")}), 400
-
-    query = (
-        "SELECT pe.phase, pe.summary, pe.details_json, pe.created_at, pe.updated_at, "
-        "w.branch, w.working_dir, p.name AS project_name, p.id AS project_id "
-        "FROM progress_entries pe "
-        "JOIN workspaces w ON pe.workspace_id = w.id "
-        "JOIN projects p ON w.project_id = p.id "
-        "WHERE (pe.created_at >= ? OR pe.updated_at >= ?) "
-        "AND (pe.created_at < ? OR pe.updated_at < ?) "
-    )
-    start = f"{date_from}T00:00:00"
-    end = f"{date_to}T23:59:59"
-    params = [start, start, end, end]
-
-    if project_id:
-        query += "AND p.id = ? "
-        params.append(project_id)
-
-    query += "ORDER BY pe.updated_at"
-
-    with get_db_ctx() as db:
-        rows = db.execute(query, params).fetchall()
-
-    entries = []
-    for row in rows:
-        entry = {
-            "project": row["project_name"],
-            "project_id": row["project_id"],
-            "branch": row["branch"],
-            "phase": row["phase"],
-            "summary": row["summary"],
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"],
-        }
-        if row["details_json"]:
-            try:
-                entry["details"] = json.loads(row["details_json"])
-            except json.JSONDecodeError:
-                pass
-        entries.append(entry)
-
-    return jsonify({"entries": entries, "date_from": date_from, "date_to": date_to})
-
 
 @bp.route("/api/ws/<project_id>/<path:branch>/research/<int:research_id>/prove", methods=["POST"])
 @with_workspace
@@ -311,59 +251,6 @@ def toggle_research_proven(db, ws, project, research_id):
     db.commit()
     return jsonify(result)
 
-
-@bp.route("/api/ws/<project_id>/<path:branch>/can-modify", methods=["POST"])
-@with_workspace
-def can_modify(db, ws, project):
-    """Check if a file can be modified in the current workspace state.
-
-    Called by pre-tool hook to enforce scope and approval.
-    Body: {"file": "relative/path/to/file"}
-
-    Checks (in order):
-    1. Files inside .claude/ are ALWAYS allowed (workspace metadata, memory, etc.)
-    2. Plan must be approved (if plan exists with execution items)
-    3. Scope must be approved
-    4. File must match scope patterns (must or may)
-
-    Returns: {"allowed": true} or {"allowed": false, "reason": "..."}
-    """
-    body = request.get_json(silent=True) or {}
-    file_path = body.get("file", "").strip()
-    if not file_path:
-        return jsonify({"error": t("api.error.fileParameterRequired")}), 400
-
-    locale = ws["locale"] if ws["locale"] else "en"
-
-    # .claude/ files are always writable (workspace metadata, memory, configs)
-    if file_path.startswith(".claude/") or file_path.startswith(".claude\\"):
-        return jsonify({"allowed": True, "reason": t("api.scope.workspaceMetadataAlwaysWritable", locale)})
-
-    # Check plan approval (if plan exists with execution items)
-    plan = plan_service.get_plan(ws)
-    if plan.get("execution"):
-        plan_status = ws_field(ws, "plan_status", "pending")
-        if plan_status != "approved":
-            return jsonify({"allowed": False, "reason": t("api.scope.planNotApproved", locale)})
-
-    # Check scope approval
-    scope_status = ws_field(ws, "scope_status", "pending")
-    if scope_status != "approved":
-        return jsonify({"allowed": False, "reason": t("api.scope.scopeNotApproved", locale)})
-
-    # Check file matches scope patterns
-    scope_map = plan_service.get_scope(ws)
-    phase = ws["phase"]
-
-    must_patterns, may_patterns = scope_service.get_scope_patterns(scope_map, phase)
-    if not must_patterns and not may_patterns:
-        # No scope patterns defined -- allow (scope is approved but empty means no restrictions)
-        return jsonify({"allowed": True, "reason": t("api.scope.noScopePatternsDefinied", locale)})
-
-    if scope_service.match_scope_patterns(file_path, scope_map, phase):
-        return jsonify({"allowed": True, "reason": t("api.scope.matchesScopePattern", locale, pattern=file_path)})
-
-    return jsonify({"allowed": False, "reason": t("api.scope.fileOutsideApprovedScope", locale, file_path=file_path)})
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/research/<int:research_id>", methods=["DELETE"])
