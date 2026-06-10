@@ -180,11 +180,6 @@ def workspace_delete_research(
       - not_found: research entry ID does not exist in this workspace.
     """
     deleted = research_service.delete_research(db, id, ws["id"])
-    if not deleted:
-        return mcp_error(
-            "not_found",
-            t("mcp.error.researchEntryNotFound", locale, id=id),
-            retryable=False,
-        )
-    db.commit()
-    return {"ok": True, "deleted_id": id}
+    if deleted:
+        db.commit()
+    return {"ok": True, "deleted_id": id, "deleted": deleted}

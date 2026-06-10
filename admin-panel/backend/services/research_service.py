@@ -38,16 +38,36 @@ def _enrich_code_snippets(findings, working_dir):
             continue
         if not proof.get("snippet_start") or not proof.get("snippet_end"):
             continue
-        file_path = Path(working_dir) / proof["file"]
-        if not file_path.exists():
-            continue
         try:
+            file_path = Path(working_dir) / proof["file"]
+            if not file_path.exists():
+                continue
             lines = file_path.read_text().splitlines()
             start = max(0, proof["snippet_start"] - 1)
             end = min(len(lines), proof["snippet_end"])
             proof["snippet"] = "\n".join(lines[start:end])
         except Exception:
             logger.warning("Failed to read proof snippet from %s", proof.get("file"), exc_info=True)
+
+
+_CODE_PROOF_REQUIRED_FIELDS = frozenset({"file"})
+
+
+def _validate_findings(findings) -> list[str]:
+    errors: list[str] = []
+    for idx, finding in enumerate(findings):
+        if not isinstance(finding, dict):
+            errors.append(f"finding[{idx}] must be a dict, got {type(finding).__name__}")
+            continue
+        proof = finding.get("proof")
+        if proof is not None and not isinstance(proof, dict):
+            errors.append(f"finding[{idx}].proof must be a dict, got {type(proof).__name__}")
+            continue
+        if isinstance(proof, dict) and proof.get("type") == "code":
+            for field in _CODE_PROOF_REQUIRED_FIELDS:
+                if not proof.get(field):
+                    errors.append(f"finding[{idx}].proof missing required field '{field}' for code proof")
+    return errors
 
 
 def save_research(db, ws, topic, findings, discussion_id=None, summary=""):
@@ -61,6 +81,10 @@ def save_research(db, ws, topic, findings, discussion_id=None, summary=""):
     if not findings:
         locale = ws["locale"] or "en"
         return {"error": t("mcp.error.noFindings", locale)}
+
+    validation_errors = _validate_findings(findings)
+    if validation_errors:
+        return {"error": "; ".join(validation_errors)}
 
     working_dir = ws["working_dir"]
     _normalize_proof_paths(findings, working_dir)

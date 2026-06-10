@@ -599,6 +599,80 @@ def test_get_branch_diff_includes_changed_lines(tmp_path):
     assert "+" in diff
 
 
+def test_integration_agent_is_error_envelope_counts_as_failure(repo_with_files):
+    ws = repo_with_files
+    is_error_envelope = json.dumps({"is_error": True, "error": "agent crashed"})
+
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
+        if agent == "architecture-reviewer":
+            return is_error_envelope
+        return _envelope("")
+
+    with patch.object(
+        review_pipeline_service.diff_filter, "list_reviewable_files",
+        return_value=[],
+    ), patch.object(
+        review_pipeline_service, "_spawn_claude_agent", side_effect=fake_spawn
+    ):
+        review_pipeline_service.start_in_background(
+            workspace_id=ws["id"],
+            project_path=Path(ws["working_dir"]),
+            base_branch="develop",
+        )
+        status = _wait_for_state(ws["id"])
+
+    summary = review_pipeline_service.status_summary(ws["id"])
+    assert summary["integration_failed"] == 1
+    assert summary["is_ok"] is False
+    assert status.integration["architecture-reviewer"] == "failed"
+    assert "is_error=True" in status.integration_errors.get("architecture-reviewer", "")
+
+
+def test_integration_agent_malformed_json_counts_as_failure(repo_with_files):
+    ws = repo_with_files
+
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
+        if agent == "correctness-reviewer":
+            return "this is not valid json at all"
+        return _envelope("")
+
+    with patch.object(
+        review_pipeline_service.diff_filter, "list_reviewable_files",
+        return_value=[],
+    ), patch.object(
+        review_pipeline_service, "_spawn_claude_agent", side_effect=fake_spawn
+    ):
+        review_pipeline_service.start_in_background(
+            workspace_id=ws["id"],
+            project_path=Path(ws["working_dir"]),
+            base_branch="develop",
+        )
+        status = _wait_for_state(ws["id"])
+
+    summary = review_pipeline_service.status_summary(ws["id"])
+    assert summary["integration_failed"] == 1
+    assert summary["is_ok"] is False
+    assert status.integration["correctness-reviewer"] == "failed"
+    assert "unparseable" in status.integration_errors.get("correctness-reviewer", "")
+
+
+def test_start_in_background_duplicate_start_is_rejected(repo_with_files):
+    ws = repo_with_files
+    sentinel = review_pipeline_service.PipelineStatus(
+        workspace_id=ws["id"], state="file_stage"
+    )
+    review_pipeline_service._set_status(sentinel)
+
+    result = review_pipeline_service.start_in_background(
+        workspace_id=ws["id"],
+        project_path=Path(ws["working_dir"]),
+        base_branch="develop",
+    )
+
+    assert result is None
+    assert review_pipeline_service._STATUS[ws["id"]] is sentinel
+
+
 def test_run_integration_agent_embeds_diff_in_prompt(tmp_path):
     from services.review_pipeline_service import _run_integration_agent
 

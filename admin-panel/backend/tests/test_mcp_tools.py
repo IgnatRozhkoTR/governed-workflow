@@ -355,6 +355,36 @@ class TestResearch:
         full = workspace_get_research(ids=[rid])
         assert full[0]["summary"] is None
 
+    def test_save_research_finding_not_dict_returns_validation_error(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_save_research
+        result = workspace_save_research(topic="Bad shape", findings=["not a dict"])
+        assert "error" in result
+        assert result["errorCategory"] == "validation"
+        assert result["isRetryable"] is False
+
+    def test_save_research_proof_missing_file_returns_validation_error(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_save_research
+        findings = [{
+            "summary": "Found something",
+            "proof": {"type": "code", "line_start": 1, "line_end": 5},
+        }]
+        result = workspace_save_research(topic="Missing file", findings=findings)
+        assert "error" in result
+        assert result["errorCategory"] == "validation"
+        assert "file" in result["error"]
+
+    def test_save_research_valid_web_proof_still_works(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_save_research
+        findings = [{
+            "summary": "Found something",
+            "proof": {"type": "web", "url": "http://example.com", "title": "T", "quote": "Q"},
+        }]
+        result = workspace_save_research(topic="Web proof", findings=findings)
+        assert result["ok"] is True
+
     def test_save_research_normalizes_paths(self, workspace, monkeypatch, tmp_path):
         # Simulate agent running from a subdirectory
         subdir = Path(workspace["working_dir"]) / "src"
@@ -867,16 +897,32 @@ class TestDeleteResearch:
         result = workspace_delete_research(id=rid)
         assert result["ok"] is True
         assert result["deleted_id"] == rid
+        assert result["deleted"] is True
         remaining = workspace_list_research()
         assert all(e["id"] != rid for e in remaining)
 
-    def test_delete_research_unknown_id_returns_not_found(self, workspace, monkeypatch):
+    def test_delete_research_already_deleted_is_idempotent(self, workspace, monkeypatch):
+        rid = add_research(workspace["id"], topic="ToDelete")
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_delete_research
+        first = workspace_delete_research(id=rid)
+        assert first["ok"] is True
+        assert first["deleted"] is True
+
+        second = workspace_delete_research(id=rid)
+        assert second["ok"] is True
+        assert second["deleted_id"] == rid
+        assert second["deleted"] is False
+        assert "error" not in second
+
+    def test_delete_research_unknown_id_is_idempotent(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_delete_research
         result = workspace_delete_research(id=424242)
-        assert "error" in result
-        assert result["errorCategory"] == "not_found"
-        assert result["isRetryable"] is False
+        assert result["ok"] is True
+        assert result["deleted_id"] == 424242
+        assert result["deleted"] is False
+        assert "error" not in result
 
 
 class TestPostComment:
@@ -1284,10 +1330,12 @@ class TestErrorEnvelopeContract:
         from mcp_server import workspace_prove_research
         self._assert_envelope(workspace_prove_research(id=777777, proven=True))
 
-    def test_delete_research_not_found(self, workspace, monkeypatch):
+    def test_delete_research_missing_id_is_idempotent(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_delete_research
-        self._assert_envelope(workspace_delete_research(id=777777))
+        result = workspace_delete_research(id=777777)
+        assert result["ok"] is True
+        assert result["deleted"] is False
 
     def test_resolve_comment_not_found(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])

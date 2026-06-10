@@ -234,9 +234,8 @@ def start_in_background(
                 existing.state,
             )
             return None
-
-    status = PipelineStatus(workspace_id=workspace_id, started_at=time.time())
-    _set_status(status)
+        status = PipelineStatus(workspace_id=workspace_id, started_at=time.time())
+        _STATUS[workspace_id] = status
 
     thread = threading.Thread(
         target=_run_thread,
@@ -449,19 +448,17 @@ async def _run_integration_agent(
         max_turns=None,
         timeout_s=_timeout_s() * _INTEGRATION_TIMEOUT_MULTIPLIER,
     )
+    if not stdout.strip():
+        return
     try:
-        envelope = json.loads(stdout) if stdout.strip() else {}
-        if envelope.get("is_error"):
-            log.warning(
-                "%s returned is_error=True; findings may be missing",
-                agent_name,
-            )
-    except json.JSONDecodeError:
-        log.warning(
-            "%s envelope malformed but findings may have been submitted via MCP; "
-            "check workspace_get_review_issues",
-            agent_name,
-        )
+        envelope = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"{agent_name} returned unparseable envelope: {exc}"
+        ) from exc
+    if envelope.get("is_error"):
+        error_msg = envelope.get("error", "agent reported is_error=True")
+        raise RuntimeError(f"{agent_name} returned is_error=True: {error_msg}")
 
 
 def _parse_file_reviewer_findings(stdout: str) -> list[dict]:
