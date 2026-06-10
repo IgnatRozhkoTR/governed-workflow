@@ -30,7 +30,7 @@ tool_name = data.get("tool_name", "")
 
 # Allow orchestrator to write to .claude/ paths (memory, settings, etc.)
 # BUT NOT .claude/worktrees/ (project code) or the admin-panel source itself.
-if tool_name in ("Edit", "Write", "NotebookEdit"):
+if tool_name in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
     file_path = data.get("tool_input", {}).get("file_path", "")
     cwd = data.get("cwd", ".")
     resolved_fp = Path(os.path.normpath(os.path.join(cwd, file_path))) if file_path else Path()

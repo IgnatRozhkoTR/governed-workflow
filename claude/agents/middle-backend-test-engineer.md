@@ -42,3 +42,9 @@ DO NOT WRITE:
 - Tests that exercise the mock framework rather than the code under test
 - Tests with TODO/FIXME comments
 </quality-gate>
+
+<workspace-protocol>
+When working as a teammate, the orchestrator will provide the plan file path in the task message.
+Read the relevant section for your task before implementing.
+Report completion via SendMessage with a brief summary of changes made.
+</workspace-protocol>

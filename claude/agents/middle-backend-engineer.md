@@ -61,3 +61,9 @@ SKIP (do not flag):
 - For multi-file changes: list the files you need to touch UP FRONT, then Edit each one. Do not discover files mid-implementation.
 - Independent operations: emit parallel tool calls within a single response. Sequential only when one call's output feeds the next.
 </tool-discipline>
+
+<workspace-protocol>
+When working as a teammate, the orchestrator will provide the plan file path in the task message.
+Read the relevant section for your task before implementing.
+Report completion via SendMessage with a brief summary of changes made.
+</workspace-protocol>

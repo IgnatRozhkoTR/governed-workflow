@@ -105,7 +105,7 @@ Each finding proof:
     "type": "web",
     "url": "page URL observed",
     "title": "Page or component name",
-    "quote": "Description of what was observed in the UI"
+    "quote": "Verbatim DOM text / attribute value observed (or CSS selector + exact attribute value for structural findings)"
 }
 - url and quote are required — server cannot fetch web pages on demand
 

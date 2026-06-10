@@ -45,12 +45,13 @@ Agents execute their task and return. The orchestrator continues them for follow
 | senior-backend-test-engineer | Complex test scenarios spanning write + fix cycles. Continue via SendMessage. Tests ONLY — always deployed AFTER engineer completes. |
 | senior-code-validator | Continue via SendMessage when re-validation after fixes is expected |
 | senior-code-researcher | Deep research spanning multiple rounds. Continue via SendMessage. |
-| researcher (middle) | Phase 1.1 (parallel, one per topic) |
+| code-researcher | Phase 1.1 (parallel, one per topic). Variants: diff-researcher, web-researcher, ui-researcher depending on where the answer lives. |
 | research-prover | Phase 1.2 |
-| engineer (middle) | Phases 3.N.0 (stage 1), 3.N.2, 3.N.4, 4.1. Production code ONLY — never tests. |
-| test engineer (middle) | Phase 3.N.0 (stage 2, after engineer). Tests ONLY. |
-| validator (middle) | Phase 3.N.1 |
-| reviewer | Phase 4.0 |
+| middle-backend-engineer | Phases 3.N.0 (stage 1), 3.N.2, 3.N.4, 4.1. Production code ONLY — never tests. |
+| middle-backend-test-engineer | Phase 3.N.0 (stage 2, after engineer). Tests ONLY. |
+| middle-code-validator | Phase 3.N.1 |
+| review-validator | Phase 4.0 — validates that review findings are addressed. The server-side pipeline dispatches architecture-reviewer, correctness-reviewer, and file-reviewer automatically. |
+| reflector | Phase 5.1 — spawned once with the reflection context embedded in its prompt. |
 
 ---
 
@@ -127,7 +128,7 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 | Tool | Why it needs explanation |
 |------|--------------------------|
 | `workspace_get_state` | Single source of truth for `phase`, `scope`, `plan`, `context`, `previous_sessions`. Call at session start and after every gate event. |
-| `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules; for `3.N.4` pass `commit_hash`; for `1.1` pass `no_further_research_needed=true`. |
+| `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules. Required arguments vary by phase — consult the per-phase blocks below for what to pass at each advance. |
 | `workspace_set_scope` | Writes must/may scope. Planning-phase only — call alongside `workspace_set_plan`. |
 | `workspace_set_plan` | Writes or replaces the execution plan. Planning-phase only; switches `plan_status` back to `pending`. |
 | `workspace_extend_plan` | Appends a sub-phase to an already-approved plan. Use instead of `workspace_set_plan` when execution surfaces new work — avoids invalidating prior sub-phases. |
@@ -149,7 +150,6 @@ Full tool roster is granted via this agent's frontmatter; consult tool descripti
 | Gate | On reject, phase becomes | What to do |
 |------|--------------------------|------------|
 | 1.4 (Preparation Review) | `1.1` | Read comments, run more research, update impact analysis, re-prove, then advance |
-| 2.1 (Plan Review) | `2.0` | Read comments, revise plan, then advance |
 | 3.N.3 (Code Review) | `3.N.2` | Read comments, fix code, then advance |
 | 4.2 (Final Approval) | `4.1` | Read comments, fix code, then advance |
 
@@ -190,7 +190,7 @@ Required before certain advances. Use `workspace_update_progress`:
 | 1.0 → 1.1 | `"1.0"` |
 | 1.2 → 1.3 | `"1"` |
 | 1.3 → 1.4 | `"1.3"` |
-| 2.0 → 2.1 | `"2"` |
+| 2.0 → 3.1.0 | `"2"` |
 | 3.N.4 → next | `"3.N"` |
 | 4.0 → 4.1 | `"4.0"` |
 | 4.1 → 4.2 | `"4"` |

@@ -1,7 +1,7 @@
 ---
 name: senior-code-validator
 description: Validator for complex interdependent changes requiring deep analysis. Use when multiple components are tightly coupled, edge cases matter, or middle validator found concerning patterns. For standard changes, use middle-code-validator.
-tools: Read, Grep
+tools: Glob, Grep, LS, Read
 model: opus
 color: cyan
 ---

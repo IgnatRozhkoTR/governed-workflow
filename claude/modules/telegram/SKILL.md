@@ -9,6 +9,8 @@ tools_required:
   - Write
 ---
 
+> This module intentionally ships no `phase.yaml` — it contributes an MCP server and skill only, and is not loaded by `register_module_phases_from_disk`.
+
 > This module can be configured via the admin panel's Setup page.
 
 # /telegram-multi-session — Multi-Session Telegram Channel Manager

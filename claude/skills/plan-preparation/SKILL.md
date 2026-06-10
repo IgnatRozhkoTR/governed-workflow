@@ -24,9 +24,9 @@ Produce a structured assessment that maps the ticket to the codebase and surface
 Resume the plan-advisor teammate with an explicit structure requirement:
 
 ```
-Agent(
-  resume: {plan_advisor_id},
-  prompt: "Begin assessment. Read workspace_get_state for context (ticket, working_dir, context notes).
+SendMessage(
+  to: "plan-advisor",
+  content: "Begin assessment. Read workspace_get_state for context (ticket, working_dir, context notes).
 
            Produce a STRUCTURED assessment with these sections:
 
@@ -67,10 +67,11 @@ Agent(
 ### After assessment completes
 
 1. Review the assessment. If the ticket restatement is wrong or incomplete, correct the plan-advisor and have them revise before proceeding.
-2. Call `workspace_update_progress` for phase `"1.0"` with a summary covering: ticket restatement, affected areas count, research questions count, and any discussion points raised.
-3. Call `workspace_advance`.
+2. Propose initial acceptance criteria via `workspace_propose_criteria` for unit/integration/BDD/custom checks relevant to the ticket. Users accept or reject them in the admin panel.
+3. Call `workspace_update_progress` for phase `"1.0"` with a summary covering: ticket restatement, affected areas count, research questions count, and any discussion points raised.
+4. Call `workspace_advance`.
 
-**Advance 1.0 -> 1.1** requires: progress entry `"1.0"` with non-empty summary.
+**Advance 1.0 -> 1.1** requires: progress entry `"1.0"` with non-empty summary AND at least one open research discussion (type='research').
 
 ---
 
@@ -169,8 +170,8 @@ Do not advance with rejected research. The loop must converge — if a researche
 When the prover rejects a research entry:
 1. First assess: is the research topic still relevant, or has it become stale/unnecessary?
 2. If still relevant: re-deploy the researcher to fix the proofs, then re-prove.
-3. If stale or no longer needed: ask the user to delete the research entry via the admin panel (Research tab → delete button). The agent cannot delete research entries — only the user can.
-4. All research entries must be either proven or deleted before advancing past 1.2. Rejected entries block advancement.
+3. If stale or no longer needed: call `workspace_delete_research(id)` to remove the entry, or the user can delete it via the admin panel (Research tab → delete button). All entries must be proven or deleted before advancing past 1.2.
+4. Rejected entries block advancement — do not advance with any rejected research remaining.
 
 After 2 failed re-proof attempts for the same topic, treat it as stale and ask the user whether to delete it or provide additional context.
 
@@ -185,11 +186,23 @@ After 2 failed re-proof attempts for the same topic, treat it as stale and ask t
 
 ## Phase 1.3: Impact Analysis
 
-**Actor**: Orchestrator
+**Actors**: Orchestrator + plan-advisor
 
 ### Goal
 
 Analyze the proven research findings to identify high-level impacts beyond the immediate code changes. This is where you catch the consequences the ticket doesn't mention — the API contract that breaks, the data pipeline that needs a new field, the team that consumes your output.
+
+Send the plan-advisor a brief prompt before starting:
+
+```
+SendMessage(
+  to: "plan-advisor",
+  content: "We are in phase 1.3 (Impact Analysis). The research is proven.
+            I will produce the impact analysis. Please review the proven research
+            via workspace_list_research and workspace_get_research, and flag any
+            impacts I should ensure I cover."
+)
+```
 
 ### Required analysis structure
 
@@ -217,7 +230,7 @@ Things that need user input because they cannot be resolved from code, web, or g
 
 As part of impact analysis, review existing acceptance criteria:
 
-1. Read `acceptance_criteria` from `workspace_get_state`
+1. Call `workspace_get_criteria()` for the full criteria list
 2. For each existing criterion: fill in file paths, test names, and refined description via `workspace_update_criteria`
 3. Propose additional criteria via `workspace_propose_criteria` if the research reveals gaps the existing criteria don't cover
 

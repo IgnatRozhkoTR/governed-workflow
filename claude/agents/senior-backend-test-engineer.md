@@ -27,6 +27,7 @@ color: pink
 - Never test UI/Jmix views/frontend
 - Check project rules first
 - Match existing patterns where appropriate
+- Run tests via Bash (gradle or maven commands)
 </constraints>
 
 <quality-gate>

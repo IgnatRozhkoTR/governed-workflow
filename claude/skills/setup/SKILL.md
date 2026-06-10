@@ -164,7 +164,7 @@ For custom profiles with LSP:
 
 1. The user provides the binary name (`lsp_server`) and install command (`lsp_install`) in the configuration
 2. Follow the same check → install → smoke-test flow described above
-3. **CRITICAL**: Pass LSP parameters directly in `workspace_create_verification_profile` — they CANNOT be added after creation. The following parameters map from the user's configuration:
+3. Pass LSP parameters in `workspace_create_verification_profile` for a clean setup, or add/update them later via `workspace_update_verification_profile`. The following parameters map from the user's configuration:
    - `lsp_server` → `lsp_command` parameter
    - `lsp_install` → `lsp_install_command` parameter
    - Auto-derive `lsp_install_check_command` as `which <lsp_server>` if not provided

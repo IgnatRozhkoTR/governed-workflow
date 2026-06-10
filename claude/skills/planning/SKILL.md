@@ -94,7 +94,7 @@ Format:
 }
 ```
 
-Each key is a sub-phase ID matching the plan's execution items. During execution, the hook enforces the current sub-phase's scope automatically. When the plan is approved at phase 2.1, the scope is approved together with it. No separate scope proposal per sub-phase is needed later.
+Each key is a sub-phase ID matching the plan's execution items. During execution, the hook enforces the current sub-phase's scope automatically. When the user approves both plan and scope in the admin panel (while workspace is at 2.0), the scope is approved together with the plan. No separate scope proposal per sub-phase is needed later.
 
 For test-type acceptance criteria, add the test file paths to the relevant sub-phase's must-scope.
 
@@ -106,7 +106,7 @@ Acceptance criteria are validated programmatically when the last sub-phase commi
 
 ### Reviewing existing criteria
 
-Call `workspace_get_state` and read the `acceptance_criteria` field. The user may have defined criteria during workspace setup. Review them for completeness — do they cover the ticket's requirements?
+Call `workspace_get_criteria()` for the full criteria list. The user may have defined criteria during workspace setup. Review them for completeness — do they cover the ticket's requirements?
 
 ### Proposing additional criteria
 
@@ -203,12 +203,12 @@ Review the expansion. Send numbered remarks on specific tasks if needed. The pla
 ### Step 5 — Finalize
 
 Execute in order:
-1. `workspace_set_scope` — phase-keyed scope map (one entry per sub-phase)
-2. `workspace_set_plan` — full plan JSON (execution items define tasks, NOT scope)
+1. `workspace_set_scope` — phase-keyed scope map (one entry per sub-phase). Resets scope approval status to pending.
+2. `workspace_set_plan` — full plan JSON (execution items define tasks, NOT scope). Resets plan approval status to pending.
 3. `workspace_update_progress` for phase `"2"` with a summary of the plan
-4. `workspace_advance`
+4. `workspace_advance` — this enters the user review wait at 2.0. The workspace stays at 2.0 while the user reviews and approves both plan and scope in the admin panel. Once both are approved, the backend advances directly to 3.1.0.
 
-**Advance 2.0 -> 2.1** requires: valid plan with at least 1 execution sub-phase + progress entry `"2"`.
+**Advance 2.0 -> 3.1.0** requires: valid plan with at least 1 execution sub-phase + progress entry `"2"` + both plan and scope approved by user in the admin panel. There is no separate 2.1 gate phase — plan and scope approval happen together in the panel while the workspace remains at 2.0.
 
 ---
 

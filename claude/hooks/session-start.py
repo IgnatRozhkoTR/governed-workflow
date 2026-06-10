@@ -6,11 +6,12 @@ Calls the Flask admin panel API instead of querying SQLite directly.
 import json
 import sys
 import os
+import urllib.parse
 import urllib.request
 import urllib.error
 import threading
 
-API_BASE = "http://localhost:5111"
+API_BASE = os.environ.get("GOVERNED_ADMIN_API_BASE", "http://localhost:5111")
 
 data = json.load(sys.stdin)
 session_id = data.get("session_id", "")
@@ -42,7 +43,7 @@ cwd = data.get("cwd", os.getcwd())
 
 try:
     req = urllib.request.Request(
-        API_BASE + "/api/hook/session-context?cwd=" + urllib.request.pathname2url(cwd),
+        API_BASE + "/api/hook/session-context?cwd=" + urllib.parse.quote(cwd, safe=""),
         method="GET"
     )
     with urllib.request.urlopen(req, timeout=5) as resp:
@@ -74,7 +75,7 @@ Branch: {branch} | Phase: {phase}
 Session was compacted. Recovery steps:
 1. Call workspace_get_state to read current phase and context
 2. Read progress entries to understand what was completed
-3. Re-spawn the plan-advisor teammate if phase > 0
+3. Re-spawn the plan-advisor sub-agent (phase >= 1.0)
 4. Continue from the current phase
 
 {f"Research entries:\\n{research_lines}" if research_lines else ""}
