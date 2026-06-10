@@ -425,6 +425,43 @@ class TestWriteWorkspaceSettingsUnion:
         ]
         assert len(block_entries) == 1
 
+    def test_write_workspace_settings_enables_agent_teams(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.json"
+
+        _WORKSPACES._write_workspace_settings(settings)
+
+        data = json.loads(settings.read_text())
+        assert data["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+
+    def test_write_workspace_settings_preserves_existing_env(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.json"
+        settings.parent.mkdir(parents=True, exist_ok=True)
+        settings.write_text(json.dumps({"env": {"SOME_OTHER": "x"}}))
+
+        _WORKSPACES._write_workspace_settings(settings)
+
+        data = json.loads(settings.read_text())
+        assert data["env"]["SOME_OTHER"] == "x"
+        assert data["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+
+    def test_write_workspace_settings_hook_merge_unaffected_by_env(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.json"
+        settings.parent.mkdir(parents=True, exist_ok=True)
+        existing = {
+            "env": {"SOME_OTHER": "x"},
+            "hooks": {
+                "PostToolUse": [{"matcher": "Read", "hooks": [{"type": "command", "command": "echo done"}]}]
+            }
+        }
+        settings.write_text(json.dumps(existing))
+
+        _WORKSPACES._write_workspace_settings(settings)
+
+        data = json.loads(settings.read_text())
+        assert "PostToolUse" in data["hooks"]
+        assert "SessionStart" in data["hooks"]
+        assert data["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+
 
 class TestBackupRestoreDirectories:
     """Tests for the expanded backup/restore with _BACKUP_DIRS."""

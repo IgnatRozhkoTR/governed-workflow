@@ -215,6 +215,10 @@ _WORKSPACE_HOOKS = {
     }
 }
 
+# The orchestrator's SendMessage / teammate coordination requires Claude Code's
+# agent-teams feature, which is gated behind this env flag.
+_WORKSPACE_ENV = {"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"}
+
 _MCP_SERVER_PATH = str(Path(__file__).resolve().parent.parent / "mcp_server.py")
 
 _BACKUP_FILES = [".claude/settings.json", ".mcp.json", "CLAUDE.md"]
@@ -280,6 +284,13 @@ def _write_workspace_settings(settings_path):
         merged_hooks[hook_type] = _merge_hook_arrays(current, governed_entries)
 
     existing["hooks"] = merged_hooks
+
+    env = existing.get("env", {})
+    if not isinstance(env, dict):
+        env = {}
+    env.update(_WORKSPACE_ENV)
+    existing["env"] = env
+
     settings_path.write_text(json.dumps(existing, indent=2))
 
 

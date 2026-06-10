@@ -256,6 +256,8 @@ Questions that cannot be resolved from code, web, or git research are left as op
    - `ticket_gaps`: Ambiguities discovered
    - `open_questions`: Questions for the user
 
+   Within each field, put each distinct item on its own line or as a markdown bullet (`- item`) so the panel renders a readable list rather than a run-on paragraph.
+
    This data is displayed in the Pre-planning tab for user review at phase 1.4.
 
 2. Call `workspace_update_progress` for phase `"1.3"` summarizing: affected user flows, API changes, data flow changes, external dependencies, ticket gaps with recommendations, and open questions for the user.
