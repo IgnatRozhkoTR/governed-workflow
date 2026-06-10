@@ -5,7 +5,7 @@ import re
 from advance.phases import Phase
 from advance.validators import validate_all
 from core.db import get_db_ctx, ws_field
-from core.helpers import workspace_dir, run_git, match_scope_pattern, DEFAULT_SOURCE_BRANCH
+from core.helpers import run_git, match_scope_pattern, DEFAULT_SOURCE_BRANCH
 from core.i18n import t
 from services import plan_service
 from services import scope_service
@@ -135,7 +135,6 @@ class VerificationPhase(Phase):
 
     def __init__(self, n):
         self._n = n
-        self._project_path = None
 
     @property
     def id(self):
@@ -147,7 +146,6 @@ class VerificationPhase(Phase):
 
     def validate(self, ws, body, project_path):
         """Run verification profiles at validation phase. Blocks advance if any blocking step fails."""
-        self._project_path = project_path
         phase = f"3.{self._n}.1"
         with get_db_ctx() as db:
             passed, run_id = verification_service.run_verification(
@@ -161,31 +159,15 @@ class VerificationPhase(Phase):
             return True, {}
 
     def next_phase(self, ws):
-        """Route after validation based on agent results and legacy file."""
+        """Route after validation based on the verification run for this phase."""
         n = self._n
         phase = f"3.{n}.1"
 
-        # Check agent validation results (submitted via workspace_submit_validation)
         with get_db_ctx() as db:
-            agent_result = verification_service.get_verification_results(db, ws["id"], phase=phase)
-            if agent_result and agent_result.get("status") == "failed":
-                return f"3.{n}.2"
-
-        # Fallback: check legacy file-based validation (skipped in yolo mode where _project_path is None)
-        if self._project_path is None:
-            return f"3.{n}.3"
-        ws_dir = workspace_dir(self._project_path, ws["branch"])
-        validation_path = ws_dir / "validation" / f"3.{n}.json"
-        if validation_path.exists():
-            try:
-                data = json.loads(validation_path.read_text())
-                if data.get("status") == "clean":
-                    return f"3.{n}.3"
-            except (json.JSONDecodeError, OSError):
-                pass
+            run_result = verification_service.get_verification_results(db, ws["id"], phase=phase)
+        if run_result and run_result.get("status") == "failed":
             return f"3.{n}.2"
 
-        # No validation data -- default to clean
         return f"3.{n}.3"
 
 
@@ -447,10 +429,10 @@ Call `workspace_advance` when both implementation and tests are complete.
 
 **Actors**: Validator sub-agents | **Code edits: OFF**
 
-Deploy validator sub-agents for compilation check + code quality review. Submit structured results via `workspace_submit_validation(phase="3.N.1", status="clean"|"dirty", findings=[...])`. Verification profiles assigned to the workspace also run automatically at this phase (configured via `workspace_assign_verification_profile`); blocking steps must pass.
+Deploy validator sub-agents (`middle-code-validator` / `senior-code-validator`) for compilation check + code quality review. Each validator returns its PASS/FAIL findings directly to you as its response — there is no tool to submit them. Verification profiles assigned to the workspace (configured via `workspace_assign_verification_profile`) run automatically server-side at the phase gate; blocking steps must pass before you can advance.
 
-Call `workspace_advance`. Backend auto-routes:
-- Issues found or verification failed → `3.N.2` (Fixes)
+Call `workspace_advance`. The phase machine reads the verification results and auto-routes:
+- Verification failed → `3.N.2` (Fixes)
 - Clean → `3.N.3` (Code Review)""",
 
     2: """\

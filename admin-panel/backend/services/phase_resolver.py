@@ -76,12 +76,22 @@ def _load_workspace_row(db, workspace_id):
     ).fetchone()
 
 
-def _canonical_registered_ids() -> list[str]:
-    """Registered non-templated phase ids, sorted in canonical order."""
+def _canonical_registered_ids(include_templated: bool = False) -> list[str]:
+    """Registered phase ids, sorted in canonical order.
+
+    Templated execution ids (``3.x.K``) are excluded by default. When
+    ``include_templated`` is True they are kept and sorted inline; ``phase_key``
+    places ``3.x.K`` between ``2.x`` and ``4.0`` so the execution family renders
+    in its natural workflow position.
+    """
     from advance.phases import PHASE_REGISTRY
 
     return sorted(
-        (pid for pid in PHASE_REGISTRY.keys() if not is_templated(pid)),
+        (
+            pid
+            for pid in PHASE_REGISTRY.keys()
+            if include_templated or not is_templated(pid)
+        ),
         key=phase_key,
     )
 
@@ -169,14 +179,20 @@ def resolve_for_workspace(db, workspace_id) -> list[str]:
     return [pid for pid in ordered_phase_ids + extra_ordered if pid in enabled]
 
 
-def resolve_for_project(db, project_id) -> list[str]:
+def resolve_for_project(db, project_id, include_templated: bool = False) -> list[str]:
     """Return the ordered list of effective enabled phases for a project.
 
     Baseline is every canonical registered phase id. Device- and project-level
     scope overrides are applied; workspace-level overrides are excluded
     because no workspace is in scope when writing project-level config files.
+
+    With ``include_templated`` the templated execution ids (``3.x.0..3.x.4``)
+    are kept in the result, sorted into their natural position between ``2.x``
+    and ``4.0``. Scope overrides addressing those literal templated ids still
+    apply. Defaults to False so callers that render one entry per concrete
+    phase are unaffected.
     """
-    ordered_phase_ids = _canonical_registered_ids()
+    ordered_phase_ids = _canonical_registered_ids(include_templated)
     universe = set(ordered_phase_ids)
 
     overrides = _collect_overrides(db, None, project_id, ("device", "project"))

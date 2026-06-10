@@ -55,25 +55,9 @@ When plan is agreed:
 
 **Extending the plan later**: If during execution the user requests additional changes within the same ticket, or new work is discovered that warrants a new sub-phase, use `workspace_extend_plan` instead of rewriting the entire plan with `workspace_set_plan`. This appends a new sub-phase (auto-assigned ID, with scope) without touching existing sub-phases — fewer tokens, less risk of breaking the plan. The plan and scope statuses are set to 'pending' (user must re-approve).
 
-**Advance 2.0 → 2.1** requires: valid plan with ≥1 execution sub-phase, plan_status='approved', scope_status='approved', ≥1 acceptance criterion, no pending/rejected criteria, and progress entry `"2"`.
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves BOTH the plan and the scope in the admin panel. `workspace_advance` stays blocked until `plan_status='approved'` AND `scope_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0` (the first execution item) — there is no separate 2.1 gate phase. If the user rejects, the plan and scope statuses go back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan` / `workspace_set_scope`, then call `workspace_advance` again.
 
----
-
-## 2.1 Plan Review (USER GATE)
-
-User reviews the plan, scope, and system diagram in the admin panel.
-
-- **Approve** → advances to `3.1.0`
-- **Reject** → back to `2.0` with comments
-
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
-
-**After rejection**: the backend sets the phase to `2.0`. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to confirm you're at `2.0`
-2. Call `workspace_get_comments` to read the rejection feedback
-3. Message plan-advisor via `SendMessage(to: "plan-advisor", ...)` with the feedback to revise the plan
-4. Call `workspace_set_plan` and `workspace_set_scope` with the revised plan
-5. Call `workspace_advance` only after the plan is updated"""
+**Advance 2.0 → 3.1.0** requires: valid plan with ≥1 execution sub-phase, plan_status='approved', scope_status='approved', ≥1 acceptance criterion, no pending/rejected criteria, and progress entry `"2"`."""
 
     def progress_key(self, ws):
         return "2"

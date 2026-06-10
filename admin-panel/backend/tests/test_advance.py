@@ -450,14 +450,35 @@ def test_execution_implementation_passes_with_changes(workspace, project):
     assert result["phase"] == "3.1.1"
 
 
-def test_execution_validation_routes_to_review(workspace, project):
-    """Phase 3.1.1 routes to 3.1.3 (code review gate) when validation is clean."""
-    _setup_execution_phase(workspace["id"], "3.1.1")
+def _add_verification_run(ws_id, phase, status):
+    """Insert a completed verification run so VerificationPhase.next_phase can route off it."""
+    db = get_db()
+    try:
+        now = datetime.now().isoformat()
+        db.execute(
+            "INSERT INTO verification_runs (workspace_id, phase, status, started_at, completed_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (ws_id, phase, status, now, now),
+        )
+        db.commit()
+    finally:
+        db.close()
 
-    ws_dir = Path(project["path"]) / ".claude" / "workspaces" / "feature-test"
-    validation_dir = ws_dir / "validation"
-    validation_dir.mkdir(parents=True, exist_ok=True)
-    (validation_dir / "3.1.json").write_text(json.dumps({"status": "clean"}))
+
+def test_execution_validation_routes_to_review(workspace, project):
+    """Phase 3.1.1 routes to 3.1.3 (code review gate) when verification passed."""
+    _setup_execution_phase(workspace["id"], "3.1.1")
+    _add_verification_run(workspace["id"], "3.1.1", "passed")
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 202
+    assert result["phase"] == "3.1.3"
+
+
+def test_execution_validation_routes_to_review_when_no_verification_run(workspace, project):
+    """Phase 3.1.1 defaults to 3.1.3 (clean) when no verification run exists."""
+    _setup_execution_phase(workspace["id"], "3.1.1")
 
     ws = _get_ws_row(workspace["id"])
     result, code = perform_advance(ws, project["path"])
@@ -466,13 +487,9 @@ def test_execution_validation_routes_to_review(workspace, project):
 
 
 def test_execution_validation_routes_to_fixes(workspace, project):
-    """Phase 3.1.1 routes to 3.1.2 (fixes) when validation is dirty."""
+    """Phase 3.1.1 routes to 3.1.2 (fixes) when verification failed."""
     _setup_execution_phase(workspace["id"], "3.1.1")
-
-    ws_dir = Path(project["path"]) / ".claude" / "workspaces" / "feature-test"
-    validation_dir = ws_dir / "validation"
-    validation_dir.mkdir(parents=True, exist_ok=True)
-    (validation_dir / "3.1.json").write_text(json.dumps({"status": "dirty"}))
+    _add_verification_run(workspace["id"], "3.1.1", "failed")
 
     ws = _get_ws_row(workspace["id"])
     result, code = perform_advance(ws, project["path"])

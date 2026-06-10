@@ -76,7 +76,7 @@ When assessment is complete:
 2. Call `workspace_update_progress` for phase `"1.0"` with a non-empty summary
 3. Call `workspace_advance`
 
-**Advance 1.0 → 1.1** requires: at least one open research discussion (`type='research'`)."""
+**Advance 1.0 → 1.1** requires: progress entry `"1.0"` with a non-empty summary AND at least one open research discussion (`type='research'`)."""
 
     def progress_key(self, ws):
         return "1.0"

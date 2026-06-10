@@ -2,6 +2,7 @@
 from advance.phases import Phase
 from core.db import get_db_ctx
 from core.i18n import t
+from services.proposal_service import count_pending_manual_proposals
 
 
 class AgenticReviewPhase(Phase):
@@ -139,13 +140,8 @@ class ReflectionPhase(Phase):
 
     def next_phase(self, ws):
         with get_db_ctx() as db:
-            row = db.execute(
-                "SELECT 1 FROM proposals "
-                "WHERE workspace_id = ? AND implementation_kind = 'manual' AND status = 'proposed' "
-                "LIMIT 1",
-                (ws["id"],),
-            ).fetchone()
-        return "5.2" if row is not None else "6"
+            pending = count_pending_manual_proposals(db, ws["id"])
+        return "5.2" if pending > 0 else "6"
 
 
 class ManualImplementationPhase(Phase):
@@ -168,7 +164,9 @@ class ManualImplementationPhase(Phase):
      - `agent_new` / `agent_update` / `skill_new` / `skill_update` — spawn `middle-backend-engineer` (or `junior-backend-engineer` if trivial) with a prompt that describes the new/updated agent or skill, including the proposal's payload as the source of truth.
      - `workflow_improvement` — typically requires a multi-file change; spawn `senior-backend-engineer`.
    - On the sub-agent's success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=<one-line summary>)`; on failure, call with `status="failed", result_json=<error summary>`; on conscious skip, call with `status="rejected"`.
-3. **Advance to 6 Done** when the queue is drained."""
+3. **Advance to 6 Done** when the queue is drained.
+
+Manual proposals must be implementable purely via `.claude/` workspace metadata (agents, skills, rules, memory) and the `rule_*` MCP tools — file edits outside `.claude/` are blocked at 5.2 by phase permissions, so any proposal that needs repo-code changes must become a new ticket instead."""
 
     def validate(self, ws, body, project_path):
         return True, {}

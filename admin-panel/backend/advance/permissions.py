@@ -13,7 +13,7 @@ from core.db import ws_field
 from core.paths import REPO_ROOT, STATE_DIR
 
 _EDIT_PHASE_RE = re.compile(r'^3\.\d+\.[02]$|^4\.1$')
-_COMMIT_PHASE_RE = re.compile(r'^3\.\d+\.4$|^4\.1$|^5$')
+_COMMIT_PHASE_RE = re.compile(r'^3\.\d+\.4$|^4\.1$')
 _PUSH_PHASE = "6"
 
 

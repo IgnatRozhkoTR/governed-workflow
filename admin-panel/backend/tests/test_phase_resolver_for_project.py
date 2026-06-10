@@ -27,6 +27,9 @@ def _canonical_registered_ids():
     return {pid for pid in PHASE_REGISTRY.keys() if not is_templated(pid)}
 
 
+_TEMPLATED_EXECUTION_IDS = ["3.x.0", "3.x.1", "3.x.2", "3.x.3", "3.x.4"]
+
+
 # ── Baseline ───────────────────────────────────────────────────────────────────
 
 
@@ -99,3 +102,49 @@ def test_workspace_override_is_ignored(db, project, workspace):
 
     phases = resolve_for_project(db, project["id"])
     assert "1.1" in phases
+
+
+# ── include_templated opt-in ────────────────────────────────────────────────────
+
+
+def test_default_call_excludes_templated_execution_ids(db, project):
+    """The default (include_templated=False) result carries no 3.x.K ids."""
+    phases = resolve_for_project(db, project["id"])
+
+    assert not any(pid in phases for pid in _TEMPLATED_EXECUTION_IDS)
+
+
+def test_include_templated_matches_default_plus_templated_ids(db, project):
+    """include_templated=True returns the default set plus the 3.x.K family."""
+    default_phases = resolve_for_project(db, project["id"])
+
+    templated_phases = resolve_for_project(db, project["id"], include_templated=True)
+
+    assert set(templated_phases) == set(default_phases) | set(_TEMPLATED_EXECUTION_IDS)
+
+
+def test_include_templated_places_execution_ids_between_2x_and_4_0(db, project):
+    """The 3.x.0..3.x.4 block lands after 2.0 and before 4.0, in order."""
+    phases = resolve_for_project(db, project["id"], include_templated=True)
+
+    assert phases[phases.index("2.0") + 1 : phases.index("4.0")] == _TEMPLATED_EXECUTION_IDS
+
+
+def test_include_templated_result_is_sorted_by_phase_key(db, project):
+    """The include_templated result stays in canonical phase_key order."""
+    from core.phase import phase_key
+
+    phases = resolve_for_project(db, project["id"], include_templated=True)
+
+    assert phases == sorted(phases, key=phase_key)
+
+
+def test_include_templated_honors_scope_override_on_templated_id(db, project):
+    """A project override on a literal 3.x.K id drops it from the templated result."""
+    set_scope_settings(db, "project", str(project["id"]), {"3.x.2": False})
+    db.commit()
+
+    phases = resolve_for_project(db, project["id"], include_templated=True)
+
+    assert "3.x.2" not in phases
+    assert "3.x.0" in phases  # sibling template still present
