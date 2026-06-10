@@ -95,20 +95,28 @@ def _insert_project(db, project_id, repo_path):
     )
 
 
-def _insert_workspace(db, project_id, repo_path, *, scope_json=None, session_id=None, source_branch="main"):
+def _plan_with_scope(scope_map):
+    """Build a plan_json string whose execution items embed the given scope map."""
+    execution = [
+        {"id": item_id, "name": item_id, "scope": scope, "tasks": []}
+        for item_id, scope in (scope_map or {}).items()
+    ]
+    return json.dumps({"description": "", "systemDiagram": "", "execution": execution})
+
+
+def _insert_workspace(db, project_id, repo_path, *, scope_map=None, session_id=None, source_branch="main"):
     cursor = db.execute(
         "INSERT INTO workspaces "
         "(project_id, branch, sanitized_branch, working_dir, created, status, phase, "
-        "scope_json, plan_json, source_branch, session_id) "
-        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?, ?, ?)",
+        "plan_json, source_branch, session_id) "
+        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?, ?)",
         (
             project_id,
             "feature/x",
             "feature-x",
             str(repo_path),
             datetime.now().isoformat(),
-            scope_json or "{}",
-            '{"description":"","systemDiagram":"","execution":[]}',
+            _plan_with_scope(scope_map),
             source_branch,
             session_id,
         ),
@@ -134,14 +142,14 @@ def test_gather_reflection_context_returns_all_four_blobs_when_everything_presen
         _assistant_entry("implement b.py"),
     ])
 
-    scope_json = json.dumps({"3.1": {"must": ["b.py"], "may": []}})
+    scope_map = {"3.1": {"must": ["b.py"], "may": []}}
 
     db = get_db()
     try:
         _insert_project(db, "p1", repo)
         ws_id = _insert_workspace(
             db, "p1", repo,
-            scope_json=scope_json,
+            scope_map=scope_map,
             session_id=session_id,
             source_branch="main",
         )
@@ -230,7 +238,7 @@ def test_gather_reflection_context_returns_empty_scope_when_unset(tmp_path, clea
     db = get_db()
     try:
         _insert_project(db, "p5", repo)
-        ws_id = _insert_workspace(db, "p5", repo, scope_json=None)
+        ws_id = _insert_workspace(db, "p5", repo, scope_map=None)
         db.commit()
 
         ws = _fetch_ws(db, ws_id)

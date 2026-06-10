@@ -64,8 +64,27 @@ def test_get_workspace_state_not_found(client, project):
     assert "error" in response.get_json()
 
 
-def test_set_scope(client, workspace):
-    scope = {"must": ["src/"], "may": ["tests/"]}
+def _seed_plan(client, workspace, scope):
+    """Set a one-item plan at phase 2.0 so scope has an execution item to land in."""
+    set_phase(workspace["id"], "2.0")
+    plan = {
+        "description": "",
+        "systemDiagram": "",
+        "execution": [{"id": "3.1", "name": "N", "scope": {"must": [], "may": []},
+                       "tasks": [{"title": "T", "files": [], "agent": "a"}]}],
+    }
+    from mcp_server import workspace_set_plan
+    import os
+    cwd = os.getcwd()
+    os.chdir(workspace["working_dir"])
+    try:
+        workspace_set_plan(plan=plan)
+    finally:
+        os.chdir(cwd)
+
+
+def test_set_scope_echoes_payload(client, workspace):
+    scope = {"3.1": {"must": ["src/"], "may": ["tests/"]}}
     response = client.put(_ws_url(workspace, "scope"), json={"scope": scope})
     assert response.status_code == 200
     data = response.get_json()
@@ -73,36 +92,31 @@ def test_set_scope(client, workspace):
     assert data["scope"] == scope
 
 
-def test_set_scope_during_execution(client, workspace):
+def test_set_scope_merges_into_plan_item(client, workspace):
+    _seed_plan(client, workspace, scope={"must": [], "may": []})
     set_phase(workspace["id"], "3.1.0")
     scope = {"3.1": {"must": ["src/"], "may": ["tests/"]}}
     response = client.put(_ws_url(workspace, "scope"), json={"scope": scope})
     assert response.status_code == 200
-    data = response.get_json()
-    assert data["ok"] is True
+    assert response.get_json()["ok"] is True
 
     state = client.get(_ws_url(workspace, "state")).get_json()
     assert state["scope"] == scope
 
 
+def test_set_scope_revokes_plan_approval(client, workspace):
+    _seed_plan(client, workspace, scope={"must": [], "may": []})
+    set_phase(workspace["id"], "3.1.0", plan_status="approved")
+    client.put(_ws_url(workspace, "scope"), json={"scope": {"3.1": {"must": ["src/"], "may": []}}})
+
+    state = client.get(_ws_url(workspace, "state")).get_json()
+    assert state["plan_status"] == "pending"
+
+
 def test_set_scope_not_found(client, project):
     url = f"/api/ws/{project['id']}/feature/nonexistent/scope"
-    response = client.put(url, json={"scope": {"must": [], "may": []}})
+    response = client.put(url, json={"scope": {"3.1": {"must": [], "may": []}}})
     assert response.status_code == 404
-    assert "error" in response.get_json()
-
-
-def test_set_scope_status(client, workspace):
-    response = client.post(_ws_url(workspace, "scope-status"), json={"status": "approved"})
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data["ok"] is True
-    assert data["scope_status"] == "approved"
-
-
-def test_set_scope_status_invalid(client, workspace):
-    response = client.post(_ws_url(workspace, "scope-status"), json={"status": "invalid"})
-    assert response.status_code == 400
     assert "error" in response.get_json()
 
 
@@ -202,5 +216,56 @@ def test_set_plan_status(client, workspace):
 def test_set_plan_status_invalid(client, workspace):
     r = client.post("/api/ws/test-project/feature/test/plan-status", json={"status": "invalid"})
     assert r.status_code == 400
+
+
+def _criteria_statuses(ws_id):
+    from core.db import get_db
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT status FROM acceptance_criteria WHERE workspace_id = ? ORDER BY id",
+            (ws_id,)
+        ).fetchall()
+        return [row["status"] for row in rows]
+    finally:
+        db.close()
+
+
+def test_approve_plan_cascades_proposed_criteria_to_accepted(client, workspace):
+    from testing_utils import add_criterion
+    add_criterion(workspace["id"], status="proposed")
+    add_criterion(workspace["id"], status="proposed")
+
+    r = client.post("/api/ws/test-project/feature/test/plan-status", json={"status": "approved"})
+    assert r.status_code == 200
+
+    assert _criteria_statuses(workspace["id"]) == ["accepted", "accepted"]
+
+
+def test_approve_plan_cascade_is_idempotent_when_none_proposed(client, workspace):
+    from testing_utils import add_criterion
+    add_criterion(workspace["id"], status="accepted")
+
+    client.post("/api/ws/test-project/feature/test/plan-status", json={"status": "approved"})
+    r = client.post("/api/ws/test-project/feature/test/plan-status", json={"status": "approved"})
+    assert r.status_code == 200
+
+    assert _criteria_statuses(workspace["id"]) == ["accepted"]
+
+
+def test_reject_plan_does_not_accept_proposed_criteria(client, workspace):
+    from testing_utils import add_criterion
+    add_criterion(workspace["id"], status="proposed")
+
+    r = client.post("/api/ws/test-project/feature/test/plan-status", json={"status": "rejected"})
+    assert r.status_code == 200
+
+    assert _criteria_statuses(workspace["id"]) == ["proposed"]
+
+
+def test_state_payload_has_no_scope_status(client, workspace):
+    state = client.get(_ws_url(workspace, "state")).get_json()
+    assert "scope_status" not in state
+    assert "scope" in state
 
 

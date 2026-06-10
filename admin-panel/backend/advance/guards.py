@@ -111,30 +111,6 @@ class PlanApprovedGuard(AdvanceGuard):
         return {"guard": self.name, "status": "approved"}
 
 
-class ScopeApprovedGuard(AdvanceGuard):
-    """Blocks advancement during execution and review phases if scope is not approved.
-
-    Applies to phases starting with '3.' or '4.'. All other phases are skipped.
-    """
-
-    @property
-    def name(self) -> str:
-        return "scope_approved"
-
-    def evaluate(self, phase: str, ws, body: dict) -> dict:
-        if phase_key(phase) < phase_key("3.0") or phase_key(phase) >= phase_key("5.1"):
-            return {"guard": self.name, "status": "skip"}
-
-        if ws["scope_status"] != "approved":
-            return {
-                "guard": self.name,
-                "status": "rejected",
-                "message": "Scope has not been approved. User must approve the scope in admin panel before advancing.",
-            }
-
-        return {"guard": self.name, "status": "approved"}
-
-
 class ReviewGuard(AdvanceGuard):
     """Blocks advancement if any review items (scope='review') are unresolved.
 
@@ -187,6 +163,5 @@ class GuardOrchestrator:
 GUARD_ORCHESTRATOR = GuardOrchestrator([
     ResearchProvenGuard(),
     PlanApprovedGuard(),
-    ScopeApprovedGuard(),
     ReviewGuard(),
 ])

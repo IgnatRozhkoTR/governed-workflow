@@ -162,15 +162,9 @@ function renderApprovalStatus() {
     return '<span class="badge">' + t('status.notSet') + '</span>';
   }
 
-  var scopeStatus = LOCK_DATA.scope_status || null;
   var planStatus = LOCK_DATA.plan_status || null;
 
   container.innerHTML =
-    '<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">' +
-      '<span style="min-width: 60px; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);">' + t('phase.scopeStatus') + '</span>' +
-      badgeForStatus(scopeStatus) +
-      '<button class="btn btn-sm" onclick="switchTab(\'plan\'); setTimeout(function(){ var el = document.querySelector(\'.card:has(#scopeMust)\'); if(el) el.scrollIntoView({behavior:\'smooth\'}); }, 300);">' + t('buttons.viewScope') + '</button>' +
-    '</div>' +
     '<div style="display: flex; align-items: center; gap: 12px;">' +
       '<span style="min-width: 60px; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);">' + t('phase.planStatus') + '</span>' +
       badgeForStatus(planStatus) +

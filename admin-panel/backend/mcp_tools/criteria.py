@@ -6,6 +6,7 @@ from pydantic import Field
 from mcp_tools import mcp, with_mcp_workspace, mcp_error
 from core.helpers import VALID_CRITERIA_TYPES
 from core.i18n import t
+from core.phase import phase_key
 from services import criteria_service
 
 _CRITERIA_TYPE = Literal["unit_test", "integration_test", "bdd_scenario", "custom"]
@@ -70,9 +71,9 @@ def workspace_propose_criteria(
     """Propose an acceptance criterion for the workspace.
 
     Purpose
-      Called by the agent to suggest a verifiable criterion. Each call
-      creates a new criterion record with status='proposed'. The user
-      reviews and accepts or rejects it in the admin panel.
+      Called by the agent during planning (phase 2.0+) to suggest a verifiable
+      criterion. Each call creates a new criterion record with status='proposed'.
+      Approving the plan accepts all proposed criteria in one action.
 
     Parameters
       type: Criterion kind — unit_test, integration_test, bdd_scenario, custom.
@@ -83,13 +84,21 @@ def workspace_propose_criteria(
       {ok: True, criterion: {id, type, description, details, status, source}}
 
     Errors
-      validation — type not in allowed set, details_json not valid JSON or not an object.
+      validation — proposed before phase 2.0, type not in allowed set,
+                   details_json not valid JSON or not an object.
 
     Example
       workspace_propose_criteria(type="unit_test",
           description="UserService.createUser saves to DB",
           details_json='{"file": "tests/UserServiceTest.java", "test_names": ["createUser_shouldPersist"]}')
     """
+    if phase_key(ws["phase"]) < phase_key("2.0"):
+        return mcp_error(
+            "validation",
+            t("mcp.error.criteriaPhase", locale),
+            retryable=False,
+        )
+
     if type not in VALID_CRITERIA_TYPES:
         return mcp_error(
             "validation",

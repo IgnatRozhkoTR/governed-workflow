@@ -25,7 +25,7 @@ class TestGetState:
         from mcp_server import workspace_get_state
         result = workspace_get_state()
         assert result["phase"] == "0"
-        assert result["scope"] == {"must": [], "may": []}
+        assert result["scope"] == {}
 
     def test_full_state_with_data(self, workspace, monkeypatch):
         add_research(workspace["id"])
@@ -89,46 +89,51 @@ class TestAdvance:
         assert "error" in result
 
 
-class TestSetScope:
-    def test_set_scope_during_planning(self, workspace, monkeypatch):
+class TestSetPlanScope:
+    """Scope is now embedded in the plan and set via workspace_set_plan."""
+
+    def test_set_plan_persists_per_item_scope(self, workspace, monkeypatch):
         set_phase(workspace["id"], "2.0")
         monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_set_scope
-        result = workspace_set_scope(scope={"3.1": {"must": ["src/"], "may": ["tests/"]}})
-        assert result["ok"]
-
-    def test_set_scope_during_execution_revokes_approval(self, workspace, monkeypatch):
-        set_phase(workspace["id"], "3.1.0")
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_set_scope, workspace_get_state
-        scope = {"3.1": {"must": ["src/new/"], "may": ["test/"]}}
-        result = workspace_set_scope(scope=scope)
+        from mcp_server import workspace_set_plan, workspace_get_state
+        plan = {
+            "systemDiagram": "",
+            "execution": [
+                {"id": "3.1", "name": "P1", "scope": {"must": ["src/"], "may": ["tests/"]}, "tasks": []}
+            ],
+        }
+        result = workspace_set_plan(plan=plan)
         assert result["ok"] is True
-        assert result["scope_status"] == "pending"
+
         state = workspace_get_state()
-        assert state["scope"] == scope
-        assert state["scope_status"] == "pending"
+        assert state["scope"] == {"3.1": {"must": ["src/"], "may": ["tests/"]}}
 
-    def test_set_scope_blocked_at_early_phase(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_set_scope
-        result = workspace_set_scope(scope={"3.1": {"must": ["src/"]}})
-        assert "error" in result
-
-    def test_set_scope_no_workspace(self, monkeypatch, tmp_path):
-        monkeypatch.chdir(tmp_path)
-        from mcp_server import workspace_set_scope
-        result = workspace_set_scope(scope={"3.1": {"must": ["src/"]}})
-        assert "error" in result
-
-    def test_set_scope_persisted(self, workspace, monkeypatch):
+    def test_set_plan_rejects_item_without_scope(self, workspace, monkeypatch):
         set_phase(workspace["id"], "2.0")
         monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_set_scope, workspace_get_state
-        scope = {"3.1": {"must": ["src/"], "may": ["docs/"]}}
-        workspace_set_scope(scope=scope)
+        from mcp_server import workspace_set_plan
+        plan = {"systemDiagram": "", "execution": [{"id": "3.1", "name": "P1", "tasks": []}]}
+        result = workspace_set_plan(plan=plan)
+        assert "error" in result
+
+    def test_get_scope_reconstructs_phase_keyed_map(self, workspace, monkeypatch):
+        set_phase(workspace["id"], "2.0")
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_set_plan, workspace_get_state
+        plan = {
+            "systemDiagram": "",
+            "execution": [
+                {"id": "3.1", "name": "P1", "scope": {"must": ["a/"], "may": []}, "tasks": []},
+                {"id": "3.2", "name": "P2", "scope": {"must": ["b/"], "may": ["c/"]}, "tasks": []},
+            ],
+        }
+        workspace_set_plan(plan=plan)
+
         state = workspace_get_state()
-        assert state["scope"] == scope
+        assert state["scope"] == {
+            "3.1": {"must": ["a/"], "may": []},
+            "3.2": {"must": ["b/"], "may": ["c/"]},
+        }
 
 
 class TestSetPlan:
@@ -627,6 +632,7 @@ class TestProgress:
 
 class TestCriteria:
     def test_propose_criteria(self, workspace, monkeypatch):
+        set_phase(workspace["id"], "2.0")
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_propose_criteria
         result = workspace_propose_criteria(type="unit_test", description="Test user service")
@@ -634,7 +640,15 @@ class TestCriteria:
         assert result["criterion"]["source"] == "agent"
         assert result["criterion"]["status"] == "proposed"
 
+    def test_propose_criteria_blocked_before_planning(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_propose_criteria
+        result = workspace_propose_criteria(type="unit_test", description="Too early")
+        assert "error" in result
+        assert result["errorCategory"] == "validation"
+
     def test_propose_criteria_with_valid_details_json(self, workspace, monkeypatch):
+        set_phase(workspace["id"], "2.0")
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_propose_criteria, workspace_get_criteria
         details = json.dumps({"file": "tests/test_user.py", "test_names": ["test_create_user"]})
@@ -649,6 +663,7 @@ class TestCriteria:
         assert match["details"] == {"file": "tests/test_user.py", "test_names": ["test_create_user"]}
 
     def test_propose_criteria_with_invalid_details_json(self, workspace, monkeypatch):
+        set_phase(workspace["id"], "2.0")
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_propose_criteria
         result = workspace_propose_criteria(
@@ -658,6 +673,7 @@ class TestCriteria:
         assert "not valid JSON" in result["error"]
 
     def test_propose_criteria_with_non_object_details_json(self, workspace, monkeypatch):
+        set_phase(workspace["id"], "2.0")
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_propose_criteria
         result = workspace_propose_criteria(
@@ -667,6 +683,7 @@ class TestCriteria:
         assert "object" in result["error"].lower()
 
     def test_propose_criteria_invalid_type(self, workspace, monkeypatch):
+        set_phase(workspace["id"], "2.0")
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_propose_criteria
         result = workspace_propose_criteria(type="invalid_type", description="Test")
@@ -679,6 +696,7 @@ class TestCriteria:
         assert "error" in result
 
     def test_propose_all_valid_types(self, workspace, monkeypatch):
+        set_phase(workspace["id"], "2.0")
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_propose_criteria
         for cr_type in ("unit_test", "integration_test", "bdd_scenario", "custom"):
@@ -841,9 +859,11 @@ class TestExtendPlan:
             "description": "Initial plan",
             "systemDiagram": [],
             "execution": [
-                {"id": "3.1", "name": "Phase 1", "tasks": [
-                    {"title": "t1", "files": ["src/a.py"], "agent": "middle-backend-engineer"}
-                ]}
+                {"id": "3.1", "name": "Phase 1",
+                 "scope": {"must": ["src/a.py"], "may": []},
+                 "tasks": [
+                     {"title": "t1", "files": ["src/a.py"], "agent": "middle-backend-engineer"}
+                 ]}
             ],
         }
         result = workspace_set_plan(plan=plan)
@@ -863,6 +883,23 @@ class TestExtendPlan:
         plan = workspace_get_plan()
         execution_ids = [item["id"] for item in plan["execution"]]
         assert "3.2" in execution_ids
+
+    def test_extend_plan_embeds_scope_in_new_item(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace)
+        from mcp_server import workspace_extend_plan, workspace_get_plan, workspace_get_state
+        workspace_extend_plan(
+            subphase={"name": "Added Phase",
+                      "tasks": [{"title": "t2", "files": ["src/b.py"],
+                                 "agent": "middle-backend-engineer"}]},
+            scope={"must": ["src/b.py"], "may": ["tests/b/"]},
+        )
+        plan = workspace_get_plan()
+        new_item = next(item for item in plan["execution"] if item["id"] == "3.2")
+        assert new_item["scope"] == {"must": ["src/b.py"], "may": ["tests/b/"]}
+
+        state = workspace_get_state()
+        assert state["scope"]["3.2"] == {"must": ["src/b.py"], "may": ["tests/b/"]}
 
     def test_extend_plan_requires_tasks(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
@@ -1166,7 +1203,6 @@ class TestAssignVerificationProfile:
 EXPECTED_ANNOTATIONS = {
     "workspace_get_state": (True, True, False),
     "workspace_advance": (False, False, False),
-    "workspace_set_scope": (False, False, False),
     "workspace_set_plan": (False, False, False),
     "workspace_get_plan": (True, True, False),
     "workspace_extend_plan": (False, False, False),
@@ -1215,7 +1251,7 @@ class TestMcpToolContracts:
     def test_all_tools_have_annotations(self):
         from mcp.types import ToolAnnotations
         tools = self._tools()
-        assert len(tools) == 40, f"expected 40 registered tools, got {len(tools)}"
+        assert len(tools) == 39, f"expected 39 registered tools, got {len(tools)}"
         for name, tool in tools.items():
             ann = tool.annotations
             assert ann is not None, f"{name} missing annotations"
@@ -1383,11 +1419,6 @@ class TestErrorEnvelopeContract:
         self._assert_envelope(workspace_create_verification_profile(
             name="", language="go"
         ))
-
-    def test_set_scope_before_phase1(self, workspace, monkeypatch):
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_set_scope
-        self._assert_envelope(workspace_set_scope(scope={"3.1": {"must": ["src/"]}}))
 
     def test_set_plan_before_planning(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])

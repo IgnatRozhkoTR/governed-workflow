@@ -25,13 +25,12 @@ function renderCriteria() {
     return;
   }
 
-  list.innerHTML = CRITERIA_DATA.map(function(c) {
+  list.innerHTML = '<p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 8px;">' + t('criteria.acceptedOnPlanApproval') + '</p>' +
+    CRITERIA_DATA.map(function(c) {
     var statusBadge = '';
     if (c.status === 'proposed') {
       var sourceLabel = c.source === 'agent' ? t('badges.proposedByAgent') : t('badges.pendingReview');
-      statusBadge = '<span class="badge badge-warning">' + sourceLabel + '</span>' +
-        ' <button class="btn btn-sm" onclick="updateCriterionStatus(' + c.id + ', \'accepted\')">' + t('buttons.accept') + '</button>' +
-        ' <button class="btn btn-sm btn-danger" onclick="updateCriterionStatus(' + c.id + ', \'rejected\')">' + t('buttons.deny') + '</button>';
+      statusBadge = '<span class="badge badge-warning">' + sourceLabel + '</span>';
     } else if (c.status === 'accepted') {
       statusBadge = '<span class="badge badge-success">' + t('badges.accepted') + '</span>';
     } else if (c.status === 'rejected') {
@@ -194,30 +193,6 @@ function addCriterion() {
       document.getElementById('criteriaTestNames').value = '';
       loadCriteria();
     });
-}
-
-function updateCriterionStatus(id, status) {
-  var ctx = getWorkspaceContext();
-  if (!ctx) return;
-
-  if (status === 'rejected') {
-    var reason = prompt(t('criteria.rejectReason'));
-    var base = '/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch);
-    apiPut(base + '/criteria/' + id, { status: status })
-      .then(function() {
-        if (reason && reason.trim()) {
-          return apiPost(base + '/comments', {
-            scope: 'criteria',
-            target: 'criterion:' + id,
-            text: reason.trim()
-          });
-        }
-      })
-      .then(function() { loadCriteria(); });
-  } else {
-    apiPut('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/criteria/' + id, { status: status })
-      .then(function() { loadCriteria(); });
-  }
 }
 
 function deleteCriterion(id) {

@@ -14,13 +14,13 @@ flowchart TB
 
     subgraph P1["Phase 1 — Pre-planning"]
         direction LR
-        A["1.0: Assessment<br/>Post research questions<br/>Propose criteria"] --> R["1.1: Research<br/>Answer questions with findings"] --> RP["1.2: Research Proving"] --> IA["1.3: Impact Analysis"] --> G1{{"1.4: Preparation Review<br/>USER GATE"}}
+        A["1.0: Assessment<br/>Post research questions"] --> R["1.1: Research<br/>Answer questions with findings"] --> RP["1.2: Research Proving"] --> IA["1.3: Impact Analysis"] --> G1{{"1.4: Preparation Review<br/>USER GATE"}}
         G1 -.->|Reject| R
     end
 
     subgraph P2["Phase 2 — Planning"]
         direction LR
-        PL["2.0: Planning"] --> G2{{"2.1: Plan Review<br/>USER GATE<br/>All criteria must be accepted"}}
+        PL["2.0: Planning<br/>Propose criteria"] --> G2{{"2.1: Plan Review<br/>USER GATE<br/>Approving plan accepts all criteria"}}
         G2 -.->|Reject| PL
     end
 
@@ -64,19 +64,19 @@ Hexagonal nodes are **user gates** — the workflow pauses until a human approve
 
 **Phase advancement.** The agent calls `workspace_advance` — the backend decides the next phase. Each phase has an advancer that validates prerequisites (progress documented, research proven, scope changes present, commit hash valid). Failures return specific errors explaining what's missing.
 
-**User gates.** Preparation Review (1.4), Plan Review (2.1), Code Review (3.N.3), and Final Approval (4.2) generate cryptographic nonces. Only the admin panel UI can present them, ensuring the agent cannot self-approve. Phases 5.1 and 5.2 advance automatically — no user gate.
+**User gates.** Preparation Review (1.4), Plan Review (2.1), Code Review (3.N.3), and Final Approval (4.2) generate cryptographic nonces. Only the admin panel UI can present them, ensuring the agent cannot self-approve. At the 2.1 gate, approving the plan also approves embedded scope and accepts all proposed criteria in one action. Phases 5.1 and 5.2 advance automatically — no user gate.
 
-**Scope locking.** Each execution sub-phase defines `must` (required changes) and `may` (permitted boundary) file patterns. Pre-tool hooks enforce these at edit time — the agent physically cannot write outside its scope. Scope and plan carry separate approval statuses. Updating either one auto-revokes its approval, requiring the user to re-approve before execution can continue.
+**Scope locking.** Each execution sub-phase defines `must` (required changes) and `may` (permitted boundary) file patterns. Scope is embedded as a field in each plan execution item — there is no separate scope entity or approval step. Pre-tool hooks enforce the current sub-phase's scope at edit time — the agent physically cannot write outside its scope. Updating the plan auto-revokes plan approval, requiring the user to re-approve before execution can continue.
 
 **Research proving.** Researchers save findings with typed proofs (code:file:line, web:url, diff:commit). A separate prover agent verifies every proof before the workflow continues. No unproven claims pass. Rejected entries must be re-researched and re-proven before the workflow is allowed to advance past the research proving phase.
 
 **Research discussions.** The agent posts research questions during assessment. Each question must be linked to at least one research entry before the workflow can advance past the research phase. Users can review questions, add their own, and reply in threaded discussions.
 
-**Acceptance criteria.** During assessment and planning, the agent proposes acceptance criteria (unit tests, integration tests, BDD scenarios, custom checks) via MCP. Users accept or reject them in the admin panel. On the last execution commit, the server programmatically validates test-type criteria — it checks that named test methods actually exist in the specified test files. Plan approval is blocked if any criteria remain unresolved.
+**Acceptance criteria.** During planning (phase 2.0), the agent proposes acceptance criteria (unit tests, integration tests, BDD scenarios, custom checks) via MCP. Approving the plan in the admin panel cascades all proposed criteria to accepted — there is no separate per-criterion accept/reject step. On the last execution commit, the server programmatically validates test-type criteria — it checks that named test methods actually exist in the specified test files as literal substrings.
 
 **Verification profiles.** Automated code quality checks that run at phase validation (3.N.1). Each profile targets a language or toolchain (Java Gradle, Python, TypeScript, etc.) and contains ordered steps: compilation, formatting, linting, static analysis. Each step has an install check command, an auto-install command, and a fail severity (blocking or warning). Profiles are global — not workspace-specific — but assigned per-workspace. The system ships with 4 preset profiles; users can create custom ones via the admin panel or setup wizard.
 
-**Plan structure.** The execution plan includes system diagrams (class diagram and sequence diagrams in Mermaid) and tasks organized into sub-phases. Tasks can declare parallel groups for fork/join execution. Each sub-phase has its own scope (must/may file patterns), so different sub-phases can touch completely different parts of the codebase.
+**Plan structure.** The execution plan includes system diagrams (class diagram and sequence diagrams in Mermaid) and tasks organized into sub-phases. Each execution item carries a `scope` field (must/may file patterns) inline — scope is part of the plan, not a separate entity. Tasks can declare parallel groups for fork/join execution. Each sub-phase can touch completely different parts of the codebase.
 
 **Execution sub-phases.** The plan defines N sub-phases (3.1, 3.2, ...), each cycling through Implementation, Validation, Fixes, Code Review, and Commit. Production code and tests are always written by separate agents to maintain objectivity.
 

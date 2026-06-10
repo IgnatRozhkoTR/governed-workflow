@@ -72,9 +72,8 @@ SendMessage(
 ```
 
 When assessment is complete:
-1. Propose acceptance criteria via `workspace_propose_criteria` (unit tests, integration tests, BDD scenarios, custom checks). Users accept or reject them in the admin panel.
-2. Call `workspace_update_progress` for phase `"1.0"` with a non-empty summary
-3. Call `workspace_advance`
+1. Call `workspace_update_progress` for phase `"1.0"` with a non-empty summary
+2. Call `workspace_advance`
 
 **Advance 1.0 → 1.1** requires: progress entry `"1.0"` with a non-empty summary AND at least one open research discussion (`type='research'`)."""
 
@@ -336,13 +335,13 @@ class PreparationReviewPhase(Phase):
     is_user_gate = True
     approve_target = "2.0"
     reject_target = "1.1"
-    short_description = "User reviews assessment, research, impact analysis, and criteria"
+    short_description = "User reviews assessment, research, and impact analysis"
 
     def description_for_skill(self) -> str:
         return """\
 ## 1.4 Preparation Review (USER GATE)
 
-The user reviews the full preparation package in the Pre-planning tab: assessment summary, research findings, impact analysis, proposed acceptance criteria.
+The user reviews the full preparation package in the Pre-planning tab: assessment summary, research findings, and impact analysis.
 
 - **Approve** → advances to `2.0`
 - **Reject** → back to `1.1` with comments

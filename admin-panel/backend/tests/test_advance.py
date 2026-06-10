@@ -10,7 +10,7 @@ from testing_utils import set_phase, add_progress, add_research, add_discussion,
 def test_approve_at_plan_review(workspace, project):
     """Phase 2.0 auto-advances directly to first execution phase when scope and plan are both approved."""
     plan = make_plan_json(2)
-    set_phase(workspace["id"], "2.0", plan_json=plan, plan_status="approved", scope_status="approved")
+    set_phase(workspace["id"], "2.0", plan_json=plan, plan_status="approved")
     add_progress(workspace["id"], "2", "Planning done")
     add_criterion(workspace["id"], status="accepted")
     ws = _get_ws_row(workspace["id"])
@@ -23,7 +23,7 @@ def test_approve_at_code_review(client, workspace):
     """Approve at 3.1.3 → advances to 3.1.4 (commit)."""
     plan = make_plan_json(1)
     set_phase(workspace["id"], "3.1.3", plan_json=plan,
-              plan_status="approved", scope_status="approved")
+              plan_status="approved")
 
     r = client.post("/api/ws/test-project/feature/test/approve", json={})
     assert r.status_code == 200
@@ -34,7 +34,7 @@ def test_approve_at_final_gate(client, workspace):
     """Approve at 4.2 → phase 5.1 (Reflection)."""
     plan = make_plan_json(1)
     set_phase(workspace["id"], "4.2", plan_json=plan,
-              plan_status="approved", scope_status="approved")
+              plan_status="approved")
 
     r = client.post("/api/ws/test-project/feature/test/approve", json={})
     assert r.status_code == 200
@@ -242,7 +242,7 @@ def test_plan_blocked_no_plan(workspace, project):
 
 def test_plan_passes(workspace, project):
     plan = make_plan_json(2)
-    set_phase(workspace["id"], "2.0", plan_json=plan, plan_status="approved", scope_status="approved")
+    set_phase(workspace["id"], "2.0", plan_json=plan, plan_status="approved")
     add_progress(workspace["id"], "2", "Planning done")
     add_criterion(workspace["id"], status="accepted")
     ws = _get_ws_row(workspace["id"])
@@ -254,7 +254,7 @@ def test_plan_passes(workspace, project):
 def test_plan_blocked_by_pending_criteria(workspace, project):
     """PlanAdvancer at 2.0 blocks when proposed criteria exist."""
     plan = make_plan_json(1)
-    set_phase(workspace["id"], "2.0", plan_json=plan, plan_status="approved", scope_status="approved")
+    set_phase(workspace["id"], "2.0", plan_json=plan, plan_status="approved")
     add_progress(workspace["id"], "2", "Planning done")
     add_criterion(workspace["id"], status="proposed")
     ws = _get_ws_row(workspace["id"])
@@ -278,15 +278,15 @@ from testing_utils import _git, GIT_ENV
 
 
 def _setup_execution_phase(ws_id, phase, num_plan_phases=3):
-    """Set up workspace for an execution phase with all required fields."""
+    """Set up workspace for an execution phase with all required fields.
+
+    Scope lives inside the plan's execution items (see make_plan_json).
+    """
     plan = make_plan_json(num_plan_phases)
-    scope = {f"3.{n}": {"must": ["src/"], "may": ["tests/"]} for n in range(1, num_plan_phases + 1)}
     set_phase(
         ws_id, phase,
         plan_json=plan,
         plan_status="approved",
-        scope_status="approved",
-        scope_json=json.dumps(scope),
     )
 
 
@@ -297,7 +297,6 @@ def test_agentic_review_blocked_without_progress(workspace, project):
         workspace["id"], "4.0",
         plan_json=plan,
         plan_status="approved",
-        scope_status="approved",
     )
 
     ws = _get_ws_row(workspace["id"])
@@ -313,7 +312,6 @@ def test_agentic_review_passes_with_progress(workspace, project):
         workspace["id"], "4.0",
         plan_json=plan,
         plan_status="approved",
-        scope_status="approved",
     )
     add_progress(workspace["id"], "4.0", "Agentic review completed")
 
@@ -351,7 +349,6 @@ def test_address_fix_blocked_without_progress(workspace, project):
         workspace["id"], "4.1",
         plan_json=plan,
         plan_status="approved",
-        scope_status="approved",
     )
 
     ws = _get_ws_row(workspace["id"])
@@ -367,7 +364,6 @@ def test_address_fix_passes_no_issues(workspace, project):
         workspace["id"], "4.1",
         plan_json=plan,
         plan_status="approved",
-        scope_status="approved",
     )
     add_progress(workspace["id"], "4", "All fixes addressed")
 
@@ -384,7 +380,6 @@ def test_address_fix_advances_with_unresolved_review(workspace, project):
         workspace["id"], "4.1",
         plan_json=plan,
         plan_status="approved",
-        scope_status="approved",
     )
     add_progress(workspace["id"], "4", "Addressing fixes")
     add_comment(workspace["id"], scope="review", text="Review finding", resolution="fixed")
@@ -402,7 +397,6 @@ def test_address_fix_passes_all_fixed(workspace, project):
         workspace["id"], "4.1",
         plan_json=plan,
         plan_status="approved",
-        scope_status="approved",
     )
     add_progress(workspace["id"], "4", "All fixes addressed")
     # code_snippet is "old buggy code" which does NOT exist in any file
@@ -695,11 +689,15 @@ def test_last_commit_skips_criteria_when_not_last_subphase(workspace, project):
 
 
 def test_approve_blocked_by_proposed_criteria(workspace, project):
-    """PlanAdvancer at 2.0 blocks when a criterion has 'rejected' status."""
+    """PlanAdvancer at 2.0 blocks when a criterion is still 'proposed'.
+
+    The cascade normally accepts proposed criteria when the plan is approved,
+    so a leftover proposed criterion at advance time blocks the gate.
+    """
     plan = make_plan_json(1)
-    set_phase(workspace["id"], "2.0", plan_json=plan, plan_status="approved", scope_status="approved")
+    set_phase(workspace["id"], "2.0", plan_json=plan, plan_status="approved")
     add_progress(workspace["id"], "2", "Planning done")
-    add_criterion(workspace["id"], status="rejected")
+    add_criterion(workspace["id"], status="proposed")
     ws = _get_ws_row(workspace["id"])
     result, code = perform_advance(ws, project["path"])
     assert code == 422
@@ -710,7 +708,7 @@ def test_approve_gate_blocked_by_unresolved_review(client, workspace, project):
     """approve_gate blocked when unresolved review items exist."""
     plan = make_plan_json(2)
     set_phase(workspace["id"], "3.1.3",
-              plan_json=plan, plan_status="approved", scope_status="approved")
+              plan_json=plan, plan_status="approved")
     add_comment(workspace["id"], scope="review", text="Unresolved finding", resolution="open")
     r = client.post(
         f"/api/ws/{project['id']}/{workspace['branch']}/approve",
@@ -726,7 +724,7 @@ def test_approve_gate_passes_with_resolved_review(client, workspace, project):
     from core.db import get_db
     plan = make_plan_json(2)
     set_phase(workspace["id"], "3.1.3",
-              plan_json=plan, plan_status="approved", scope_status="approved")
+              plan_json=plan, plan_status="approved")
     comment_id = add_comment(workspace["id"], scope="review", text="Resolved finding", resolution="fixed")
     db = get_db()
     db.execute("UPDATE discussions SET status = 'resolved' WHERE id = ?", (comment_id,))

@@ -53,8 +53,8 @@ def worktree_workspace(project_with_template, tmp_path):
     try:
         cur = db.execute(
             "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
-            "created, status, phase, scope_json, plan_json, source_branch) "
-            "VALUES (?, ?, ?, ?, ?, 'active', '0', '{}', '{}', 'develop')",
+            "created, status, phase, plan_json, source_branch) "
+            "VALUES (?, ?, ?, ?, ?, 'active', '0', '{}', 'develop')",
             (project_with_template["id"], "feature/rendering",
              "feature-rendering", str(working_dir), datetime.now().isoformat()),
         )

@@ -1,4 +1,6 @@
 """Tests for cross-cutting advance guards."""
+import json
+
 from advance.guards import GUARD_ORCHESTRATOR, ResearchProvenGuard, ReviewGuard
 from advance.orchestrator import perform_advance
 from testing_utils import set_phase, add_progress, add_research, make_plan_json, add_comment
@@ -158,54 +160,49 @@ def test_plan_guard_approved_when_approved(workspace, project):
     assert result["status"] == "approved"
 
 
-# ── ScopeApprovedGuard tests ────────────────────────────────────────────────
+# ── PlanApprovedGuard covers execution phases (formerly ScopeApprovedGuard) ──
 
-def test_scope_guard_skip_non_execution(workspace, project):
-    """Scope guard skips at non-execution phases."""
-    from advance.guards import ScopeApprovedGuard
-    guard = ScopeApprovedGuard()
-    ws = _get_ws_row(workspace["id"])
-    for phase in ("0", "1.0", "1.1", "2.0", "2.1", "5.1", "5.2", "6"):
-        result = guard.evaluate(phase, ws, {})
-        assert result["status"] == "skip", f"Expected skip at phase {phase}"
+def test_plan_guard_rejected_unapproved_at_execution(workspace, project):
+    """Plan not approved during execution — the single plan guard rejects.
 
-
-def test_scope_guard_rejected_unapproved(workspace, project):
-    """Scope not approved during execution — guard rejects."""
-    from advance.guards import ScopeApprovedGuard
-    guard = ScopeApprovedGuard()
-    set_phase(workspace["id"], "3.1.0", scope_status="pending")
+    PlanApprovedGuard now covers what ScopeApprovedGuard used to: execution and
+    review phases are gated by plan approval (scope is part of the plan).
+    """
+    from advance.guards import PlanApprovedGuard
+    guard = PlanApprovedGuard()
+    set_phase(workspace["id"], "3.1.0", plan_json=make_plan_json(1), plan_status="pending")
     ws = _get_ws_row(workspace["id"])
     result = guard.evaluate("3.1.0", ws, {})
     assert result["status"] == "rejected"
-    assert result["guard"] == "scope_approved"
+    assert result["guard"] == "plan_approved"
 
 
-def test_scope_guard_approved_when_approved(workspace, project):
-    """Scope approved during execution — guard passes."""
-    from advance.guards import ScopeApprovedGuard
-    guard = ScopeApprovedGuard()
-    set_phase(workspace["id"], "3.1.0", scope_status="approved")
+def test_plan_guard_approved_at_execution(workspace, project):
+    """Plan approved during execution — the plan guard passes."""
+    from advance.guards import PlanApprovedGuard
+    guard = PlanApprovedGuard()
+    set_phase(workspace["id"], "3.1.0", plan_json=make_plan_json(1), plan_status="approved")
     ws = _get_ws_row(workspace["id"])
     result = guard.evaluate("3.1.0", ws, {})
     assert result["status"] == "approved"
 
 
+def test_set_plan_revokes_only_plan_status(workspace, project):
+    """set_plan resets plan_status to pending; there is no separate scope status."""
+    from services import plan_service
+    set_phase(workspace["id"], "2.0", plan_status="approved")
+    ws = _get_ws_row(workspace["id"])
 
-def test_set_plan_revokes_scope_status(workspace, project):
-    """workspace_set_plan should revoke both plan_status and scope_status."""
-    set_phase(workspace["id"], "2.0", scope_status="approved")
     db = get_db()
     try:
-        plan_json = '{"description":"test","systemDiagram":"","execution":[{"id":"3.1","name":"Test","scope":{"must":["src/"],"may":[]},"tasks":[]}]}'
-        db.execute("UPDATE workspaces SET plan_json = ?, plan_status = 'pending', scope_status = 'pending' WHERE id = ?",
-                   (plan_json, workspace["id"]))
+        result = plan_service.set_plan(db, ws, json.loads(make_plan_json(1)))
         db.commit()
     finally:
         db.close()
-    ws = _get_ws_row(workspace["id"])
-    assert ws["plan_status"] == "pending"
-    assert ws["scope_status"] == "pending"
+
+    assert result["plan_status"] == "pending"
+    assert "scope_status" not in result
+    assert _get_ws_row(workspace["id"])["plan_status"] == "pending"
 
 
 # ── ReviewGuard tests ────────────────────────────────────────────────────────
@@ -274,7 +271,7 @@ def test_review_guard_does_not_block_fixes_to_review(workspace, project):
 def test_advance_blocked_by_review_guard_at_gate(workspace, project):
     """approve_gate blocked by ReviewGuard with unresolved review item at 4.2."""
     add_comment(workspace["id"], scope="review", text="Blocking finding", resolution="open")
-    set_phase(workspace["id"], "4.2", scope_status="approved", plan_status="approved")
+    set_phase(workspace["id"], "4.2", plan_status="approved")
     add_research(workspace["id"], topic="Good", proven=1)
     ws = _get_ws_row(workspace["id"])
 

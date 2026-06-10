@@ -1,11 +1,11 @@
 ---
 name: planning
-description: Guides the orchestrator through Phase 2.0 (Planning) of the governed workflow — structuring the execution plan, defining scope, proposing acceptance criteria, and collaborating with the plan-advisor teammate.
+description: Guides the orchestrator through Phase 2.0 (Planning) of the governed workflow — structuring the execution plan (with per-item scope), proposing acceptance criteria, and collaborating with the plan-advisor teammate.
 ---
 
 # Planning Skill
 
-Phase 2.0 of the governed workflow. The orchestrator and plan-advisor teammate collaborate to produce an execution plan, scope definition, and acceptance criteria. The plan must pass backend validation and user review before execution begins.
+Phase 2.0 of the governed workflow. The orchestrator and plan-advisor teammate collaborate to produce an execution plan with scope embedded in each execution item, and acceptance criteria. The plan must pass backend validation and user review before execution begins.
 
 ---
 
@@ -26,19 +26,23 @@ This paragraph is the first thing the user reads. Keep it under 5 sentences. No 
 
 ### Sub-phases
 
-Each sub-phase has `id`, `name`, and `tasks`. Sub-phases map to execution cycles (3.1, 3.2, ...) — each goes through implementation, validation, review, and commit.
+Each sub-phase has `id`, `name`, `tasks`, and `scope`. Sub-phases map to execution cycles (3.1, 3.2, ...) — each goes through implementation, validation, review, and commit.
 
-**Splitting into sub-phases is NOT required.** A single sub-phase (`3.1`) is the default. Only split when:
+**Default: one sub-phase.** A small or single-area change — for example, adding a service and repository layer to an existing backend feature — is always exactly ONE sub-phase. Do not split it.
 
-- The task has **large, independently reviewable parts** — e.g., backend feature implementation, frontend UI, and BDD scenarios are three distinct review scopes that benefit from separate commits and reviews.
-- Each part is **self-contained enough** to be reviewed on its own — it compiles, tests pass, and the reviewer can understand the change without seeing the other sub-phases.
+**Split only for genuinely large jobs** that change a lot of code across clearly different areas, where each area should be fully implemented and validated before the next area begins. A concrete example of a large new feature that warrants three sub-phases:
+
+1. Sub-phase 1 — backend: implement all changes across all layers (entity, repository, service, controller) including unit tests, fully. Validated and committed before frontend work begins.
+2. Sub-phase 2 — frontend: after the backend is implemented and validated, implement the whole frontend plus its UI/unit tests with full coverage. Validated and committed before E2E work begins.
+3. Sub-phase 3 — end-to-end: large no-mock UI/Cucumber/E2E tests that span the full stack.
 
 **Do NOT split when:**
 - Two changes depend on each other (e.g., an entity and the service that uses it) — these belong in the same sub-phase even if they're in different files.
 - The split would create sub-phases so small they don't warrant independent review.
 - You're splitting just to organize by file or class — that's what tasks within a sub-phase are for.
+- The whole job is backend-only, even if it touches several layers — a backend-only feature, no matter how many files, is one sub-phase.
 
-**The litmus test: will the reviewer get lost?** If the combined diff would be large and span multiple concerns, split it. If the reviewer can follow the changes as a single coherent unit, keep it together. The purpose of sub-phases is to make review manageable — don't avoid splitting when the review genuinely needs it, but don't inflate the plan either.
+**The litmus test: will the reviewer get lost?** If the combined diff would be large and span multiple concerns (backend AND frontend AND E2E), split it. If the reviewer can follow the changes as a single coherent unit, keep it together. When in doubt, one sub-phase is always the right answer for anything backend-only or small.
 
 ### Tasks — two-layer structure
 
@@ -80,29 +84,38 @@ Format:
 
 ## Scope Definition
 
-Scope is defined per sub-phase as a phase-keyed map, set via `workspace_set_scope`. The distinction between `must` and `may` matters for enforcement:
+Scope is defined **per execution item**, embedded directly inside each item submitted via `workspace_set_plan` or `workspace_extend_plan`. There is no separate `workspace_set_scope` call — scope lives in the plan.
 
-- **must**: Broad areas where absence of changes means the task is incomplete. These are ticket-level requirements obvious before planning. Keep this list short — if the ticket says "add BDD scenarios", the BDD module is must-scope.
+Each execution item carries a `scope` field with `must` and `may` arrays:
 
-- **may**: Specific files and packages identified during planning. Most paths from the execution plan belong here. These are permitted but not required — the plan proposes them, but the user decides if they are all necessary.
+- **must**: Broad areas where absence of changes means the task is incomplete. Keep this list short — if the ticket says "add BDD scenarios", the BDD module is must-scope.
 
-Format:
+- **may**: Specific files and packages identified during planning. Most paths from the execution plan belong here. Permitted but not required.
+
+Format inside each execution item:
 ```json
 {
-  "3.1": {"must": ["src/main/java/**/entity/"], "may": ["src/main/resources/db/changelog/"]},
-  "3.2": {"must": ["src/main/java/**/service/"], "may": ["src/main/java/**/util/"]}
+  "id": "3.1",
+  "name": "Backend implementation",
+  "scope": {
+    "must": ["src/main/java/**/entity/", "src/main/java/**/service/"],
+    "may": ["src/main/resources/db/changelog/", "src/main/java/**/util/"]
+  },
+  "tasks": [...]
 }
 ```
 
-Each key is a sub-phase ID matching the plan's execution items. During execution, the hook enforces the current sub-phase's scope automatically. When the user approves both plan and scope in the admin panel (while workspace is at 2.0), the scope is approved together with the plan. No separate scope proposal per sub-phase is needed later.
+During execution, the hook enforces the current sub-phase's scope automatically. When the user approves the plan in the admin panel (while the workspace is at 2.0), scope is approved as part of the plan — there is no separate scope approval step.
 
-For test-type acceptance criteria, add the test file paths to the relevant sub-phase's must-scope.
+For test-type acceptance criteria, add the test file paths to the relevant sub-phase's `must` array.
 
 ---
 
 ## Acceptance Criteria
 
-Acceptance criteria are validated programmatically when the last sub-phase commits. If any accepted criterion with a validator fails, advancement to review is blocked.
+Acceptance criteria are **authored here, during planning (phase 2.0)**. This is the canonical place to propose criteria via `workspace_propose_criteria`. Calling `workspace_propose_criteria` before phase 2.0 is rejected by the backend.
+
+Criteria are validated programmatically when the last sub-phase commits. If any accepted criterion with a validator fails, advancement to review is blocked. Approving the plan also accepts all proposed criteria — there is no separate per-criterion accept/reject step.
 
 ### Reviewing existing criteria
 
@@ -130,10 +143,13 @@ workspace_propose_criteria(
 
 2. **`file`** — full path to the test class, relative to project root. Use the project's actual directory structure (check existing tests with Glob/Grep to confirm the path convention).
 
-3. **`test_names`** — array of exact test method names. Before proposing, check the project's existing test naming convention:
-   - Look at existing test files in the same module/package
-   - Common conventions: `methodName_shouldBehavior_whenCondition`, `test_method_name_condition`, `testMethodNameCondition`
-   - **Match whatever convention the project already uses** — the test names you propose here will be matched against actual method names at validation time. If they don't match, validation fails.
+3. **`test_names`** — array of exact test method names. **Before proposing any test-type criterion, you MUST read actual existing test files of the same kind (unit / integration / BDD) in the repository and understand their naming structure.** This is not optional. Criteria are verified by a literal substring check — the validator searches for the exact method name as a string in the test file at commit time. If the name does not match precisely, validation fails and the commit is blocked. The test names **cannot be changed** after the plan is approved.
+
+   How to get the names right:
+   - Use Glob to find test files in the same module/package (`**/UserServiceTest.java`, `**/*IntegrationTest.java`, etc.)
+   - Read those files to see the exact naming pattern in use
+   - Common patterns: `methodName_shouldBehavior_whenCondition`, `test_method_name_condition`, `testMethodNameCondition` — but only the pattern actually used in this repo is correct
+   - **Match the convention exactly, character for character** — the test names you propose will be searched as literal substrings at validation time
 
 4. **One call per test class** — if you need unit tests for `UserService` and `OrderService`, that's two `workspace_propose_criteria` calls (one for `UserServiceTest`, one for `OrderServiceTest`), not one call per test method and not one call with mixed files.
 
@@ -203,12 +219,11 @@ Review the expansion. Send numbered remarks on specific tasks if needed. The pla
 ### Step 5 — Finalize
 
 Execute in order:
-1. `workspace_set_scope` — phase-keyed scope map (one entry per sub-phase). Resets scope approval status to pending.
-2. `workspace_set_plan` — full plan JSON (execution items define tasks, NOT scope). Resets plan approval status to pending.
-3. `workspace_update_progress` for phase `"2"` with a summary of the plan
-4. `workspace_advance` — this enters the user review wait at 2.0. The workspace stays at 2.0 while the user reviews and approves both plan and scope in the admin panel. Once both are approved, the backend advances directly to 3.1.0.
+1. `workspace_set_plan` — full plan JSON with execution items, each carrying its own `scope` (must/may). Resets plan approval status to pending.
+2. `workspace_update_progress` for phase `"2"` with a summary of the plan.
+3. `workspace_advance` — this enters the user review wait at 2.0. The workspace stays at 2.0 while the user reviews and approves the plan in the admin panel. Approving the plan also approves scope and cascades all proposed acceptance criteria to accepted. Once approved, the backend advances directly to 3.1.0.
 
-**Advance 2.0 -> 3.1.0** requires: valid plan with at least 1 execution sub-phase + progress entry `"2"` + >=1 acceptance criterion with no pending/rejected criteria + both plan and scope approved by user in the admin panel. There is no separate 2.1 gate phase — plan and scope approval happen together in the panel while the workspace remains at 2.0.
+**Advance 2.0 -> 3.1.0** requires: valid plan with at least 1 execution sub-phase + progress entry `"2"` + >=1 acceptance criterion with no pending/rejected criteria + plan approved by user in the admin panel. There is no separate 2.1 gate phase and no separate scope approval — one plan approval covers everything.
 
 ---
 
@@ -226,4 +241,4 @@ Execute in order:
 | Pass `details_json` as a dict object | It must be a JSON-encoded string |
 | Put file paths or test names in `description` instead of `details_json` | `description` is for humans; `details_json.file` and `details_json.test_names` are what the validator reads |
 | Create one criterion per test method | Group all methods for the same test class into one criterion with the `test_names` array |
-| Invent test names without checking project convention | Grep existing tests first, match the naming pattern (e.g., `method_shouldX_whenY`) |
+| Invent test names without reading existing tests first | Read actual test files of the same kind before proposing; names are a literal substring check and cannot be changed after plan approval |

@@ -139,13 +139,20 @@ def add_criterion(ws_id, cr_type="unit_test", description="Test criterion",
     return criterion_id
 
 
-def make_plan_json(num_phases=2):
-    """Generate a valid plan JSON with the given number of execution sub-phases."""
+def make_plan_json(num_phases=2, scope=None):
+    """Generate a valid plan JSON with the given number of execution sub-phases.
+
+    Scope lives inside each execution item under a "scope" key. By default each
+    item gets ``{"must": ["src/"], "may": ["tests/"]}``; pass ``scope`` to
+    override the embedded scope for every item.
+    """
+    item_scope = scope if scope is not None else {"must": ["src/"], "may": ["tests/"]}
     execution = []
     for i in range(1, num_phases + 1):
         execution.append({
             "id": f"3.{i}",
             "name": f"Sub-phase {i}",
+            "scope": dict(item_scope),
             "tasks": [{"title": f"Task {i}", "files": [f"src/phase{i}/file.py"], "agent": "middle-backend-engineer"}]
         })
     return json.dumps({"description": "Test plan description", "systemDiagram": "graph LR", "execution": execution})

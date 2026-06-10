@@ -160,16 +160,16 @@ def test_create_criterion_invalid_type(client, workspace):
     assert r.status_code == 400
 
 
-def test_update_criterion_status(client, workspace):
+def test_update_criterion_status_route_removed(client, workspace):
+    """Per-criterion accept/reject is gone — approving the plan cascades instead.
+
+    The PUT /criteria/<id> status route no longer exists; the path only accepts
+    DELETE, so a PUT raises 405 which the catch-all error handler maps to 500.
+    """
     criterion_id = add_criterion(workspace["id"], cr_type="unit_test", description="Test service")
 
     r = client.put(f"{BASE}/criteria/{criterion_id}", json={"status": "accepted"})
-    assert r.status_code == 200
-    assert r.json["ok"]
-
-    r = client.get(f"{BASE}/criteria")
-    criterion = next(c for c in r.json["criteria"] if c["id"] == criterion_id)
-    assert criterion["status"] == "accepted"
+    assert r.status_code == 500
 
 
 def test_delete_criterion(client, workspace):
@@ -188,10 +188,6 @@ def test_validate_custom_criterion(client, workspace):
     from testing_utils import add_criterion
     criterion_id = add_criterion(workspace["id"], cr_type="custom", description="Manual check")
 
-    # Accept it first (required before validation)
-    client.put(f"{BASE}/criteria/{criterion_id}", json={"status": "accepted"})
-
-    # Validate it
     r = client.put(f"{BASE}/criteria/{criterion_id}/validate", json={"passed": True})
     assert r.status_code == 200
     assert r.json["ok"]
@@ -235,11 +231,10 @@ def test_reject_custom_criterion(client, workspace):
 
 def test_get_criteria_filter_by_status(client, workspace):
     """GET criteria with ?status=accepted returns only accepted criteria."""
-    client.post(f"{BASE}/criteria", json={"type": "unit_test", "description": "First"})
-    r2 = client.post(f"{BASE}/criteria", json={"type": "unit_test", "description": "Second"})
-    second_id = r2.json["id"]
-
-    client.put(f"{BASE}/criteria/{second_id}", json={"status": "accepted"})
+    add_criterion(workspace["id"], cr_type="unit_test", description="First", status="proposed")
+    second_id = add_criterion(
+        workspace["id"], cr_type="unit_test", description="Second", status="accepted"
+    )
 
     r = client.get(f"{BASE}/criteria", query_string={"status": "accepted"})
     assert r.status_code == 200
@@ -272,23 +267,16 @@ def test_post_criteria_missing_description(client, workspace):
     assert r.status_code == 400
 
 
-def test_put_criteria_reject(client, workspace):
-    """PUT criteria with status=rejected changes the criterion status."""
-    criterion_id = add_criterion(workspace["id"], cr_type="unit_test", description="To reject")
+def test_approve_plan_cascades_proposed_criteria(client, workspace):
+    """Approving the plan accepts all proposed criteria — the single approval."""
+    criterion_id = add_criterion(workspace["id"], cr_type="unit_test", description="To accept")
 
-    r = client.put(f"{BASE}/criteria/{criterion_id}", json={"status": "rejected"})
+    r = client.post(f"{BASE}/plan-status", json={"status": "approved"})
     assert r.status_code == 200
-    assert r.json["ok"]
 
     r = client.get(f"{BASE}/criteria")
     criterion = next(c for c in r.json["criteria"] if c["id"] == criterion_id)
-    assert criterion["status"] == "rejected"
-
-
-def test_put_criteria_not_found(client, workspace):
-    """PUT criteria for non-existent ID returns 404."""
-    r = client.put(f"{BASE}/criteria/999", json={"status": "accepted"})
-    assert r.status_code == 404
+    assert criterion["status"] == "accepted"
 
 
 def test_delete_criteria_not_found(client, workspace):

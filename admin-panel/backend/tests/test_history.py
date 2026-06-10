@@ -101,11 +101,11 @@ def history_workspace(history_repo, clean_db):
     )
     cursor = db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
-        "created, status, phase, scope_json, plan_json, source_branch) "
-        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?, ?)",
+        "created, status, phase, plan_json, source_branch) "
+        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?)",
         (
             project_id, "develop", "develop", str(history_repo),
-            now, '{"must":[],"may":[]}',
+            now,
             '{"description":"","systemDiagram":"","execution":[]}', "develop"
         )
     )
@@ -315,11 +315,10 @@ def test_undo_rejects_initial_commit(client, tmp_path, clean_db):
     )
     db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
-        "created, status, phase, scope_json, plan_json, source_branch) "
-        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?, ?)",
+        "created, status, phase, plan_json, source_branch) "
+        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?)",
         (
             project_id, "main", "main", str(repo), now,
-            '{"must":[],"may":[]}',
             '{"description":"","systemDiagram":"","execution":[]}', "main"
         )
     )
@@ -507,11 +506,10 @@ def test_squash_rejects_when_no_origin_ref(client, tmp_path, clean_db):
     )
     db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
-        "created, status, phase, scope_json, plan_json, source_branch) "
-        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?, ?)",
+        "created, status, phase, plan_json, source_branch) "
+        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?)",
         (
             project_id, "feature", "feature", str(repo), now,
-            '{"must":[],"may":[]}',
             '{"description":"","systemDiagram":"","execution":[]}', "develop"
         )
     )

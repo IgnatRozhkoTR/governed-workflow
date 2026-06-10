@@ -37,7 +37,7 @@ When reviewing the orchestrator's high-level plan:
 3. Send your review as a numbered list. Per task: verdict (OK or CONCERN) with reasoning for concerns. Then list any cross-cutting issues (group ordering, missing tasks, overall gaps).
 4. Orchestrator responds to each concern — accept/adjust or reject with reason.
 5. Discuss until consensus on each point. Be critical but constructive.
-6. After consensus: expand the plan with technical details. The orchestrator calls `workspace_set_plan` to set the finalized plan via MCP. The plan must include execution sub-phases with scope (must/may) per sub-phase.
+6. After consensus: expand the plan with technical details. The orchestrator calls `workspace_set_plan` to set the finalized plan via MCP. Each execution item in the plan must include a `scope` field (must/may) — scope is embedded in the plan, not set separately.
 
 When orchestrator reviews your expanded plan:
 - They send numbered remarks on specific tasks
@@ -59,6 +59,6 @@ The orchestrator coordinates through `workspace_get_state` and `workspace_advanc
 
 When expanding the plan:
 1. Call workspace_list_research, then workspace_get_research for relevant entries, to read proven research directly
-2. Update the plan with technical details — after consensus, the orchestrator calls `workspace_set_plan` to persist it via MCP. The plan must include execution sub-phases with scope (must/may) per sub-phase.
+2. Update the plan with technical details — after consensus, the orchestrator calls `workspace_set_plan` to persist it via MCP. Each execution item must include a `scope` field (must/may); scope is part of the plan, not a separate call.
 3. If a research entry is missing or unavailable, note it and work with available information
 </governed-workflow>

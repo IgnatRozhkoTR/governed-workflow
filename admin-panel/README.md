@@ -110,7 +110,7 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 | Auth | `GET /api/auth/status`, `POST /api/auth/check` |
 | State | `GET .../state`, `PUT .../phase`, `PUT .../scope`, `PUT .../locale`, `PUT .../yolo` |
 | Network | `GET/PUT /api/network-mode`, `POST /api/restart` |
-| Plan/Scope Approval | `POST .../plan-status`, `POST .../scope-status` |
+| Plan Approval | `POST .../plan-status` |
 | Advance | `POST .../approve`, `POST .../reject` |
 | Comments | `GET/POST .../comments`, `PUT .../comments/<id>/resolve`, `POST .../comments/<id>/reply` |
 | Discussions | `POST .../discussions`, `PUT .../discussions/<id>/hide` |
@@ -133,16 +133,15 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 
 ## MCP Tools
 
-40 tools total — 35 `workspace_*` and 5 `rule_*`.
+39 tools total — 34 `workspace_*` and 5 `rule_*`.
 
 ### Plan & Scope
 
 | Tool | Description |
 |------|-------------|
-| `workspace_set_scope` | Set the phase-keyed scope map (must/may file patterns) |
-| `workspace_set_plan` | Set or replace the execution plan |
+| `workspace_set_plan` | Set or replace the execution plan; each execution item carries a `scope` field (must/may) |
 | `workspace_get_plan` | Get the full execution plan with all sub-phases and tasks |
-| `workspace_extend_plan` | Append a new sub-phase to the plan without rewriting existing ones (auto-assigns ID, optional scope) |
+| `workspace_extend_plan` | Append a new sub-phase to the plan without rewriting existing ones; the new item carries its own `scope` |
 
 ### Research
 

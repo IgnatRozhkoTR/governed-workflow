@@ -21,17 +21,42 @@ def get_plan(ws):
 
 
 def get_scope(ws):
-    """Parse scope_json from workspace row with default fallback."""
-    raw = ws["scope_json"]
-    if raw:
-        return json.loads(raw)
-    return {}
+    """Reconstruct the phase-keyed scope map {"3.N": {must, may}} from the plan.
+
+    Scope now lives inside each plan execution item under a "scope" key. This
+    rebuilds the legacy phase-keyed shape so callers that still expect a
+    sub-phase-keyed map (state serialization, reflection, panel) keep working.
+    """
+    plan = get_plan(ws)
+    scope_map = {}
+    for item in plan.get("execution", []):
+        item_id = item.get("id")
+        item_scope = item.get("scope")
+        if item_id and isinstance(item_scope, dict):
+            scope_map[item_id] = item_scope
+    return scope_map
+
+
+def _validate_execution_scope(execution):
+    """Return an error string when any execution item lacks a valid scope.must.
+
+    Scope is embedded per execution item now; every item must carry a scope
+    object with a "must" list (the "may" list is optional).
+    """
+    for i, item in enumerate(execution):
+        scope = item.get("scope")
+        if not isinstance(scope, dict):
+            return f"execution[{i}] is missing a 'scope' object with a 'must' list"
+        if not isinstance(scope.get("must"), list):
+            return f"execution[{i}].scope must include a 'must' list"
+    return None
 
 
 def set_plan(db, ws, plan_data):
-    """Set execution plan on workspace. Resets statuses and adjusts phase if needed.
+    """Set execution plan on workspace. Resets plan_status and adjusts phase if needed.
 
-    Returns a result dict with ok/error keys.
+    Every execution item must embed its own scope (must list required). Returns
+    a result dict with ok/error keys.
     """
     locale = ws["locale"] or "en"
     phase = ws["phase"]
@@ -39,10 +64,14 @@ def set_plan(db, ws, plan_data):
     if phase_key(phase) < phase_key("2.0"):
         return {"error": t("mcp.error.planPhase", locale)}
 
+    scope_error = _validate_execution_scope(plan_data.get("execution", []))
+    if scope_error:
+        return {"error": scope_error}
+
     plan_json_str = json.dumps(plan_data)
     db.execute("UPDATE workspaces SET plan_json = ? WHERE id = ?", (plan_json_str, ws["id"]))
     db.execute(
-        "UPDATE workspaces SET plan_status = 'pending', scope_status = 'pending' WHERE id = ?",
+        "UPDATE workspaces SET plan_status = 'pending' WHERE id = ?",
         (ws["id"],)
     )
 
@@ -60,7 +89,6 @@ def set_plan(db, ws, plan_data):
     return {
         "ok": True,
         "plan_status": "pending",
-        "scope_status": "pending",
         "note": t("mcp.error.planNoteRevoked", locale),
     }
 
@@ -114,25 +142,23 @@ def extend_plan(db, ws, new_subphase, scope_entry, diagrams=None, replace_diagra
         if not isinstance(task, dict) or not task.get("title") or not isinstance(task.get("files"), list) or not task.get("agent"):
             return {"error": f"task[{i}] must have title (string), files (list), and agent (string)"}
 
+    if not isinstance(scope_entry.get("must"), list):
+        return {"error": "scope must include a 'must' list"}
+
     plan = get_plan(ws)
     new_n = _next_subphase_id(plan)
 
     execution = plan.get("execution", [])
-    execution.append({"id": f"3.{new_n}", "name": name, "tasks": tasks})
+    execution.append({"id": f"3.{new_n}", "name": name, "scope": scope_entry, "tasks": tasks})
     plan["execution"] = execution
 
     if diagrams and isinstance(diagrams, list):
         _merge_diagrams(plan, diagrams, replace_diagrams)
 
     db.execute("UPDATE workspaces SET plan_json = ? WHERE id = ?", (json.dumps(plan), ws["id"]))
-
-    scope_map = get_scope(ws)
-    scope_map[f"3.{new_n}"] = scope_entry
-    db.execute("UPDATE workspaces SET scope_json = ? WHERE id = ?", (json.dumps(scope_map), ws["id"]))
-
     db.execute(
-        "UPDATE workspaces SET plan_status = 'pending', scope_status = 'pending' WHERE id = ?",
+        "UPDATE workspaces SET plan_status = 'pending' WHERE id = ?",
         (ws["id"],)
     )
 
-    return {"ok": True, "new_subphase_id": f"3.{new_n}", "plan_status": "pending", "scope_status": "pending"}
+    return {"ok": True, "new_subphase_id": f"3.{new_n}", "plan_status": "pending"}

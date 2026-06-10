@@ -1,5 +1,4 @@
 """Execution sub-phases: 3.N.0 through 3.N.4, parameterized by execution item N."""
-import json
 import re
 
 from advance.phases import Phase
@@ -37,7 +36,7 @@ def _diff_files_outside_scope(ws, checkpoint: str, commit_hash: str) -> tuple[li
     if not changed:
         return [], []
 
-    scope_map = json.loads(ws["scope_json"]) if ws["scope_json"] else {}
+    scope_map = plan_service.get_scope(ws)
     must_patterns, may_patterns = scope_service.get_scope_patterns(scope_map, ws["phase"])
     all_patterns = list(must_patterns) + list(may_patterns)
 
@@ -73,7 +72,7 @@ class ImplementationPhase(Phase):
         return f"3.{self._n}"
 
     def validate(self, ws, body, project_path):
-        scope_map = json.loads(ws["scope_json"]) if ws["scope_json"] else {}
+        scope_map = plan_service.get_scope(ws)
         phase = ws["phase"]
         must_patterns = scope_service.get_phase_must_patterns(scope_map, phase)
 

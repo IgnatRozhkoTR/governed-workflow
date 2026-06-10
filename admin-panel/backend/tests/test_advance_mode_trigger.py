@@ -52,8 +52,8 @@ def _insert_workspace_and_project(db, ws):
     )
     db.execute(
         "INSERT INTO workspaces (id, project_id, branch, sanitized_branch, working_dir, "
-        "created, status, phase, scope_json, plan_json, source_branch, last_confirmed_commit) "
-        "VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)",
+        "created, status, phase, plan_json, source_branch, last_confirmed_commit) "
+        "VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)",
         (
             ws["id"],
             ws["project_id"],
@@ -62,7 +62,6 @@ def _insert_workspace_and_project(db, ws):
             ws["working_dir"],
             "2024-01-01T00:00:00",
             ws["phase"],
-            '{"must":[],"may":[]}',
             '{"description":"","systemDiagram":"","execution":[]}',
             "develop",
             ws["last_confirmed_commit"],

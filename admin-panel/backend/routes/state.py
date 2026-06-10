@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 from core.db import ws_field
 from services import comment_service
+from services import criteria_service
 from services import discussion_service
 from core.decorators import with_workspace
 from core.i18n import t
@@ -100,7 +101,6 @@ def get_workspace_state(db, ws, project):
         "phase": ws["phase"],
         "status": ws["status"],
         "scope": scope,
-        "scope_status": ws["scope_status"],
         "plan": plan,
         "plan_status": ws["plan_status"],
         "phase_sequence": phase_sequence,
@@ -161,7 +161,7 @@ def set_yolo_mode(db, ws, project):
 @bp.route("/api/ws/<project_id>/<path:branch>/scope", methods=["PUT"])
 @with_workspace
 def set_scope(db, ws, project):
-    """Update workspace scope as a phase-keyed map."""
+    """Update workspace scope as a phase-keyed map; merged into the plan's items."""
     body = request.get_json(silent=True) or {}
     scope = body.get("scope", {})
 
@@ -172,34 +172,18 @@ def set_scope(db, ws, project):
     return jsonify({"ok": True, "scope": scope})
 
 
-@bp.route("/api/ws/<project_id>/<path:branch>/scope-status", methods=["POST"])
-@with_workspace
-def set_scope_status(db, ws, project):
-    """Set scope status: pending, approved, or rejected."""
-    body = request.get_json(silent=True) or {}
-    status = body.get("status", "pending")
-    result = scope_service.set_scope_status(db, ws["id"], status, locale=ws["locale"])
-    if "error" in result:
-        return jsonify(result), 400
-    db.commit()
-
-    if status == 'approved':
-        notify_workspace(ws, 'Scope has been approved.')
-    elif status == 'rejected':
-        notify_workspace(ws, 'Scope has been rejected. Check comments for feedback.')
-
-    return jsonify({"ok": True, "scope_status": status})
-
-
 @bp.route("/api/ws/<project_id>/<path:branch>/plan-status", methods=["POST"])
 @with_workspace
 def set_plan_status(db, ws, project):
-    """Set plan status: pending, approved, or rejected."""
+    """Set plan status. Approving the plan also accepts all proposed criteria."""
     body = request.get_json(silent=True) or {}
     status = body.get("status", "pending")
     if status not in ("pending", "approved", "rejected"):
         return jsonify({"error": t("api.error.invalidStatus")}), 400
+
     db.execute("UPDATE workspaces SET plan_status = ? WHERE id = ?", (status, ws["id"]))
+    if status == 'approved':
+        criteria_service.accept_all_proposed(db, ws["id"])
     db.commit()
 
     if status == 'approved':

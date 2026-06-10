@@ -4,33 +4,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from mcp_tools import mcp, mcp_error, with_mcp_workspace
-from core.i18n import t
 from services import plan_service
-from services import scope_service
-
-
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=False, destructiveHint=False))
-@with_mcp_workspace
-def workspace_set_scope(
-    ws, project, db, locale,
-    scope: Annotated[dict, Field(description="Phase-keyed map {phase_id: {must: [...], may: [...]}}.")]
-) -> dict:
-    """Set workspace scope as a phase-keyed map. Allowed from phase 1 onwards.
-
-    Setting scope automatically revokes approval — the user must review and re-approve
-    the new scope in the admin panel before code edits are allowed.
-
-    Format: {"3.1": {"must": ["src/models/"], "may": ["src/config/"]}, "3.2": {...}}
-    Each key is a sub-phase ID from the execution plan.
-    'must' paths MUST have changes for the phase to advance.
-    'may' paths are permitted but not required.
-
-    Same scope set twice is a no-op on content but still revokes approval."""
-    result = scope_service.set_scope(db, ws, scope)
-    if "error" in result:
-        return mcp_error("validation", result["error"], retryable=False)
-    db.commit()
-    return result
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=False, destructiveHint=False))
@@ -42,7 +16,8 @@ def workspace_set_plan(
     """Set the execution plan. Editable during and after planning (phase >= 2.0).
 
     Setting a plan revokes approval — the user must review and re-approve before
-    the workflow can advance past planning.
+    the workflow can advance past planning. Approving the plan also approves its
+    scope and accepts all proposed acceptance criteria.
 
     Expected format:
     {
@@ -53,6 +28,7 @@ def workspace_set_plan(
             {
                 "id": "3.1",
                 "name": "Sub-phase name",
+                "scope": {"must": ["src/models/"], "may": ["src/config/"]},
                 "tasks": [{"title": "...", "files": ["..."], "agent": "...",
                            "status": "pending", "group": "optional group"}]
             }
@@ -62,8 +38,12 @@ def workspace_set_plan(
     systemDiagram must be an array of {title: str, diagram: str} objects (Mermaid syntax).
     Include at minimum one class/entity diagram and one sequence diagram.
 
+    Each execution item must carry a per-item "scope" object with a "must" list
+    (a "may" list is optional). 'must' paths MUST have changes for the sub-phase
+    to advance; 'may' paths are permitted but not required.
+
     Tasks with the same "group" name run in parallel. Tasks without a group run
-    sequentially. Scope is set separately via workspace_set_scope."""
+    sequentially."""
     result = plan_service.set_plan(db, ws, plan)
     if "error" in result:
         return mcp_error("business", result["error"], retryable=False)
@@ -99,11 +79,12 @@ def workspace_extend_plan(
     subphase: dict with 'name' (string) and 'tasks' (list). Each task needs:
       title (string), files (list), agent (string).
       Optional task fields: group (string), status (string, default 'pending').
-    scope: must/may scope entry for the new sub-phase.
+    scope: must/may scope entry for the new sub-phase; embedded into the new
+      execution item. A 'must' list is required.
     diagrams: optional list of {title, diagram} objects to add. Appended by default;
       set replace_diagrams=True to replace the entire diagram list instead.
 
-    plan_status and scope_status are set to 'pending'. Existing sub-phases are unchanged."""
+    plan_status is set to 'pending'. Existing sub-phases are unchanged."""
     result = plan_service.extend_plan(db, ws, subphase, scope, diagrams, replace_diagrams)
     if "error" in result:
         return mcp_error("validation", result["error"], retryable=False)

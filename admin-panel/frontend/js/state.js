@@ -8,7 +8,6 @@ var AppState = {
       phase: "0",
       status: "active",
     scope: {},
-    scope_status: "pending",
     plan_status: "pending",
     plan: null,
     session_id: null,
@@ -119,7 +118,6 @@ function applyStateData(stateData) {
   LOCK_DATA.phase = stateData.phase || "0";
   LOCK_DATA.status = stateData.status || "active";
   LOCK_DATA.scope = stateData.scope || {};
-  LOCK_DATA.scope_status = stateData.scope_status || "pending";
   LOCK_DATA.plan_status = stateData.plan_status || "pending";
   LOCK_DATA.locale = stateData.locale || null;
   LOCK_DATA.yolo_mode = !!stateData.yolo_mode;
@@ -162,7 +160,6 @@ function resetAppState() {
   LOCK_DATA.phase = "0";
   LOCK_DATA.status = "active";
   LOCK_DATA.scope = {};
-  LOCK_DATA.scope_status = "pending";
   LOCK_DATA.plan_status = "pending";
   LOCK_DATA.plan = null;
   LOCK_DATA.session_id = null;

@@ -83,29 +83,6 @@ function _updateApprovalUI(badgeId, approveBtnId, rejectBtnId, setStatus, status
   }
 }
 
-function updateScopeStatusUI(status) {
-  _updateApprovalUI('scopeStatusBadge', 'scopeApproveBtn', 'scopeRejectBtn', setScopeStatus, status);
-}
-
-async function setScopeStatus(status) {
-  var ctx = getWorkspaceContext();
-  if (!ctx) return;
-
-  try {
-    await apiPost('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/scope-status', {status: status});
-    LOCK_DATA.scope_status = status;
-    EventBus.emit('approval:changed');
-    if (status === 'approved') {
-      updateScopeStatusUI(status);
-      await tryAutoAdvanceGate();
-    } else {
-      updateScopeStatusUI(status);
-    }
-  } catch (e) {
-    console.error('Failed to set scope status:', e);
-  }
-}
-
 function updatePlanApprovalUI(status) {
   _updateApprovalUI('planStatusBadge', 'planApproveBtn', 'planRejectBtn', setPlanStatus, status);
 }
@@ -118,30 +95,9 @@ async function setPlanStatus(status) {
     await apiPost('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/plan-status', {status: status});
     LOCK_DATA.plan_status = status;
     EventBus.emit('approval:changed');
-    if (status === 'approved') {
-      updatePlanApprovalUI(status);
-      await tryAutoAdvanceGate();
-    } else {
-      updatePlanApprovalUI(status);
-    }
+    updatePlanApprovalUI(status);
   } catch (e) {
     console.error('Failed to set plan status:', e);
-  }
-}
-
-async function tryAutoAdvanceGate() {
-  if (state.phase !== '2.1') return;
-  if (LOCK_DATA.plan_status !== 'approved' || LOCK_DATA.scope_status !== 'approved') return;
-
-  var ctx = getWorkspaceContext();
-  if (!ctx) return;
-
-  try {
-    var result = await apiApprove(ctx.projectId, ctx.branch, '');
-    showToast(t('messages.approved', {phase: result.phase}));
-    await refreshState();
-  } catch (e) {
-    console.log('Auto-advance failed, use Phase Control:', e.message);
   }
 }
 
@@ -178,7 +134,6 @@ async function refreshState() {
     var yoloCheck = document.getElementById('yoloCheck');
     if (yoloCheck) yoloCheck.checked = !!LOCK_DATA.yolo_mode;
 
-    updateScopeStatusUI(LOCK_DATA.scope_status || 'pending');
     updatePlanApprovalUI(LOCK_DATA.plan_status || 'pending');
 
     EventBus.emit('state:refreshed', stateData);

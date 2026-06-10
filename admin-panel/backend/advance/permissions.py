@@ -3,11 +3,11 @@
 Evaluates whether a tool use is allowed based on workspace phase, scope,
 and approval status. Called on every tool use, so performance matters.
 """
-import json
 import os
 import re
 from pathlib import Path
 
+from services import plan_service
 from services import scope_service
 from core.db import ws_field
 from core.paths import REPO_ROOT, STATE_DIR
@@ -135,7 +135,7 @@ def check_tool_permission(ws, tool_name, tool_input, project_path):
     """Route a tool invocation to the appropriate permission checker.
 
     Args:
-        ws: workspace row (dict-like) with phase, scope_json, etc.
+        ws: workspace row (dict-like) with phase, plan_json, etc.
         tool_name: name of the tool being invoked (Edit, Bash, etc.)
         tool_input: dict with tool-specific fields (file_path, command, etc.)
         project_path: current working directory for path resolution.
@@ -155,18 +155,13 @@ def check_tool_permission(ws, tool_name, tool_input, project_path):
 
 
 def _requires_approval(ws):
-    """Check scope and plan approval status.
+    """Check plan approval status (scope is part of the plan now).
 
     Returns:
-        None if both are approved, or a denial result dict if either is not.
+        None if the plan is approved, or a denial result dict if it is not.
     """
     phase = ws["phase"]
-    scope_status = ws_field(ws, "scope_status", "pending")
     plan_status = ws_field(ws, "plan_status", "pending")
-
-    if scope_status != "approved":
-        return {"governed": True, "phase": phase, "allowed": False,
-                "reason": "Scope has not been approved by the user. Wait for scope approval in the admin panel."}
 
     if plan_status != "approved":
         return {"governed": True, "phase": phase, "allowed": False,
@@ -244,13 +239,8 @@ def _file_matches_scope(file_path, ws):
             return False, ["(workspace directory only)"]
         return True, []
 
-    scope_json = ws["scope_json"]
-    if not scope_json or scope_json in ("{}", "null"):
-        return True, []
-
-    try:
-        scope_map = json.loads(scope_json)
-    except json.JSONDecodeError:
+    scope_map = plan_service.get_scope(ws)
+    if not scope_map:
         return True, []
 
     phase = ws["phase"]

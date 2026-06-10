@@ -7,7 +7,6 @@ These verify that ``CommitPhase.validate`` enforces:
 - Replaying the same commit twice is rejected
 - Yolo mode bypasses every advance-side check (checkpoint, descendant, scope).
 """
-import json
 import subprocess
 from pathlib import Path
 
@@ -25,15 +24,15 @@ def _get_ws_row(ws_id):
 
 
 def _setup_execution_phase(ws_id, phase, num_plan_phases=3):
-    """Set up workspace for an execution phase with per-sub-phase scope."""
+    """Set up workspace for an execution phase with per-sub-phase scope.
+
+    Scope lives inside the plan's execution items (see make_plan_json).
+    """
     plan = make_plan_json(num_plan_phases)
-    scope = {f"3.{n}": {"must": ["src/"], "may": ["tests/"]} for n in range(1, num_plan_phases + 1)}
     set_phase(
         ws_id, phase,
         plan_json=plan,
         plan_status="approved",
-        scope_status="approved",
-        scope_json=json.dumps(scope),
     )
 
 

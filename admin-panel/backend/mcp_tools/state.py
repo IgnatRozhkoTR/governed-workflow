@@ -32,7 +32,7 @@ def workspace_get_state(ws, project, db, locale) -> dict:
         No parameters. Workspace is auto-detected from the working directory.
 
     Returns:
-        Dict with keys: phase, status, scope, scope_status, phase_sequence,
+        Dict with keys: phase, status, scope, phase_sequence,
         context, discussions, plan_summary, progress_summary,
         research_summary, unresolved_comments_count, review_issues_summary,
         criteria_summary, previous_sessions_count, locale, branch,
@@ -107,7 +107,6 @@ def workspace_get_state(ws, project, db, locale) -> dict:
         "phase": ws["phase"],
         "status": ws["status"],
         "scope": scope,
-        "scope_status": ws["scope_status"],
         "phase_sequence": phase_sequence,
         "context": context,
         "discussions": discussions,

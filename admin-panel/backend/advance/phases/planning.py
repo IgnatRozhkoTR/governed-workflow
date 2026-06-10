@@ -43,21 +43,21 @@ SendMessage(
 ```
 Here `impl` tasks run in parallel, then `test` tasks run in parallel after. Without groups, all 4 would run sequentially — wasteful when they don't conflict.
 
-**Scope (must vs may)**: Call `workspace_set_scope` alongside the plan. The distinction matters:
+**Scope (must vs may)**: Scope is part of the plan — each execution item carries its own `scope: {must, may}`. The distinction matters:
 - **must**: Broad areas where absence of changes means the task is incomplete. These are ticket-level requirements obvious *before* planning — e.g., if the ticket says "add BDD scenarios", the BDD module is must-scope. Keep this list short.
 - **may**: Specific files and packages identified *during* planning. Most paths from the execution plan belong here. These are permitted but not required — the plan proposes them, but the user decides if they're all necessary.
 
 When plan is agreed:
-1. Call `workspace_set_scope` with must/may paths
-2. Call `workspace_set_plan` with the full plan JSON
+1. Call `workspace_set_plan` with the full plan JSON — each execution item must include its `scope` (must/may)
+2. Propose acceptance criteria via `workspace_propose_criteria` (unit tests, integration tests, BDD scenarios, custom checks). At least one criterion is required before advancing.
 3. Call `workspace_update_progress` for phase `"2"`
 4. Call `workspace_advance`
 
-**Extending the plan later**: If during execution the user requests additional changes within the same ticket, or new work is discovered that warrants a new sub-phase, use `workspace_extend_plan` instead of rewriting the entire plan with `workspace_set_plan`. This appends a new sub-phase (auto-assigned ID, with scope) without touching existing sub-phases — fewer tokens, less risk of breaking the plan. The plan and scope statuses are set to 'pending' (user must re-approve).
+**Extending the plan later**: If during execution the user requests additional changes within the same ticket, or new work is discovered that warrants a new sub-phase, use `workspace_extend_plan` instead of rewriting the entire plan with `workspace_set_plan`. This appends a new sub-phase (auto-assigned ID, with its own scope) without touching existing sub-phases — fewer tokens, less risk of breaking the plan. The plan status is set to 'pending' (user must re-approve).
 
-**User review (happens while the workspace sits at 2.0)**: The user reviews and approves BOTH the plan and the scope in the admin panel. `workspace_advance` stays blocked until `plan_status='approved'` AND `scope_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0` (the first execution item) — there is no separate 2.1 gate phase. If the user rejects, the plan and scope statuses go back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan` / `workspace_set_scope`, then call `workspace_advance` again.
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. Approving the plan also approves its scope and accepts all proposed acceptance criteria — it is the single approval. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0` (the first execution item) — there is no separate 2.1 gate phase. If the user rejects, the plan status goes back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan`, then call `workspace_advance` again.
 
-**Advance 2.0 → 3.1.0** requires: valid plan with ≥1 execution sub-phase, plan_status='approved', scope_status='approved', ≥1 acceptance criterion, no pending/rejected criteria, and progress entry `"2"`."""
+**Advance 2.0 → 3.1.0** requires: valid plan with ≥1 execution sub-phase (each with a non-empty `scope.must`), plan_status='approved', ≥1 acceptance criterion, no proposed criteria, and progress entry `"2"`."""
 
     def progress_key(self, ws):
         return "2"
@@ -65,8 +65,8 @@ When plan is agreed:
     def validate(self, ws, body, project_path):
         locale = ws["locale"]
 
-        if ws["scope_status"] != "approved" or ws["plan_status"] != "approved":
-            return False, {"error": t("advance.error.scopeAndPlanMustBeApproved", locale)}
+        if ws["plan_status"] != "approved":
+            return False, {"error": t("advance.error.planMustBeApproved", locale)}
 
         plan = plan_service.get_plan(ws)
         execution = plan.get("execution", [])
@@ -84,6 +84,10 @@ When plan is agreed:
 
             if not isinstance(item.get("name"), str) or not item.get("name"):
                 issues.append(t("advance.error.planItemMissingName", locale, i=i))
+
+            scope = item.get("scope")
+            if not isinstance(scope, dict) or not isinstance(scope.get("must"), list):
+                issues.append(t("advance.error.planItemMissingScope", locale, i=i))
 
             tasks = item.get("tasks", [])
             if not isinstance(tasks, list) or not tasks:
@@ -109,7 +113,7 @@ When plan is agreed:
             ).fetchone()["cnt"]
             pending = db.execute(
                 "SELECT COUNT(*) as cnt FROM acceptance_criteria "
-                "WHERE workspace_id = ? AND status IN ('proposed', 'rejected')",
+                "WHERE workspace_id = ? AND status = 'proposed'",
                 (ws["id"],)
             ).fetchone()["cnt"]
 

@@ -44,23 +44,6 @@ def create_criterion(db, ws, project):
     return jsonify({"ok": True, "id": result["criterion"]["id"]}), 201
 
 
-@bp.route("/api/ws/<project_id>/<path:branch>/criteria/<int:criterion_id>", methods=["PUT"])
-@with_workspace
-def update_criterion(db, ws, project, criterion_id):
-    body = request.get_json(silent=True) or {}
-    new_status = body.get("status")
-    if not new_status:
-        return jsonify({"error": t("api.error.statusRequired")}), 400
-    if new_status not in ("accepted", "rejected"):
-        return jsonify({"error": t("api.error.statusMustBeAcceptedOrRejected")}), 400
-
-    result = criteria_service.set_criterion_status(db, criterion_id, ws["id"], new_status)
-    if "error" in result:
-        return jsonify({"error": t("api.error.criterionNotFound")}), 404
-    db.commit()
-    return jsonify({"ok": True})
-
-
 @bp.route("/api/ws/<project_id>/<path:branch>/criteria/<int:criterion_id>", methods=["DELETE"])
 @with_workspace
 def delete_criterion(db, ws, project, criterion_id):

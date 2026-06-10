@@ -45,8 +45,6 @@
   "buttons.reply": "Ответить",
   "buttons.resolve": "решить",
   "buttons.unresolve": "Открыть",
-  "buttons.accept": "Принять",
-  "buttons.deny": "Отказать",
   "buttons.reapprove": "Одобрить повторно",
   "buttons.validate": "Проверить",
   "buttons.open": "Открыть",
@@ -231,7 +229,6 @@
   "phase.phaseName": "Фаза {phase}",
   "phase.execution": "Реализация",
   "phase.overrideTitle": "Переопределить фазу",
-  "phase.scopeStatus": "Скоуп",
   "phase.planStatus": "План",
 
   "status.approved": "Утверждено",
@@ -291,7 +288,7 @@
   "criteria.bddScenario": "BDD-сценарий",
   "criteria.custom": "Произвольный",
   "criteria.noDetailsAvailable": "Детали недоступны.",
-  "criteria.rejectReason": "Причина отклонения критерия (необязательно):",
+  "criteria.acceptedOnPlanApproval": "Предложенные критерии автоматически принимаются при утверждении плана.",
   "criteria.viewDetails": "Нажмите для просмотра деталей",
   "criteria.detailsLink": "детали",
 

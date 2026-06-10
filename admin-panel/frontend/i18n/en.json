@@ -45,8 +45,6 @@
   "buttons.reply": "Reply",
   "buttons.resolve": "resolve",
   "buttons.unresolve": "Unresolve",
-  "buttons.accept": "Accept",
-  "buttons.deny": "Deny",
   "buttons.reapprove": "Re-approve",
   "buttons.validate": "Validate",
   "buttons.open": "Open",
@@ -231,7 +229,6 @@
   "phase.phaseName": "Phase {phase}",
   "phase.execution": "Execution",
   "phase.overrideTitle": "Override phase",
-  "phase.scopeStatus": "Scope",
   "phase.planStatus": "Plan",
 
   "status.approved": "Approved",
@@ -291,7 +288,7 @@
   "criteria.bddScenario": "BDD Scenario",
   "criteria.custom": "Custom",
   "criteria.noDetailsAvailable": "No details available.",
-  "criteria.rejectReason": "Reason for rejecting this criterion (optional):",
+  "criteria.acceptedOnPlanApproval": "Proposed criteria are accepted automatically when the plan is approved.",
   "criteria.viewDetails": "Click to view details",
   "criteria.detailsLink": "details",
 

@@ -684,10 +684,10 @@ def _register_workspace(
 
     db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, session_id, "
-        "working_dir, created, status, phase, scope_json, plan_json, source_branch, locale) "
-        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?)",
+        "working_dir, created, status, phase, plan_json, source_branch, locale) "
+        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?)",
         (project_id, branch, sanitized, str(working_dir), created,
-         '{}', '{"description":"","systemDiagram":"","execution":[]}', source, locale)
+         '{"description":"","systemDiagram":"","execution":[]}', source, locale)
     )
     db.commit()
 

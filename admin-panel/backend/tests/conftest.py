@@ -267,11 +267,10 @@ def workspace(project, git_repo):
     now = datetime.now().isoformat()
     cursor = db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
-        "created, status, phase, scope_json, plan_json, source_branch) "
-        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?, ?)",
+        "created, status, phase, plan_json, source_branch) "
+        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?)",
         (project["id"], "feature/test", "feature-test", git_repo,
-         now, '{"must":[],"may":[]}',
-         '{"description":"","systemDiagram":"","execution":[]}', "develop")
+         now, '{"description":"","systemDiagram":"","execution":[]}', "develop")
     )
     ws_id = cursor.lastrowid
     db.commit()
@@ -294,11 +293,10 @@ def second_workspace(project, git_repo):
     now = datetime.now().isoformat()
     cursor = db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
-        "created, status, phase, scope_json, plan_json, source_branch) "
-        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?, ?)",
+        "created, status, phase, plan_json, source_branch) "
+        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?)",
         (project["id"], "feature/other", "feature-other", git_repo,
-         now, '{"must":[],"may":[]}',
-         '{"description":"","systemDiagram":"","execution":[]}', "develop")
+         now, '{"description":"","systemDiagram":"","execution":[]}', "develop")
     )
     ws_id = cursor.lastrowid
     db.commit()

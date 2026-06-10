@@ -169,23 +169,18 @@ def update_criterion(db, criterion_id, workspace_id, description=None, details_j
     return result
 
 
-def set_criterion_status(db, criterion_id, workspace_id, status):
-    """Set the status of a criterion (accepted/rejected).
+def accept_all_proposed(db, workspace_id):
+    """Cascade every 'proposed' criterion to 'accepted' for a workspace.
 
-    Returns a result dict with ok or error key.
+    Called when the plan is approved — approving the plan accepts all proposed
+    criteria in the same transaction. Idempotent: a no-op when none are proposed.
+    Returns the number of rows updated.
     """
-    row = db.execute(
-        "SELECT id FROM acceptance_criteria WHERE id = ? AND workspace_id = ?",
-        (criterion_id, workspace_id)
-    ).fetchone()
-    if not row:
-        return {"error": "criterion_not_found"}
-
-    db.execute(
-        "UPDATE acceptance_criteria SET status = ? WHERE id = ?",
-        (status, criterion_id)
-    )
-    return {"ok": True}
+    return db.execute(
+        "UPDATE acceptance_criteria SET status = 'accepted' "
+        "WHERE workspace_id = ? AND status = 'proposed'",
+        (workspace_id,)
+    ).rowcount
 
 
 def validate_criterion_manual(db, criterion_id, workspace_id, passed, message=None):

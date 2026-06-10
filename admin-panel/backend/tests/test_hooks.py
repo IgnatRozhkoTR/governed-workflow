@@ -91,7 +91,7 @@ def test_session_start_deduplicates(client, workspace):
 def test_yolo_mode_bypasses_scope_matching(client, workspace):
     """When yolo_mode is set, ``check-permission`` allows any tool+file
     without consulting scope patterns."""
-    set_phase(workspace["id"], "3.1.0", yolo_mode=1, scope_status="pending")
+    set_phase(workspace["id"], "3.1.0", yolo_mode=1)
     r = client.post(
         "/api/hook/check-permission",
         json={
@@ -106,18 +106,15 @@ def test_yolo_mode_bypasses_scope_matching(client, workspace):
 
 def test_scope_enforced_when_yolo_disabled(client, workspace):
     """Without yolo, ``check-permission`` enforces scope so an out-of-scope
-    file is rejected."""
-    import json as _json
-    scope = _json.dumps({"3.1": {"must": ["src/"], "may": []}})
+    file is rejected. Scope lives inside the plan execution item."""
     plan = (
         '{"description":"p","systemDiagram":"","execution":'
-        '[{"id":"3.1","name":"N","tasks":[{"title":"T","files":[]}]}]}'
+        '[{"id":"3.1","name":"N","scope":{"must":["src/"],"may":[]},'
+        '"tasks":[{"title":"T","files":[]}]}]}'
     )
     set_phase(
         workspace["id"], "3.1.0",
         yolo_mode=0,
-        scope_json=scope,
-        scope_status="approved",
         plan_json=plan,
         plan_status="approved",
     )
@@ -137,7 +134,7 @@ def test_scope_enforced_when_yolo_disabled(client, workspace):
 def test_edit_tool_blocked_from_governed_workflow_install(client, workspace):
     """Edit/Write targeting any file inside the governed-workflow install tree
     is denied from a user workspace, even with yolo mode enabled."""
-    set_phase(workspace["id"], "3.1.0", yolo_mode=1, scope_status="pending")
+    set_phase(workspace["id"], "3.1.0", yolo_mode=1)
 
     from core.paths import REPO_ROOT
     evil_target = str(REPO_ROOT / "admin-panel" / "backend" / "admin-panel.db")
@@ -159,7 +156,7 @@ def test_edit_tool_blocked_from_governed_workflow_install(client, workspace):
 def test_bash_command_blocked_when_referencing_governed_workflow_path(client, workspace):
     """Bash commands that reference a governed-workflow path (even via cat or
     python) are denied from a user workspace."""
-    set_phase(workspace["id"], "3.1.0", yolo_mode=1, scope_status="pending")
+    set_phase(workspace["id"], "3.1.0", yolo_mode=1)
 
     from core.paths import REPO_ROOT
     command = f"cat {REPO_ROOT}/admin-panel/backend/admin-panel.db"
@@ -195,11 +192,10 @@ def test_edit_tool_allowed_inside_governed_workflow_self_workspace(
     now = datetime.now().isoformat()
     cursor = db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
-        "created, status, phase, scope_json, plan_json, source_branch, yolo_mode) "
-        "VALUES (?, ?, ?, ?, ?, 'active', '3.1.0', ?, ?, ?, 1)",
+        "created, status, phase, plan_json, source_branch, yolo_mode) "
+        "VALUES (?, ?, ?, ?, ?, 'active', '3.1.0', ?, ?, 1)",
         (
             project["id"], "self-edit", "self-edit", self_wd, now,
-            '{"must":[],"may":[]}',
             '{"description":"","systemDiagram":"","execution":[]}', "main"
         )
     )

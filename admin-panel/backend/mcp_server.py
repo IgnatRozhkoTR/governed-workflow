@@ -8,7 +8,6 @@ from mcp_tools import mcp
 from mcp_tools.state import workspace_get_state
 from mcp_tools.advance import workspace_advance
 from mcp_tools.plan_scope import (
-    workspace_set_scope,
     workspace_set_plan,
     workspace_get_plan,
     workspace_extend_plan,

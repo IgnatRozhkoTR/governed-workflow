@@ -91,8 +91,8 @@ def project_row(db, project_root):
 def _insert_worktree(db, project_id: str, branch: str, working_dir: Path, status: str = "active") -> int:
     cur = db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
-        "created, status, phase, scope_json, plan_json, source_branch) "
-        "VALUES (?, ?, ?, ?, ?, ?, '0', '{}', '{}', 'develop')",
+        "created, status, phase, plan_json, source_branch) "
+        "VALUES (?, ?, ?, ?, ?, ?, '0', '{}', 'develop')",
         (project_id, branch, branch.replace("/", "-"), str(working_dir),
          datetime.now().isoformat(), status),
     )

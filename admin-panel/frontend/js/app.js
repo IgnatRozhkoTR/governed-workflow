@@ -113,7 +113,6 @@ async function initApp() {
   renderPhaseHistory();
   renderPlan();
   renderScope();
-  updateScopeStatusUI(LOCK_DATA.scope_status || 'pending');
   updatePlanApprovalUI(LOCK_DATA.plan_status || 'pending');
   renderResearch();
   renderPreplanning();

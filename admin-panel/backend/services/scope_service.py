@@ -1,7 +1,9 @@
-"""Scope domain logic: set, validate status, and pattern matching for workspace scope.
+"""Scope domain logic: set scope into the plan and pattern matching for workspace scope.
 
-All scope business logic lives here. MCP tools and route handlers are thin
-wrappers that delegate to this module.
+Scope lives inside each plan execution item under a "scope" key. This module is
+the single adapter: callers set scope as a phase-keyed map and read patterns
+through the accessors here, which operate on the reconstructed map. MCP tools and
+route handlers are thin wrappers that delegate to this module.
 """
 import json
 import re
@@ -9,18 +11,19 @@ import re
 from core.helpers import match_scope_pattern
 from core.i18n import t
 from core.phase import phase_key
+from services import plan_service
 
 _PHASE_3_SUB_RE = re.compile(r'^3\.\d+\.\d+$')
 
-VALID_SCOPE_STATUSES = ("pending", "approved", "rejected")
-
 
 def set_scope(db, ws, scope_data, enforce_phase_guard=True):
-    """Update scope_json and reset scope_status to 'pending'.
+    """Merge a phase-keyed scope map into the plan's execution items and revoke approval.
 
-    When enforce_phase_guard=True (default, used by MCP), rejects updates at phase 0.
-    When enforce_phase_guard=False (used by admin UI), allows updates at any phase.
-    Always resets approval so the user must re-approve.
+    Scope is part of the plan now: each entry of ``scope_data`` (keyed by a
+    "3.N" sub-phase id) is written onto the matching execution item's "scope"
+    key. When enforce_phase_guard=True (default, used by MCP), rejects updates
+    at phase 0; when False (admin UI), allows updates at any phase. Editing
+    scope resets plan_status so the user must re-approve.
     Returns a result dict with ok/error keys.
     """
     locale = ws["locale"] or "en"
@@ -29,24 +32,17 @@ def set_scope(db, ws, scope_data, enforce_phase_guard=True):
     if enforce_phase_guard and phase_key(phase) < phase_key("1.0"):
         return {"error": t("mcp.error.scopePhase0", locale)}
 
-    scope_json = json.dumps(scope_data)
-    db.execute("UPDATE workspaces SET scope_json = ? WHERE id = ?", (scope_json, ws["id"]))
-    db.execute("UPDATE workspaces SET scope_status = 'pending' WHERE id = ?", (ws["id"],))
+    plan = plan_service.get_plan(ws)
+    for item in plan.get("execution", []):
+        entry = scope_data.get(item.get("id"))
+        if isinstance(entry, dict):
+            item["scope"] = entry
 
-    return {"ok": True, "phase": phase, "scope_status": "pending",
+    db.execute("UPDATE workspaces SET plan_json = ? WHERE id = ?", (json.dumps(plan), ws["id"]))
+    db.execute("UPDATE workspaces SET plan_status = 'pending' WHERE id = ?", (ws["id"],))
+
+    return {"ok": True, "phase": phase, "plan_status": "pending",
             "note": t("mcp.error.scopeNoteRevoked", locale)}
-
-
-def set_scope_status(db, ws_id, status, locale="en"):
-    """Validate and UPDATE scope_status for the given workspace.
-
-    Returns a result dict with ok/error keys.
-    """
-    if status not in VALID_SCOPE_STATUSES:
-        return {"error": t("api.error.invalidStatus", locale)}
-
-    db.execute("UPDATE workspaces SET scope_status = ? WHERE id = ?", (status, ws_id))
-    return {"ok": True, "scope_status": status}
 
 
 def get_scope_patterns(scope, phase):
@@ -56,7 +52,7 @@ def get_scope_patterns(scope, phase):
     For all other phases: aggregates across all phase entries in the scope map.
 
     Args:
-        scope: parsed scope dict (phase-keyed map from scope_json)
+        scope: parsed scope dict (phase-keyed map reconstructed from the plan)
         phase: current phase string e.g. "3.1.0", "2.0"
 
     Returns:
