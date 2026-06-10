@@ -9,12 +9,6 @@ from core.i18n import t
 from services import comment_service
 
 
-_RESOLVE_COMMENT_CATEGORIES = {
-    "review_scope_blocked": "business",
-    "not_found": "not_found",
-}
-
-
 @mcp.tool(annotations=ToolAnnotations(
     title="Get Comments",
     readOnlyHint=True,
@@ -145,38 +139,44 @@ def workspace_post_comment(
 @with_mcp_workspace
 def workspace_resolve_comment(
     ws, project, db, locale,
-    comment_id: Annotated[int, Field(description=(
-        "ID of the comment to resolve. Obtain from workspace_get_comments or "
-        "workspace_get_state. Must belong to the current workspace."
+    comment_ids: Annotated[list[int], Field(description=(
+        "List of comment IDs to resolve. Obtain from workspace_get_comments or "
+        "workspace_get_state. All IDs must belong to the current workspace. "
+        "Pass a single-element list to resolve one comment."
     ))],
 ) -> dict:
-    """Mark a user comment as resolved.
+    """Mark one or more user comments as resolved in a single call.
 
     Purpose:
-        Sets the resolved flag on a non-review comment after the feedback has
-        been addressed. Setting the same comment to resolved a second time is
-        a no-op (idempotent).
+        Sets the resolved flag on non-review comments after their feedback has
+        been addressed. Best-effort per id: a missing id or a review-scope id
+        goes to not_found rather than aborting the whole batch. An already-
+        resolved id is reported under already_resolved without re-writing it.
 
     Parameters:
-        comment_id: The ID of the comment to resolve.
+        comment_ids: Non-empty list of comment IDs to resolve.
 
     Returns:
-        {"ok": True, "comment_id": <id>, "resolved": True} on success.
+        {
+          "resolved": [<ids successfully resolved>],
+          "not_found": [<ids missing, foreign, or review-scope>],
+          "already_resolved": [<ids that were already resolved>],
+          "count": <number actually resolved>
+        }
 
     Errors:
-        not_found — comment_id does not exist or belongs to a different workspace.
-        business  — comment has scope='review'; use workspace_resolve_review_issue
-                    for review-scope items.
+        validation — comment_ids is empty.
+        not_found  — workspace not detected (handled by decorator).
 
     Example:
-        workspace_resolve_comment(17)
+        workspace_resolve_comment(comment_ids=[17, 18, 19])
     """
-    result = comment_service.resolve_comment(db, comment_id, ws["id"], block_review_scope=True, locale=locale)
-    if "ok" in result:
+    if not comment_ids:
+        return mcp_error("validation", t("mcp.error.emptyIdList", locale), retryable=False)
+
+    result = comment_service.resolve_comments_batch(db, ws["id"], comment_ids, locale=locale)
+    if result["count"] > 0:
         db.commit()
-    if "error" in result:
-        category = _RESOLVE_COMMENT_CATEGORIES.get(result.get("error_key"), "not_found")
-        return mcp_error(category, result["error"], retryable=False, details={"comment_id": comment_id})
     return result
 
 
@@ -330,37 +330,47 @@ def workspace_get_review_issues(
 @with_mcp_workspace
 def workspace_resolve_review_issue(
     ws, project, db, locale,
-    issue_id: Annotated[int, Field(description=(
-        "ID of the review issue to resolve. Obtain from workspace_get_review_issues."
+    issue_ids: Annotated[list[int], Field(description=(
+        "List of review issue IDs to resolve. Obtain from workspace_get_review_issues. "
+        "All IDs must belong to the current workspace. "
+        "Pass a single-element list to resolve one issue."
     ))],
     resolution: Annotated[Literal["fixed", "false_positive", "out_of_scope", "open"], Field(description=(
-        "How the issue was addressed: "
+        "How the issues were addressed: "
         "'fixed' — code changed to eliminate the defect; "
-        "'false_positive' — issue is invalid, code is correct as-is; "
-        "'out_of_scope' — legitimate issue but outside the allowed change scope; "
+        "'false_positive' — issues are invalid, code is correct as-is; "
+        "'out_of_scope' — legitimate issues but outside the allowed change scope; "
         "'open' — resets to unresolved (used by review-validator to reopen issues)."
     ))],
 ) -> dict:
-    """Set the resolution on a review issue.
+    """Set the resolution on one or more review issues in a single call.
 
     Purpose:
-        Called by agents after addressing a review finding. Setting the same
-        resolution a second time is a no-op (idempotent). The 'open' value
-        is reserved for the review-validator agent to reopen issues that were
-        incorrectly closed.
+        Called by agents after addressing review findings. Best-effort per id:
+        a missing or foreign-workspace id goes to not_found rather than
+        aborting the whole batch. An id whose resolution already matches the
+        requested value is reported under already_resolved without re-writing it.
+        The 'open' value is reserved for the review-validator agent to reopen
+        issues that were incorrectly closed.
 
     Parameters:
-        issue_id: Review item ID from workspace_get_review_issues.
+        issue_ids: Non-empty list of review issue IDs from workspace_get_review_issues.
         resolution: One of 'fixed', 'false_positive', 'out_of_scope', 'open'.
 
     Returns:
-        {"ok": True, ...} on success.
+        {
+          "resolved": [<ids successfully updated>],
+          "not_found": [<ids missing or foreign to this workspace>],
+          "already_resolved": [<ids that already had this resolution>],
+          "count": <number actually updated>
+        }
 
     Errors:
-        not_found — issue_id does not exist or belongs to a different workspace.
+        validation — issue_ids is empty, or resolution value is not allowed.
+        not_found  — workspace not detected (handled by decorator).
 
     Example:
-        workspace_resolve_review_issue(7, "fixed")
+        workspace_resolve_review_issue(issue_ids=[7, 8, 9], resolution="fixed")
     """
     _VALID_RESOLUTIONS = ("fixed", "false_positive", "out_of_scope", "open")
     if resolution not in _VALID_RESOLUTIONS:
@@ -371,16 +381,12 @@ def workspace_resolve_review_issue(
             details={"allowed": list(_VALID_RESOLUTIONS), "resolution": resolution},
         )
 
-    result = comment_service.resolve_review_issue(
-        db, issue_id, ws["id"], resolution, locale=locale
+    if not issue_ids:
+        return mcp_error("validation", t("mcp.error.emptyIdList", locale), retryable=False)
+
+    result = comment_service.resolve_review_issues_batch(
+        db, ws["id"], issue_ids, resolution, locale=locale
     )
-    if "ok" in result:
+    if result["count"] > 0:
         db.commit()
-    if "error" in result:
-        return mcp_error(
-            "not_found",
-            result["error"],
-            retryable=False,
-            details={"issue_id": issue_id},
-        )
     return result

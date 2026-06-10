@@ -450,20 +450,22 @@ class TestComments:
         cid = add_comment(workspace["id"])
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_comment
-        result = workspace_resolve_comment(comment_id=cid)
-        assert result["ok"]
+        result = workspace_resolve_comment(comment_ids=[cid])
+        assert result["count"] == 1
+        assert cid in result["resolved"]
 
     def test_resolve_comment_not_found(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_comment
-        result = workspace_resolve_comment(comment_id=9999)
-        assert "error" in result
+        result = workspace_resolve_comment(comment_ids=[9999])
+        assert result["count"] == 0
+        assert 9999 in result["not_found"]
 
     def test_resolve_comment_marks_resolved(self, workspace, monkeypatch):
         cid = add_comment(workspace["id"])
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_comment, workspace_get_comments
-        workspace_resolve_comment(comment_id=cid)
+        workspace_resolve_comment(comment_ids=[cid])
         result = workspace_get_comments(unresolved_only=True)
         assert result == []
 
@@ -558,14 +560,15 @@ class TestReviewIssues:
         iid = add_comment(workspace["id"], scope="review", text="Test issue", resolution="open")
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_review_issue
-        result = workspace_resolve_review_issue(issue_id=iid, resolution="fixed")
-        assert result["ok"]
+        result = workspace_resolve_review_issue(issue_ids=[iid], resolution="fixed")
+        assert result["count"] == 1
+        assert iid in result["resolved"]
 
     def test_resolve_issue_invalid_resolution(self, workspace, monkeypatch):
         iid = add_comment(workspace["id"], scope="review", text="Test issue", resolution="open")
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_review_issue
-        result = workspace_resolve_review_issue(issue_id=iid, resolution="wontfix")
+        result = workspace_resolve_review_issue(issue_ids=[iid], resolution="wontfix")
         assert "error" in result
         assert result["errorCategory"] == "validation"
         assert result["isRetryable"] is False
@@ -573,23 +576,25 @@ class TestReviewIssues:
     def test_resolve_issue_not_found(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_review_issue
-        result = workspace_resolve_review_issue(issue_id=9999, resolution="fixed")
-        assert "error" in result
+        result = workspace_resolve_review_issue(issue_ids=[9999], resolution="fixed")
+        assert result["count"] == 0
+        assert 9999 in result["not_found"]
 
     def test_resolve_false_positive(self, workspace, monkeypatch):
         iid = add_comment(workspace["id"], scope="review", text="Test issue", resolution="open")
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_review_issue
-        result = workspace_resolve_review_issue(issue_id=iid, resolution="false_positive")
-        assert result["ok"]
-        assert result["resolution"] == "false_positive"
+        result = workspace_resolve_review_issue(issue_ids=[iid], resolution="false_positive")
+        assert result["count"] == 1
+        assert iid in result["resolved"]
 
     def test_resolve_comment_blocked_for_review_scope(self, workspace, monkeypatch):
         cid = add_comment(workspace["id"], scope="review", text="Review finding", resolution="open")
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_comment
-        result = workspace_resolve_comment(comment_id=cid)
-        assert "error" in result
+        result = workspace_resolve_comment(comment_ids=[cid])
+        assert result["count"] == 0
+        assert cid in result["not_found"]
 
 
 class TestProgress:
@@ -1095,7 +1100,7 @@ class TestGetVerificationResultsNotFound:
 
 
 class TestResolveCommentReviewScopeI18n:
-    def test_resolve_review_scope_returns_business_for_russian_locale(self, workspace, monkeypatch):
+    def test_resolve_review_scope_goes_to_not_found_bucket(self, workspace, monkeypatch):
         from core.db import get_db
         cid = add_comment(workspace["id"], scope="review", text="Review finding", resolution="open")
         db = get_db()
@@ -1104,10 +1109,9 @@ class TestResolveCommentReviewScopeI18n:
         db.close()
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_comment
-        result = workspace_resolve_comment(comment_id=cid)
-        assert "error" in result
-        assert result["errorCategory"] == "business"
-        assert "review" not in result["error"].lower()
+        result = workspace_resolve_comment(comment_ids=[cid])
+        assert result["count"] == 0
+        assert cid in result["not_found"]
 
 
 class TestI18nBlankChecks:
@@ -1351,14 +1355,14 @@ class TestErrorEnvelopeContract:
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_review_issue
         self._assert_envelope(workspace_resolve_review_issue(
-            issue_id=iid, resolution="nope"
+            issue_ids=[iid], resolution="nope"
         ))
 
-    def test_resolve_review_issue_not_found(self, workspace, monkeypatch):
+    def test_resolve_review_issue_empty_list(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_review_issue
         self._assert_envelope(workspace_resolve_review_issue(
-            issue_id=1234567, resolution="fixed"
+            issue_ids=[], resolution="fixed"
         ))
 
     def test_prove_research_not_found(self, workspace, monkeypatch):
@@ -1373,10 +1377,10 @@ class TestErrorEnvelopeContract:
         assert result["ok"] is True
         assert result["deleted"] is False
 
-    def test_resolve_comment_not_found(self, workspace, monkeypatch):
+    def test_resolve_comment_empty_list(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_resolve_comment
-        self._assert_envelope(workspace_resolve_comment(comment_id=42424242))
+        self._assert_envelope(workspace_resolve_comment(comment_ids=[]))
 
     def test_propose_criteria_invalid_type(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])

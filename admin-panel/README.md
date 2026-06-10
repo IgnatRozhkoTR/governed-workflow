@@ -160,7 +160,7 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 |------|-------------|
 | `workspace_get_comments` | Get review comments, optionally filtered by scope |
 | `workspace_post_comment` | Post a review comment on a specific file and line range |
-| `workspace_resolve_comment` | Mark a review comment as resolved |
+| `workspace_resolve_comment` | Resolve one or more review comments in a single call (pass an array of ids) |
 
 ### Reviews
 
@@ -168,7 +168,7 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 |------|-------------|
 | `workspace_submit_review_issue` | Submit a code-review issue with severity and location |
 | `workspace_get_review_issues` | Get review issues, optionally filtered by status |
-| `workspace_resolve_review_issue` | Set resolution on a review issue (fixed, false_positive, out_of_scope) |
+| `workspace_resolve_review_issue` | Set resolution on one or more review issues in a single call (pass an array of ids; resolution: fixed, false_positive, out_of_scope) |
 
 ### Criteria
 

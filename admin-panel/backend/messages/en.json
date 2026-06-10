@@ -95,6 +95,7 @@
   "mcp.error.lineStartBeyondFile": "line_start {line_start} is beyond file length ({length} lines)",
   "mcp.error.lineStartBeyondLineEnd": "line_start must be <= line_end",
   "mcp.error.failedToReadFile": "Failed to read file: {error}",
+  "mcp.error.emptyIdList": "At least one ID is required",
   "mcp.error.invalidResolution": "Resolution must be 'fixed', 'false_positive', or 'out_of_scope'",
   "mcp.error.cannotValidateUnresolved": "Cannot validate an unresolved issue. Resolve it first.",
   "mcp.error.reviewScopeResolveBlocked": "Review items can only be resolved by the user in the admin panel",

@@ -176,7 +176,7 @@ def resolve_review_issue(db, issue_id, workspace_id, resolution, locale="en"):
     Returns a result dict with ok/error keys.
     """
     row = db.execute(
-        "SELECT id FROM discussions WHERE id = ? AND workspace_id = ? AND scope = 'review'",
+        "SELECT id, resolution FROM discussions WHERE id = ? AND workspace_id = ? AND scope = 'review'",
         (issue_id, workspace_id)
     ).fetchone()
     if not row:
@@ -187,6 +187,89 @@ def resolve_review_issue(db, issue_id, workspace_id, resolution, locale="en"):
         (resolution, issue_id)
     )
     return {"ok": True, "issue_id": issue_id, "resolution": resolution}
+
+
+def resolve_review_issues_batch(
+    db, workspace_id: int, issue_ids: list, resolution: str, locale: str = "en"
+) -> dict:
+    """Apply resolution to multiple review issues in a single transaction.
+
+    Per-id best-effort: a missing or foreign id goes to not_found; an id whose
+    resolution already matches goes to already_resolved (not re-written).
+    Caller owns the transaction — commit after this call on success.
+
+    Returns a summary dict with keys: resolved, not_found, already_resolved, count.
+    """
+    resolved = []
+    not_found = []
+    already_resolved = []
+
+    for issue_id in issue_ids:
+        row = db.execute(
+            "SELECT id, resolution FROM discussions "
+            "WHERE id = ? AND workspace_id = ? AND scope = 'review'",
+            (issue_id, workspace_id),
+        ).fetchone()
+        if not row:
+            not_found.append(issue_id)
+            continue
+        if row["resolution"] == resolution:
+            already_resolved.append(issue_id)
+            continue
+        db.execute(
+            "UPDATE discussions SET resolution = ? WHERE id = ?",
+            (resolution, issue_id),
+        )
+        resolved.append(issue_id)
+
+    return {
+        "resolved": resolved,
+        "not_found": not_found,
+        "already_resolved": already_resolved,
+        "count": len(resolved),
+    }
+
+
+def resolve_comments_batch(
+    db, workspace_id: int, comment_ids: list, locale: str = "en"
+) -> dict:
+    """Resolve multiple non-review comments in a single transaction.
+
+    Per-id best-effort: a missing/foreign id goes to not_found; a review-scope
+    comment goes to not_found (same enforcement as the single-resolve tool);
+    an already-resolved id goes to already_resolved.
+    Caller owns the transaction — commit after this call on success.
+
+    Returns a summary dict with keys: resolved, not_found, already_resolved, count.
+    """
+    resolved = []
+    not_found = []
+    already_resolved = []
+
+    for comment_id in comment_ids:
+        row = db.execute(
+            "SELECT id, scope, status FROM discussions "
+            "WHERE id = ? AND workspace_id = ? AND scope IS NOT NULL",
+            (comment_id, workspace_id),
+        ).fetchone()
+        if not row or row["scope"] == "review":
+            not_found.append(comment_id)
+            continue
+        if row["status"] == "resolved":
+            already_resolved.append(comment_id)
+            continue
+        db.execute(
+            "UPDATE discussions SET status = 'resolved', resolved_at = ? WHERE id = ?",
+            (datetime.now().isoformat(), comment_id),
+        )
+        resolved.append(comment_id)
+
+    return {
+        "resolved": resolved,
+        "not_found": not_found,
+        "already_resolved": already_resolved,
+        "count": len(resolved),
+    }
 
 
 def resolve_all_open_review_issues(db, workspace_id, resolution):

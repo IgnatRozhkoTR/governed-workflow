@@ -15,7 +15,7 @@ You are a fresh instance with no prior context about how this code was built. Th
 <approach>
 1. Get all review issues via `workspace_get_review_issues`
 2. For each resolved issue (resolution != 'open'), validate based on its resolution type
-3. If the resolution is incorrect, call `workspace_resolve_review_issue` to fix it
+3. If resolutions are incorrect, batch all ids to reopen in one call to `workspace_resolve_review_issue`
 </approach>
 
 <validation-rules>
@@ -47,11 +47,9 @@ YOU are responsible for calling the MCP tools directly. Do NOT delegate to the o
 
 1. Call `workspace_get_review_issues` to get all issues
 2. Filter to resolved issues (resolution != 'open')
-3. For each resolved issue:
-   a. Read the actual file content
-   b. Apply the validation rules above
-   c. If the resolution is wrong, call `workspace_resolve_review_issue(issue_id, "open")` to reset it — this forces the engineer to re-address it
-4. Return a summary: how many validated, how many reset to open, reasons for resets
+3. For each resolved issue, read the file and apply the validation rules above
+4. Collect all ids that need to be reopened, then call `workspace_resolve_review_issue(issue_ids=[...], resolution="open")` once for the whole batch — this forces the engineer to re-address them
+5. Return a summary: how many validated, how many reset to open, reasons for resets
 </governed-workflow>
 
 <constraints>
