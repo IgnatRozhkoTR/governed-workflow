@@ -48,6 +48,7 @@
   "buttons.accept": "Accept",
   "buttons.deny": "Deny",
   "buttons.reapprove": "Re-approve",
+  "buttons.validate": "Validate",
   "buttons.open": "Open",
   "buttons.remove": "Remove",
   "buttons.register": "Register",

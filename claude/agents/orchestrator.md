@@ -94,4 +94,4 @@ Always consult `workspace_get_state` early in a session and after any phase-rele
 - Open discussions, review issues, unresolved comments
 - Previous sessions count
 
-Refer to the `/governed-workflow` skill for phase-specific playbooks. Each phase has its own gate semantics — preparation review at 1.4, plan review at 2.1, code review at 3.N.3, final approval at 4.2.
+Refer to the `/governed-workflow` skill for phase-specific playbooks. Each phase has its own gate semantics — preparation review at 1.4, plan+scope approval in the panel during 2.0, code review at 3.N.3, final approval at 4.2.

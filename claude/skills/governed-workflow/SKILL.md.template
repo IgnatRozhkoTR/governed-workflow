@@ -7,7 +7,7 @@ description: Orchestrates a governed multi-phase implementation workflow — ass
 
 Multi-phase implementation workflow with backend-enforced transitions. Every phase advance is validated server-side — the orchestrator cannot self-certify readiness.
 
-**Start every session by calling `workspace_get_state`.** The `phase` field tells you where you are. The `previous_sessions` field tells you whether this is a fresh start or a continuation.
+**Start every session by calling `workspace_get_state`.** The `phase` field tells you where you are. The `previous_sessions_count` field tells you whether this is a fresh start or a continuation.
 
 ---
 
@@ -50,7 +50,7 @@ Agents execute their task and return. The orchestrator continues them for follow
 | middle-backend-engineer | Phases 3.N.0 (stage 1), 3.N.2, 3.N.4, 4.1. Production code ONLY — never tests. |
 | middle-backend-test-engineer | Phase 3.N.0 (stage 2, after engineer). Tests ONLY. |
 | middle-code-validator | Phase 3.N.1 |
-| review-validator | Phase 4.0 — validates that review findings are addressed. The server-side pipeline dispatches architecture-reviewer, correctness-reviewer, and file-reviewer automatically. |
+| review-validator | Phase 4.1 — after resolutions are set, verifies 'fixed' issues were actually fixed and 'false_positive' claims hold. |
 | reflector | Phase 5.1 — spawned once with the reflection context embedded in its prompt. |
 
 ---
@@ -70,13 +70,13 @@ Phases stored as strings: `"0"`, `"1.2"`, `"3.2.3"`. Execution items `3.N.K` exp
 **Every session — fresh or resumed — starts here:**
 
 1. Call `workspace_get_state`
-2. Read `phase` and `previous_sessions`
+2. Read `phase` and `previous_sessions_count`
 
-**Fresh start** (`phase == "0"` and `previous_sessions` is empty): proceed to Phase 0.
+**Fresh start** (`phase == "0"` and `previous_sessions_count == 0`): proceed to Phase 0.
 
-**Recovery** (`phase > "0"` or `previous_sessions` is non-empty): the previous session ended (compaction, restart, or manual resume). **The plan-advisor from the previous session is gone — you MUST re-spawn it.**
+**Recovery** (`phase > "0"` or `previous_sessions_count > 0`): the previous session ended (compaction, restart, or manual resume). **The plan-advisor from the previous session is gone — you MUST re-spawn it.**
 
-1. Read `progress` entries to reconstruct what happened
+1. Call `workspace_get_progress` to reconstruct what happened
 2. **IMMEDIATELY re-spawn plan-advisor as a background sub-agent** (phase >= 1.0):
    ```
    Agent(
@@ -127,7 +127,7 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 
 | Tool | Why it needs explanation |
 |------|--------------------------|
-| `workspace_get_state` | Single source of truth for `phase`, `scope`, `plan`, `context`, `previous_sessions`. Call at session start and after every gate event. |
+| `workspace_get_state` | Single source of truth for `phase`, `scope`, `plan`, `context`, `previous_sessions_count`, `progress_summary`. Call at session start and after every gate event. |
 | `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules. Required arguments vary by phase — consult the per-phase blocks below for what to pass at each advance. |
 | `workspace_set_scope` | Writes must/may scope. Planning-phase only — call alongside `workspace_set_plan`. |
 | `workspace_set_plan` | Writes or replaces the execution plan. Planning-phase only; switches `plan_status` back to `pending`. |

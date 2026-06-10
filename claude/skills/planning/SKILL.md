@@ -208,7 +208,7 @@ Execute in order:
 3. `workspace_update_progress` for phase `"2"` with a summary of the plan
 4. `workspace_advance` — this enters the user review wait at 2.0. The workspace stays at 2.0 while the user reviews and approves both plan and scope in the admin panel. Once both are approved, the backend advances directly to 3.1.0.
 
-**Advance 2.0 -> 3.1.0** requires: valid plan with at least 1 execution sub-phase + progress entry `"2"` + both plan and scope approved by user in the admin panel. There is no separate 2.1 gate phase — plan and scope approval happen together in the panel while the workspace remains at 2.0.
+**Advance 2.0 -> 3.1.0** requires: valid plan with at least 1 execution sub-phase + progress entry `"2"` + >=1 acceptance criterion with no pending/rejected criteria + both plan and scope approved by user in the admin panel. There is no separate 2.1 gate phase — plan and scope approval happen together in the panel while the workspace remains at 2.0.
 
 ---
 

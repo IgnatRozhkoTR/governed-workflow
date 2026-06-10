@@ -1,6 +1,6 @@
 # agents
 
-19 specialized agent role definitions used by the governed workflow orchestrator. Each file is a Markdown spec that Claude Code loads as an agent.
+20 agent definitions — the orchestrator plus 19 sub-agent roles it works with. Each file is a Markdown spec that Claude Code loads as an agent.
 
 ## Frontmatter Fields
 

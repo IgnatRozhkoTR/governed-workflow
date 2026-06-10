@@ -52,7 +52,7 @@ function renderCriteria() {
         validationBadge = ' <span class="badge badge-danger">' + t('badges.userRejected') + '</span>' +
           ' <button class="btn btn-sm" onclick="validateCriterion(' + c.id + ', true)">' + t('buttons.reapprove') + '</button>';
       } else {
-        validationBadge = ' <button class="btn btn-sm" onclick="validateCriterionManual(' + c.id + ')">Validate</button>';
+        validationBadge = ' <button class="btn btn-sm" onclick="validateCriterionManual(' + c.id + ')">' + t('buttons.validate') + '</button>';
       }
     }
 
@@ -230,15 +230,23 @@ function deleteCriterion(id) {
 async function validateCriterionManual(id) {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
-  await apiPut('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/criteria/' + id + '/validate', { passed: true });
-  loadCriteria();
+  try {
+    await apiPut('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/criteria/' + id + '/validate', { passed: true });
+    await loadCriteria();
+  } catch (err) {
+    showToast(t('messages.failedToUpdate').replace('{error}', err && err.message ? err.message : String(err)));
+  }
 }
 
 async function validateCriterion(id, passed) {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
-  await apiPut('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/criteria/' + id + '/validate', { passed: passed });
-  await loadCriteria();
+  try {
+    await apiPut('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/criteria/' + id + '/validate', { passed: passed });
+    await loadCriteria();
+  } catch (err) {
+    showToast(t('messages.failedToUpdate').replace('{error}', err && err.message ? err.message : String(err)));
+  }
 }
 
 document.addEventListener('DOMContentLoaded', function() {

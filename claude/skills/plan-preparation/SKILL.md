@@ -131,7 +131,7 @@ If a research question originated from a discussion (posted via `workspace_post_
 
 Call `workspace_advance`.
 
-**Advance 1.1 -> 1.2** requires: at least 1 research entry saved, all entries valid.
+**Advance 1.1 -> 1.2** requires: `no_further_research_needed=true`, every open research discussion having linked research, at least 1 research entry saved, all entries valid.
 
 ---
 

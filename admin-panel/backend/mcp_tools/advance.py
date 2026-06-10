@@ -45,7 +45,7 @@ def workspace_advance(
 
     Purpose
       Advance the governed-workflow phase after completing the current phase's work.
-      User gates (1.4, 2.1, 3.N.3, 4.2) block advancement until the user approves in the
+      User gates (1.4, 3.N.3, 4.2) block advancement until the user approves in the
       admin panel — the tool returns statusCode=202 for those cases, not an error.
 
       At phase 1.1 (research → proving), you MUST set no_further_research_needed=True to confirm

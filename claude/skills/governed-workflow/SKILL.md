@@ -7,7 +7,7 @@ description: Orchestrates a governed multi-phase implementation workflow — ass
 
 Multi-phase implementation workflow with backend-enforced transitions. Every phase advance is validated server-side — the orchestrator cannot self-certify readiness.
 
-**Start every session by calling `workspace_get_state`.** The `phase` field tells you where you are. The `previous_sessions` field tells you whether this is a fresh start or a continuation.
+**Start every session by calling `workspace_get_state`.** The `phase` field tells you where you are. The `previous_sessions_count` field tells you whether this is a fresh start or a continuation.
 
 ---
 
@@ -50,7 +50,7 @@ Agents execute their task and return. The orchestrator continues them for follow
 | middle-backend-engineer | Phases 3.N.0 (stage 1), 3.N.2, 3.N.4, 4.1. Production code ONLY — never tests. |
 | middle-backend-test-engineer | Phase 3.N.0 (stage 2, after engineer). Tests ONLY. |
 | middle-code-validator | Phase 3.N.1 |
-| review-validator | Phase 4.0 — validates that review findings are addressed. The server-side pipeline dispatches architecture-reviewer, correctness-reviewer, and file-reviewer automatically. |
+| review-validator | Phase 4.1 — after resolutions are set, verifies 'fixed' issues were actually fixed and 'false_positive' claims hold. |
 | reflector | Phase 5.1 — spawned once with the reflection context embedded in its prompt. |
 
 ---
@@ -89,13 +89,13 @@ Phases stored as strings: `"0"`, `"1.2"`, `"3.2.3"`. Execution items `3.N.K` exp
 **Every session — fresh or resumed — starts here:**
 
 1. Call `workspace_get_state`
-2. Read `phase` and `previous_sessions`
+2. Read `phase` and `previous_sessions_count`
 
-**Fresh start** (`phase == "0"` and `previous_sessions` is empty): proceed to Phase 0.
+**Fresh start** (`phase == "0"` and `previous_sessions_count == 0`): proceed to Phase 0.
 
-**Recovery** (`phase > "0"` or `previous_sessions` is non-empty): the previous session ended (compaction, restart, or manual resume). **The plan-advisor from the previous session is gone — you MUST re-spawn it.**
+**Recovery** (`phase > "0"` or `previous_sessions_count > 0`): the previous session ended (compaction, restart, or manual resume). **The plan-advisor from the previous session is gone — you MUST re-spawn it.**
 
-1. Read `progress` entries to reconstruct what happened
+1. Call `workspace_get_progress` to reconstruct what happened
 2. **IMMEDIATELY re-spawn plan-advisor as a background sub-agent** (phase >= 1.0):
    ```
    Agent(
@@ -371,11 +371,11 @@ Call `workspace_advance` when both implementation and tests are complete.
 
 **Actors**: Validator sub-agents | **Code edits: OFF**
 
-Deploy validator sub-agents (`middle-code-validator` / `senior-code-validator`) for compilation check + code quality review. Each validator returns its PASS/FAIL findings directly to you as its response — there is no tool to submit them. Verification profiles assigned to the workspace (configured via `workspace_assign_verification_profile`) run automatically server-side at the phase gate; blocking steps must pass before you can advance.
+Deploy validator sub-agents (`middle-code-validator` / `senior-code-validator`) for compilation check + code quality review. Each validator returns its PASS/FAIL findings directly to you as its response — there is no tool to submit them. Verification profiles assigned to the workspace (configured via `workspace_assign_verification_profile`) run automatically server-side **at the advance gate**.
 
-Call `workspace_advance`. The phase machine reads the verification results and auto-routes:
-- Verification failed → `3.N.2` (Fixes)
-- Clean → `3.N.3` (Code Review)
+Call `workspace_advance`. The verification run executes during the advance and the phase machine routes off its result:
+- Verification failed → the advance lands you in `3.N.2` (Fixes) — it does NOT block. Fix the failures there, then advance back here to re-validate.
+- Verification passed, or no profiles are assigned → `3.N.3` (Code Review)
 
 ---
 
@@ -383,7 +383,7 @@ Call `workspace_advance`. The phase machine reads the verification results and a
 
 **Actors**: Engineer sub-agents | **Code edits: ON (in sub-phase scope)**
 
-You arrive here from validation failures OR user gate rejections. Read `workspace_get_comments` for user feedback. Deploy engineer sub-agents to fix the issues. Call `workspace_advance` when done.
+You arrive here from a failed verification run at `3.N.1` (or a code-review rejection at `3.N.3`). Call `workspace_get_verification_results` to see exactly which steps failed, and `workspace_get_comments` for any user feedback. Deploy engineer sub-agents to fix the issues — edits are allowed here. Call `workspace_advance` when done to return to `3.N.1` and re-validate. The loop is `3.N.1 → (fail) 3.N.2 → 3.N.1 → (pass) 3.N.3`.
 
 ---
 
@@ -451,7 +451,8 @@ Active scope = union of all sub-phase scopes.
 1. Read review items via `workspace_get_review_issues`. Findings from the headless pipeline are tagged in their description: `[severity/type]` for per-file findings, `[integration:agent-name]` for integration-reviewer findings. Use the tags to triage by lane.
 2. Address each finding — fix the code, or determine it's a false positive / out of scope
 3. Set resolution via `workspace_resolve_review_issue(issue_id, "fixed"|"false_positive"|"out_of_scope")`
-4. The user reviews resolutions in the admin panel and resolves each item
+4. After marking resolutions, spawn the `review-validator` sub-agent to verify that `fixed` issues were actually fixed and `false_positive` claims hold. If it disagrees, it reopens or re-resolves the item via MCP — address its findings before proceeding.
+5. The user reviews resolutions in the admin panel and resolves each item
 
 **Important**: Agents set the `resolution` but cannot resolve items. Only the user can resolve review items (set `status='resolved'`) via the admin panel. The `ReviewGuard` blocks advancement until ALL scope='review' discussions are user-resolved.
 
@@ -488,11 +489,13 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 2. Spawn the `reflector` sub-agent via the `Agent` tool with `subagent_type="reflector"`. Hand it the context as the prompt verbatim — the agent will submit zero or more proposals via `mcp__governed-workflow__workspace_submit_proposal`.
 3. Call `mcp__governed-workflow__workspace_list_proposals` to retrieve what the reflector submitted in this run.
 4. For each proposal with `implementation_kind="auto"`, apply it now:
-   - `memory_write` / `memory_delete` — write/delete the markdown file under `~/.claude/projects/<encoded-project-path>/memory/`. Encode the project path by replacing `/` and `.` with `-` (e.g. `/Users/me/Projects/foo` → `-Users-me-Projects-foo`). Update `MEMORY.md` index if it exists.
-   - `rule_new` / `rule_update` — use the `mcp__governed-workflow__rule_create` / `mcp__governed-workflow__rule_update` MCP tools.
+   - `memory_write` / `memory_delete` — you cannot edit files yourself (Edit/Write are disallowed at this phase). Spawn a `junior-backend-engineer` sub-agent to write/delete the markdown file under `~/.claude/projects/<encoded-project-path>/memory/` and update the `MEMORY.md` index if it exists. Encode the project path by replacing `/` and `.` with `-` (e.g. `/Users/me/Projects/foo` → `-Users-me-Projects-foo`); hand the sub-agent the proposal payload as the source of truth.
+   - `rule_new` / `rule_update` — apply directly via the `mcp__governed-workflow__rule_create` / `mcp__governed-workflow__rule_update` MCP tools (no sub-agent needed).
    - On success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=...)`; on tool failure, call with `status="failed"`; on conscious skip, call with `status="rejected"`.
 5. Leave proposals with `implementation_kind="manual"` alone — phase 5.2 picks them up.
 6. **Advance.** `workspace_advance` routes automatically: if any `manual` proposals remain in `status="proposed"`, you land in **5.2 Manual implementation**; otherwise you land in **6 Done**.
+
+Auto proposals are applied here without a further human gate — phase 4.2 was the final user approval. The user can inspect the outcomes afterward via `mcp__governed-workflow__workspace_list_proposals` or directly in the DB.
 
 ---
 
@@ -529,7 +532,7 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 
 | Tool | Why it needs explanation |
 |------|--------------------------|
-| `workspace_get_state` | Single source of truth for `phase`, `scope`, `plan`, `context`, `previous_sessions`. Call at session start and after every gate event. |
+| `workspace_get_state` | Single source of truth for `phase`, `scope`, `plan`, `context`, `previous_sessions_count`, `progress_summary`. Call at session start and after every gate event. |
 | `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules. Required arguments vary by phase — consult the per-phase blocks below for what to pass at each advance. |
 | `workspace_set_scope` | Writes must/may scope. Planning-phase only — call alongside `workspace_set_plan`. |
 | `workspace_set_plan` | Writes or replaces the execution plan. Planning-phase only; switches `plan_status` back to `pending`. |

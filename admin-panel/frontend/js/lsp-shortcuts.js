@@ -206,7 +206,7 @@ function renderLspShortcutsConfig() {
     var value = shortcuts[action] || '';
     html += '<div class="lsp-shortcut-row">'
       + '<label>' + label + '</label>'
-      + '<input type="text" id="lsp-cfg-shortcut-' + action + '" value="' + _lspEscapeAttr(value) + '" placeholder="e.g., Cmd+B">'
+      + '<input type="text" id="lsp-cfg-shortcut-' + action + '" value="' + escapeAttr(value) + '" placeholder="e.g., Cmd+B">'
       + '</div>';
   }
 
@@ -257,7 +257,7 @@ function renderSetupShortcutsSection() {
     var value = shortcuts[action] || '';
     html += '<div class="setup-shortcut-row">'
       + '<label>' + label + '</label>'
-      + '<input type="text" id="shortcut-' + action + '" value="' + _lspEscapeAttr(value) + '" placeholder="e.g., Cmd+B">'
+      + '<input type="text" id="shortcut-' + action + '" value="' + escapeAttr(value) + '" placeholder="e.g., Cmd+B">'
       + '</div>';
   }
 
@@ -283,8 +283,3 @@ function collectSetupShortcuts() {
   return shortcuts;
 }
 
-// --- Helpers ---
-
-function _lspEscapeAttr(str) {
-  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}

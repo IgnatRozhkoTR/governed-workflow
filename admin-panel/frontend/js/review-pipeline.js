@@ -201,6 +201,11 @@ async function _rpFetchAndRender(container, workspaceId) {
     return;
   }
 
+  if (res.status === 401) {
+    await _handleAuthFailure();
+    return;
+  }
+
   if (res.status === 404) {
     _rpRenderEmpty(container);
     return;
