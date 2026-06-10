@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""One-shot migration: render SKILL.md for every registered project.
+"""One-shot migration: run the full configurator chain for every registered project.
+
+Renders each project's payload — SKILL.md, the mirrored agent files, and the
+Stop hook in active worktree settings — from current DB state.
 
 Run from anywhere:
     python3 admin-panel/backend/scripts/migrate_skill_md.py

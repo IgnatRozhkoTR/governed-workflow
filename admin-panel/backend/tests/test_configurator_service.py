@@ -21,6 +21,7 @@ from services.configurator_service import (
     ConfiguratorChain,
     SkillConfigurator,
     StopHookConfigurator,
+    _rendered,
 )
 
 
@@ -79,16 +80,42 @@ def _insert_worktree(db, project_id: str, branch: str, working_dir: Path, status
 # ── SkillConfigurator: template discovery ──────────────────────────────────────
 
 
-def test_template_missing_logs_warning_and_writes_nothing(db, project_row, tmp_path, caplog):
-    """When SKILL.md.template is absent, the configurator logs and skips silently."""
+def test_template_missing_everywhere_logs_warning_and_writes_nothing(
+    db, project_row, tmp_path, caplog
+):
+    """When neither the project nor the default template exists, the configurator skips."""
     empty_root = tmp_path / "no-template"
     empty_root.mkdir()
+    missing_default = tmp_path / "no-default" / "SKILL.md.template"
 
-    with caplog.at_level(logging.WARNING, logger="services.configurator_service"):
-        SkillConfigurator().configure(db, project_row, empty_root)
+    with patch("services.configurator_service.SkillConfigurator.DEFAULT_TEMPLATE_PATH", missing_default), \
+         caplog.at_level(logging.WARNING, logger="services.configurator_service"):
+        results = SkillConfigurator().configure(db, project_row, empty_root)
 
     assert not (empty_root / SKILL_OUTPUT_REL).exists()
     assert any("template missing" in r.getMessage() for r in caplog.records)
+    assert results == [{"target": "SKILL.md", "action": "skipped", "reason": "template missing"}]
+
+
+def test_falls_back_to_default_template_when_project_template_absent(
+    db, project_row, tmp_path
+):
+    """A project with no SKILL.md.template renders from the shipped default template."""
+    empty_root = tmp_path / "no-project-template"
+    empty_root.mkdir()
+    default_template = tmp_path / "default-skills" / "governed-workflow" / "SKILL.md.template"
+    default_template.parent.mkdir(parents=True)
+    default_template.write_text(SAMPLE_TEMPLATE)
+
+    with patch("services.configurator_service.SkillConfigurator.DEFAULT_TEMPLATE_PATH", default_template):
+        results = SkillConfigurator().configure(db, project_row, empty_root)
+
+    rendered = empty_root / SKILL_OUTPUT_REL
+    assert rendered.exists()
+    body = rendered.read_text()
+    assert "{{PHASES}}" not in body
+    assert "Preamble." in body and "Footer." in body
+    assert all(r["action"] == "rendered" for r in results)
 
 
 def test_template_lacking_placeholder_logs_warning_and_writes_nothing(
@@ -154,7 +181,7 @@ def test_rendered_block_joins_phase_descriptions_with_separator(db, project_row,
     from advance.phases import get_phase
     from services import phase_resolver
 
-    phase_ids = phase_resolver.resolve_for_project(db, project_row)
+    phase_ids = phase_resolver.resolve_for_project(db, project_row, include_templated=True)
     blocks = []
     for pid in phase_ids:
         phase = get_phase(pid)
@@ -196,6 +223,31 @@ def test_phase_map_placeholder_is_replaced_with_markdown_table(db, project_row, 
     assert "| `4.1` | Address Fix" in body
     # The push column flips ON only at phase 6.
     assert "| `6` | Done |" in body
+
+
+def test_phase_map_includes_templated_execution_rows(db, project_row, tmp_path):
+    """The templated 3.x.K execution rows render in the Phase Map, 3.x.3 as a USER gate."""
+    root = tmp_path / "with-exec-map"
+    (root / SKILL_TEMPLATE_REL).parent.mkdir(parents=True)
+    (root / SKILL_TEMPLATE_REL).write_text(SAMPLE_TEMPLATE_WITH_MAP)
+
+    SkillConfigurator().configure(db, project_row, root)
+
+    body = (root / SKILL_OUTPUT_REL).read_text()
+    for k in range(5):
+        assert f"| `3.x.{k}` |" in body, f"3.x.{k} execution row missing from Phase Map"
+    gate_row = next(line for line in body.splitlines() if line.startswith("| `3.x.3` |"))
+    assert "USER" in gate_row
+
+
+def test_phases_block_includes_execution_descriptions(db, project_row, project_root):
+    """The {{PHASES}} block carries the templated 3.N.K execution descriptions."""
+    SkillConfigurator().configure(db, project_row, project_root)
+
+    body = (project_root / SKILL_OUTPUT_REL).read_text()
+    assert "## 3.N.0 Implementation" in body
+    assert "## 3.N.3 Code Review (USER GATE)" in body
+    assert "## 3.N.4 Commit" in body
 
 
 def test_phase_map_omits_phases_disabled_at_project_scope(db, project_row, tmp_path):
@@ -485,7 +537,7 @@ def test_stop_hook_configurator_handles_invalid_json(
 
 
 def test_chain_continues_when_a_configurator_raises(db, project_row, project_root, caplog):
-    """A raising configurator is logged but does not stop later configurators."""
+    """A raising configurator is logged, reported as failed, and does not stop the chain."""
     calls: list[str] = []
 
     class _Boom(Configurator):
@@ -496,27 +548,64 @@ def test_chain_continues_when_a_configurator_raises(db, project_row, project_roo
     class _Recorder(Configurator):
         def configure(self, db, project_id, project_path):
             calls.append("recorder")
+            return [_rendered("recorder-target")]
 
     chain = ConfiguratorChain([_Boom(), _Recorder()])
     with caplog.at_level(logging.ERROR, logger="services.configurator_service"):
-        chain.run(db, project_row, project_root)
+        results = chain.run(db, project_row, project_root)
 
     assert calls == ["boom", "recorder"]
     assert any("Configurator _Boom failed" in r.getMessage() for r in caplog.records)
+    assert {"target": "_Boom", "action": "failed", "reason": "intentional failure"} in results
+    assert {"target": "recorder-target", "action": "rendered", "reason": None} in results
 
 
 def test_chain_run_executes_configurators_in_order(db, project_row, project_root):
-    """Configurators are invoked in declared order."""
+    """Configurators are invoked in declared order and their results aggregate."""
     order: list[str] = []
 
     class _A(Configurator):
         def configure(self, db, project_id, project_path):
             order.append("a")
+            return [_rendered("a")]
 
     class _B(Configurator):
         def configure(self, db, project_id, project_path):
             order.append("b")
+            return [_rendered("b")]
 
     chain = ConfiguratorChain([_A(), _B()])
-    chain.run(db, project_row, project_root)
+    results = chain.run(db, project_row, project_root)
     assert order == ["a", "b"]
+    assert [r["target"] for r in results] == ["a", "b"]
+
+
+def test_chain_run_returns_skipped_entries_for_missing_targets(db, project_row, tmp_path):
+    """A skipped target surfaces as a non-rendered entry callers can attach as a warning."""
+    empty_root = tmp_path / "skip-root"
+    empty_root.mkdir()
+    missing_default = tmp_path / "no-default" / "SKILL.md.template"
+    missing_agents = tmp_path / "no-agents"
+
+    with patch("services.configurator_service.SkillConfigurator.DEFAULT_TEMPLATE_PATH", missing_default), \
+         patch("services.configurator_service.DEFAULT_AGENTS_DIR", missing_agents):
+        results = ConfiguratorChain([SkillConfigurator(), AgentFilesConfigurator()]).run(
+            db, project_row, empty_root
+        )
+
+    skipped = [r for r in results if r["action"] == "skipped"]
+    assert {r["reason"] for r in skipped} == {"template missing", "source directory missing"}
+
+
+def test_atomic_write_leaves_no_tmp_files(db, project_row, project_root, tmp_path):
+    """Rendering leaves no ``.tmp`` siblings behind in any written directory."""
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/atomic", wt, status="active")
+
+    SkillConfigurator().configure(db, project_row, project_root)
+    SkillConfigurator().configure(db, project_row, project_root)
+
+    leftovers = list((project_root / ".claude" / "skills" / "governed-workflow").glob("*.tmp"))
+    leftovers += list((wt / ".claude" / "skills" / "governed-workflow").glob("*.tmp"))
+    assert leftovers == []

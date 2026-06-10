@@ -69,12 +69,16 @@ def register_project():
         seed_default_modes(db, project_id)
 
         _setup_project_configs(path)
+        warnings = []
         try:
-            ConfiguratorChain.default().run(db, project_id, Path(path))
+            results = ConfiguratorChain.default().run(db, project_id, Path(path))
+            warnings = [r for r in results if r["action"] != "rendered"]
         except Exception:
             log.exception("Configurator chain failed at register_project; SKILL.md may be stale")
 
         project = {"id": project_id, "name": name, "path": path, "registered": registered}
+        if warnings:
+            project["configurator_warnings"] = warnings
         return jsonify(project), 201
     finally:
         db.close()

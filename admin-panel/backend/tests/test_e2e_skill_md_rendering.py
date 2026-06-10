@@ -122,27 +122,20 @@ def test_project_phase_toggle_off_removes_section_in_project_skill(
         )
 
 
-def test_workspace_phase_toggle_off_also_propagates_to_skill(
+def test_device_phase_toggle_off_removes_section_in_project_skill(
     client, project_with_template, worktree_workspace
 ):
-    """A workspace-scope toggle still re-renders SKILL.md (chain runs on every save).
-
-    Workspace-scope overrides are *not* honored by resolve_for_project, so the
-    toggled phase will still appear in the rendered output, but the chain
-    must still be invoked and write a SKILL.md byte-for-byte equal between
-    the project root and the active worktree.
-    """
+    """A device-scope toggle re-renders every project's SKILL.md and drops the phase."""
     project_skill = Path(project_with_template["path"]) / SKILL_OUTPUT_REL
     worktree_skill = worktree_workspace["working_dir"] / SKILL_OUTPUT_REL
 
-    # Ensure a clean starting state with no SKILL.md yet rendered.
     if project_skill.exists():
         project_skill.unlink()
     if worktree_skill.exists():
         worktree_skill.unlink()
 
     response = client.put(
-        f"/api/ws/{project_with_template['id']}/feature/rendering/phase-settings",
+        "/api/phase-settings/device",
         json={"settings": {"1.1": False}},
     )
     assert response.status_code == 200
@@ -152,8 +145,8 @@ def test_workspace_phase_toggle_off_also_propagates_to_skill(
     body = project_skill.read_text()
     assert worktree_skill.read_text() == body
     assert "{{PHASES}}" not in body
-    # Workspace-scope settings do NOT propagate to the project-level render.
-    assert "## 1.1 Research" in body
+    assert "## 1.1 Research" not in body
+    assert "## 1.0 Assessment" in body
 
 
 def test_re_enabling_phase_restores_section(client, project_with_template, worktree_workspace):

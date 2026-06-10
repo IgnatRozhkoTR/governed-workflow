@@ -87,12 +87,17 @@ def set_enabled_modules():
             )
         db.commit()
         projects = db.execute("SELECT id, path FROM projects").fetchall()
+        warnings = []
         for project_row in projects:
             try:
-                ConfiguratorChain.default().run(db, project_row["id"], Path(project_row["path"]))
+                results = ConfiguratorChain.default().run(db, project_row["id"], Path(project_row["path"]))
+                warnings.extend(r for r in results if r["action"] != "rendered")
             except Exception:
                 log.exception(
                     "Configurator chain failed at set_enabled_modules for project %s; SKILL.md may be stale",
                     project_row["id"],
                 )
-        return jsonify({"status": "saved"})
+        body = {"status": "saved"}
+        if warnings:
+            body["configurator_warnings"] = warnings
+        return jsonify(body)

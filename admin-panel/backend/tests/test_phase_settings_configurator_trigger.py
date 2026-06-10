@@ -1,9 +1,8 @@
 """Integration tests: phase-settings saves invoke the configurator chain.
 
-Sub-phase 3.1: project- and workspace-level phase-settings mutations must
-re-render SKILL.md. Device-level updates are intentionally NOT covered —
-they touch every project's render and the existing code path does not run
-the configurator there.
+Project-level phase-settings mutations re-render their own project; device-level
+mutations re-render every registered project because they touch all renders.
+Workspace-scope phase-settings routes no longer exist (no callers).
 """
 
 from pathlib import Path
@@ -14,6 +13,7 @@ def test_project_phase_settings_put_invokes_configurator(client, project):
     """PUTing project-scope phase settings runs the chain once with project metadata."""
     with patch("routes.phase_settings.ConfiguratorChain") as MockChain:
         chain_instance = MagicMock()
+        chain_instance.run.return_value = []
         MockChain.default.return_value = chain_instance
 
         response = client.put(
@@ -29,14 +29,15 @@ def test_project_phase_settings_put_invokes_configurator(client, project):
     assert args[2] == Path(project["path"])
 
 
-def test_workspace_phase_settings_put_invokes_configurator(client, workspace, project):
-    """PUTing workspace-scope phase settings runs the chain once for the parent project."""
+def test_device_phase_settings_put_invokes_configurator_per_project(client, project):
+    """A device-scope save re-renders every registered project."""
     with patch("routes.phase_settings.ConfiguratorChain") as MockChain:
         chain_instance = MagicMock()
+        chain_instance.run.return_value = []
         MockChain.default.return_value = chain_instance
 
         response = client.put(
-            f"/api/ws/{workspace['project_id']}/{workspace['branch']}/phase-settings",
+            "/api/phase-settings/device",
             json={"settings": {"1.1": False}},
         )
 
@@ -68,25 +69,11 @@ def test_project_phase_settings_put_succeeds_when_configurator_raises(client, pr
     assert get_resp.get_json()["settings"]["1.1"] is False
 
 
-def test_workspace_phase_settings_put_succeeds_when_configurator_raises(client, workspace):
-    with patch("routes.phase_settings.ConfiguratorChain") as MockChain:
-        chain_instance = MagicMock()
-        chain_instance.run.side_effect = RuntimeError("boom")
-        MockChain.default.return_value = chain_instance
-
-        response = client.put(
-            f"/api/ws/{workspace['project_id']}/{workspace['branch']}/phase-settings",
-            json={"settings": {"1.1": False}},
-        )
-
-    assert response.status_code == 200
-    assert response.get_json()["ok"] is True
-
-
 def test_invalid_project_settings_payload_does_not_invoke_chain(client, project):
     """Body-validation errors short-circuit before the configurator runs."""
     with patch("routes.phase_settings.ConfiguratorChain") as MockChain:
         chain_instance = MagicMock()
+        chain_instance.run.return_value = []
         MockChain.default.return_value = chain_instance
 
         response = client.put(
@@ -98,15 +85,21 @@ def test_invalid_project_settings_payload_does_not_invoke_chain(client, project)
     chain_instance.run.assert_not_called()
 
 
-def test_invalid_workspace_settings_payload_does_not_invoke_chain(client, workspace):
-    with patch("routes.phase_settings.ConfiguratorChain") as MockChain:
-        chain_instance = MagicMock()
-        MockChain.default.return_value = chain_instance
+def test_project_phase_settings_reports_configurator_warnings_when_template_missing(
+    client, project, tmp_path
+):
+    """When no template can be found the response surfaces a skipped warning entry."""
+    missing_default = tmp_path / "no-default" / "SKILL.md.template"
+    missing_agents = tmp_path / "no-agents"
 
+    with patch("services.configurator_service.SkillConfigurator.DEFAULT_TEMPLATE_PATH", missing_default), \
+         patch("services.configurator_service.DEFAULT_AGENTS_DIR", missing_agents):
         response = client.put(
-            f"/api/ws/{workspace['project_id']}/{workspace['branch']}/phase-settings",
-            json={"settings": {"1.1": "not-a-bool"}},
+            f"/api/projects/{project['id']}/phase-settings",
+            json={"settings": {"1.1": False}},
         )
 
-    assert response.status_code == 400
-    chain_instance.run.assert_not_called()
+    assert response.status_code == 200
+    warnings = response.get_json()["configurator_warnings"]
+    reasons = {w["reason"] for w in warnings}
+    assert "template missing" in reasons

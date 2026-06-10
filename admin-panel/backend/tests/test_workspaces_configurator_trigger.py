@@ -14,6 +14,7 @@ def test_create_workspace_invokes_configurator(client, project):
     """A successful workspace POST runs the configurator chain once."""
     with patch("routes.workspaces.ConfiguratorChain") as MockChain:
         chain_instance = MagicMock()
+        chain_instance.run.return_value = []
         MockChain.default.return_value = chain_instance
 
         response = client.post(
@@ -49,6 +50,7 @@ def test_create_workspace_does_not_invoke_chain_when_branch_missing(client, proj
     """Validation failures short-circuit before the configurator is consulted."""
     with patch("routes.workspaces.ConfiguratorChain") as MockChain:
         chain_instance = MagicMock()
+        chain_instance.run.return_value = []
         MockChain.default.return_value = chain_instance
 
         response = client.post(
@@ -70,6 +72,7 @@ def test_create_workspace_does_not_invoke_chain_for_duplicate_branch(client, pro
 
     with patch("routes.workspaces.ConfiguratorChain") as MockChain:
         chain_instance = MagicMock()
+        chain_instance.run.return_value = []
         MockChain.default.return_value = chain_instance
 
         second = client.post(

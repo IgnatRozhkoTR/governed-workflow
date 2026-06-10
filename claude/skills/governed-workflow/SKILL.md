@@ -45,12 +45,13 @@ Agents execute their task and return. The orchestrator continues them for follow
 | senior-backend-test-engineer | Complex test scenarios spanning write + fix cycles. Continue via SendMessage. Tests ONLY — always deployed AFTER engineer completes. |
 | senior-code-validator | Continue via SendMessage when re-validation after fixes is expected |
 | senior-code-researcher | Deep research spanning multiple rounds. Continue via SendMessage. |
-| researcher (middle) | Phase 1.1 (parallel, one per topic) |
+| code-researcher | Phase 1.1 (parallel, one per topic). Variants: diff-researcher, web-researcher, ui-researcher depending on where the answer lives. |
 | research-prover | Phase 1.2 |
-| engineer (middle) | Phases 3.N.0 (stage 1), 3.N.2, 3.N.4, 4.1. Production code ONLY — never tests. |
-| test engineer (middle) | Phase 3.N.0 (stage 2, after engineer). Tests ONLY. |
-| validator (middle) | Phase 3.N.1 |
-| reviewer | Phase 4.0 |
+| middle-backend-engineer | Phases 3.N.0 (stage 1), 3.N.2, 3.N.4, 4.1. Production code ONLY — never tests. |
+| middle-backend-test-engineer | Phase 3.N.0 (stage 2, after engineer). Tests ONLY. |
+| middle-code-validator | Phase 3.N.1 |
+| review-validator | Phase 4.0 — validates that review findings are addressed. The server-side pipeline dispatches architecture-reviewer, correctness-reviewer, and file-reviewer automatically. |
+| reflector | Phase 5.1 — spawned once with the reflection context embedded in its prompt. |
 
 ---
 
@@ -67,6 +68,11 @@ Only the phases listed below are enabled for this project. The Edits, Commits, P
 | `1.3` | Impact Analysis | Document cross-cutting effects before planning | OFF | OFF | OFF | — |
 | `1.4` | Preparation Review | User reviews assessment, research, impact analysis, and criteria | OFF | OFF | OFF | USER |
 | `2.0` | Planning | Orchestrator and plan-advisor draft the execution plan and scope | OFF | OFF | OFF | — |
+| `3.x.0` | Implementation | Engineers implement sub-phase tasks (in-scope edits) | ON | OFF | OFF | — |
+| `3.x.1` | Verification | Validators run; backend routes to fixes or review | OFF | OFF | OFF | — |
+| `3.x.2` | Fix Review | Engineers address validation or review failures | ON | OFF | OFF | — |
+| `3.x.3` | Commit Approval | User reviews the diff and approves the commit message | OFF | OFF | OFF | USER |
+| `3.x.4` | Commit | Engineer commits the staged changes | OFF | ON | OFF | — |
 | `4.0` | Agentic Review | Headless review pipeline runs file and integration reviewers | OFF | OFF | OFF | — |
 | `4.1` | Address Fix | Engineers address review findings across the merged scope | ON | ON | OFF | — |
 | `4.2` | Final Approval | User reviews the resolved findings and approves delivery | OFF | OFF | OFF | USER |
@@ -179,7 +185,7 @@ When assessment is complete:
 2. Call `workspace_update_progress` for phase `"1.0"` with a non-empty summary
 3. Call `workspace_advance`
 
-**Advance 1.0 → 1.1** requires: at least one open research discussion (`type='research'`).
+**Advance 1.0 → 1.1** requires: progress entry `"1.0"` with a non-empty summary AND at least one open research discussion (`type='research'`).
 
 ---
 
@@ -327,25 +333,86 @@ When plan is agreed:
 
 **Extending the plan later**: If during execution the user requests additional changes within the same ticket, or new work is discovered that warrants a new sub-phase, use `workspace_extend_plan` instead of rewriting the entire plan with `workspace_set_plan`. This appends a new sub-phase (auto-assigned ID, with scope) without touching existing sub-phases — fewer tokens, less risk of breaking the plan. The plan and scope statuses are set to 'pending' (user must re-approve).
 
-**Advance 2.0 → 2.1** requires: valid plan with ≥1 execution sub-phase, plan_status='approved', scope_status='approved', ≥1 acceptance criterion, no pending/rejected criteria, and progress entry `"2"`.
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves BOTH the plan and the scope in the admin panel. `workspace_advance` stays blocked until `plan_status='approved'` AND `scope_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0` (the first execution item) — there is no separate 2.1 gate phase. If the user rejects, the plan and scope statuses go back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan` / `workspace_set_scope`, then call `workspace_advance` again.
+
+**Advance 2.0 → 3.1.0** requires: valid plan with ≥1 execution sub-phase, plan_status='approved', scope_status='approved', ≥1 acceptance criterion, no pending/rejected criteria, and progress entry `"2"`.
 
 ---
 
-## 2.1 Plan Review (USER GATE)
+## 3.N.0 Implementation
 
-User reviews the plan, scope, and system diagram in the admin panel.
+**Actors**: Engineer sub-agents, then test engineer sub-agents | **Code edits: ON (in sub-phase scope)**
 
-- **Approve** → advances to `3.1.0`
-- **Reject** → back to `2.0` with comments
+Deploy in two stages:
+
+**Stage 1 — Production code**: Deploy engineer sub-agent(s) for the implementation tasks.
+
+**Stage 2 — Tests**: After engineers complete, deploy test engineer sub-agent(s) to write tests for the new/changed code. Test engineers read the implementation but write tests independently — they are NOT briefed on "how the code works", only on "what it should do" (from the task description and scope).
+
+If during implementation an issue arises that requires changing the approach or scope, message the plan-advisor to discuss:
+
+```
+SendMessage(
+  to: "plan-advisor",
+  content: "Implementation issue in sub-phase {N}: {describe the problem}.
+            The original plan assumed {X} but we found {Y}. What's the best path forward?"
+)
+```
+
+If the user requests additional work or new requirements emerge, use `workspace_extend_plan` to add a new sub-phase rather than rewriting the entire plan. This preserves existing sub-phases and their progress.
+
+Call `workspace_advance` when both implementation and tests are complete.
+
+**Advance 3.N.0 → 3.N.1** requires: at least 1 file changed per `must`-scope entry.
+
+---
+
+## 3.N.1 Validation
+
+**Actors**: Validator sub-agents | **Code edits: OFF**
+
+Deploy validator sub-agents (`middle-code-validator` / `senior-code-validator`) for compilation check + code quality review. Each validator returns its PASS/FAIL findings directly to you as its response — there is no tool to submit them. Verification profiles assigned to the workspace (configured via `workspace_assign_verification_profile`) run automatically server-side at the phase gate; blocking steps must pass before you can advance.
+
+Call `workspace_advance`. The phase machine reads the verification results and auto-routes:
+- Verification failed → `3.N.2` (Fixes)
+- Clean → `3.N.3` (Code Review)
+
+---
+
+## 3.N.2 Fixes
+
+**Actors**: Engineer sub-agents | **Code edits: ON (in sub-phase scope)**
+
+You arrive here from validation failures OR user gate rejections. Read `workspace_get_comments` for user feedback. Deploy engineer sub-agents to fix the issues. Call `workspace_advance` when done.
+
+---
+
+## 3.N.3 Code Review (USER GATE)
+
+User reviews the diff in the admin panel.
+
+- **Approve** (+ optional commit message) → `3.N.4`
+- **Reject** → back to `3.N.2` with comments
 
 Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
-**After rejection**: the backend sets the phase to `2.0`. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to confirm you're at `2.0`
+**After rejection**: the backend sets the phase to `3.N.2`. You are now in the fix phase — code edits are ON. Do NOT call `workspace_advance` immediately. Instead:
+1. Call `workspace_get_state` to confirm you're at `3.N.2`
 2. Call `workspace_get_comments` to read the rejection feedback
-3. Message plan-advisor via `SendMessage(to: "plan-advisor", ...)` with the feedback to revise the plan
-4. Call `workspace_set_plan` and `workspace_set_scope` with the revised plan
-5. Call `workspace_advance` only after the plan is updated
+3. Deploy engineer sub-agents to address the feedback
+4. Call `workspace_advance` only after fixes are complete
+
+---
+
+## 3.N.4 Commit
+
+**Actor**: Engineer sub-agent | **Commits: ON**
+
+Commit all changes. Use the commit message from `workspace_get_state` (`context.commit_message`) or generate one per git-rules.md.
+
+Call `workspace_advance(commit_hash="{hash}")`.
+
+**Advance 3.N.4 → next** requires: valid commit hash + progress entry `"3.N"`. Backend routes to `3.(N+1).0` or `4.0` if last sub-phase.
 
 ---
 
@@ -444,6 +511,8 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
    - On the sub-agent's success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=<one-line summary>)`; on failure, call with `status="failed", result_json=<error summary>`; on conscious skip, call with `status="rejected"`.
 3. **Advance to 6 Done** when the queue is drained.
 
+Manual proposals must be implementable purely via `.claude/` workspace metadata (agents, skills, rules, memory) and the `rule_*` MCP tools — file edits outside `.claude/` are blocked at 5.2 by phase permissions, so any proposal that needs repo-code changes must become a new ticket instead.
+
 ---
 
 ## 6 Done
@@ -461,7 +530,7 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 | Tool | Why it needs explanation |
 |------|--------------------------|
 | `workspace_get_state` | Single source of truth for `phase`, `scope`, `plan`, `context`, `previous_sessions`. Call at session start and after every gate event. |
-| `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules; for `3.N.4` pass `commit_hash`; for `1.1` pass `no_further_research_needed=true`. |
+| `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules. Required arguments vary by phase — consult the per-phase blocks below for what to pass at each advance. |
 | `workspace_set_scope` | Writes must/may scope. Planning-phase only — call alongside `workspace_set_plan`. |
 | `workspace_set_plan` | Writes or replaces the execution plan. Planning-phase only; switches `plan_status` back to `pending`. |
 | `workspace_extend_plan` | Appends a sub-phase to an already-approved plan. Use instead of `workspace_set_plan` when execution surfaces new work — avoids invalidating prior sub-phases. |
@@ -483,7 +552,6 @@ Full tool roster is granted via this agent's frontmatter; consult tool descripti
 | Gate | On reject, phase becomes | What to do |
 |------|--------------------------|------------|
 | 1.4 (Preparation Review) | `1.1` | Read comments, run more research, update impact analysis, re-prove, then advance |
-| 2.1 (Plan Review) | `2.0` | Read comments, revise plan, then advance |
 | 3.N.3 (Code Review) | `3.N.2` | Read comments, fix code, then advance |
 | 4.2 (Final Approval) | `4.1` | Read comments, fix code, then advance |
 
@@ -524,7 +592,7 @@ Required before certain advances. Use `workspace_update_progress`:
 | 1.0 → 1.1 | `"1.0"` |
 | 1.2 → 1.3 | `"1"` |
 | 1.3 → 1.4 | `"1.3"` |
-| 2.0 → 2.1 | `"2"` |
+| 2.0 → 3.1.0 | `"2"` |
 | 3.N.4 → next | `"3.N"` |
 | 4.0 → 4.1 | `"4.0"` |
 | 4.1 → 4.2 | `"4"` |

@@ -26,7 +26,7 @@ from core.paths import (
 )
 from core.terminal import session_name
 from services.git_rules_service import migrate_legacy_git_rules
-from services import comment_service, review_pipeline_service
+from services import comment_service, proposal_service, review_pipeline_service
 from services.configurator_service import ConfiguratorChain
 
 bp = Blueprint("workspaces", __name__)
@@ -665,7 +665,7 @@ def _install_git_hooks(dst_claude, working_dir):
 def _register_workspace(
     db, project_id, branch, sanitized, working_dir, source, locale, project_path,
 ):
-    """Insert workspace into DB and return the creation response."""
+    """Insert workspace into DB and return the creation-response body dict."""
     ws_path = workspace_dir(project_path, branch)
     ws_path.mkdir(parents=True, exist_ok=True)
 
@@ -683,12 +683,12 @@ def _register_workspace(
     tmux_name = session_name(project_id, sanitized)
     command = f"cd {working_dir} && tmux attach -t {tmux_name}"
 
-    return jsonify({
+    return {
         "workspace": str(ws_path),
         "working_dir": working_dir,
         "branch": branch,
-        "command": command
-    }), 201
+        "command": command,
+    }
 
 
 @bp.route("/api/projects/<project_id>/workspaces", methods=["POST"])
@@ -745,15 +745,18 @@ def create_workspace(project_id):
                 return err
             _install_checkout_configs(project_path)
 
-        response = _register_workspace(
+        body = _register_workspace(
             db, project_id, branch, sanitized, working_dir, source, locale,
             project_path,
         )
         try:
-            ConfiguratorChain.default().run(db, project_id, project_path)
+            results = ConfiguratorChain.default().run(db, project_id, project_path)
+            warnings = [r for r in results if r["action"] != "rendered"]
+            if warnings:
+                body["configurator_warnings"] = warnings
         except Exception:
             logger.exception("Configurator chain failed after workspace creation; SKILL.md may be stale")
-        return response
+        return jsonify(body), 201
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/archive", methods=["PUT"])
@@ -783,6 +786,7 @@ def archive_workspace(db, ws, project):
         _restore_project_files(project_path)
 
     archived_key = ws["sanitized_branch"] + "--" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    proposal_service.reject_open_proposals(db, ws["id"])
     db.execute(
         "UPDATE workspaces SET status = 'archived', sanitized_branch = ? WHERE id = ?",
         (archived_key, ws["id"])

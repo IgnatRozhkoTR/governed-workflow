@@ -5,7 +5,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from core.db import get_db, get_db_ctx
-from core.decorators import with_project, with_workspace
+from core.decorators import with_project
 from core.phase import is_templated, phase_key
 from services.configurator_service import ConfiguratorChain
 from services.phase_settings import get_scope_settings, is_always_on, set_scope_settings
@@ -72,9 +72,29 @@ def set_device_settings():
             set_scope_settings(db, "device", "", settings)
             db.commit()
             updated = get_scope_settings(db, "device", "")
+            warnings = _rerender_all_projects(db)
     except ValueError as err:
         return jsonify({"error": str(err)}), 400
-    return jsonify({"ok": True, "settings": updated})
+    response = {"ok": True, "settings": updated}
+    if warnings:
+        response["configurator_warnings"] = warnings
+    return jsonify(response)
+
+
+def _rerender_all_projects(db) -> list[dict]:
+    """Re-render every project after a device-scope change touches all renders."""
+    chain = ConfiguratorChain.default()
+    warnings = []
+    for project_row in db.execute("SELECT id, path FROM projects").fetchall():
+        try:
+            results = chain.run(db, project_row["id"], Path(project_row["path"]))
+            warnings.extend(r for r in results if r["action"] != "rendered")
+        except Exception:
+            log.exception(
+                "Configurator chain failed at set_device_settings for project %s; SKILL.md may be stale",
+                project_row["id"],
+            )
+    return warnings
 
 
 @bp.route("/api/projects/<project_id>/phase-settings", methods=["GET"])
@@ -97,38 +117,16 @@ def set_project_settings(db, project):
         updated = get_scope_settings(db, "project", str(project["id"]))
     except ValueError as err:
         return jsonify({"error": str(err)}), 400
+    warnings = []
     try:
-        ConfiguratorChain.default().run(db, project["id"], Path(project["path"]))
+        results = ConfiguratorChain.default().run(db, project["id"], Path(project["path"]))
+        warnings = [r for r in results if r["action"] != "rendered"]
     except Exception:
         log.exception("Configurator chain failed at set_project_settings; SKILL.md may be stale")
-    return jsonify({"ok": True, "settings": updated})
-
-
-@bp.route("/api/ws/<project_id>/<path:branch>/phase-settings", methods=["GET"])
-@with_workspace
-def get_workspace_settings(db, ws, project):
-    settings = get_scope_settings(db, "workspace", str(ws["id"]))
-    return jsonify({"settings": settings})
-
-
-@bp.route("/api/ws/<project_id>/<path:branch>/phase-settings", methods=["PUT"])
-@with_workspace
-def set_workspace_settings(db, ws, project):
-    body = request.get_json(silent=True) or {}
-    settings, err = _validate_settings_body(body)
-    if err:
-        return jsonify({"error": err}), 400
-    try:
-        set_scope_settings(db, "workspace", str(ws["id"]), settings)
-        db.commit()
-        updated = get_scope_settings(db, "workspace", str(ws["id"]))
-    except ValueError as err:
-        return jsonify({"error": str(err)}), 400
-    try:
-        ConfiguratorChain.default().run(db, project["id"], Path(project["path"]))
-    except Exception:
-        log.exception("Configurator chain failed at set_workspace_settings; SKILL.md may be stale")
-    return jsonify({"ok": True, "settings": updated})
+    response = {"ok": True, "settings": updated}
+    if warnings:
+        response["configurator_warnings"] = warnings
+    return jsonify(response)
 
 
 @bp.route("/api/phases/available", methods=["GET"])

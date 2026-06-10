@@ -32,18 +32,6 @@ def test_put_project_persists(client, project):
     assert get_resp.get_json()["settings"]["1.1"] is False
 
 
-def test_put_workspace_persists(client, workspace):
-    pid = workspace["project_id"]
-    url = f"/api/ws/{pid}/feature/test/phase-settings"
-    put_resp = client.put(url, json={"settings": {"1.1": False}})
-    assert put_resp.status_code == 200
-    assert put_resp.get_json()["ok"] is True
-
-    get_resp = client.get(url)
-    assert get_resp.status_code == 200
-    assert get_resp.get_json()["settings"]["1.1"] is False
-
-
 # ── Always-on rejection ───────────────────────────────────────────────────────
 
 def test_put_device_rejects_always_on_disable(client):
@@ -59,13 +47,6 @@ def test_put_project_rejects_always_on_disable(client, project):
     assert "error" in response.get_json()
 
 
-def test_put_workspace_rejects_always_on_disable(client, workspace):
-    pid = workspace["project_id"]
-    response = client.put(f"/api/ws/{pid}/feature/test/phase-settings", json={"settings": {"0": False}})
-    assert response.status_code == 400
-    assert "error" in response.get_json()
-
-
 def test_put_device_accepts_always_on_enable(client):
     response = client.put("/api/phase-settings/device", json={"settings": {"0": True}})
     assert response.status_code == 200
@@ -76,13 +57,6 @@ def test_put_device_accepts_always_on_enable(client):
 
 def test_get_project_unknown_returns_404(client):
     response = client.get("/api/projects/nonexistent-project-99/phase-settings")
-    assert response.status_code == 404
-    assert "error" in response.get_json()
-
-
-def test_get_workspace_unknown_returns_404(client, project):
-    pid = project["id"]
-    response = client.get(f"/api/ws/{pid}/feature/nonexistent-branch/phase-settings")
     assert response.status_code == 404
     assert "error" in response.get_json()
 
@@ -129,9 +103,9 @@ def test_get_phases_available_excludes_templated_ids(client):
 
 # ── Commit-gate regex enforcement ─────────────────────────────────────────────
 
-def test_put_workspace_rejects_3_1_3_disable(client, workspace):
-    pid = workspace["project_id"]
-    response = client.put(f"/api/ws/{pid}/feature/test/phase-settings", json={"settings": {"3.1.3": False}})
+def test_put_project_rejects_3_1_3_disable(client, project):
+    pid = project["id"]
+    response = client.put(f"/api/projects/{pid}/phase-settings", json={"settings": {"3.1.3": False}})
     assert response.status_code == 400
     assert "error" in response.get_json()
 

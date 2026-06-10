@@ -108,6 +108,38 @@ def test_archive_workspace_already_archived(client, workspace, project):
     assert r.status_code == 404
 
 
+def test_archive_workspace_rejects_open_proposals(client, workspace, project):
+    from core.db import get_db
+    from services import proposal_service
+
+    db = get_db()
+    try:
+        proposal_id = proposal_service.create_proposal(
+            db,
+            workspace_id=workspace["id"],
+            project_id=project["id"],
+            type="rule_new",
+            implementation_kind="manual",
+            title="Dangling proposal",
+            body="should be rejected on archive",
+        )
+    finally:
+        db.close()
+
+    r = client.put(f"/api/ws/{project['id']}/feature/test/archive")
+    assert r.status_code == 200
+
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT status, reason FROM proposals WHERE id = ?", (proposal_id,)
+        ).fetchone()
+    finally:
+        db.close()
+    assert row["status"] == "rejected"
+    assert row["reason"] == "Workspace archived"
+
+
 def test_create_workspace_recovers_from_stale_worktree_dir(client, project):
     """A leftover directory at .claude/worktrees/<branch> with no registered
     git worktree should be cleaned up automatically on workspace creation."""

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Workspace Control -- Flask backend for admin panel."""
+import logging
 import os
 import subprocess
 import sys
@@ -142,6 +143,27 @@ def _maybe_dispatch_cli() -> bool:
     return False
 
 
+def _rerender_all_projects_on_startup():
+    """Re-render every project's payload so on-disk config matches current phase classes.
+
+    Run only from the __main__ entry point — create_app() stays free of this so
+    pytest never triggers filesystem writes when it imports the app factory.
+    """
+    from services.configurator_service import ConfiguratorChain
+
+    chain = ConfiguratorChain.default()
+    with get_db_ctx() as db:
+        projects = db.execute("SELECT id, path FROM projects").fetchall()
+        for project_row in projects:
+            try:
+                chain.run(db, project_row["id"], Path(project_row["path"]))
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    "Configurator chain failed at startup for project %s; SKILL.md may be stale",
+                    project_row["id"],
+                )
+
+
 if __name__ == "__main__":
     _maybe_dispatch_cli()
     Path(__file__).resolve().parent.mkdir(parents=True, exist_ok=True)
@@ -150,6 +172,7 @@ if __name__ == "__main__":
         bind_host = get_bind_host(db)
         token_configured = get_admin_token_hash(db) is not None
     app = create_app()
+    _rerender_all_projects_on_startup()
     print("Workspace Control server starting...")
     print(f"  URL: http://localhost:5111")
     print(f"  Bind host: {bind_host}")
