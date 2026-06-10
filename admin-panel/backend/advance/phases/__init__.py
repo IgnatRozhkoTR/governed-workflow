@@ -92,7 +92,6 @@ class Phase(ABC):
             "1.3": t("phase.guide.1_3", locale),
             "1.4": t("phase.guide.1_4", locale),
             "2.0": t("phase.guide.2_0", locale),
-            "2.1": t("phase.guide.2_1", locale),
             "4.0": t("phase.guide.4_0", locale),
             "4.1": t("phase.guide.4_1", locale),
             "4.2": t("phase.guide.4_2", locale),

@@ -147,6 +147,18 @@ def test_set_phase_accepts_finalization_phases(client, workspace, phase):
     assert response.get_json()["phase"] == phase
 
 
+def test_set_phase_rejects_unregistered_2_1(client, workspace):
+    response = client.put(_ws_url(workspace, "phase"), json={"phase": "2.1"})
+    assert response.status_code == 400
+    assert "error" in response.get_json()
+
+
+def test_set_phase_accepts_2_0(client, workspace):
+    response = client.put(_ws_url(workspace, "phase"), json={"phase": "2.0"})
+    assert response.status_code == 200
+    assert response.get_json()["phase"] == "2.0"
+
+
 def test_set_phase_not_found(client, project):
     url = f"/api/ws/{project['id']}/feature/nonexistent/phase"
     response = client.put(url, json={"phase": "1.0"})

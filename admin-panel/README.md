@@ -227,5 +227,5 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 
 | Tool | Description |
 |------|-------------|
-| `workspace_get_state` | Compact workspace state overview with summaries, counts, and `previous_sessions` |
+| `workspace_get_state` | Compact workspace state overview with summaries, counts, and `previous_sessions_count` |
 | `workspace_advance` | Request phase advancement (backend decides the next phase; commit_hash for 3.N.4) |

@@ -29,7 +29,7 @@ flowchart TB
         IM["3.N.0: Implementation"] --> V["3.N.1: Validation"]
         V -->|Clean| G3{{"3.N.3: Code Review<br/>USER GATE"}}
         V -->|Issues found| F["3.N.2: Fixes"]
-        F --> G3
+        F -->|Re-validate| V
         G3 -->|Approve| C["3.N.4: Commit"]
         G3 -.->|Reject| F
         C -.->|More sub-phases| IM
