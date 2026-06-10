@@ -252,7 +252,8 @@ def workspace_resolve_proposal(
             result_json=result_json,
         )
     except ProposalServiceError as exc:
-        return mcp_error("validation", exc.code, retryable=False, details={"code": exc.code})
+        category = "business" if exc.code == "already_resolved" else "validation"
+        return mcp_error(category, str(exc) or exc.code, retryable=False, details={"code": exc.code})
 
     db.commit()
     return updated

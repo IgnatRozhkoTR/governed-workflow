@@ -135,6 +135,15 @@ def resolve_proposal(
     if existing is None:
         raise ProposalServiceError(code="proposal_not_found")
 
+    if existing["status"] in TERMINAL_STATUSES:
+        if existing["status"] == status:
+            return existing
+        raise ProposalServiceError(
+            code="already_resolved",
+            message=f"proposal {proposal_id} is already {existing['status']!r}; "
+            f"cannot change to {status!r}",
+        )
+
     now = datetime.now().isoformat()
     executed_at = now if status in {"executed", "failed"} else None
     reviewed_at = now if status == "rejected" else None
@@ -157,11 +166,11 @@ def count_pending_manual_proposals(db, workspace_id: int) -> int:
     return row["cnt"] if row else 0
 
 
-def reject_open_proposals(db, workspace_id: int) -> int:
+def reject_open_proposals(db, workspace_id: int, reason: str = "Workspace archived") -> int:
     cursor = db.execute(
-        "UPDATE proposals SET status='rejected', reason='Workspace archived', "
+        "UPDATE proposals SET status='rejected', reason=?, "
         "reviewed_at=datetime('now') "
         "WHERE workspace_id=? AND status='proposed'",
-        (workspace_id,),
+        (reason, workspace_id),
     )
     return cursor.rowcount

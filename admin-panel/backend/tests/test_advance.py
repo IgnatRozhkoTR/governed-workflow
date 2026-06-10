@@ -450,34 +450,34 @@ def test_execution_implementation_passes_with_changes(workspace, project):
     assert result["phase"] == "3.1.1"
 
 
-def _add_verification_run(ws_id, phase, status):
-    """Insert a completed verification run so VerificationPhase.next_phase can route off it."""
+def _assign_verification_profile(project_id, command):
+    """Assign a single-step shell profile to the project so VerificationPhase runs it."""
     db = get_db()
     try:
         now = datetime.now().isoformat()
+        profile_cursor = db.execute(
+            "INSERT INTO verification_profiles (name, language, origin, created_at) "
+            "VALUES ('Test', 'shell', 'system', ?)",
+            (now,),
+        )
+        profile_id = profile_cursor.lastrowid
         db.execute(
-            "INSERT INTO verification_runs (workspace_id, phase, status, started_at, completed_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (ws_id, phase, status, now, now),
+            "INSERT INTO verification_steps (profile_id, name, command, enabled, timeout, "
+            "fail_severity, created_at) VALUES (?, 'Step', ?, 1, 10, 'blocking', ?)",
+            (profile_id, command, now),
+        )
+        db.execute(
+            "INSERT INTO project_verification_profiles (project_id, profile_id, subpath) "
+            "VALUES (?, ?, '.')",
+            (project_id, profile_id),
         )
         db.commit()
     finally:
         db.close()
 
 
-def test_execution_validation_routes_to_review(workspace, project):
-    """Phase 3.1.1 routes to 3.1.3 (code review gate) when verification passed."""
-    _setup_execution_phase(workspace["id"], "3.1.1")
-    _add_verification_run(workspace["id"], "3.1.1", "passed")
-
-    ws = _get_ws_row(workspace["id"])
-    result, code = perform_advance(ws, project["path"])
-    assert code == 202
-    assert result["phase"] == "3.1.3"
-
-
-def test_execution_validation_routes_to_review_when_no_verification_run(workspace, project):
-    """Phase 3.1.1 defaults to 3.1.3 (clean) when no verification run exists."""
+def test_execution_validation_routes_to_review_when_no_profiles(workspace, project):
+    """Phase 3.1.1 routes to 3.1.3 (code review gate) when no verification profiles are assigned."""
     _setup_execution_phase(workspace["id"], "3.1.1")
 
     ws = _get_ws_row(workspace["id"])
@@ -486,15 +486,73 @@ def test_execution_validation_routes_to_review_when_no_verification_run(workspac
     assert result["phase"] == "3.1.3"
 
 
-def test_execution_validation_routes_to_fixes(workspace, project):
-    """Phase 3.1.1 routes to 3.1.2 (fixes) when verification failed."""
+def test_execution_validation_routes_to_review_when_verification_passes(workspace, project):
+    """Phase 3.1.1 routes to 3.1.3 (clean) when the verification run passes."""
     _setup_execution_phase(workspace["id"], "3.1.1")
-    _add_verification_run(workspace["id"], "3.1.1", "failed")
+    _assign_verification_profile(project["id"], "exit 0")
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 202
+    assert result["phase"] == "3.1.3"
+
+
+def test_execution_validation_routes_to_fixes_when_verification_fails(workspace, project):
+    """Phase 3.1.1 routes to 3.1.2 (fixes) — a failed run does NOT block the advance."""
+    _setup_execution_phase(workspace["id"], "3.1.1")
+    _assign_verification_profile(project["id"], "exit 1")
 
     ws = _get_ws_row(workspace["id"])
     result, code = perform_advance(ws, project["path"])
     assert code == 200
     assert result["phase"] == "3.1.2"
+
+
+def test_execution_fix_routes_back_to_validation(workspace, project):
+    """Phase 3.1.2 advances back to 3.1.1 to re-validate after fixes."""
+    _setup_execution_phase(workspace["id"], "3.1.2")
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 200
+    assert result["phase"] == "3.1.1"
+
+
+def test_execution_fail_fix_pass_loop(workspace, project):
+    """Full loop: 3.1.1 (fail) → 3.1.2 → 3.1.1 (pass) → 3.1.3."""
+    _setup_execution_phase(workspace["id"], "3.1.1")
+    _assign_verification_profile(project["id"], "exit 1")
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 200
+    assert result["phase"] == "3.1.2"
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 200
+    assert result["phase"] == "3.1.1"
+
+    _flip_verification_step(project["id"], "exit 0")
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 202
+    assert result["phase"] == "3.1.3"
+
+
+def _flip_verification_step(project_id, command):
+    """Rewrite the assigned profile's step command so the next run flips outcome."""
+    db = get_db()
+    try:
+        db.execute(
+            "UPDATE verification_steps SET command = ? WHERE profile_id IN "
+            "(SELECT profile_id FROM project_verification_profiles WHERE project_id = ?)",
+            (command, project_id),
+        )
+        db.commit()
+    finally:
+        db.close()
 
 
 def test_execution_commit_blocked_no_hash(workspace, project):
@@ -783,3 +841,62 @@ def test_get_phase_concrete_execution_phase_unaffected_by_templates():
     assert concrete is not None
     assert isinstance(concrete, ImplementationPhase)
     assert concrete.id == "3.5.0"
+
+
+# ── Done phase rejects leftover proposals ──────────────────────────────────────
+
+
+def _insert_open_proposal(ws_id, project_id, implementation_kind="auto"):
+    """Insert a 'proposed' proposal and return its id."""
+    db = get_db()
+    try:
+        cursor = db.execute(
+            "INSERT INTO proposals (workspace_id, project_id, type, implementation_kind, "
+            "status, title, body, payload_json, origin, created_at) "
+            "VALUES (?, ?, 'rule_new', ?, 'proposed', 'Leftover', '', '{}', 'reflection', ?)",
+            (ws_id, project_id, implementation_kind, datetime.now().isoformat()),
+        )
+        db.commit()
+        return cursor.lastrowid
+    finally:
+        db.close()
+
+
+def _proposal_row(proposal_id):
+    db = get_db()
+    try:
+        return db.execute(
+            "SELECT status, reason FROM proposals WHERE id = ?", (proposal_id,)
+        ).fetchone()
+    finally:
+        db.close()
+
+
+def test_advance_to_done_rejects_leftover_proposal_from_5_1(workspace, project):
+    """Advancing 5.1 → 6 with a leftover auto proposal marks it rejected as completed."""
+    set_phase(workspace["id"], "5.1")
+    proposal_id = _insert_open_proposal(workspace["id"], project["id"], implementation_kind="auto")
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 200
+    assert result["phase"] == "6"
+
+    row = _proposal_row(proposal_id)
+    assert row["status"] == "rejected"
+    assert row["reason"] == "Workspace completed"
+
+
+def test_advance_to_done_rejects_leftover_proposal_from_5_2(workspace, project):
+    """Advancing 5.2 → 6 with a leftover manual proposal marks it rejected as completed."""
+    set_phase(workspace["id"], "5.2")
+    proposal_id = _insert_open_proposal(workspace["id"], project["id"], implementation_kind="manual")
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 200
+    assert result["phase"] == "6"
+
+    row = _proposal_row(proposal_id)
+    assert row["status"] == "rejected"
+    assert row["reason"] == "Workspace completed"

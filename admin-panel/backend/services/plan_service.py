@@ -50,10 +50,8 @@ def set_plan(db, ws, plan_data):
     match = re.match(r'^3\.(\d+)\.\d+$', current_phase)
     if match:
         execution = plan_data.get("execution", [])
-        if not execution:
+        if not execution or int(match.group(1)) > len(execution):
             new_phase = "2.0"
-        elif int(match.group(1)) > len(execution):
-            new_phase = "3.0"
         else:
             new_phase = current_phase
         if new_phase != current_phase:

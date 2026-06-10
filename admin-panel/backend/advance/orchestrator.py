@@ -448,6 +448,10 @@ def perform_advance(ws, project_path, body=None):
         if post_commit is None:
             return {"error": t("advance.error.phaseAlreadyChanged", locale)}, 409
 
+        if new_phase == "6":
+            from services.proposal_service import reject_open_proposals
+            reject_open_proposals(db, ws["id"], reason="Workspace completed")
+
         db.commit()
         for callback in post_commit:
             callback()

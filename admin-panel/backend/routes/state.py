@@ -35,7 +35,7 @@ _PHASES_WITH_SUBS = {"1", "2", "3", "4"}
 
 # Static phase ids that are always valid without consulting the registry.
 _STATIC_PHASE_RE = re.compile(
-    r'^(0|1\.[0-4]|2\.[01]|3\.\d+\.[0-4]|4\.[0-2]|5)$'
+    r'^(0|1\.[0-4]|2\.[01]|3\.\d+\.[0-4]|4\.[0-2]|5\.[12]|6)$'
 )
 
 

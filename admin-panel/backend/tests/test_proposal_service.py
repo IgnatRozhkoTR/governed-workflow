@@ -238,6 +238,40 @@ def test_resolve_proposal_raises_when_missing(workspace):
     assert exc_info.value.code == "proposal_not_found"
 
 
+def test_resolve_proposal_is_idempotent_when_same_terminal_status(workspace):
+    from services.proposal_service import resolve_proposal
+    proposal_id = _create(workspace)
+
+    db = get_db()
+    try:
+        first = resolve_proposal(db, proposal_id, status="executed", result_json='{"r": 1}')
+        db.commit()
+        again = resolve_proposal(db, proposal_id, status="executed", result_json='{"r": 2}')
+        db.commit()
+    finally:
+        db.close()
+
+    assert again["status"] == "executed"
+    assert again["executed_at"] == first["executed_at"]
+    assert again["result_json"] == '{"r": 1}'
+
+
+def test_resolve_proposal_raises_when_changing_terminal_status(workspace):
+    from services.proposal_service import ProposalServiceError, resolve_proposal
+    proposal_id = _create(workspace)
+
+    db = get_db()
+    try:
+        resolve_proposal(db, proposal_id, status="executed")
+        db.commit()
+        with pytest.raises(ProposalServiceError) as exc_info:
+            resolve_proposal(db, proposal_id, status="rejected")
+    finally:
+        db.close()
+
+    assert exc_info.value.code == "already_resolved"
+
+
 # ---------------------------------------------------------------------------
 # count_pending_manual_proposals
 # ---------------------------------------------------------------------------
@@ -363,3 +397,20 @@ def test_reject_open_proposals_returns_zero_when_no_open_proposals(workspace):
         db.close()
 
     assert count == 0
+
+
+def test_reject_open_proposals_uses_custom_reason(workspace):
+    proposal_id = _create(workspace, title="Open proposal")
+
+    db = get_db()
+    try:
+        reject_open_proposals(db, workspace["id"], reason="Workspace completed")
+        db.commit()
+        row = db.execute(
+            "SELECT status, reason FROM proposals WHERE id = ?", (proposal_id,)
+        ).fetchone()
+    finally:
+        db.close()
+
+    assert row["status"] == "rejected"
+    assert row["reason"] == "Workspace completed"

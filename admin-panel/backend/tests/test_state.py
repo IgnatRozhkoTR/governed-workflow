@@ -1,4 +1,6 @@
 """Tests for workspace state routes."""
+import pytest
+
 from testing_utils import set_phase, add_research
 
 
@@ -129,6 +131,20 @@ def test_set_phase_invalid(client, workspace):
     response = client.put(_ws_url(workspace, "phase"), json={"phase": "99"})
     assert response.status_code == 400
     assert "error" in response.get_json()
+
+
+def test_set_phase_rejects_bare_five(client, workspace):
+    """Bare '5' is no longer a real phase (it split into 5.1/5.2/6)."""
+    response = client.put(_ws_url(workspace, "phase"), json={"phase": "5"})
+    assert response.status_code == 400
+    assert "error" in response.get_json()
+
+
+@pytest.mark.parametrize("phase", ["5.1", "5.2", "6"])
+def test_set_phase_accepts_finalization_phases(client, workspace, phase):
+    response = client.put(_ws_url(workspace, "phase"), json={"phase": phase})
+    assert response.status_code == 200
+    assert response.get_json()["phase"] == phase
 
 
 def test_set_phase_not_found(client, project):

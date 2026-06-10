@@ -170,3 +170,25 @@ def test_resolve_proposal_returns_validation_error_when_result_json_unparseable(
     assert "error" in result
     assert result["errorCategory"] == "validation"
     assert result["isRetryable"] is False
+
+
+def test_resolve_proposal_is_idempotent_for_same_terminal_status(workspace, monkeypatch):
+    proposal_id = _submit(workspace, monkeypatch)
+    _call_resolve(workspace, monkeypatch, proposal_id=proposal_id, status="executed")
+
+    result = _call_resolve(workspace, monkeypatch, proposal_id=proposal_id, status="executed")
+
+    assert "error" not in result
+    assert result["status"] == "executed"
+
+
+def test_resolve_proposal_returns_business_error_when_changing_terminal_status(workspace, monkeypatch):
+    proposal_id = _submit(workspace, monkeypatch)
+    _call_resolve(workspace, monkeypatch, proposal_id=proposal_id, status="executed")
+
+    result = _call_resolve(workspace, monkeypatch, proposal_id=proposal_id, status="rejected")
+
+    assert "error" in result
+    assert result["errorCategory"] == "business"
+    assert result["isRetryable"] is False
+    assert result["code"] == "already_resolved"

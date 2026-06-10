@@ -130,11 +130,20 @@ class ImplementationPhase(Phase):
 
 
 class VerificationPhase(Phase):
-    """Execution sub-phase K=1: verification."""
+    """Execution sub-phase K=1: verification.
+
+    The verification run happens at the advance gate (``validate``). A run that
+    completes with status ``failed`` does NOT block the advance — it routes the
+    workspace into the 3.N.2 Fix phase where edits are allowed. ``validate``
+    threads the run status onto the instance so ``next_phase`` routes off the
+    exact run it just performed; a re-read of the latest run is the fallback for
+    callers that reach ``next_phase`` without going through ``validate``.
+    """
     name = "Verification"
 
     def __init__(self, n):
         self._n = n
+        self._last_run_status = None
 
     @property
     def id(self):
@@ -145,34 +154,37 @@ class VerificationPhase(Phase):
         return f"3.{self._n}"
 
     def validate(self, ws, body, project_path):
-        """Run verification profiles at validation phase. Blocks advance if any blocking step fails."""
         phase = f"3.{self._n}.1"
         with get_db_ctx() as db:
-            passed, run_id = verification_service.run_verification(
+            passed, _ = verification_service.run_verification(
                 db, ws["id"], phase, ws["working_dir"]
             )
             db.commit()
-            if not passed:
-                return False, {
-                    "message": f"Verification failed (run_id={run_id}). Check verification results in the admin panel and fix the issues before advancing."
-                }
-            return True, {}
+        self._last_run_status = "passed" if passed else "failed"
+        return True, {}
 
     def next_phase(self, ws):
-        """Route after validation based on the verification run for this phase."""
         n = self._n
-        phase = f"3.{n}.1"
+        status = self._last_run_status
+        if status is None:
+            with get_db_ctx() as db:
+                run_result = verification_service.get_verification_results(
+                    db, ws["id"], phase=f"3.{n}.1"
+                )
+            status = run_result.get("status") if run_result else None
 
-        with get_db_ctx() as db:
-            run_result = verification_service.get_verification_results(db, ws["id"], phase=phase)
-        if run_result and run_result.get("status") == "failed":
+        if status == "failed":
             return f"3.{n}.2"
-
         return f"3.{n}.3"
 
 
 class FixReviewPhase(Phase):
-    """Execution sub-phase K=2: fix review after failed verification."""
+    """Execution sub-phase K=2: fix failures, then re-validate.
+
+    Reached from a failed verification run (3.N.1) or a code-review rejection
+    (3.N.3). Edits are allowed here; advancing routes back to 3.N.1 so the
+    fixes are re-verified before the workspace can reach code review.
+    """
     name = "Fix Review"
 
     def __init__(self, n):
@@ -190,7 +202,7 @@ class FixReviewPhase(Phase):
         return True, {}
 
     def next_phase(self, ws):
-        return f"3.{self._n}.3"
+        return f"3.{self._n}.1"
 
 
 class CommitApprovalPhase(Phase):
@@ -429,18 +441,18 @@ Call `workspace_advance` when both implementation and tests are complete.
 
 **Actors**: Validator sub-agents | **Code edits: OFF**
 
-Deploy validator sub-agents (`middle-code-validator` / `senior-code-validator`) for compilation check + code quality review. Each validator returns its PASS/FAIL findings directly to you as its response — there is no tool to submit them. Verification profiles assigned to the workspace (configured via `workspace_assign_verification_profile`) run automatically server-side at the phase gate; blocking steps must pass before you can advance.
+Deploy validator sub-agents (`middle-code-validator` / `senior-code-validator`) for compilation check + code quality review. Each validator returns its PASS/FAIL findings directly to you as its response — there is no tool to submit them. Verification profiles assigned to the workspace (configured via `workspace_assign_verification_profile`) run automatically server-side **at the advance gate**.
 
-Call `workspace_advance`. The phase machine reads the verification results and auto-routes:
-- Verification failed → `3.N.2` (Fixes)
-- Clean → `3.N.3` (Code Review)""",
+Call `workspace_advance`. The verification run executes during the advance and the phase machine routes off its result:
+- Verification failed → the advance lands you in `3.N.2` (Fixes) — it does NOT block. Fix the failures there, then advance back here to re-validate.
+- Verification passed, or no profiles are assigned → `3.N.3` (Code Review)""",
 
     2: """\
 ## 3.N.2 Fixes
 
 **Actors**: Engineer sub-agents | **Code edits: ON (in sub-phase scope)**
 
-You arrive here from validation failures OR user gate rejections. Read `workspace_get_comments` for user feedback. Deploy engineer sub-agents to fix the issues. Call `workspace_advance` when done.""",
+You arrive here from a failed verification run at `3.N.1` (or a code-review rejection at `3.N.3`). Call `workspace_get_verification_results` to see exactly which steps failed, and `workspace_get_comments` for any user feedback. Deploy engineer sub-agents to fix the issues — edits are allowed here. Call `workspace_advance` when done to return to `3.N.1` and re-validate. The loop is `3.N.1 → (fail) 3.N.2 → 3.N.1 → (pass) 3.N.3`.""",
 
     3: """\
 ## 3.N.3 Code Review (USER GATE)
