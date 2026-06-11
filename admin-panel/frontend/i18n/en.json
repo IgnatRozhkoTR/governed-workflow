@@ -181,6 +181,8 @@
   "messages.phaseSettingsSaveFailed": "Failed to save settings: {error}",
   "messages.startCommandCopied": "Start command copied",
   "messages.resumeCommandCopied": "Resume command copied",
+  "messages.fileSaved": "File saved",
+  "messages.fileSaveFailed": "Failed to save file",
 
   "errors.unknownError": "Unknown error",
   "errors.failedToSetPhase": "Failed to set phase: {error}",

@@ -4,6 +4,8 @@
 
 var explorerState = { selectedFile: null, filter: '', mdMode: 'preview', dirCache: {}, totalFiles: 0 };
 var _explorerPreviousLspFile = null;
+var _explorerSaveBtn = null;
+var _explorerEditorDirty = false;
 
 function explorerApiUrl(ctx, params) {
   var url = '/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/files';
@@ -221,6 +223,28 @@ function renderExplorerContent(path, lines, lineNumber) {
     toggle.appendChild(srcBtn);
     toggle.appendChild(prevBtn);
     header.appendChild(toggle);
+
+    var copyBtn = document.createElement('button');
+    copyBtn.className = 'btn btn-sm';
+    copyBtn.textContent = t('buttons.copy');
+    copyBtn.onclick = function() {
+      safeCopyToClipboard(lines.join('\n')).then(function() {
+        flashButton(copyBtn, t('actions.copied'));
+      });
+    };
+    header.appendChild(copyBtn);
+
+    if (explorerState.mdMode === 'source') {
+      var saveBtn = document.createElement('button');
+      saveBtn.className = 'btn btn-sm';
+      saveBtn.textContent = t('buttons.save');
+      saveBtn.disabled = true;
+      saveBtn.onclick = function() { saveExplorerFile(); };
+      header.appendChild(saveBtn);
+      _explorerSaveBtn = saveBtn;
+    } else {
+      _explorerSaveBtn = null;
+    }
   }
 
   var lineCount = document.createElement('span');
@@ -267,24 +291,56 @@ function renderExplorerContent(path, lines, lineNumber) {
 
     var fileContent = lines.join('\n');
     var language = isMd ? 'markdown' : getMonacoLanguage(path);
-    createEditor(editorContainer, fileContent, language, path).then(function(editor) {
+    var editorReadOnly = !(isMd && explorerState.mdMode === 'source');
+    _explorerEditorDirty = false;
+    createEditor(editorContainer, fileContent, language, path, editorReadOnly).then(function(editor) {
       lspDidOpenDocument(path, fileContent, language);
       registerLspProviders(editor, path, language);
       _explorerPreviousLspFile = path;
       if (lineNumber) {
         revealLine(lineNumber);
       }
+      if (!editorReadOnly) {
+        editor.onDidChangeModelContent(function() {
+          var isDirty = editor.getValue() !== _explorerFileLines.join('\n');
+          if (isDirty !== _explorerEditorDirty) {
+            _explorerEditorDirty = isDirty;
+            if (_explorerSaveBtn) _explorerSaveBtn.disabled = !isDirty;
+          }
+        });
+      }
     });
   }
 }
 
 function setExplorerMdMode(mode) {
+  if (mode === 'preview' && explorerState.mdMode === 'source' && window._monacoEditor) {
+    var currentContent = window._monacoEditor.getValue();
+    _explorerFileLines = currentContent.split('\n');
+  }
   explorerState.mdMode = mode;
   if (_explorerFileLines.length > 0 && explorerState.selectedFile) {
     renderExplorerContent(explorerState.selectedFile, _explorerFileLines);
   }
   document.querySelectorAll('.md-toggle .toggle-opt').forEach(function(btn) {
     btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+}
+
+function saveExplorerFile() {
+  var ctx = getWorkspaceContext();
+  if (!ctx || !explorerState.selectedFile || !window._monacoEditor) return;
+
+  var content = window._monacoEditor.getValue();
+  if (_explorerSaveBtn) _explorerSaveBtn.disabled = true;
+
+  apiWriteFile(ctx.projectId, ctx.branch, explorerState.selectedFile, content).then(function() {
+    _explorerFileLines = content.split('\n');
+    _explorerEditorDirty = false;
+    showToast(t('messages.fileSaved'));
+  }).catch(function(e) {
+    if (_explorerSaveBtn) _explorerSaveBtn.disabled = false;
+    showToast(t('messages.fileSaveFailed'));
   });
 }
 
@@ -296,6 +352,8 @@ document.addEventListener('workspace-reset', function() {
   explorerState.selectedFile = null;
   explorerState.totalFiles = 0;
   _explorerFileLines = [];
+  _explorerSaveBtn = null;
+  _explorerEditorDirty = false;
   if (_explorerPreviousLspFile) {
     unregisterLspProviders();
     lspDidCloseDocument(_explorerPreviousLspFile);

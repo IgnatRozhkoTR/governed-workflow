@@ -181,6 +181,8 @@
   "messages.phaseSettingsSaveFailed": "Ошибка сохранения настроек: {error}",
   "messages.startCommandCopied": "Команда запуска скопирована",
   "messages.resumeCommandCopied": "Команда возобновления скопирована",
+  "messages.fileSaved": "Файл сохранён",
+  "messages.fileSaveFailed": "Не удалось сохранить файл",
 
   "errors.unknownError": "Неизвестная ошибка",
   "errors.failedToSetPhase": "Ошибка установки фазы: {error}",

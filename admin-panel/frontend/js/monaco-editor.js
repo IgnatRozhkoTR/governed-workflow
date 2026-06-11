@@ -128,7 +128,8 @@ function initMonaco() {
   });
 }
 
-function createEditor(container, content, language, filePath) {
+function createEditor(container, content, language, filePath, readOnly) {
+  if (readOnly === undefined) readOnly = true;
   return window._monacoReady.then(function() {
     if (window._monacoEditor) {
       window._monacoEditor.dispose();
@@ -138,7 +139,7 @@ function createEditor(container, content, language, filePath) {
     var editor = monaco.editor.create(container, {
       value: content,
       language: language,
-      readOnly: true,
+      readOnly: readOnly,
       theme: state.theme === 'dark' ? 'vs-dark' : 'vs',
       automaticLayout: true,
       minimap: { enabled: true },

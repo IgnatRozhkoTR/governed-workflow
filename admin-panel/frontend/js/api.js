@@ -308,6 +308,10 @@ function apiReadFile(projectId, branch, filePath, startLine, endLine, absolute) 
   return apiGet(url);
 }
 
+function apiWriteFile(projectId, branch, filePath, content) {
+  return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/file', { path: filePath, content: content });
+}
+
 function apiGetDiff(projectId, branch, mode, commit) {
   var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/diff';
   var q = [];
