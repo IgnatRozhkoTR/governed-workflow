@@ -253,7 +253,7 @@ function renderExplorerContent(path, lines, lineNumber) {
   header.appendChild(lineCount);
 
   if (isMd && typeof marked !== 'undefined' && explorerState.mdMode === 'preview') {
-    var parsed = DOMPurify.sanitize(marked.parse(lines.join('\n')));
+    var parsed = DOMPurify.sanitize(marked.parse(lines.join('\n'), { breaks: true, gfm: true }));
     var tmp = document.createElement('div');
     tmp.innerHTML = parsed;
     tmp.querySelectorAll('code').forEach(function(el) {

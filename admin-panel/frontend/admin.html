@@ -11,20 +11,20 @@
 <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
 <script>
   if (typeof marked !== 'undefined') {
+    // Consume a lone ~ as literal text so marked's built-in GFM strikethrough tokenizer
+    // never forms a single-tilde <del> span. Double ~~...~~ is left to the built-in.
     marked.use({
       extensions: [{
-        name: 'del',
+        name: 'literalTilde',
         level: 'inline',
-        start: function (src) { return src.indexOf('~~'); },
+        start: function (src) { var i = src.indexOf('~'); return i < 0 ? undefined : i; },
         tokenizer: function (src) {
-          var match = src.match(/^~~(?!~)([\s\S]+?)(?<!~)~~/);
-          if (match) {
-            return { type: 'del', raw: match[0], tokens: this.lexer.inlineTokens(match[1]) };
+          if (src.charAt(0) === '~' && src.charAt(1) !== '~') {
+            return { type: 'literalTilde', raw: '~', text: '~' };
           }
+          return undefined;
         },
-        renderer: function (token) {
-          return '<del>' + this.parser.parseInline(token.tokens) + '</del>';
-        }
+        renderer: function () { return '~'; }
       }]
     });
   }
