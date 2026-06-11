@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from flask import Blueprint, render_template, send_from_directory
+from flask import Blueprint, make_response, render_template, send_from_directory
 
 bp = Blueprint("static_files", __name__)
 
@@ -14,7 +14,9 @@ _I18N_DIR = TEMPLATES_DIR / "i18n"
 def index():
     i18n_path = _I18N_DIR / "en.json"
     i18n_default = json.loads(i18n_path.read_text(encoding="utf-8"))
-    return render_template("admin.html", i18n_default=json.dumps(i18n_default))
+    resp = make_response(render_template("admin.html", i18n_default=json.dumps(i18n_default)))
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @bp.route("/css/<path:filename>")

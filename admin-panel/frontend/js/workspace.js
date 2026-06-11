@@ -540,8 +540,7 @@ async function _wsOnSimplePlanningChange() {
 
 (function () {
   const ctx = getWorkspaceContext();
-  const savedLocale = localStorage.getItem('admin-panel-locale');
-  const needsLocaleLoad = savedLocale && savedLocale !== 'en' && typeof loadI18n === 'function';
+  const savedLocale = localStorage.getItem('admin-panel-locale') || 'en';
 
   function _wsBoot() {
     _wsInitSelector();
@@ -556,7 +555,7 @@ async function _wsOnSimplePlanningChange() {
     }
   }
 
-  if (needsLocaleLoad) {
+  if (typeof loadI18n === 'function') {
     loadI18n(savedLocale).then(_wsBoot);
   } else {
     _wsBoot();
