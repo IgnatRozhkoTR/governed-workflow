@@ -490,3 +490,115 @@ def test_diff_mode_commit_does_not_include_untracked(client, workspace):
     paths = [f["path"] for f in r.json["files"]]
     assert "tracked.py" in paths
     assert "untracked_extra.py" not in paths
+
+
+# ---------------------------------------------------------------------------
+# list_files — untracked / .gitignore coverage
+# ---------------------------------------------------------------------------
+
+def test_list_files_includes_untracked_file(client, workspace):
+    wd = Path(workspace["working_dir"])
+
+    (wd / "tracked.py").write_text("x = 1")
+    _git(str(wd), "add", "tracked.py")
+    _git(str(wd), "commit", "-m", "Add tracked")
+
+    (wd / "untracked_new.py").write_text("y = 2")
+
+    r = client.get("/api/ws/test-project/feature/test/files")
+
+    assert r.status_code == 200
+    names = [e["name"] for e in r.json["entries"]]
+    assert "untracked_new.py" in names
+    assert "tracked.py" in names
+
+
+def test_list_files_search_finds_untracked_file(client, workspace):
+    wd = Path(workspace["working_dir"])
+    (wd / "untracked_widget.py").write_text("pass")
+
+    r = client.get("/api/ws/test-project/feature/test/files?search=widget")
+
+    assert r.status_code == 200
+    names = [e["name"] for e in r.json["entries"]]
+    assert "untracked_widget.py" in names
+
+
+def test_list_files_excludes_gitignored_file(client, workspace):
+    wd = Path(workspace["working_dir"])
+
+    (wd / ".gitignore").write_text("*.secret\n")
+    _git(str(wd), "add", ".gitignore")
+    _git(str(wd), "commit", "-m", "Add .gitignore")
+
+    (wd / "hidden.secret").write_text("do not show")
+
+    r = client.get("/api/ws/test-project/feature/test/files")
+
+    assert r.status_code == 200
+    names = [e["name"] for e in r.json["entries"]]
+    assert "hidden.secret" not in names
+
+
+# ---------------------------------------------------------------------------
+# write_file (PUT /file) tests
+# ---------------------------------------------------------------------------
+
+def test_write_file_creates_and_reads_back(client, workspace):
+    wd = workspace["working_dir"]
+
+    put_r = client.put(
+        "/api/ws/test-project/feature/test/file",
+        json={"path": "new_doc.md", "content": "# Hello\nworld\n"},
+        content_type="application/json",
+    )
+
+    assert put_r.status_code == 200
+    assert put_r.json["ok"] is True
+
+    get_r = client.get("/api/ws/test-project/feature/test/file?path=new_doc.md")
+    assert get_r.status_code == 200
+    assert get_r.json["lines"] == ["# Hello", "world"]
+
+
+def test_write_file_creates_parent_dirs(client, workspace):
+    put_r = client.put(
+        "/api/ws/test-project/feature/test/file",
+        json={"path": "deep/nested/dir/file.txt", "content": "hi"},
+        content_type="application/json",
+    )
+
+    assert put_r.status_code == 200
+    assert (Path(workspace["working_dir"]) / "deep" / "nested" / "dir" / "file.txt").exists()
+
+
+def test_write_file_empty_content_when_absent(client, workspace):
+    put_r = client.put(
+        "/api/ws/test-project/feature/test/file",
+        json={"path": "empty.txt"},
+        content_type="application/json",
+    )
+
+    assert put_r.status_code == 200
+    assert (Path(workspace["working_dir"]) / "empty.txt").read_text() == ""
+
+
+def test_write_file_missing_path_returns_400(client, workspace):
+    r = client.put(
+        "/api/ws/test-project/feature/test/file",
+        json={"content": "some content"},
+        content_type="application/json",
+    )
+
+    assert r.status_code == 400
+    assert "path" in r.json["error"].lower()
+
+
+def test_write_file_path_traversal_returns_403(client, workspace):
+    r = client.put(
+        "/api/ws/test-project/feature/test/file",
+        json={"path": "../escape/file.txt", "content": "bad"},
+        content_type="application/json",
+    )
+
+    assert r.status_code == 403

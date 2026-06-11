@@ -81,6 +81,28 @@ def read_file(db, ws, project):
     })
 
 
+@bp.route("/api/ws/<project_id>/<path:branch>/file", methods=["PUT"])
+@with_workspace
+def write_file(db, ws, project):
+    working_dir = ws["working_dir"]
+    body = request.get_json(silent=True) or {}
+
+    rel_path = body.get("path", "")
+    if not rel_path:
+        return jsonify({"error": t("api.error.pathRequired")}), 400
+
+    file_path = Path(working_dir) / rel_path
+    try:
+        file_path.resolve().relative_to(Path(working_dir).resolve())
+    except ValueError:
+        return jsonify({"error": t("api.error.pathOutsideWorkingDir")}), 403
+
+    content = body.get("content", "")
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(content, encoding="utf-8")
+    return jsonify({"ok": True})
+
+
 def _collapse_single_dirs(entries, all_files):
     """Collapse chains of directories that contain only a single subdirectory."""
     result = []
@@ -127,11 +149,15 @@ def list_files(db, ws, project):
     dir_path = request.args.get("path", "")
     search = request.args.get("search", "").strip().lower()
 
-    ok, output, _ = run_git(working_dir, "ls-files")
-    if not ok:
+    ok_tracked, tracked_out, _ = run_git(working_dir, "ls-files")
+    if not ok_tracked:
         return jsonify({"error": t("api.error.failedToListFiles")}), 500
 
-    all_files = [f for f in output.strip().split("\n") if f]
+    ok_others, others_out, _ = run_git(working_dir, "ls-files", "--others", "--exclude-standard")
+    tracked = [f for f in tracked_out.strip().split("\n") if f]
+    others = [f for f in others_out.strip().split("\n") if f] if ok_others else []
+    seen = set(tracked)
+    all_files = tracked + [f for f in others if f not in seen]
 
     if search:
         matched = [f for f in all_files if search in f.split("/")[-1].lower()]
