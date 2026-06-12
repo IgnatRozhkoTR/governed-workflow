@@ -112,6 +112,25 @@ def run_git(cwd, *args):
     map those to ``(False, "", <message>)`` so every caller treats them like
     any other git failure instead of propagating an unhandled exception.
     """
+    return run_git_with(cwd, list(args))
+
+
+def run_git_with(cwd, args, env_overrides=None, stdin_input=None):
+    """Invoke ``git`` with optional env overrides and stdin, return ``(ok, stdout, stderr)``.
+
+    ``env_overrides`` is merged onto the current process environment so callers
+    can set ``GIT_AUTHOR_*`` when replaying commits with ``commit-tree`` and
+    still preserve the existing git config. ``stdin_input`` feeds a string to
+    git's stdin (used for ``commit-tree -F -`` so commit messages with newlines
+    and shell-special characters are passed verbatim, never interpolated).
+
+    Shares the same failure mapping as ``run_git`` so callers treat a stale
+    worktree (``FileNotFoundError`` / ``NotADirectoryError``) like any other git
+    failure instead of propagating an unhandled exception.
+    """
+    env = None
+    if env_overrides:
+        env = {**os.environ, **env_overrides}
     try:
         result = subprocess.run(
             ["git"] + list(args),
@@ -120,6 +139,8 @@ def run_git(cwd, *args):
             text=True,
             timeout=30,
             errors="replace",
+            env=env,
+            input=stdin_input,
         )
     except (FileNotFoundError, NotADirectoryError) as exc:
         return False, "", f"working directory unavailable: {exc}"

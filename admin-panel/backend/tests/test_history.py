@@ -28,6 +28,37 @@ def _log_subject(repo, ref="HEAD"):
     return result.stdout.strip()
 
 
+def _tree_sha(repo, ref="HEAD"):
+    return _rev_parse(repo, f"{ref}^{{tree}}")
+
+
+def _author(repo, ref="HEAD"):
+    """Return (author_name, author_email) of <ref>."""
+    result = subprocess.run(
+        ["git", "show", "-s", "--format=%an%n%ae", ref],
+        cwd=str(repo), capture_output=True, text=True, env=GIT_ENV
+    )
+    name, email = result.stdout.splitlines()[:2]
+    return name, email
+
+
+def _subjects_oldest_first(repo, source_branch="develop"):
+    """Return local-unpushed commit subjects in oldest-first order."""
+    result = subprocess.run(
+        ["git", "log", "--reverse", f"origin/{source_branch}..HEAD", "--format=%s"],
+        cwd=str(repo), capture_output=True, text=True, env=GIT_ENV
+    )
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def _porcelain(repo):
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=str(repo), capture_output=True, text=True, env=GIT_ENV
+    )
+    return result.stdout.strip()
+
+
 def _commit_file(repo, filename, content, message):
     path = Path(repo) / filename
     path.write_text(content)
@@ -207,6 +238,300 @@ def test_rename_rejects_empty_message(client, history_workspace):
     )
     assert r.status_code == 400
     assert "message" in r.get_json()["error"].lower()
+
+
+def test_rename_head_via_explicit_sha_uses_amend_path(client, history_workspace):
+    """Passing the HEAD sha explicitly behaves like the omitted-sha amend path:
+    message changes, commit count unchanged, HEAD identity preserved by content."""
+    repo = history_workspace["working_dir"]
+    pid = history_workspace["project_id"]
+
+    head = _rev_parse(repo)
+    count_before = len(_local_shas(repo))
+    head_tree = _tree_sha(repo, head)
+
+    r = client.post(
+        f"/api/ws/{pid}/develop/history/rename",
+        json={"sha": head, "message": "renamed-head-explicit"},
+    )
+
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["ok"] is True
+    assert _log_subject(repo) == "renamed-head-explicit"
+    assert len(_local_shas(repo)) == count_before
+    assert _tree_sha(repo) == head_tree
+
+
+def test_rename_middle_commit_rewrites_only_target_message(client, history_workspace):
+    """Reword the MIDDLE local commit (local-2). Surrounding commits keep their
+    exact messages, every commit keeps its original tree, count is unchanged,
+    and HEAD moves to a new SHA."""
+    repo = history_workspace["working_dir"]
+    pid = history_workspace["project_id"]
+
+    shas = _local_shas(repo)  # newest-first: [local-3, local-2, local-1]
+    assert [_log_subject(repo, s) for s in shas] == ["local-3", "local-2", "local-1"]
+    middle = shas[1]
+
+    head_before = _rev_parse(repo)
+    trees_before = {
+        "local-1": _tree_sha(repo, shas[2]),
+        "local-2": _tree_sha(repo, shas[1]),
+        "local-3": _tree_sha(repo, shas[0]),
+    }
+    count_before = len(shas)
+
+    r = client.post(
+        f"/api/ws/{pid}/develop/history/rename",
+        json={"sha": middle, "message": "renamed-local-2"},
+    )
+
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["ok"] is True
+    assert data["subject"] == "renamed-local-2"
+    assert data["reworded_sha"] != middle
+
+    new_shas = _local_shas(repo)
+    assert len(new_shas) == count_before
+    assert _rev_parse(repo) != head_before
+
+    new_subjects = [_log_subject(repo, s) for s in new_shas]
+    assert new_subjects == ["local-3", "renamed-local-2", "local-1"]
+
+    assert _tree_sha(repo, new_shas[2]) == trees_before["local-1"]
+    assert _tree_sha(repo, new_shas[1]) == trees_before["local-2"]
+    assert _tree_sha(repo, new_shas[0]) == trees_before["local-3"]
+
+
+def test_rename_oldest_local_commit_preserves_descendants(client, history_workspace):
+    """Reword the OLDEST local commit (local-1, whose parent is the pushed base).
+    Both descendants keep their messages and all trees are preserved."""
+    repo = history_workspace["working_dir"]
+    pid = history_workspace["project_id"]
+
+    shas = _local_shas(repo)  # [local-3, local-2, local-1]
+    oldest = shas[-1]
+    pushed_base = _rev_parse(repo, "origin/develop")
+
+    trees_before = [_tree_sha(repo, s) for s in shas]
+
+    r = client.post(
+        f"/api/ws/{pid}/develop/history/rename",
+        json={"sha": oldest, "message": "renamed-local-1"},
+    )
+
+    assert r.status_code == 200
+    assert r.get_json()["ok"] is True
+
+    new_shas = _local_shas(repo)
+    assert len(new_shas) == 3
+    assert [_log_subject(repo, s) for s in new_shas] == ["local-3", "local-2", "renamed-local-1"]
+
+    # Reworded oldest still sits directly on the unchanged pushed base
+    assert _rev_parse(repo, f"{new_shas[-1]}~1") == pushed_base
+    assert [_tree_sha(repo, s) for s in new_shas] == trees_before
+
+
+def test_rename_root_commit_without_parent(client, tmp_path, clean_db):
+    """Reword the ROOT commit (no parent) of a repo whose local stack starts at
+    the initial commit. The commit-tree path must handle the missing parent."""
+    bare = tmp_path / "bare_root"
+    bare.mkdir()
+    subprocess.run(["git", "init", "--bare"], cwd=str(bare), check=True, capture_output=True, env=GIT_ENV)
+
+    repo = tmp_path / "rootrepo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "checkout", "-b", "main")
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(bare)],
+        cwd=str(repo), check=True, capture_output=True, env=GIT_ENV
+    )
+
+    # Unrelated seed so origin/main exists but does not contain our local stack
+    seed = tmp_path / "seed_root"
+    seed.mkdir()
+    _git(seed, "init")
+    _git(seed, "checkout", "-b", "main")
+    _commit_file(seed, "seed.py", "s = 0\n", "seed-commit")
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(bare)],
+        cwd=str(seed), check=True, capture_output=True, env=GIT_ENV
+    )
+    subprocess.run(
+        ["git", "push", "-u", "origin", "main"],
+        cwd=str(seed), check=True, capture_output=True, env=GIT_ENV
+    )
+    subprocess.run(
+        ["git", "fetch", "origin"],
+        cwd=str(repo), check=True, capture_output=True, env=GIT_ENV
+    )
+
+    # Local stack on an unrelated root commit, plus one descendant
+    root = _commit_file(repo, "root.py", "r = 1\n", "root-commit")
+    _commit_file(repo, "second.py", "s = 2\n", "second-commit")
+
+    from core.db import get_db
+    db = get_db()
+    now = datetime.now().isoformat()
+    project_id = "root-project"
+    db.execute(
+        "INSERT INTO projects (id, name, path, registered) VALUES (?, ?, ?, ?)",
+        (project_id, "Root", str(repo), now)
+    )
+    db.execute(
+        "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
+        "created, status, phase, plan_json, source_branch) "
+        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?)",
+        (
+            project_id, "main", "main", str(repo), now,
+            '{"description":"","systemDiagram":"","execution":[]}', "main"
+        )
+    )
+    db.commit()
+    db.close()
+
+    root_tree = _tree_sha(repo, root)
+
+    r = client.post(
+        f"/api/ws/{project_id}/main/history/rename",
+        json={"sha": root, "message": "renamed-root"},
+    )
+
+    assert r.status_code == 200
+    assert r.get_json()["ok"] is True
+
+    new_shas = _local_shas(repo, "main")
+    assert [_log_subject(repo, s) for s in new_shas] == ["second-commit", "renamed-root"]
+
+    new_root = new_shas[-1]
+    # The reworded root still has no parent and keeps its tree
+    parent = subprocess.run(
+        ["git", "rev-parse", f"{new_root}~1"],
+        cwd=str(repo), capture_output=True, text=True, env=GIT_ENV
+    )
+    assert parent.returncode != 0
+    assert _tree_sha(repo, new_root) == root_tree
+
+
+def test_rename_preserves_original_author(client, history_workspace):
+    """The reworded commit keeps the original author name/email even though the
+    committer becomes the current git user."""
+    repo = history_workspace["working_dir"]
+    pid = history_workspace["project_id"]
+
+    shas = _local_shas(repo)
+    middle = shas[1]
+    original_author = _author(repo, middle)
+
+    r = client.post(
+        f"/api/ws/{pid}/develop/history/rename",
+        json={"sha": middle, "message": "author-check"},
+    )
+
+    assert r.status_code == 200
+    new_shas = _local_shas(repo)
+    reworded = new_shas[1]
+    assert _log_subject(repo, reworded) == "author-check"
+    assert _author(repo, reworded) == original_author
+
+
+def test_rename_preserves_distinct_author_identity(client, history_workspace):
+    """A commit authored by someone other than the committer keeps that author
+    after rewording an earlier commit in the stack."""
+    repo = history_workspace["working_dir"]
+    pid = history_workspace["project_id"]
+
+    # Add a commit authored by a distinct identity on top of the stack
+    path = Path(repo) / "authored.py"
+    path.write_text("a = 1\n")
+    _git(repo, "add", "authored.py")
+    subprocess.run(
+        ["git", "commit", "-m", "authored-by-other",
+         "--author=Other Dev <other@example.com>"],
+        cwd=str(repo), check=True, capture_output=True, env=GIT_ENV
+    )
+
+    shas = _local_shas(repo)  # newest-first; index 0 is authored-by-other
+    distinct_author = _author(repo, shas[0])
+    assert distinct_author == ("Other Dev", "other@example.com")
+
+    oldest = shas[-1]
+    r = client.post(
+        f"/api/ws/{pid}/develop/history/rename",
+        json={"sha": oldest, "message": "reword-bottom"},
+    )
+
+    assert r.status_code == 200
+    new_shas = _local_shas(repo)
+    # The distinct-author commit (still newest) must keep its author after replay
+    assert _author(repo, new_shas[0]) == distinct_author
+
+
+def test_rename_rejects_pushed_sha(client, history_workspace):
+    """Rewording a commit that is below origin/develop (already pushed) is rejected."""
+    repo = history_workspace["working_dir"]
+    pid = history_workspace["project_id"]
+
+    pushed_sha = _rev_parse(repo, "origin/develop")
+
+    r = client.post(
+        f"/api/ws/{pid}/develop/history/rename",
+        json={"sha": pushed_sha, "message": "should fail"},
+    )
+
+    assert r.status_code == 400
+    error = r.get_json()["error"].lower()
+    assert "pushed" in error or "not found" in error
+
+
+def test_rename_rejects_unknown_sha(client, history_workspace):
+    """A sha not present anywhere is rejected without mutating history."""
+    repo = history_workspace["working_dir"]
+    pid = history_workspace["project_id"]
+
+    head_before = _rev_parse(repo)
+
+    r = client.post(
+        f"/api/ws/{pid}/develop/history/rename",
+        json={"sha": "deadbeef" * 5, "message": "nope"},
+    )
+
+    assert r.status_code == 400
+    assert _rev_parse(repo) == head_before
+
+
+def test_rename_non_head_leaves_clean_linear_history(client, history_workspace):
+    """After a successful non-HEAD reword the working tree is clean, there is no
+    rebase/merge state, and history stays linear (every commit has one parent)."""
+    repo = history_workspace["working_dir"]
+    pid = history_workspace["project_id"]
+
+    shas = _local_shas(repo)
+    middle = shas[1]
+
+    r = client.post(
+        f"/api/ws/{pid}/develop/history/rename",
+        json={"sha": middle, "message": "atomic-check"},
+    )
+    assert r.status_code == 200
+
+    assert _porcelain(repo) == ""
+
+    git_dir = Path(repo) / ".git"
+    assert not (git_dir / "rebase-merge").exists()
+    assert not (git_dir / "rebase-apply").exists()
+    assert not (git_dir / "MERGE_HEAD").exists()
+
+    # Linear: each local commit has exactly one parent line
+    for sha in _local_shas(repo):
+        parents = subprocess.run(
+            ["git", "rev-list", "--parents", "-n", "1", sha],
+            cwd=str(repo), capture_output=True, text=True, env=GIT_ENV
+        ).stdout.split()
+        assert len(parents) == 2  # the commit itself + exactly one parent
 
 
 # ---------------------------------------------------------------------------

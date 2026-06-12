@@ -332,9 +332,9 @@ function apiGetBranches(projectId, branch) {
   return apiGet(url);
 }
 
-function apiHistoryRename(projectId, branch, message) {
+function apiHistoryRename(projectId, branch, sha, message) {
   var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/history/rename';
-  return apiPost(url, { message: message });
+  return apiPost(url, { sha: sha, message: message });
 }
 
 function apiHistoryUndo(projectId, branch) {

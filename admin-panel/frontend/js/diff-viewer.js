@@ -684,6 +684,9 @@ function updateRewriteButtonsState() {
 
   var headIsLocalUnpushed = state.historyCommits.length >= 1 && state.historyCommits[0].ahead_of_origin === true;
 
+  var active = state.historyCommits.find(function(c) { return c.full_sha === state.activeCommit; }) || state.historyCommits[0];
+  var activeIsLocalUnpushed = !!(active && active.ahead_of_origin === true);
+
   var squashable = state.selectedCommits.length >= 2 &&
     state.selectedCommits.every(function(sha) {
       var c = state.historyCommits.find(function(h) { return h.full_sha === sha; });
@@ -691,10 +694,10 @@ function updateRewriteButtonsState() {
     }) &&
     isSelectionContiguous(state.selectedCommits, state.historyCommits);
 
-  renameBtn.disabled = !headIsLocalUnpushed;
-  renameBtn.title = headIsLocalUnpushed
+  renameBtn.disabled = !activeIsLocalUnpushed;
+  renameBtn.title = activeIsLocalUnpushed
     ? ''
-    : 'Rename is only available for the latest local unpushed commit';
+    : 'Rename is only available for a selected local unpushed commit';
 
   undoBtn.disabled = !headIsLocalUnpushed;
   undoBtn.title = headIsLocalUnpushed
@@ -826,24 +829,24 @@ function _showHistoryDialog(options) {
 }
 
 async function historyRename() {
-  if (state.historyCommits.length === 0 || !state.historyCommits[0].ahead_of_origin) {
-    showToast(t('history.errors.renameFailed', { error: 'No local unpushed commit to rename' }));
+  var target = state.historyCommits.find(function(c) { return c.full_sha === state.activeCommit; }) || state.historyCommits[0];
+  if (!target || !target.ahead_of_origin) {
+    showToast(t('history.errors.renameFailed', { error: 'No local unpushed commit selected' }));
     return;
   }
   var ctx = getWorkspaceContext();
   if (!ctx) return;
 
-  var head = state.historyCommits[0];
   var newMessage = await _showHistoryDialog({
     title: t('history.rename'),
     inputLabel: t('history.dialogs.renamePrompt'),
-    inputValue: head.subject || '',
+    inputValue: target.subject || '',
     confirmLabel: t('history.rename')
   });
   if (newMessage === null || newMessage.trim() === '') return;
 
   try {
-    await apiHistoryRename(ctx.projectId, ctx.branch, newMessage.trim());
+    await apiHistoryRename(ctx.projectId, ctx.branch, target.full_sha, newMessage.trim());
     showToast(t('history.rename') + ' OK');
     await loadCommitHistory();
   } catch (e) {
