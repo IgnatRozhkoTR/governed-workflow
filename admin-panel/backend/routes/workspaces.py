@@ -228,8 +228,20 @@ _BACKUP_DIRS = [".claude/agents", ".claude/hooks"]
 _SYMLINK_TO_PROJECT = ["rules", "git-config.json", "git-rules.md"]
 
 
-def _ensure_workspace_mcp(mcp_path):
-    """Ensure the workspace MCP server is present in .mcp.json."""
+def _normalize_mcp_server_paths(servers: dict) -> None:
+    """Overwrite the governed-workflow entry and fix any stale mcp_server.py paths in-place."""
+    servers["governed-workflow"] = {"command": "python3", "args": [_MCP_SERVER_PATH]}
+    for name, entry in servers.items():
+        if name == "governed-workflow":
+            continue
+        args = entry.get("args", [])
+        for i, arg in enumerate(args):
+            if isinstance(arg, str) and arg.endswith("mcp_server.py"):
+                args[i] = _MCP_SERVER_PATH
+
+
+def _ensure_workspace_mcp(mcp_path) -> None:
+    """Normalize the governed MCP server path in .mcp.json to this machine's runtime path."""
     data = {}
     if mcp_path.exists():
         try:
@@ -237,12 +249,8 @@ def _ensure_workspace_mcp(mcp_path):
         except (json.JSONDecodeError, ValueError, OSError):
             pass
     servers = data.setdefault("mcpServers", {})
-    if "workspace" not in servers:
-        servers["workspace"] = {
-            "command": "python3",
-            "args": [_MCP_SERVER_PATH]
-        }
-        mcp_path.write_text(json.dumps(data, indent=2))
+    _normalize_mcp_server_paths(servers)
+    mcp_path.write_text(json.dumps(data, indent=2))
 
 
 def _hook_entries_equal(a, b):

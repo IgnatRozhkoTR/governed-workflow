@@ -324,7 +324,7 @@ class TestMergeLayer:
         dst_mcp = wt / ".mcp.json"
         assert dst_mcp.is_symlink()
         data = json.loads(dst_mcp.read_text())
-        assert "workspace" in data["mcpServers"]
+        assert "governed-workflow" in data["mcpServers"]
         assert "custom" in data["mcpServers"]
 
     def test_rules_symlinked_to_project(self, project_with_assets, tmp_path):
@@ -461,6 +461,77 @@ class TestWriteWorkspaceSettingsUnion:
         assert "PostToolUse" in data["hooks"]
         assert "SessionStart" in data["hooks"]
         assert data["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+
+
+class TestEnsureWorkspaceMcp:
+    """Tests for _ensure_workspace_mcp path normalisation."""
+
+    def test_governed_workflow_entry_written_when_no_file(self, tmp_path):
+        mcp_path = tmp_path / ".mcp.json"
+
+        _WORKSPACES._ensure_workspace_mcp(mcp_path)
+
+        data = json.loads(mcp_path.read_text())
+        entry = data["mcpServers"]["governed-workflow"]
+        assert entry["command"] == "python3"
+        assert entry["args"] == [_WORKSPACES._MCP_SERVER_PATH]
+
+    def test_stale_governed_workflow_path_overwritten(self, tmp_path):
+        mcp_path = tmp_path / ".mcp.json"
+        stale_path = "/Users/otheruser/x/admin-panel/backend/mcp_server.py"
+        mcp_path.write_text(json.dumps({
+            "mcpServers": {
+                "governed-workflow": {"command": "python3", "args": [stale_path]}
+            }
+        }, indent=2))
+
+        _WORKSPACES._ensure_workspace_mcp(mcp_path)
+
+        data = json.loads(mcp_path.read_text())
+        assert data["mcpServers"]["governed-workflow"]["args"] == [_WORKSPACES._MCP_SERVER_PATH]
+
+    def test_stale_workspace_entry_path_also_fixed(self, tmp_path):
+        mcp_path = tmp_path / ".mcp.json"
+        stale_path = "/Users/otheruser/x/admin-panel/backend/mcp_server.py"
+        mcp_path.write_text(json.dumps({
+            "mcpServers": {
+                "governed-workflow": {"command": "python3", "args": [stale_path]},
+                "workspace": {"command": "python3", "args": [stale_path]},
+                "gitlab": {"command": "node", "args": ["/usr/local/bin/gitlab-mcp"]}
+            }
+        }, indent=2))
+
+        _WORKSPACES._ensure_workspace_mcp(mcp_path)
+
+        data = json.loads(mcp_path.read_text())
+        assert data["mcpServers"]["governed-workflow"]["args"] == [_WORKSPACES._MCP_SERVER_PATH]
+        assert data["mcpServers"]["workspace"]["args"] == [_WORKSPACES._MCP_SERVER_PATH]
+        assert data["mcpServers"]["gitlab"]["args"] == ["/usr/local/bin/gitlab-mcp"]
+
+    def test_unrelated_server_preserved_exactly(self, tmp_path):
+        mcp_path = tmp_path / ".mcp.json"
+        mcp_path.write_text(json.dumps({
+            "mcpServers": {
+                "gitlab": {"command": "node", "args": ["/usr/local/bin/gitlab-mcp"], "env": {"TOKEN": "abc"}}
+            }
+        }, indent=2))
+
+        _WORKSPACES._ensure_workspace_mcp(mcp_path)
+
+        data = json.loads(mcp_path.read_text())
+        gitlab = data["mcpServers"]["gitlab"]
+        assert gitlab["command"] == "node"
+        assert gitlab["args"] == ["/usr/local/bin/gitlab-mcp"]
+        assert gitlab["env"] == {"TOKEN": "abc"}
+
+    def test_malformed_json_recovered_with_governed_workflow_entry(self, tmp_path):
+        mcp_path = tmp_path / ".mcp.json"
+        mcp_path.write_text("{not valid json,,}")
+
+        _WORKSPACES._ensure_workspace_mcp(mcp_path)
+
+        data = json.loads(mcp_path.read_text())
+        assert data["mcpServers"]["governed-workflow"]["args"] == [_WORKSPACES._MCP_SERVER_PATH]
 
 
 class TestBackupRestoreDirectories:
