@@ -837,10 +837,14 @@ async function historyRename() {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
 
+  var fullMessage = target.subject || '';
+  if (target.body) { fullMessage += '\n\n' + target.body; }
+
   var newMessage = await _showHistoryDialog({
     title: t('history.rename'),
     inputLabel: t('history.dialogs.renamePrompt'),
-    inputValue: target.subject || '',
+    inputValue: fullMessage,
+    textarea: true,
     confirmLabel: t('history.rename')
   });
   if (newMessage === null || newMessage.trim() === '') return;
