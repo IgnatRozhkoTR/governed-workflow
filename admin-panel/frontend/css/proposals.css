@@ -1,0 +1,98 @@
+.proposal-card {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+}
+
+.proposal-card:last-child {
+  border-bottom: none;
+}
+
+.proposal-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.proposal-card__title {
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.proposal-card__badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.proposal-card__body {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  margin-bottom: 8px;
+}
+
+.proposal-card__body p:first-child { margin-top: 0; }
+.proposal-card__body p:last-child { margin-bottom: 0; }
+
+.proposal-reason {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.proposal-reason__label {
+  font-weight: 600;
+}
+
+.proposal-payload {
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+}
+
+.proposal-payload summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-weight: 600;
+  user-select: none;
+}
+
+.proposal-payload pre {
+  margin-top: 6px;
+  padding: 8px;
+  background: var(--bg-raised);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-secondary);
+}
+
+.proposal-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.proposal-card__date {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.proposal-card__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.proposal-status--proposed { background: var(--accent-dim); color: var(--accent); }
+.proposal-status--executed { background: var(--success-dim); color: var(--success); }
+.proposal-status--failed   { background: var(--danger-dim);  color: var(--danger); }
+.proposal-status--rejected { background: var(--bg-hover);    color: var(--text-muted); }

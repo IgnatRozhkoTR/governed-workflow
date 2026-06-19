@@ -108,6 +108,7 @@ async function initApp() {
   }
 
   loadReviewComments();
+  loadProposals();
 
   renderPhaseBar('phaseBarControl', 'phaseLabelsControl');
   renderPhaseHistory();

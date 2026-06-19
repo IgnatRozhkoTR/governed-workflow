@@ -240,6 +240,14 @@ function apiListComments(projectId, branch, scope, showResolved) {
   return apiGet(url);
 }
 
+function apiListProposals(projectId, branch) {
+  return apiGet('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/proposals');
+}
+
+function apiResolveProposal(projectId, branch, proposalId, status, resultJson) {
+  return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/proposals/' + proposalId + '/resolve', { status: status, result_json: resultJson || null });
+}
+
 function apiSavePlan(projectId, branch, planData) {
   return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/plan', planData);
 }

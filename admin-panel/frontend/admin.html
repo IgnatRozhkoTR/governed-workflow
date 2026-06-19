@@ -79,6 +79,7 @@
 <link rel="stylesheet" href="css/mobile.css?v=11">
 <link rel="stylesheet" href="css/workspace.css?v=11">
 <link rel="stylesheet" href="css/phase-settings.css?v=1">
+<link rel="stylesheet" href="css/proposals.css?v=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -164,6 +165,10 @@
   <button class="sidebar-btn" data-tab="review" title="Review" data-i18n-title="tabs.review">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
     <span class="review-badge" id="reviewBadge" style="display:none"></span>
+  </button>
+  <button class="sidebar-btn" data-tab="reflection" title="Reflection" data-i18n-title="tabs.reflection">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 018.91 14"/></svg>
+    <span class="review-badge" id="reflectionBadge" style="display:none"></span>
   </button>
 <button class="sidebar-btn" data-tab="terminal" title="Terminal" data-i18n-title="tabs.terminal">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -677,6 +682,19 @@
     </div>
   </div>
 
+  <!-- ─── REFLECTION ─── -->
+  <div class="tab-panel" id="panel-reflection">
+    <div class="card">
+      <div class="card-header">
+        <span data-i18n="tabs.reflection">Reflection</span>
+        <div class="card-header__actions">
+          <button class="btn btn-sm" id="proposalsShowResolvedBtn" onclick="toggleProposalsResolved()" data-i18n="proposals.showResolved">Show resolved</button>
+        </div>
+      </div>
+      <div id="proposalsList"></div>
+    </div>
+  </div>
+
   <!-- ─── TERMINAL ─── -->
   <div class="tab-panel" id="panel-terminal">
     <div class="terminal-container">
@@ -759,6 +777,7 @@
 <script src="js/state.js?v=10"></script>
 <script src="js/review-thread.js?v=10"></script>
 <script src="js/review-tab.js?v=10"></script>
+<script src="js/proposals.js?v=1"></script>
 <script src="js/comments.js?v=10"></script>
 <script src="js/theme.js?v=10"></script>
 <script src="js/terminal.js?v=10"></script>
