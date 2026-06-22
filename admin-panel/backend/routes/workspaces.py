@@ -414,22 +414,29 @@ def _merge_project_assets(project_path: str, workspace_path: Path):
     # Pass 1: fill missing files from repo defaults
     _fill_missing_repo_defaults(workspace_path)
 
-    # Pass 2: project-local content overwrites workspace copies (project wins)
-    for project_subdir, dst_rel in [
-        (project / ".claude", workspace_path / ".claude"),
-    ]:
-        if not project_subdir.exists():
-            continue
-        for src_file in project_subdir.rglob("*"):
-            if not src_file.is_file():
+    # Pass 2: project-local content overwrites workspace copies (project wins).
+    # Prune the worktrees storage root BEFORE descending — it holds a full
+    # checkout per workspace (hundreds of thousands of files) and walking it
+    # only to skip it made creation slower with every workspace added.
+    project_claude = project / ".claude"
+    workspace_claude = workspace_path / ".claude"
+    if project_claude.exists():
+        for entry in project_claude.iterdir():
+            if entry.name == "worktrees":
                 continue
-            rel = src_file.relative_to(project_subdir)
-            # Never merge content from the worktrees storage root
-            if rel.parts and rel.parts[0] == "worktrees":
+            if entry.is_file():
+                dst_file = workspace_claude / entry.name
+                dst_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(entry, dst_file)
                 continue
-            dst_file = dst_rel / rel
-            dst_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_file, dst_file)
+            if entry.is_dir():
+                for src_file in entry.rglob("*"):
+                    if not src_file.is_file():
+                        continue
+                    rel = src_file.relative_to(project_claude)
+                    dst_file = workspace_claude / rel
+                    dst_file.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src_file, dst_file)
 
 
 @bp.route("/api/projects/<project_id>/branches", methods=["GET"])
