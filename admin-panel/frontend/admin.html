@@ -243,6 +243,10 @@
             <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.externalPaths">Allowed external paths (comma-separated)</label>
             <input type="text" class="context-input" id="allowedExternalPathsInput" placeholder="/tmp/, /var/log/" style="width: 100%;">
           </div>
+          <div style="margin-top: 8px;">
+            <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.envVars">Environment variables (KEY=VALUE per line)</label>
+            <textarea class="context-input" id="envVarsInput" rows="4" placeholder="API_KEY=sk-...&#10;DEBUG=1" style="width: 100%; font-family: var(--font-mono); resize: vertical;"></textarea>
+          </div>
           <div style="display: flex; gap: 6px; justify-content: flex-end;">
             <button class="btn btn-sm" onclick="saveClaudeCommand()" data-i18n="buttons.save">Save</button>
           </div>
@@ -795,7 +799,7 @@
 <script src="js/file-explorer.js?v=10"></script>
 <script src="js/git-config.js?v=10"></script>
 <script src="js/rules.js?v=1"></script>
-<script src="js/claude-config.js?v=10"></script>
+<script src="js/claude-config.js?v=11"></script>
 <script src="js/network-mode.js?v=11"></script>
 <script src="js/context.js?v=10"></script>
 <script src="js/criteria.js?v=10"></script>

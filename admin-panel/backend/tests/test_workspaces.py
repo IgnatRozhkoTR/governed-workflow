@@ -629,3 +629,33 @@ class TestHookScriptRepoResolution:
         assert proc.returncode == 0
         output = json.loads(proc.stdout)
         assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_get_command_config_returns_env_vars(client, workspace, project):
+    r = client.get(f"/api/ws/{project['id']}/feature/test/command")
+    assert r.status_code == 200
+    assert r.json["env_vars"] == ""
+
+
+def test_update_command_config_persists_env_vars(client, workspace, project):
+    env_block = "FOO=bar\nBAZ=qux"
+    r = client.put(
+        f"/api/ws/{project['id']}/feature/test/command",
+        json={"env_vars": env_block},
+    )
+    assert r.status_code == 200
+
+    r = client.get(f"/api/ws/{project['id']}/feature/test/command")
+    assert r.status_code == 200
+    assert r.json["env_vars"] == env_block
+
+
+def test_update_command_config_rerenders_launch_env_file(client, workspace, project):
+    r = client.put(
+        f"/api/ws/{project['id']}/feature/test/command",
+        json={"env_vars": "FOO=bar"},
+    )
+    assert r.status_code == 200
+
+    launch_env = Path(workspace["working_dir"]) / ".claude" / "state" / "launch-env"
+    assert launch_env.read_text() == "export FOO=bar\n"

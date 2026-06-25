@@ -85,6 +85,7 @@
   "config.skipPermissions": "Включить флаг --dangerously-skip-permissions",
   "config.restrictToWorkspace": "Ограничить модификацию файлов директорией workspace",
   "config.externalPaths": "Разрешённые внешние пути (через запятую)",
+  "config.envVars": "Переменные окружения (КЛЮЧ=ЗНАЧЕНИЕ построчно)",
   "config.channels": "Каналы",
   "config.yoloMode": "YOLO",
   "config.phaseSettingsDesc": "Включите или отключите фазы для данной области. Всегда включённые фазы нельзя отключить.",

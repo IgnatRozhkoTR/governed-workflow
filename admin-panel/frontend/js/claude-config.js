@@ -18,6 +18,8 @@ function loadClaudeCommand() {
       }
       var pathsInput = document.getElementById('allowedExternalPathsInput');
       if (pathsInput) pathsInput.value = data.allowed_external_paths || '/tmp/';
+      var envInput = document.getElementById('envVarsInput');
+      if (envInput) envInput.value = data.env_vars || '';
     })
     .catch(function(e) { console.warn('claude-config loadClaudeCommand failed:', e && e.message); });
 }
@@ -30,6 +32,7 @@ function saveClaudeCommand() {
   var checkbox = document.getElementById('skipPermissionsCheck');
   var restrictCheck = document.getElementById('restrictToWorkspaceCheck');
   var pathsInput = document.getElementById('allowedExternalPathsInput');
+  var envInput = document.getElementById('envVarsInput');
 
   var cmd = input ? input.value.trim() : 'claude';
   var skip = checkbox ? checkbox.checked : true;
@@ -38,7 +41,8 @@ function saveClaudeCommand() {
     claude_command: cmd,
     skip_permissions: skip,
     restrict_to_workspace: restrictCheck ? restrictCheck.checked : true,
-    allowed_external_paths: pathsInput ? pathsInput.value.trim() : '/tmp/'
+    allowed_external_paths: pathsInput ? pathsInput.value.trim() : '/tmp/',
+    env_vars: envInput ? envInput.value : ''
   })
   .then(function(data) {
     if (data.ok) {

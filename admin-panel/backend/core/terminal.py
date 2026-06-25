@@ -190,6 +190,44 @@ def kill_session(name):
 
 _STATE_DIR_REL = Path(".claude") / "state"
 _FORCE_NEW_SESSION_FLAG = "force-new-session"
+_ENV_KEY_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+
+
+def parse_env_vars(text):
+    """Parse dotenv-style text into a list of (key, value) pairs.
+
+    Skips blank lines and lines starting with '#'. Splits on the first '='.
+    Keys must match [A-Za-z_][A-Za-z0-9_]*; key and value are stripped of
+    surrounding whitespace; invalid lines are skipped.
+    """
+    pairs = []
+    for raw in (text or '').splitlines():
+        line = raw.strip()
+        if not line or line.startswith('#'):
+            continue
+        if '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        key = key.strip()
+        if not _ENV_KEY_RE.match(key):
+            continue
+        pairs.append((key, value.strip()))
+    return pairs
+
+
+def write_launch_env_file(working_dir, env_text):
+    """Render workspace env vars to a sourceable file in the state dir.
+
+    Each pair becomes 'export KEY=<shlex-quoted value>'. ALWAYS (re)writes
+    the file (empty when there are no vars) so stale values don't linger on
+    a fresh session start. Returns the number of vars written.
+    """
+    state_dir = Path(working_dir) / '.claude' / 'state'
+    state_dir.mkdir(parents=True, exist_ok=True)
+    pairs = parse_env_vars(env_text)
+    lines = [f"export {key}={shlex.quote(value)}" for key, value in pairs]
+    (state_dir / 'launch-env').write_text('\n'.join(lines) + ('\n' if lines else ''))
+    return len(pairs)
 
 
 def mark_new_session(working_dir):
@@ -225,6 +263,7 @@ def build_claude_command(ws, resume=False, channels=None):
         f"bash -c "
         f"'cd \"$0\" && mkdir -p .claude/state && while true; do "
         f"if [ -e .claude/state/wrapper-stop ]; then rm -f .claude/state/wrapper-stop; break; fi; "
+        f"if [ -f .claude/state/launch-env ]; then . .claude/state/launch-env; fi; "
         f"if [ -e .claude/state/force-new-session ]; then "
         f"rm -f .claude/state/force-new-session; "
         f"{base}; "
