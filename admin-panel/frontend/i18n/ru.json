@@ -438,6 +438,7 @@
   "terminal.kill": "Завершить",
   "terminal.noSessions": "Нет сессий",
   "terminal.attached": "подключена",
+  "terminal.imagePasted": "Изображение прикреплено",
   "terminal.detached": "отключена",
   "terminal.killSession": "Завершить сессию",
 

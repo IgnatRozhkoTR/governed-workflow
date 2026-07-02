@@ -1,6 +1,8 @@
 """Terminal WebSocket and REST routes for tmux session management."""
 import json
 import re
+import uuid
+from pathlib import Path
 
 from flask import Blueprint, request, jsonify
 from flask_sock import Sock
@@ -278,3 +280,31 @@ def terminal_kill(project, branch):
     if session_exists(name):
         kill_session(name)
     return jsonify({'ok': True, 'status': 'killed', 'kind': session_kind})
+
+
+@bp.route('/api/ws/<project>/<path:branch>/terminal/paste-image', methods=['POST'])
+def terminal_paste_image(project, branch):
+    """Persist an uploaded image and return a path Claude Code can attach."""
+    with get_db_ctx() as db:
+        ws = find_workspace(db, project, branch)
+        if not ws:
+            return jsonify({'error': 'Workspace not found'}), 404
+        working_dir = ws['working_dir']
+
+    file = request.files.get('image')
+    if file is None or not file.filename:
+        return jsonify({'error': 'No image provided'}), 400
+
+    content_type = (file.mimetype or '').lower()
+    if not content_type.startswith('image/'):
+        return jsonify({'error': 'Uploaded file is not an image'}), 400
+
+    ext = {'image/png': '.png', 'image/jpeg': '.jpg', 'image/jpg': '.jpg',
+           'image/gif': '.gif', 'image/webp': '.webp'}.get(content_type, '.png')
+
+    dest_dir = Path(working_dir) / '.claude' / 'state' / 'pasted-images'
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / (uuid.uuid4().hex + ext)
+    file.save(str(dest))
+
+    return jsonify({'ok': True, 'path': str(dest)})

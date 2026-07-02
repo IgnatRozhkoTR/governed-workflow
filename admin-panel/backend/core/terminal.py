@@ -120,9 +120,12 @@ def create_session(name, working_dir, env=None):
             subprocess.run(['tmux', 'setenv', '-t', name, key, value], capture_output=True)
     subprocess.run(['tmux', 'set-option', '-t', name, 'mouse', 'on'], capture_output=True)
     subprocess.run(['tmux', 'set-option', '-t', name, 'set-clipboard', 'on'], capture_output=True)
-    # Override WheelUpPane to always enter copy mode (fixes Claude Code stealing scroll)
+    # Forward the wheel to full-screen mouse apps (e.g. Claude Code scrolls its
+    # own transcript); only fall back to tmux copy-mode for plain panes. The old
+    # "always copy-mode" override trapped users in an empty [0/0] scrollback
+    # because Claude Code runs on the alternate screen, which has no tmux history.
     subprocess.run(['tmux', 'bind-key', '-n', 'WheelUpPane',
-                    'if-shell', '-F', '#{pane_in_mode}',
+                    'if-shell', '-F', '#{?pane_in_mode,1,#{mouse_any_flag}}',
                     'send-keys -M',
                     'copy-mode -e; send-keys -M'], capture_output=True)
     # Copy mouse selection to system clipboard, stay in copy mode
