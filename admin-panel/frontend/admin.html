@@ -219,43 +219,63 @@
     </div>
     <div id="sessionsHistoryDropdown" style="display:none; margin-bottom:12px; padding:8px 12px; background:var(--bg-raised); border:1px solid var(--border); border-radius:var(--radius-sm); max-height:200px; overflow-y:auto;"></div>
 
-    <!-- Claude Command -->
+    <!-- Task Context (moved from Context tab) -->
     <div class="card collapsed">
       <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.claudeCommand">Claude Command</span>
+        <span class="card-title" data-i18n="cards.taskContext">Task Context</span>
         <span class="card-collapse-chevron">&#9660;</span>
       </div>
       <div class="card-body">
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <div>
-            <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.commandLabel">Command</label>
-            <input type="text" class="context-input" id="claudeCommandInput" placeholder="claude" style="width: 100%;">
+        <div class="context-fields">
+          <div class="context-row">
+            <div class="context-field">
+              <label class="context-label" data-i18n="labels.ticketId">Ticket ID</label>
+              <input type="text" class="context-input" id="contextTicketId" readonly>
+            </div>
+            <div class="context-field context-field-grow">
+              <label class="context-label" data-i18n="labels.ticketName">Ticket Name</label>
+              <input type="text" class="context-input" id="contextTicketName" placeholder="Enter ticket/task name..." data-i18n-placeholder="placeholders.enterTicketName">
+            </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="skipPermissionsCheck" checked>
-            <label for="skipPermissionsCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.skipPermissions">Include --dangerously-skip-permissions flag</label>
+          <div class="context-field">
+            <label class="context-label" data-i18n="labels.context">Context</label>
+            <textarea class="context-textarea" id="contextText" placeholder="Describe the task, requirements, acceptance criteria..." data-i18n-placeholder="placeholders.describeTask"></textarea>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-            <input type="checkbox" id="restrictToWorkspaceCheck" checked>
-            <label for="restrictToWorkspaceCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.restrictToWorkspace">Restrict file modifications to workspace directory</label>
+          <div class="context-field" style="margin-top: 4px;">
+            <label class="context-label" data-i18n="labels.fileDirectoryReferences">File &amp; Directory References</label>
+            <div style="position: relative;">
+              <input type="text" id="contextRefSearch" class="context-input"
+                     placeholder="Type to search files and directories..."
+                     data-i18n-placeholder="placeholders.searchFilesAndDirs"
+                     autocomplete="off"
+                     oninput="searchContextRefs(this.value)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();addManualContextRef(this.value);}">
+              <div id="contextRefDropdown" class="ref-dropdown" style="display:none;"></div>
+            </div>
+            <div id="contextRefsList" class="refs-list" style="margin-top: 8px;"></div>
           </div>
-          <div style="margin-top: 8px;">
-            <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.externalPaths">Allowed external paths (comma-separated)</label>
-            <input type="text" class="context-input" id="allowedExternalPathsInput" placeholder="/tmp/, /var/log/" style="width: 100%;">
-          </div>
-          <div style="margin-top: 8px;">
-            <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.envVars">Environment variables (KEY=VALUE per line)</label>
-            <textarea class="context-input" id="envVarsInput" rows="4" placeholder="API_KEY=sk-...&#10;DEBUG=1" style="width: 100%; font-family: var(--font-mono); resize: vertical;"></textarea>
-          </div>
-          <div style="display: flex; gap: 6px; justify-content: flex-end;">
-            <button class="btn btn-sm" onclick="saveClaudeCommand()" data-i18n="buttons.save">Save</button>
+          <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+            <button class="btn btn-sm" onclick="saveContext()" data-i18n="buttons.saveContext">Save Context</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Network Mode -->
-    <div class="card" id="networkModeCard"></div>
+    <!-- Verification Profiles -->
+    <div class="card">
+      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
+        <span class="card-title" data-i18n="cards.verificationProfiles">Verification Profiles</span>
+        <span class="card-collapse-chevron">&#9660;</span>
+      </div>
+      <div class="card-body">
+        <div id="verificationAssigned"></div>
+        <div class="verification-assign-row">
+          <select id="verificationProfileSelect"></select>
+          <input type="text" id="verificationSubpath" placeholder="subpath (default: .)" title="Subpath (default: .)">
+          <button class="btn btn-sm" onclick="assignVerificationProfile()" data-i18n="verification.assign">Assign</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Git Configuration -->
     <div class="card collapsed">
@@ -327,6 +347,44 @@
       </div>
     </div>
 
+    <!-- Claude Command -->
+    <div class="card collapsed">
+      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
+        <span class="card-title" data-i18n="cards.claudeCommand">Claude Command</span>
+        <span class="card-collapse-chevron">&#9660;</span>
+      </div>
+      <div class="card-body">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div>
+            <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.commandLabel">Command</label>
+            <input type="text" class="context-input" id="claudeCommandInput" placeholder="claude" style="width: 100%;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="skipPermissionsCheck" checked>
+            <label for="skipPermissionsCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.skipPermissions">Include --dangerously-skip-permissions flag</label>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+            <input type="checkbox" id="restrictToWorkspaceCheck" checked>
+            <label for="restrictToWorkspaceCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.restrictToWorkspace">Restrict file modifications to workspace directory</label>
+          </div>
+          <div style="margin-top: 8px;">
+            <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.externalPaths">Allowed external paths (comma-separated)</label>
+            <input type="text" class="context-input" id="allowedExternalPathsInput" placeholder="/tmp/, /var/log/" style="width: 100%;">
+          </div>
+          <div style="margin-top: 8px;">
+            <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.envVars">Environment variables (KEY=VALUE per line)</label>
+            <textarea class="context-input" id="envVarsInput" rows="4" placeholder="API_KEY=sk-...&#10;DEBUG=1" style="width: 100%; font-family: var(--font-mono); resize: vertical;"></textarea>
+          </div>
+          <div style="display: flex; gap: 6px; justify-content: flex-end;">
+            <button class="btn btn-sm" onclick="saveClaudeCommand()" data-i18n="buttons.save">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Network Mode -->
+    <div class="card" id="networkModeCard"></div>
+
     <!-- LSP Shortcuts -->
     <div class="card collapsed" id="lspShortcutsCard">
       <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
@@ -344,64 +402,6 @@
         <span class="card-collapse-chevron">&#9660;</span>
       </div>
       <div class="card-body" id="modulesCardBody">
-      </div>
-    </div>
-
-    <!-- Verification Profiles -->
-    <div class="card">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.verificationProfiles">Verification Profiles</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body">
-        <div id="verificationAssigned"></div>
-        <div class="verification-assign-row">
-          <select id="verificationProfileSelect"></select>
-          <input type="text" id="verificationSubpath" placeholder="subpath (default: .)" title="Subpath (default: .)">
-          <button class="btn btn-sm" onclick="assignVerificationProfile()" data-i18n="verification.assign">Assign</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Task Context (moved from Context tab) -->
-    <div class="card collapsed">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.taskContext">Task Context</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body">
-        <div class="context-fields">
-          <div class="context-row">
-            <div class="context-field">
-              <label class="context-label" data-i18n="labels.ticketId">Ticket ID</label>
-              <input type="text" class="context-input" id="contextTicketId" readonly>
-            </div>
-            <div class="context-field context-field-grow">
-              <label class="context-label" data-i18n="labels.ticketName">Ticket Name</label>
-              <input type="text" class="context-input" id="contextTicketName" placeholder="Enter ticket/task name..." data-i18n-placeholder="placeholders.enterTicketName">
-            </div>
-          </div>
-          <div class="context-field">
-            <label class="context-label" data-i18n="labels.context">Context</label>
-            <textarea class="context-textarea" id="contextText" placeholder="Describe the task, requirements, acceptance criteria..." data-i18n-placeholder="placeholders.describeTask"></textarea>
-          </div>
-          <div class="context-field" style="margin-top: 4px;">
-            <label class="context-label" data-i18n="labels.fileDirectoryReferences">File &amp; Directory References</label>
-            <div style="position: relative;">
-              <input type="text" id="contextRefSearch" class="context-input"
-                     placeholder="Type to search files and directories..."
-                     data-i18n-placeholder="placeholders.searchFilesAndDirs"
-                     autocomplete="off"
-                     oninput="searchContextRefs(this.value)"
-                     onkeydown="if(event.key==='Enter'){event.preventDefault();addManualContextRef(this.value);}">
-              <div id="contextRefDropdown" class="ref-dropdown" style="display:none;"></div>
-            </div>
-            <div id="contextRefsList" class="refs-list" style="margin-top: 8px;"></div>
-          </div>
-          <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
-            <button class="btn btn-sm" onclick="saveContext()" data-i18n="buttons.saveContext">Save Context</button>
-          </div>
-        </div>
       </div>
     </div>
 
