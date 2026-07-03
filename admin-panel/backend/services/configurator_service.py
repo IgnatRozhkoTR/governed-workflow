@@ -107,6 +107,7 @@ class SkillConfigurator(Configurator):
     PLACEHOLDER_PHASE_MAP = "{{PHASE_MAP}}"
 
     def configure(self, db: sqlite3.Connection, project_id: int, project_path: Path) -> list[dict]:
+        project_path = Path(project_path)
         template, skip = self._load_engine_template()
         if template is None:
             return [skip]

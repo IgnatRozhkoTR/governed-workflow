@@ -31,14 +31,17 @@ def test_is_major_transition_bad_input_is_safe():
 # ── Integration helpers ───────────────────────────────────────────────────────
 
 
-def _make_ws(ws_id, project_id, working_dir, phase):
-    return {
+def _make_ws(ws_id, project_id, working_dir, phase, workflow_mode=None):
+    ws = {
         "id": ws_id,
         "project_id": project_id,
         "working_dir": working_dir,
         "phase": phase,
         "last_confirmed_commit": None,
     }
+    if workflow_mode is not None:
+        ws["workflow_mode"] = workflow_mode
+    return ws
 
 
 def _action_file(working_dir):
@@ -220,6 +223,60 @@ def test_major_transition_none_mode_writes_no_file(tmp_path):
         db.close()
 
     assert not os.path.isfile(_action_file(working_dir))
+
+
+def test_fast_workspace_major_transition_compact_mode_writes_no_file(tmp_path):
+    """A fast-mode workspace never gets an advance action, even when the project's
+    boundary mode is 'compact' — every boundary behaves as mode 'none'.
+    """
+    working_dir = str(tmp_path / "repo")
+    os.makedirs(working_dir)
+    project_id = "proj-fast-compact"
+
+    db = get_db()
+    try:
+        ws = _make_ws(9008, project_id, working_dir, "1.4", workflow_mode="fast")
+        _insert_workspace_and_project(db, ws)
+        set_modes(db, project_id, {"2": "compact"})
+
+        post_commit = transition_phase(db, ws, "2.0")
+
+        assert post_commit is not None
+        db.commit()
+        for callback in post_commit:
+            callback()
+    finally:
+        db.close()
+
+    assert not os.path.isfile(_action_file(working_dir))
+
+
+def test_standard_workspace_major_transition_compact_mode_still_writes_file(tmp_path):
+    """Control for the fast-mode test above: an otherwise-identical standard
+    workspace still writes the pending-advance-action file as before.
+    """
+    working_dir = str(tmp_path / "repo")
+    os.makedirs(working_dir)
+    project_id = "proj-standard-compact"
+
+    db = get_db()
+    try:
+        ws = _make_ws(9009, project_id, working_dir, "1.4", workflow_mode="standard")
+        _insert_workspace_and_project(db, ws)
+        set_modes(db, project_id, {"2": "compact"})
+
+        post_commit = transition_phase(db, ws, "2.0")
+
+        assert post_commit is not None
+        db.commit()
+        for callback in post_commit:
+            callback()
+    finally:
+        db.close()
+
+    action_file = _action_file(working_dir)
+    assert os.path.isfile(action_file), "pending-advance-action file must be written"
+    assert open(action_file).read() == "compact"
 
 
 def test_missing_working_dir_is_graceful(tmp_path):

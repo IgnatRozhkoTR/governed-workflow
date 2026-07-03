@@ -626,6 +626,22 @@ def test_chain_run_executes_configurators_in_order(db, project_row, project_root
     assert [r["target"] for r in results] == ["a", "b"]
 
 
+def test_chain_run_accepts_project_path_as_plain_string(db, project_row, project_root, tmp_path):
+    """Regression: route handlers pass ``project["path"]`` (a plain str sqlite3.Row column),
+    not a Path. SkillConfigurator.configure must coerce it instead of crashing on
+    ``str / str`` when building the project-root render target.
+    """
+    wt = tmp_path / "wt-str-path"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/str-path", wt, status="active")
+
+    results = ConfiguratorChain.default().run(db, project_row, str(project_root))
+
+    assert all(r["action"] != "failed" for r in results)
+    assert (project_root / SKILL_OUTPUT_REL).exists()
+    assert (wt / SKILL_OUTPUT_REL).exists()
+
+
 def test_chain_run_returns_skipped_entries_for_missing_targets(db, project_row, tmp_path):
     """A skipped target surfaces as a non-rendered entry callers can attach as a warning."""
     empty_root = tmp_path / "skip-root"

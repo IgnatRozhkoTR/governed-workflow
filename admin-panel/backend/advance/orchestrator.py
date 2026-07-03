@@ -165,8 +165,13 @@ def _maybe_write_advance_action(db, ws, new_phase: str) -> None:
     """Write pending-advance-action file when crossing a boundary_key boundary.
 
     Only fires for compact/clear modes; none and missing rows are no-ops.
+    Fast-mode workspaces never get an advance action — every boundary behaves
+    as mode 'none' regardless of the project's configured boundary mode.
     Write failures are swallowed so they never block a phase transition.
     """
+    if ws_field(ws, "workflow_mode", "standard") == "fast":
+        return
+
     old_phase = ws["phase"]
     if not _is_major_transition(old_phase, new_phase):
         return
