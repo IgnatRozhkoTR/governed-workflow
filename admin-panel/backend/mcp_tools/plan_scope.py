@@ -3,6 +3,7 @@ from typing import Annotated, Optional
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from core.db import ws_field
 from mcp_tools import mcp, mcp_error, with_mcp_workspace
 from services import plan_service
 
@@ -44,7 +45,11 @@ def workspace_set_plan(
 
     Tasks with the same "group" name run in parallel. Tasks without a group run
     sequentially."""
-    result = plan_service.set_plan(db, ws, plan, simple_mode=bool(project["simple_planning"]))
+    result = plan_service.set_plan(
+        db, ws, plan,
+        simple_mode=bool(project["simple_planning"]),
+        fast_mode=ws_field(ws, "workflow_mode", "standard") == "fast",
+    )
     if "error" in result:
         return mcp_error("business", result["error"], retryable=False)
     db.commit()

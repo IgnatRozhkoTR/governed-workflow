@@ -2,7 +2,7 @@
 import sqlite3
 
 from advance.phases import Phase
-from core.db import get_db_ctx
+from core.db import get_db_ctx, ws_field
 from core.i18n import t
 from services import plan_service
 
@@ -20,10 +20,55 @@ class PlanningPhase(Phase):
     name = "Planning"
     short_description = "Orchestrator and plan-advisor draft the execution plan and scope"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         if simple_planning:
             return self._simple_description()
+        if workflow_mode == "fast":
+            return self._fast_description()
         return self._full_description()
+
+    def _fast_description(self) -> str:
+        return """\
+## 2.0 Planning
+
+**Actors**: Orchestrator + plan-advisor
+
+Fast mode: the plan MUST have exactly ONE execution sub-phase (`3.1`) covering the whole change — no additional sub-phases.
+
+Message the plan-advisor teammate to collaborate on the execution plan:
+
+```
+SendMessage(
+  to: "plan-advisor",
+  content: "We are in the planning phase. Review the research findings via workspace_get_state.
+            Help me design the execution plan for this task. We need exactly ONE sub-phase (3.1)
+            with its scope and tasks."
+)
+```
+
+When the plan is agreed:
+1. Call `workspace_set_plan` with the full plan JSON — exactly ONE execution item with `"id": "3.1"`:
+```json
+{
+  "description": "High-level description of what this plan achieves",
+  "systemDiagram": [],
+  "execution": [
+    {
+      "id": "3.1",
+      "name": "Sub-phase name",
+      "scope": {"must": ["src/models/"], "may": ["src/config/"]},
+      "tasks": [{"title": "...", "files": ["..."], "agent": "..."}]
+    }
+  ]
+}
+```
+2. Acceptance criteria are optional in fast mode — propose any via `workspace_propose_criteria` if useful, but none are required to advance.
+3. Call `workspace_update_progress` for phase `"2"`
+4. Call `workspace_advance`
+
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel (auto-approved when `yolo_mode` is on). `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0`.
+
+**Advance 2.0 → 3.1.0** requires: a single execution sub-phase `3.1` with a non-empty `scope.must`, plan_status='approved', and progress entry `"2"`."""
 
     def _simple_description(self) -> str:
         return """\
@@ -131,15 +176,17 @@ When plan is agreed:
 
         with get_db_ctx() as db:
             is_simple = _is_simple_planning(db, ws["project_id"])
+        is_fast = ws_field(ws, "workflow_mode", "standard") == "fast"
 
-        if is_simple and len(execution) > 1:
-            return False, {"message": "Simple planning mode requires exactly one execution sub-phase."}
+        if (is_simple or is_fast) and plan_service.exceeds_single_execution_item(execution):
+            mode_label = "Simple planning" if is_simple else "Fast workflow"
+            return False, {"message": f"{mode_label} mode requires exactly one execution sub-phase."}
 
         issues = self._validate_execution_items(execution, locale)
         if issues:
             return False, {"message": t("advance.error.planValidationFailed", locale), "issues": issues}
 
-        if not is_simple:
+        if not (is_simple or is_fast):
             ok, detail = self._validate_criteria(ws, locale)
             if not ok:
                 return False, detail

@@ -25,6 +25,11 @@ function renderPhaseHistory() {
 // ═══════════════════════════════════════════════
 
 function getPhaseSequenceForBar() {
+  var enabledPhases = LOCK_DATA.enabled_phases;
+  if (enabledPhases && enabledPhases.length > 0) {
+    return enabledPhases.slice();
+  }
+
   var fixedBefore = ['0', '1.0', '1.1', '1.2', '1.3', '1.4', '2.0', '2.1'];
   var fixedAfter = ['4.0', '4.1', '4.2', '5'];
 

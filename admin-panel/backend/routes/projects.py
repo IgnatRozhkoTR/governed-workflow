@@ -15,7 +15,13 @@ from core.i18n import t
 from core.paths import DEFAULT_GIT_RULES
 from services.advance_mode_service import seed_default_modes
 from services.configurator_service import ConfiguratorChain
-from services.project_settings_service import ProjectSettingsError, get_simple_planning, set_simple_planning
+from services.project_settings_service import (
+    ProjectSettingsError,
+    get_fast_mode_default,
+    get_simple_planning,
+    set_fast_mode_default,
+    set_simple_planning,
+)
 
 log = logging.getLogger(__name__)
 
@@ -160,8 +166,10 @@ def _ensure_git_rules_symlink(project_path):
 @bp.route("/api/projects/<project_id>/settings", methods=["GET"])
 @with_project
 def get_project_settings(db, project):
-    simple_planning = get_simple_planning(db, project["id"])
-    return jsonify({"simple_planning": simple_planning})
+    return jsonify({
+        "simple_planning": get_simple_planning(db, project["id"]),
+        "fast_mode_default": get_fast_mode_default(db, project["id"]),
+    })
 
 
 @bp.route("/api/projects/<project_id>/settings", methods=["PUT"])
@@ -173,8 +181,14 @@ def put_project_settings(db, project):
     if not isinstance(body["simple_planning"], bool):
         return jsonify({"error": "simple_planning must be a boolean"}), 400
 
+    fast_mode_default = body.get("fast_mode_default")
+    if fast_mode_default is not None and not isinstance(fast_mode_default, bool):
+        return jsonify({"error": "fast_mode_default must be a boolean"}), 400
+
     try:
         set_simple_planning(db, project["id"], body["simple_planning"])
+        if fast_mode_default is not None:
+            set_fast_mode_default(db, project["id"], fast_mode_default)
         db.commit()
     except ProjectSettingsError as exc:
         return jsonify({"error": str(exc)}), 404
@@ -186,7 +200,11 @@ def put_project_settings(db, project):
     except Exception:
         log.exception("Configurator chain failed at put_project_settings; SKILL.md may be stale")
 
-    response = {"ok": True, "simple_planning": body["simple_planning"]}
+    response = {
+        "ok": True,
+        "simple_planning": body["simple_planning"],
+        "fast_mode_default": get_fast_mode_default(db, project["id"]),
+    }
     if warnings:
         response["configurator_warnings"] = warnings
     return jsonify(response)

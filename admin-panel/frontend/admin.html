@@ -108,6 +108,7 @@
     <img src="/img/logo.png" alt="WC" width="36" height="36" style="border-radius: 6px;">
     <span class="header-title" data-i18n="header.title">Workspace Control</span>
     <span class="header-branch" id="branchName">feature/scope-locked-flow</span>
+    <span class="badge badge-warning" id="headerWorkflowModeBadge" style="display:none;margin-left:8px;"></span>
   </div>
   <div class="header-right">
     <span class="badge badge-warning mobile-phase-badge" id="phaseLabelMobile"></span>
@@ -345,6 +346,15 @@
           <button class="btn btn-sm btn-primary" onclick="openRuleModal()" data-i18n="buttons.newRule">New rule</button>
         </div>
       </div>
+    </div>
+
+    <!-- Workflow Mode -->
+    <div class="card collapsed" id="workflowModeCard">
+      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
+        <span class="card-title" data-i18n="cards.workflowMode">Workflow Mode</span>
+        <span class="card-collapse-chevron">&#9660;</span>
+      </div>
+      <div class="card-body" id="workflowModeCardBody"></div>
     </div>
 
     <!-- Claude Command -->
@@ -775,10 +785,10 @@
 <script src="js/vendor/idiomorph.min.js?v=10"></script>
 <script src="js/event-bus.js?v=10"></script>
 <script src="js/i18n.js?v=10"></script>
-<script src="js/api.js?v=11"></script>
+<script src="js/api.js?v=12"></script>
 <script src="js/auth.js?v=11"></script>
 <script src="js/toast.js?v=10"></script>
-<script src="js/state.js?v=10"></script>
+<script src="js/state.js?v=11"></script>
 <script src="js/review-thread.js?v=10"></script>
 <script src="js/review-tab.js?v=10"></script>
 <script src="js/proposals.js?v=1"></script>
@@ -786,7 +796,7 @@
 <script src="js/theme.js?v=10"></script>
 <script src="js/terminal.js?v=11"></script>
 <script src="js/tabs.js?v=10"></script>
-<script src="js/phase.js?v=10"></script>
+<script src="js/phase.js?v=11"></script>
 <script src="js/plan.js?v=10"></script>
 <script src="js/scope.js?v=10"></script>
 <script src="js/tree-utils.js?v=10"></script>
@@ -799,7 +809,7 @@
 <script src="js/file-explorer.js?v=10"></script>
 <script src="js/git-config.js?v=10"></script>
 <script src="js/rules.js?v=1"></script>
-<script src="js/claude-config.js?v=11"></script>
+<script src="js/claude-config.js?v=12"></script>
 <script src="js/network-mode.js?v=11"></script>
 <script src="js/context.js?v=10"></script>
 <script src="js/criteria.js?v=10"></script>
@@ -810,8 +820,8 @@
 <script src="js/advance-modes.js?v=1"></script>
 <script src="js/review-pipeline.js?v=1"></script>
 <script src="js/actions.js?v=10"></script>
-<script src="js/app.js?v=10"></script>
-<script src="js/workspace.js?v=10"></script>
+<script src="js/app.js?v=11"></script>
+<script src="js/workspace.js?v=11"></script>
 
 <div id="diagramOverlay" class="diagram-overlay" style="display:none" onclick="closeDiagramOverlay(event)">
   <div class="diagram-overlay-content" onclick="event.stopPropagation()">

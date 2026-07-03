@@ -64,3 +64,21 @@ def set_scope_settings(db, scope_type: str, scope_id: str, settings: dict) -> No
     except Exception:
         db.rollback()
         raise
+
+
+def delete_scope_settings(db, scope_type: str, scope_id: str, phase_ids) -> None:
+    """Remove the scope-override rows for the given phase ids at one scope.
+
+    A no-op when ``phase_ids`` is empty. Used to revert a scoped override set
+    (e.g. clearing a workspace's fast-mode rows) back to inherited defaults.
+    """
+    _validate_scope_type(scope_type)
+    phase_ids = tuple(phase_ids)
+    if not phase_ids:
+        return
+    placeholders = ",".join("?" for _ in phase_ids)
+    db.execute(
+        f"DELETE FROM phase_settings WHERE scope_type = ? AND scope_id = ? "
+        f"AND phase_id IN ({placeholders})",
+        (scope_type, scope_id, *phase_ids),
+    )

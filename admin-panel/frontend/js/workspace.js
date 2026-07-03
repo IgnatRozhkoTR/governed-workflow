@@ -3,6 +3,7 @@ let _wsSelectedProjectId = null;
 let _wsSelectedProjectName = null;
 let _wsShowArchived = false;
 let _wsSimplePlanningPrior = false;
+let _wsFastModeDefaultPrior = false;
 
 function showProjectSelector() {
   resetUrlToSelector();
@@ -178,6 +179,7 @@ function _wsRenderWorkspaceCards(projectId, workspaces) {
         '<div class="ws-workspace-card-branch">' + branchLabel + '</div>' +
         '<div class="ws-workspace-card-meta">' +
           (ws.phase != null ? '<span class="badge badge-warning">' + t('badges.phase', {phase: ws.phase}) + '</span>' : '') +
+          (ws.workflow_mode === 'fast' ? '<span class="badge badge-warning">' + t('badges.fastMode') + '</span>' : '') +
           (sessions.length > 0 && !isArchived ? '<span class="badge badge-info">' + t('badges.sessionActive') + '</span>' : '') +
           actionHtml +
         '</div>' +
@@ -282,11 +284,13 @@ async function createWorkspace(projectId) {
   const branchInput = document.getElementById('ws-new-branch');
   const sourceSelect = document.getElementById('ws-source-branch');
   const worktreeCheckbox = document.getElementById('ws-worktree');
+  const fastModeCheckbox = document.getElementById('ws-fast-mode');
   const resultEl = document.getElementById('ws-create-result');
 
   const branch = branchInput.value.trim();
   const source = sourceSelect.value;
   const worktree = worktreeCheckbox.checked;
+  const workflowMode = fastModeCheckbox && fastModeCheckbox.checked ? 'fast' : 'standard';
 
   _wsClearError('ws-create-error');
   resultEl.innerHTML = '';
@@ -298,7 +302,7 @@ async function createWorkspace(projectId) {
 
   let result;
   try {
-    result = await apiCreateWorkspace(projectId, branch, source, worktree);
+    result = await apiCreateWorkspace(projectId, branch, source, worktree, workflowMode);
   } catch (err) {
     resultEl.innerHTML = '';
     _wsShowError('ws-create-error', err.message);
@@ -415,6 +419,11 @@ function _wsInitSelector() {
               <label for="simplePlanningCheck" class="simple-planning__label">${t('config.simplePlanning')}</label>
             </div>
             <div class="simple-planning__desc">${t('config.simplePlanningDesc')}</div>
+            <div class="simple-planning__row" style="margin-top: 10px;">
+              <input type="checkbox" class="phase-settings__checkbox" id="fastModeDefaultCheck">
+              <label for="fastModeDefaultCheck" class="simple-planning__label">${t('config.fastModeDefault')}</label>
+            </div>
+            <div class="simple-planning__desc">${t('config.fastModeDefaultDesc')}</div>
           </div>
         </div>
 
@@ -445,6 +454,12 @@ function _wsInitSelector() {
                 ${t('labels.createAsGitWorktree')}
               </label>
             </div>
+            <div class="ws-form-row">
+              <label class="ws-checkbox-label">
+                <input type="checkbox" id="ws-fast-mode">
+                ${t('labels.fastMode')}
+              </label>
+            </div>
             <button class="btn btn-primary" onclick="createWorkspace(_wsSelectedProjectId)">${t('buttons.createWorkspace')}</button>
           </div>
           <div id="ws-create-error"></div>
@@ -457,6 +472,11 @@ function _wsInitSelector() {
   var simplePlanningCheck = document.getElementById('simplePlanningCheck');
   if (simplePlanningCheck) {
     simplePlanningCheck.onchange = _wsOnSimplePlanningChange;
+  }
+
+  var fastModeDefaultCheck = document.getElementById('fastModeDefaultCheck');
+  if (fastModeDefaultCheck) {
+    fastModeDefaultCheck.onchange = _wsOnFastModeDefaultChange;
   }
 
   if (!document.getElementById('selector-toolbar')) {
@@ -498,12 +518,17 @@ function _wsBackToProjects() {
 async function _wsLoadSimplePlanning(projectId) {
   var card = document.getElementById('simplePlanningCard');
   var checkbox = document.getElementById('simplePlanningCheck');
+  var fastModeDefaultCheckbox = document.getElementById('fastModeDefaultCheck');
+  var createFastModeCheckbox = document.getElementById('ws-fast-mode');
   if (!card || !checkbox) return;
 
   try {
     var data = await apiGet('/api/projects/' + encodeURIComponent(projectId) + '/settings');
     _wsSimplePlanningPrior = !!data.simple_planning;
     checkbox.checked = _wsSimplePlanningPrior;
+    _wsFastModeDefaultPrior = !!data.fast_mode_default;
+    if (fastModeDefaultCheckbox) fastModeDefaultCheckbox.checked = _wsFastModeDefaultPrior;
+    if (createFastModeCheckbox) createFastModeCheckbox.checked = _wsFastModeDefaultPrior;
     card.style.display = '';
   } catch (err) {
     card.style.display = 'none';
@@ -532,6 +557,36 @@ async function _wsOnSimplePlanningChange() {
     }
   } catch (err) {
     checkbox.checked = _wsSimplePlanningPrior;
+    showToast(t('messages.phaseSettingsSaveFailed').replace('{error}', err.message));
+  } finally {
+    checkbox.disabled = false;
+  }
+}
+
+async function _wsOnFastModeDefaultChange() {
+  var checkbox = document.getElementById('fastModeDefaultCheck');
+  if (!checkbox || !_wsSelectedProjectId) return;
+
+  var newValue = checkbox.checked;
+  checkbox.disabled = true;
+
+  try {
+    var result = await apiPut(
+      '/api/projects/' + encodeURIComponent(_wsSelectedProjectId) + '/settings',
+      { fast_mode_default: newValue }
+    );
+    _wsFastModeDefaultPrior = newValue;
+    var createFastModeCheckbox = document.getElementById('ws-fast-mode');
+    if (createFastModeCheckbox) createFastModeCheckbox.checked = newValue;
+    showToast(t('messages.phaseSettingsSaved'));
+    var warnings = result.configurator_warnings;
+    if (warnings && warnings.length > 0) {
+      warnings.forEach(function(w) {
+        showToast(w.reason || w.action);
+      });
+    }
+  } catch (err) {
+    checkbox.checked = _wsFastModeDefaultPrior;
     showToast(t('messages.phaseSettingsSaveFailed').replace('{error}', err.message));
   } finally {
     checkbox.disabled = false;

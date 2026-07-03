@@ -9,7 +9,9 @@ Multi-phase implementation workflow with backend-enforced transitions. Every pha
 
 **Start every session by calling `workspace_get_state`.** The `phase` field tells you where you are. The `previous_sessions_count` field tells you whether this is a fresh start or a continuation.
 
----
+{{#FAST_MODE}}This workspace runs in **fast mode** — a reduced phase set that skips impact analysis, the preparation review gate, the blind review pipeline, and reflection. Ask for an on-demand integration review at any time; the orchestrator spawns `integration-reviewer` and relays its findings.
+
+{{/FAST_MODE}}---
 
 ## Agent Roles: All Agents Are Resumable Sub-agents
 
@@ -40,19 +42,19 @@ Agents execute their task and return. The orchestrator continues them for follow
 
 | Role | When |
 |------|------|
-| **plan-advisor** | Phase 0 (background), messaged in phases 1.0, 1.3, 2.0, 3.N.0 |
-| senior-backend-engineer | Complex sub-phases spanning 3.N.0 → 3.N.2 fix cycles. Continue via SendMessage. Production code ONLY — never tests. |
+| **plan-advisor** | Phase 0 (background), messaged in phases 1.0{{#STANDARD_MODE}}, 1.3{{/STANDARD_MODE}}, 2.0, 3.N.0 |
+| senior-backend-engineer | Complex sub-phases spanning 3.N.0{{#STANDARD_MODE}} → 3.N.2 fix cycles{{/STANDARD_MODE}}. Continue via SendMessage. Production code ONLY — never tests. |
 | senior-backend-test-engineer | Complex test scenarios spanning write + fix cycles. Continue via SendMessage. Tests ONLY — always deployed AFTER engineer completes. |
 | senior-code-validator | Continue via SendMessage when re-validation after fixes is expected |
 | senior-code-researcher | Deep research spanning multiple rounds. Continue via SendMessage. |
 | code-researcher | Phase 1.1 (parallel, one per topic). Variants: diff-researcher, web-researcher, ui-researcher depending on where the answer lives. |
 | research-prover | Phase 1.2 |
-| middle-backend-engineer | Phases 3.N.0 (stage 1), 3.N.2, 3.N.4, 4.1. Production code ONLY — never tests. |
+| middle-backend-engineer | Phases 3.N.0 (stage 1){{#STANDARD_MODE}}, 3.N.2{{/STANDARD_MODE}}, 3.N.4, 4.1. Production code ONLY — never tests. |
 | middle-backend-test-engineer | Phase 3.N.0 (stage 2, after engineer). Tests ONLY. |
-| middle-code-validator | Phase 3.N.1 |
-| review-validator | Phase 4.1 — after resolutions are set, verifies 'fixed' issues were actually fixed and 'false_positive' claims hold. |
-| reflector | Phase 5.1 — spawned once with the reflection context embedded in its prompt. |
-
+{{#STANDARD_MODE}}| middle-code-validator | Phase 3.N.1 |
+{{/STANDARD_MODE}}| review-validator | Phase 4.1 — after resolutions are set, verifies 'fixed' issues were actually fixed and 'false_positive' claims hold. |
+{{#STANDARD_MODE}}| reflector | Phase 5.1 — spawned once with the reflection context embedded in its prompt. |
+{{/STANDARD_MODE}}
 ---
 
 ## Phase Map
@@ -148,15 +150,15 @@ Full tool roster is granted via this agent's frontmatter; consult tool descripti
 
 | Gate | On reject, phase becomes | What to do |
 |------|--------------------------|------------|
-| 1.4 (Preparation Review) | `1.1` | Read comments, run more research, update impact analysis, re-prove, then advance |
+{{#STANDARD_MODE}}| 1.4 (Preparation Review) | `1.1` | Read comments, run more research, update impact analysis, re-prove, then advance |
 | 3.N.3 (Code Review) | `3.N.2` | Read comments, fix code, then advance |
-| 4.2 (Final Approval) | `4.1` | Read comments, fix code, then advance |
+{{/STANDARD_MODE}}| 4.2 (Final Approval) | `4.1` | Read comments, fix code, then advance |
 
 **NEVER call `workspace_advance` immediately after detecting a rejection.** Always: (1) read `workspace_get_state` to confirm the new phase, (2) read `workspace_get_comments` for feedback, (3) do the work, (4) then advance.
 
 ---
 
-## Review Item Resolution Flow
+{{#STANDARD_MODE}}## Review Item Resolution Flow
 
 Review items (scope='review' discussions) follow a two-step lifecycle:
 
@@ -167,7 +169,7 @@ The `ReviewGuard` only blocks at user gate phases (3.N.3, 4.2) — it does NOT b
 
 ---
 
-## Advance Error Handling
+{{/STANDARD_MODE}}## Advance Error Handling
 
 | Code | Meaning |
 |------|---------|
@@ -187,11 +189,12 @@ Required before certain advances. Use `workspace_update_progress`:
 | Advance | Requires progress for |
 |---------|----------------------|
 | 1.0 → 1.1 | `"1.0"` |
-| 1.2 → 1.3 | `"1"` |
-| 1.3 → 1.4 | `"1.3"` |
-| 2.0 → 3.1.0 | `"2"` |
+{{#STANDARD_MODE}}| 1.2 → 1.3 | `"1"` |
+{{/STANDARD_MODE}}{{#FAST_MODE}}| 1.2 → 2.0 | `"1"` |
+{{/FAST_MODE}}{{#STANDARD_MODE}}| 1.3 → 1.4 | `"1.3"` |
+{{/STANDARD_MODE}}| 2.0 → 3.1.0 | `"2"` |
 | 3.N.4 → next | `"3.N"` |
-| 4.0 → 4.1 | `"4.0"` |
-| 4.1 → 4.2 | `"4"` |
+{{#STANDARD_MODE}}| 4.0 → 4.1 | `"4.0"` |
+{{/STANDARD_MODE}}| 4.1 → 4.2 | `"4"` |
 
 Progress is used for phase gate validation, session recovery after compaction, and retrospective review.

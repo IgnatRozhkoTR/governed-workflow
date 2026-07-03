@@ -52,12 +52,25 @@ def _validate_execution_scope(execution):
     return None
 
 
-def set_plan(db, ws, plan_data, simple_mode: bool = False):
+def exceeds_single_execution_item(execution: list) -> bool:
+    """True when execution has more than one item.
+
+    Shared between set_plan (submission time) and PlanningPhase.validate
+    (advance-gate time): both simple_planning and fast workflow_mode collapse
+    the plan to exactly one execution sub-phase, so both call this instead of
+    duplicating the length check.
+    """
+    return len(execution) > 1
+
+
+def set_plan(db, ws, plan_data, simple_mode: bool = False, fast_mode: bool = False):
     """Set execution plan on workspace. Resets plan_status and adjusts phase if needed.
 
     Every execution item must embed its own scope (must list required). When
     simple_mode is True, the plan must contain exactly one execution item and
-    no system diagrams. Returns a result dict with ok/error keys.
+    no system diagrams. When fast_mode is True (and simple_mode is False), the
+    plan must contain exactly one execution item; diagrams are unrestricted.
+    Returns a result dict with ok/error keys.
     """
     locale = ws["locale"] or "en"
     phase = ws["phase"]
@@ -66,8 +79,7 @@ def set_plan(db, ws, plan_data, simple_mode: bool = False):
         return {"error": t("mcp.error.planPhase", locale)}
 
     if simple_mode:
-        execution = plan_data.get("execution", [])
-        if len(execution) > 1:
+        if exceeds_single_execution_item(plan_data.get("execution", [])):
             return {
                 "error": "Simple planning mode allows exactly one execution sub-phase (3.1).",
                 "errorCode": "simple_multiple_subphases",
@@ -77,6 +89,12 @@ def set_plan(db, ws, plan_data, simple_mode: bool = False):
             return {
                 "error": "System diagrams are not used in simple planning mode.",
                 "errorCode": "simple_no_diagrams",
+            }
+    elif fast_mode:
+        if exceeds_single_execution_item(plan_data.get("execution", [])):
+            return {
+                "error": "Fast workflow mode allows exactly one execution sub-phase (3.1).",
+                "errorCode": "fast_multiple_subphases",
             }
 
     scope_error = _validate_execution_scope(plan_data.get("execution", []))

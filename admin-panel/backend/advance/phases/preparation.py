@@ -11,7 +11,7 @@ class InitPhase(Phase):
     name = "Init"
     short_description = "Spawn plan-advisor"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         return """\
 ## 0 Init — Spawn Plan-Advisor
 
@@ -52,7 +52,7 @@ class AssessmentPhase(Phase):
     name = "Assessment"
     short_description = "plan-advisor surveys the codebase and raises research topics"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         return """\
 ## 1.0 Assessment
 
@@ -104,7 +104,7 @@ class ResearchPhase(Phase):
     name = "Research"
     short_description = "Parallel researcher sub-agents investigate each topic"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         return """\
 ## 1.1 Research
 
@@ -228,7 +228,12 @@ class ProverPhase(Phase):
     name = "Research Proving"
     short_description = "Prover sub-agent verifies every research entry"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+        if workflow_mode == "fast":
+            return self._fast_description()
+        return self._standard_description()
+
+    def _standard_description(self) -> str:
         return """\
 ## 1.2 Research Proving
 
@@ -253,6 +258,32 @@ When all research is proven (prover confirms):
 2. Call `workspace_advance`
 
 **Advance 1.2 → 1.3** requires: all research entries proven (none rejected, none unproven) + progress entry `"1"`."""
+
+    def _fast_description(self) -> str:
+        return """\
+## 1.2 Research Proving
+
+**Actor**: Prover sub-agent (Opus, one-shot)
+
+Deploy one prover sub-agent:
+
+```
+Agent(
+  subagent_type: "research-prover",
+  prompt: "Verify all research entries for this workspace. Mark each as proven or rejected.
+           Workspace: {working_dir}"
+)
+```
+
+The prover ONLY verifies — it does NOT research. It calls `workspace_prove_research` for each entry DIRECTLY — the orchestrator does NOT need to call it. Wait for the prover to finish, then check results.
+
+If any research is rejected: re-deploy the original researcher sub-agents for those topics (to fix their proofs), then re-deploy the prover.
+
+When all research is proven (prover confirms):
+1. Call `workspace_update_progress` for phase `"1"`
+2. Call `workspace_advance`
+
+**Advance 1.2 → 2.0** requires: all research entries proven (none rejected, none unproven) + progress entry `"1"`. Fast mode skips impact analysis (1.3) and the preparation review gate (1.4) — advancing here goes directly to planning."""
 
     def progress_key(self, ws):
         return "1"
@@ -294,7 +325,7 @@ class ImpactAnalysisPhase(Phase):
     name = "Impact Analysis"
     short_description = "Document cross-cutting effects before planning"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         return """\
 ## 1.3 Impact Analysis
 
@@ -337,7 +368,7 @@ class PreparationReviewPhase(Phase):
     reject_target = "1.1"
     short_description = "User reviews assessment, research, and impact analysis"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         return """\
 ## 1.4 Preparation Review (USER GATE)
 

@@ -146,13 +146,15 @@ def resolve_enabled_phases(db, workspace_id, project_id, all_phase_ids: set) -> 
     return enabled
 
 
-def resolve_for_workspace(db, workspace_id) -> list[str]:
+def resolve_for_workspace(db, workspace_id, include_templated: bool = False) -> list[str]:
     """Return the ordered list of effective enabled phases for a workspace.
 
     Resolution order:
         1. Baseline = every canonical registered phase id, in ``phase_key``
-           order. Templated ids (``3.x.K``) are excluded — they describe a
-           per-plan family, not a standalone enable/disable target.
+           order. Templated ids (``3.x.K``) are excluded by default; with
+           ``include_templated`` they are kept in their natural position so
+           renderers that emit one entry per execution family (SKILL.md) can
+           honor workspace-scope toggles on ``3.x.K``.
         2. The universe is widened with concrete ``3.N.K`` scope-override
            targets whose templated parent is registered, so a workspace can
            toggle a specific execution sub-phase.
@@ -167,7 +169,7 @@ def resolve_for_workspace(db, workspace_id) -> list[str]:
     if ws_row is None:
         return []
 
-    ordered_phase_ids = _canonical_registered_ids()
+    ordered_phase_ids = _canonical_registered_ids(include_templated)
     universe = set(ordered_phase_ids)
 
     overrides = _collect_overrides(db, workspace_id, ws_row["project_id"], _SCOPE_PRECEDENCE)

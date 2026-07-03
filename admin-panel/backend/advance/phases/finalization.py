@@ -10,7 +10,7 @@ class AgenticReviewPhase(Phase):
     name = "Agentic Review"
     short_description = "Headless review pipeline runs file and integration reviewers"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         return """\
 ## 4.0 Blind Code Review (automated)
 
@@ -51,7 +51,12 @@ class AddressFixPhase(Phase):
     name = "Address Fix"
     short_description = "Engineers address review findings across the merged scope"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+        if workflow_mode == "fast":
+            return self._fast_description()
+        return self._standard_description()
+
+    def _standard_description(self) -> str:
         return """\
 ## 4.1 Address & Fix
 
@@ -73,6 +78,24 @@ When complete:
 
 **Advance 4.1 → 4.2** requires: progress entry `"4"` + all review items resolved by user."""
 
+    def _fast_description(self) -> str:
+        return """\
+## 4.1 Address & Fix (fast mode)
+
+**Actors**: Engineer sub-agents | **Code edits: ON (merged scope), Commits: ON**
+
+Active scope = union of all sub-phase scopes. Fast mode has no blind-review pipeline (4.0) — you land here either as a pass-through right after the `3.N.4` commit, or after the user rejects at `4.2` with comments.
+
+1. Call `workspace_get_comments` to check for open user-review issues from a `4.2` rejection.
+2. If there are open issues, address them with engineer sub-agents.
+3. If there are none (first pass after commit), there is nothing to fix.
+
+When complete:
+1. Call `workspace_update_progress` for phase `"4"`
+2. Call `workspace_advance`
+
+**Advance 4.1 → 4.2** requires: progress entry `"4"`."""
+
     def progress_key(self, ws):
         return "4"
 
@@ -91,7 +114,12 @@ class FinalApprovalPhase(Phase):
     reject_target = "4.1"
     short_description = "User reviews the resolved findings and approves delivery"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+        if workflow_mode == "fast":
+            return self._fast_description()
+        return self._standard_description()
+
+    def _standard_description(self) -> str:
         return """\
 ## 4.2 Final Approval (USER GATE)
 
@@ -106,6 +134,25 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 3. Address the feedback — fix code, update resolutions
 4. Call `workspace_advance` only after fixes are complete"""
 
+    def _fast_description(self) -> str:
+        return """\
+## 4.2 Final Approval (USER GATE, fast mode)
+
+This is the fast-mode review gate — the user's only checkpoint before delivery. Present a concise summary of the delivered change (what changed, why, and the commit(s) made).
+
+If the user asks for a review, spawn the `integration-reviewer` agent and relay its findings verbatim — the user decides what, if anything, needs fixing before approving.
+
+- **Approve** → workflow completes (fast mode skips reflection, `5.1`/`5.2`)
+- **Reject** → back to `4.1` with the user's comments
+
+Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat. Auto-approved when `yolo_mode` is on.
+
+**After rejection**: the backend sets the phase to `4.1`. Do NOT call `workspace_advance` immediately. Instead:
+1. Call `workspace_get_state` to confirm you're at `4.1`
+2. Call `workspace_get_comments` to read the rejection feedback
+3. Address the feedback — fix code
+4. Call `workspace_advance` only after fixes are complete"""
+
     def validate(self, ws, body, project_path):
         return True, {}
 
@@ -118,7 +165,7 @@ class ReflectionPhase(Phase):
     name = "Reflection"
     short_description = "Reflector sub-agent emits proposals; auto-apply easy ones"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         return """\
 ## Phase 5.1: Reflection
 
@@ -152,7 +199,7 @@ class ManualImplementationPhase(Phase):
     name = "Manual implementation"
     short_description = "Implement the manual proposals queued by 5.1"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         return """\
 ## Phase 5.2: Manual implementation
 
@@ -183,7 +230,7 @@ class DonePhase(Phase):
     name = "Done"
     short_description = "Push and open the MR/PR; task complete"
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         return """\
 ## 6 Done
 

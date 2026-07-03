@@ -127,3 +127,77 @@ def test_scope_accessors_read_must_patterns_for_subphase(workspace):
     assert may_combined == ["t/"]
     assert scope_service.match_scope_patterns("src/b/file.py", scope_map, "3.2.0") is True
     assert scope_service.match_scope_patterns("src/a/file.py", scope_map, "3.2.0") is False
+
+
+# ── set_plan fast_mode ──────────────────────────────────────────────────────────
+
+
+def test_exceeds_single_execution_item_true_for_multiple():
+    assert plan_service.exceeds_single_execution_item(json.loads(make_plan_json(2))["execution"]) is True
+
+
+def test_exceeds_single_execution_item_false_for_one():
+    assert plan_service.exceeds_single_execution_item(json.loads(make_plan_json(1))["execution"]) is False
+
+
+def test_set_plan_fast_mode_rejects_multiple_subphases(workspace):
+    set_phase(workspace["id"], "2.0")
+    ws = _ws_row(workspace["id"])
+    plan = json.loads(make_plan_json(2))
+
+    db = get_db()
+    try:
+        result = plan_service.set_plan(db, ws, plan, fast_mode=True)
+    finally:
+        db.close()
+
+    assert "error" in result
+    assert result.get("errorCode") == "fast_multiple_subphases"
+
+
+def test_set_plan_fast_mode_accepts_single_subphase(workspace):
+    set_phase(workspace["id"], "2.0")
+    ws = _ws_row(workspace["id"])
+    plan = json.loads(make_plan_json(1))
+
+    db = get_db()
+    try:
+        result = plan_service.set_plan(db, ws, plan, fast_mode=True)
+        db.commit()
+    finally:
+        db.close()
+
+    assert result.get("ok") is True
+
+
+def test_set_plan_fast_mode_allows_system_diagram(workspace):
+    """Unlike simple_mode, fast_mode does not restrict system diagrams."""
+    set_phase(workspace["id"], "2.0")
+    ws = _ws_row(workspace["id"])
+    plan = json.loads(make_plan_json(1))
+    plan["systemDiagram"] = [{"title": "Diagram", "diagram": "graph LR\nA-->B"}]
+
+    db = get_db()
+    try:
+        result = plan_service.set_plan(db, ws, plan, fast_mode=True)
+        db.commit()
+    finally:
+        db.close()
+
+    assert result.get("ok") is True
+
+
+def test_set_plan_simple_mode_takes_precedence_over_fast_mode(workspace):
+    """When both flags are set, simple_mode's stricter diagram check still applies."""
+    set_phase(workspace["id"], "2.0")
+    ws = _ws_row(workspace["id"])
+    plan = json.loads(make_plan_json(1))
+    plan["systemDiagram"] = [{"title": "Diagram", "diagram": "graph LR\nA-->B"}]
+
+    db = get_db()
+    try:
+        result = plan_service.set_plan(db, ws, plan, simple_mode=True, fast_mode=True)
+    finally:
+        db.close()
+
+    assert result.get("errorCode") == "simple_no_diagrams"

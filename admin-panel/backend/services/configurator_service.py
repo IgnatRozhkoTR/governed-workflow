@@ -21,12 +21,16 @@ def _on_off(flag: bool) -> str:
     return "ON" if flag else "OFF"
 
 
-def _active_worktree_paths(db: sqlite3.Connection, project_id: int) -> list[str]:
-    cur = db.execute(
-        "SELECT working_dir FROM workspaces WHERE project_id = ? AND status = 'active'",
+def _active_workspaces(db: sqlite3.Connection, project_id: int) -> list[sqlite3.Row]:
+    return db.execute(
+        "SELECT id, project_id, working_dir, workflow_mode "
+        "FROM workspaces WHERE project_id = ? AND status = 'active'",
         (project_id,),
-    )
-    return [row[0] for row in cur.fetchall() if row[0]]
+    ).fetchall()
+
+
+def _active_worktree_paths(db: sqlite3.Connection, project_id: int) -> list[str]:
+    return [ws["working_dir"] for ws in _active_workspaces(db, project_id) if ws["working_dir"]]
 
 
 def _atomic_write_text(path: Path, content: str) -> None:
@@ -69,6 +73,18 @@ class Configurator(ABC):
         ``{'target': str, 'action': 'rendered'|'skipped'|'failed', 'reason': str|None}``.
         """
 
+    def configure_workspace(
+        self, db: sqlite3.Connection, project: sqlite3.Row, ws: sqlite3.Row
+    ) -> list[dict]:
+        """Re-render only the artifacts that differ per workspace, for one worktree.
+
+        Default no-op: configurators whose output is identical across a
+        project's worktrees have nothing to do for a single-workspace refresh.
+        Overridden by :class:`SkillConfigurator`, whose SKILL.md is rendered
+        from the workspace-scope phase set.
+        """
+        return []
+
 
 class SkillConfigurator(Configurator):
     """Renders SKILL.md from the engine's SKILL.md.template + each enabled phase's
@@ -91,13 +107,36 @@ class SkillConfigurator(Configurator):
     PLACEHOLDER_PHASE_MAP = "{{PHASE_MAP}}"
 
     def configure(self, db: sqlite3.Connection, project_id: int, project_path: Path) -> list[dict]:
+        template, skip = self._load_engine_template()
+        if template is None:
+            return [skip]
+
+        simple_planning = self._fetch_simple_planning(db, project_id)
+        results = [self._render_project_root(db, project_id, project_path, template, simple_planning)]
+        for ws in _active_workspaces(db, project_id):
+            if ws["working_dir"]:
+                results.append(self._render_workspace(db, template, simple_planning, ws))
+        return results
+
+    def configure_workspace(
+        self, db: sqlite3.Connection, project: sqlite3.Row, ws: sqlite3.Row
+    ) -> list[dict]:
+        template, skip = self._load_engine_template()
+        if template is None:
+            return [skip]
+        if not ws["working_dir"]:
+            return [_skipped("SKILL.md", "workspace has no working_dir")]
+        simple_planning = self._fetch_simple_planning(db, project["id"])
+        return [self._render_workspace(db, template, simple_planning, ws)]
+
+    def _load_engine_template(self) -> tuple[str | None, dict | None]:
+        """Read and validate the engine template. Returns (template, None) or (None, skip)."""
         if not self.DEFAULT_TEMPLATE_PATH.exists():
             log.warning(
                 "SkillConfigurator: engine template missing at %s, skipping",
                 self.DEFAULT_TEMPLATE_PATH,
             )
-            return [_skipped("SKILL.md", "template missing")]
-
+            return None, _skipped("SKILL.md", "template missing")
         template = self.DEFAULT_TEMPLATE_PATH.read_text()
         if self.PLACEHOLDER_PHASES not in template:
             log.warning(
@@ -105,41 +144,63 @@ class SkillConfigurator(Configurator):
                 self.DEFAULT_TEMPLATE_PATH,
                 self.PLACEHOLDER_PHASES,
             )
-            return [_skipped("SKILL.md", "template missing placeholder")]
+            return None, _skipped("SKILL.md", "template missing placeholder")
+        return template, None
 
-        simple_planning = self._fetch_simple_planning(db, project_id)
-        phase_ids = self._resolve_phase_ids(db, project_id)
-        rendered = self.render(template, phase_ids, simple_planning=simple_planning)
-
-        results = []
-        if project_path.exists():
-            results.append(self._write_target(project_path / self.OUTPUT_REL_PATH, rendered))
-        else:
+    def _render_project_root(
+        self, db: sqlite3.Connection, project_id: int, project_path: Path,
+        template: str, simple_planning: bool,
+    ) -> dict:
+        """Render the canonical project-scope SKILL.md seed at the project root."""
+        target = project_path / self.OUTPUT_REL_PATH
+        if not project_path.exists():
             log.warning(
                 "SkillConfigurator: project path %s missing, skipping project-root render",
                 project_path,
             )
-            results.append(_skipped(str(project_path / self.OUTPUT_REL_PATH), "project path missing"))
-        for working_dir in _active_worktree_paths(db, project_id):
-            results.append(
-                self._write_target(Path(working_dir) / self.OUTPUT_REL_PATH, rendered)
-            )
-        return results
+            return _skipped(str(target), "project path missing")
+        from services import phase_resolver
+
+        phase_ids = phase_resolver.resolve_for_project(db, project_id, include_templated=True)
+        rendered = self.render(template, phase_ids, simple_planning=simple_planning)
+        return self._write_target(target, rendered)
+
+    def _render_workspace(
+        self, db: sqlite3.Connection, template: str, simple_planning: bool, ws: sqlite3.Row,
+    ) -> dict:
+        """Render SKILL.md for a single worktree using its workspace-scope phase set."""
+        from services import phase_resolver
+
+        phase_ids = phase_resolver.resolve_for_workspace(db, ws["id"], include_templated=True)
+        workflow_mode = ws["workflow_mode"] if "workflow_mode" in ws.keys() else "standard"
+        rendered = self.render(
+            template, phase_ids, simple_planning=simple_planning, workflow_mode=workflow_mode
+        )
+        return self._write_target(Path(ws["working_dir"]) / self.OUTPUT_REL_PATH, rendered)
 
     @classmethod
-    def render(cls, template: str, phase_ids: list[str], simple_planning: bool = False) -> str:
+    def render(
+        cls, template: str, phase_ids: list[str],
+        simple_planning: bool = False, workflow_mode: str = "standard",
+    ) -> str:
         """Substitute the {{PHASES}} and {{PHASE_MAP}} placeholders for *phase_ids*.
 
         When simple_planning is True, {{#FULL_PLANNING}}...{{/FULL_PLANNING}} blocks
         are removed entirely. When False, the markers are stripped and the inner
-        content is kept (full-mode rendering).
+        content is kept (full-mode rendering). ``workflow_mode`` is threaded into
+        each phase's ``description_for_skill`` for mode-specific rendering, and
+        also gates {{#STANDARD_MODE}}...{{/STANDARD_MODE}} /
+        {{#FAST_MODE}}...{{/FAST_MODE}} blocks in the fixed template text —
+        the non-matching mode's block is removed, the matching mode's markers
+        are stripped and its content kept.
         """
         rendered = template.replace(
-            cls.PLACEHOLDER_PHASES, cls._build_phase_block(phase_ids, simple_planning)
+            cls.PLACEHOLDER_PHASES, cls._build_phase_block(phase_ids, simple_planning, workflow_mode)
         ).replace(
             cls.PLACEHOLDER_PHASE_MAP, cls._build_phase_map(phase_ids)
         )
-        return cls._apply_full_planning_blocks(rendered, simple_planning)
+        rendered = cls._apply_full_planning_blocks(rendered, simple_planning)
+        return cls._apply_workflow_mode_blocks(rendered, workflow_mode)
 
     @staticmethod
     def _fetch_simple_planning(db: sqlite3.Connection, project_id: int | str | None) -> bool:
@@ -151,14 +212,10 @@ class SkillConfigurator(Configurator):
         ).fetchone()
         return bool(row["simple_planning"]) if row else False
 
-    def _resolve_phase_ids(self, db: sqlite3.Connection, project_id: int) -> list[str]:
-        """Resolved phase ids for the project, including templated execution rows."""
-        from services import phase_resolver
-
-        return phase_resolver.resolve_for_project(db, project_id, include_templated=True)
-
     @staticmethod
-    def _build_phase_block(phase_ids: list[str], simple_planning: bool = False) -> str:
+    def _build_phase_block(
+        phase_ids: list[str], simple_planning: bool = False, workflow_mode: str = "standard",
+    ) -> str:
         """Concatenate each enabled phase's description_for_skill() in resolved order.
 
         Skips phases without a registered instance or with an empty description.
@@ -170,7 +227,9 @@ class SkillConfigurator(Configurator):
             phase = get_phase(pid)
             if phase is None:
                 continue
-            block = phase.description_for_skill(simple_planning=simple_planning).strip()
+            block = phase.description_for_skill(
+                simple_planning=simple_planning, workflow_mode=workflow_mode
+            ).strip()
             if block:
                 blocks.append(block)
         return "\n\n---\n\n".join(blocks)
@@ -191,6 +250,28 @@ class SkillConfigurator(Configurator):
 
         content = content.replace('{{#FULL_PLANNING}}', '')
         content = content.replace('{{/FULL_PLANNING}}', '')
+        return content
+
+    @staticmethod
+    def _apply_workflow_mode_blocks(content: str, workflow_mode: str) -> str:
+        """Strip {{#STANDARD_MODE}}/{{#FAST_MODE}} conditional blocks for *workflow_mode*.
+
+        The block matching the active mode has its markers stripped and its
+        content kept; the other mode's block is removed entirely, markers and
+        content alike. Mirrors ``_apply_full_planning_blocks``.
+        """
+        import re
+
+        is_fast = workflow_mode == "fast"
+        drop_tag = "FAST_MODE" if not is_fast else "STANDARD_MODE"
+        keep_tag = "STANDARD_MODE" if not is_fast else "FAST_MODE"
+
+        content = re.sub(
+            r'\{\{#' + drop_tag + r'\}\}.*?\{\{/' + drop_tag + r'\}\}', '', content, flags=re.DOTALL
+        )
+        content = re.sub(
+            r'\{\{#' + keep_tag + r'\}\}(.*?)\{\{/' + keep_tag + r'\}\}', r'\1', content, flags=re.DOTALL
+        )
         return content
 
     @staticmethod
@@ -434,6 +515,30 @@ class ConfiguratorChain:
             except Exception as exc:
                 log.exception(
                     "Configurator %s failed for project %s", type(cfg).__name__, project_id
+                )
+                results.append({
+                    "target": type(cfg).__name__,
+                    "action": "failed",
+                    "reason": str(exc),
+                })
+        return results
+
+    def run_for_workspace(
+        self, db: sqlite3.Connection, project: sqlite3.Row, ws: sqlite3.Row
+    ) -> list[dict]:
+        """Re-render the workspace-scoped artifacts for a single worktree.
+
+        Narrow counterpart to :meth:`run`: only configurators whose output
+        varies per workspace (SKILL.md) do work here. Used when a single
+        workspace's mode changes, so sibling worktrees are left untouched.
+        """
+        results: list[dict] = []
+        for cfg in self._configurators:
+            try:
+                results.extend(cfg.configure_workspace(db, project, ws))
+            except Exception as exc:
+                log.exception(
+                    "Configurator %s failed for workspace %s", type(cfg).__name__, ws["id"]
                 )
                 results.append({
                     "target": type(cfg).__name__,
