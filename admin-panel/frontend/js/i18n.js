@@ -49,11 +49,7 @@ function setLocale(locale) {
     : null;
 
   var persist = url
-    ? fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locale: locale })
-      }).catch(function(e) { console.warn('Failed to persist locale:', e.message); })
+    ? apiPut(url, { locale: locale }).catch(function(e) { console.warn('Failed to persist locale:', e.message); })
     : Promise.resolve();
 
   persist.then(function() {

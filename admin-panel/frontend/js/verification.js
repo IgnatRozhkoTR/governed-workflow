@@ -9,11 +9,11 @@ var VERIFICATION_RESULTS = null;
 async function loadVerificationData() {
     var ctx = getWorkspaceContext();
     try {
-        var resp = await fetch('/api/verification/profiles');
-        var allProfiles = await resp.json();
+        var allProfiles = await apiGet('/api/verification/profiles');
         VERIFICATION_PROFILES = allProfiles.profiles || [];
     } catch(e) {
         console.warn('Failed to load verification profiles:', e.message);
+        if (typeof showToast === 'function') showToast('Failed to load verification profiles: ' + e.message);
     }
 
     if (ctx) {
@@ -163,7 +163,7 @@ async function unassignVerificationProfile(assignmentId) {
     var ctx = getWorkspaceContext();
     if (!ctx) return;
     try {
-        await fetch('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/verification/unassign/' + assignmentId, {method: 'DELETE'});
+        await apiDelete('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/verification/unassign/' + assignmentId);
         await loadVerificationData();
     } catch(e) {
         if (typeof showToast === 'function') showToast('Failed to remove: ' + e.message);
@@ -172,11 +172,7 @@ async function unassignVerificationProfile(assignmentId) {
 
 async function toggleVerificationStep(stepId, enabled) {
     try {
-        await fetch('/api/verification/steps/' + stepId, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({enabled: enabled})
-        });
+        await apiPut('/api/verification/steps/' + stepId, {enabled: enabled});
         await loadVerificationData();
     } catch(e) {
         if (typeof showToast === 'function') showToast('Failed to update step: ' + e.message);
