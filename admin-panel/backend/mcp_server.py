@@ -4,13 +4,17 @@ All tool implementations live in mcp_tools/.
 Importing mcp_tools triggers @mcp.tool registration for all tools.
 """
 from advance.phases import register_module_phases_from_disk
-from mcp_tools import mcp
+from mcp_tools import mcp, _detect_workspace
 from mcp_tools.state import workspace_get_state
 from mcp_tools.advance import workspace_advance
 from mcp_tools.plan_scope import (
     workspace_set_plan,
     workspace_get_plan,
     workspace_extend_plan,
+    workspace_update_subphase,
+    workspace_delete_subphase,
+    workspace_set_plan_diagrams,
+    workspace_set_plan_description,
 )
 from mcp_tools.research import (
     workspace_post_discussion,
@@ -37,6 +41,7 @@ from mcp_tools.criteria import (
     workspace_propose_criteria,
     workspace_get_criteria,
     workspace_update_criteria,
+    workspace_delete_criteria,
 )
 from mcp_tools.verification import (
     workspace_get_verification_results,
@@ -65,7 +70,11 @@ _SIMPLE_MODE_HIDDEN_TOOLS = (
     "workspace_propose_criteria",
     "workspace_update_criteria",
     "workspace_get_criteria",
+    "workspace_delete_criteria",
     "workspace_extend_plan",
+    "workspace_update_subphase",
+    "workspace_delete_subphase",
+    "workspace_set_plan_diagrams",
 )
 
 

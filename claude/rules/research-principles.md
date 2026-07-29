@@ -31,3 +31,6 @@ Include:
 - Context and connections
 - Patterns identified
 - Limitations of findings
+
+## Absence Claims
+Any claim of the form "there is no X in this codebase" must state the search you ran (the exact grep/glob pattern and the paths covered). Unverified absence claims are the single most common failure mode in this workflow.

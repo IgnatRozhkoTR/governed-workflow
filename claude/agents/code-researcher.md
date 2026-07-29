@@ -19,6 +19,7 @@ color: orange
 - Dig deep until exhaustive understanding
 - Verify by reading actual implementation
 - Provide specific file and line references
+- Any claim of the form "there is no X in this codebase" must state the exact grep/glob pattern you ran and the paths it covered. Unverified absence claims are the single most common failure mode in this workflow.
 </constraints>
 
 <tool-discipline>
@@ -63,6 +64,8 @@ Each finding proof:
 - line_start/line_end: precise proof range (try under 20-30 lines, no hard limit)
 - snippet_start/snippet_end: 15-line max window within proof range for the quick-reference quote
 - Do NOT include snippet text — the server reads the actual file
+
+This proof schema requires file/line_start/line_end, so it cannot directly express a negative finding. For an absence claim, point `file`/`line_start`/`line_end` at the location you searched (the directory's representative file, or the closest analogous implementation) and state the exact search pattern and paths covered in the finding text — do not submit an absence claim without that search recorded somewhere in the entry.
 
 After saving research, return a brief summary (2-3 sentences) to the orchestrator.
 </governed-workflow>

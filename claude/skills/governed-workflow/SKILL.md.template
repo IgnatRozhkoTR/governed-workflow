@@ -133,7 +133,12 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 | `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules. Required arguments vary by phase — consult the per-phase blocks below for what to pass at each advance. |
 | `workspace_set_plan` | Writes or replaces the execution plan. Each execution item carries a `scope` field (must/may) — there is no separate scope call. Planning-phase only; switches `plan_status` back to `pending`. |
 {{#FULL_PLANNING}}| `workspace_extend_plan` | Appends a sub-phase to an already-approved plan. Each new item carries its own `scope`. Use instead of `workspace_set_plan` when execution surfaces new work — avoids invalidating prior sub-phases. |
+| `workspace_update_subphase` | Patches ONE execution item in place (name/tasks/scope) without resubmitting the whole plan. Prefer this over `workspace_set_plan` for a single-item fix. Resets `plan_status` to `pending`. |
+| `workspace_delete_subphase` | Removes one execution item; remaining items are renumbered to stay sequential. Cannot delete the last remaining sub-phase. Resets `plan_status` to `pending`. |
+| `workspace_set_plan_diagrams` | Replaces or appends the plan's `systemDiagram` list. Does NOT reset plan approval. |
+| `workspace_set_plan_description` | Replaces the plan's `description`. Does NOT reset plan approval. |
 | `workspace_propose_criteria` | Records acceptance criteria the user reviews at the plan approval gate. Valid from phase 2.0 only; required before advancing past 2.0. |
+| `workspace_delete_criteria` | Deletes a proposed acceptance criterion. Allowed only while it is not yet accepted — plan approval accepts all proposed criteria, after which deletion is refused. |
 {{/FULL_PLANNING}}| `workspace_post_discussion` | Raises an architectural or research question the user resolves in the admin panel. Required by some advance guards (e.g. open research discussion at 1.0). |
 | `workspace_resolve_review_issue` | Resolve one or more review issues in a single call (pass an array of ids). Agents set resolution (`fixed` / `false_positive` / `out_of_scope`) on findings. The user still has to mark each one resolved in the panel — this only records what was done. |
 | `workspace_get_reflection_context` | Returns the scope, branch diff, review findings, and filtered transcript fed to the reflector at 5.1. Call once on entry. |

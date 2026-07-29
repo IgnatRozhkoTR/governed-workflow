@@ -184,6 +184,18 @@ def test_delete_criterion(client, workspace):
     assert criterion_id not in ids
 
 
+def test_delete_accepted_criterion_is_allowed(client, workspace):
+    criterion_id = add_criterion(workspace["id"], cr_type="unit_test",
+                                 description="Accepted", status="accepted")
+
+    r = client.delete(f"{BASE}/criteria/{criterion_id}")
+    assert r.status_code == 200
+    assert r.json["ok"]
+
+    r = client.get(f"{BASE}/criteria")
+    assert criterion_id not in [c["id"] for c in r.json["criteria"]]
+
+
 def test_validate_custom_criterion(client, workspace):
     from testing_utils import add_criterion
     criterion_id = add_criterion(workspace["id"], cr_type="custom", description="Manual check")

@@ -375,6 +375,46 @@ def test_workspace_extend_plan_blocked_in_simple_mode(workspace, project):
     assert "simple planning mode" in result["error"].lower()
 
 
+@pytest.mark.parametrize("tool_name,kwargs", [
+    ("workspace_update_subphase", {"subphase_id": "3.1", "name": "Renamed"}),
+    ("workspace_delete_subphase", {"subphase_id": "3.1"}),
+    ("workspace_set_plan_diagrams", {"diagrams": [{"title": "T", "diagram": "graph TD"}]}),
+])
+def test_granular_plan_tools_blocked_in_simple_mode(workspace, project, tool_name, kwargs):
+    import mcp_tools.plan_scope as plan_scope
+
+    _set_simple_planning_flag(project["id"], True)
+    set_phase(workspace["id"], "2.0", plan_json=make_plan_json(1))
+
+    db = get_db()
+    try:
+        ws = db.execute("SELECT * FROM workspaces WHERE id = ?", (workspace["id"],)).fetchone()
+        proj = db.execute("SELECT * FROM projects WHERE id = ?", (project["id"],)).fetchone()
+        result = getattr(plan_scope, tool_name).__wrapped__(ws, proj, db, "en", **kwargs)
+    finally:
+        db.close()
+
+    assert result["errorCategory"] == "business"
+    assert "simple planning mode" in result["error"].lower()
+
+
+def test_workspace_delete_criteria_blocked_in_simple_mode(workspace, project):
+    from mcp_tools.criteria import workspace_delete_criteria
+
+    _set_simple_planning_flag(project["id"], True)
+    criterion_id = add_criterion(workspace["id"])
+
+    db = get_db()
+    try:
+        ws = db.execute("SELECT * FROM workspaces WHERE id = ?", (workspace["id"],)).fetchone()
+        proj = db.execute("SELECT * FROM projects WHERE id = ?", (project["id"],)).fetchone()
+        result = workspace_delete_criteria.__wrapped__(ws, proj, db, "en", criterion_id=criterion_id)
+    finally:
+        db.close()
+
+    assert result["errorCategory"] == "business"
+
+
 def test_workspace_propose_criteria_blocked_in_simple_mode(workspace, project):
     from mcp_tools.criteria import workspace_propose_criteria
 
@@ -679,3 +719,33 @@ def test_simple_project_planning_block_is_simple_variant(
     output = (project_root_dir / SkillConfigurator.OUTPUT_REL_PATH).read_text()
     assert "workspace_propose_criteria" not in output
     assert "workspace_set_plan" in output
+
+
+# ── Simple-mode tool deregistration ───────────────────────────────────────────
+
+
+def _deregistered_tool_names(detected_project):
+    """Run _deregister_simple_mode_tools against a stubbed registry and detection."""
+    import mcp_server
+
+    removed = []
+    with patch.object(mcp_server, "_detect_workspace", return_value=({}, detected_project)), \
+            patch.object(mcp_server.mcp, "remove_tool", side_effect=removed.append):
+        mcp_server._deregister_simple_mode_tools()
+    return removed
+
+
+def test_simple_mode_deregisters_hidden_tools():
+    import mcp_server
+
+    removed = _deregistered_tool_names({"simple_planning": 1})
+
+    assert removed == list(mcp_server._SIMPLE_MODE_HIDDEN_TOOLS)
+
+
+def test_full_mode_keeps_all_tools_registered():
+    assert _deregistered_tool_names({"simple_planning": 0}) == []
+
+
+def test_missing_project_keeps_all_tools_registered():
+    assert _deregistered_tool_names(None) == []

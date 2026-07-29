@@ -66,6 +66,8 @@ When the plan is agreed:
 3. Call `workspace_update_progress` for phase `"2"`
 4. Call `workspace_advance`
 
+**Editing the plan later**: do not resubmit the whole plan to change one part of it. Use `workspace_update_subphase` to patch `3.1`'s name, tasks or scope (sets plan status to 'pending' — the user must re-approve), and `workspace_set_plan_diagrams` / `workspace_set_plan_description` for documentation edits (these keep the approval intact). Fast mode stays at one sub-phase, so `workspace_extend_plan` and `workspace_delete_subphase` do not apply.
+
 **User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel (auto-approved when `yolo_mode` is on). `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0`.
 
 **Advance 2.0 → 3.1.0** requires: a single execution sub-phase `3.1` with a non-empty `scope.must`, plan_status='approved', and progress entry `"2"`."""
@@ -105,6 +107,8 @@ When the plan is agreed:
 ```
 2. Call `workspace_update_progress` for phase `"2"`
 3. Call `workspace_advance`
+
+**Editing the plan later**: to reword the plan's summary, call `workspace_set_plan_description` instead of resubmitting the whole plan — it keeps the user's approval intact.
 
 **User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0`.
 
@@ -153,7 +157,14 @@ When plan is agreed:
 3. Call `workspace_update_progress` for phase `"2"`
 4. Call `workspace_advance`
 
-**Extending the plan later**: If during execution the user requests additional changes within the same ticket, or new work is discovered that warrants a new sub-phase, use `workspace_extend_plan` instead of rewriting the entire plan with `workspace_set_plan`. This appends a new sub-phase (auto-assigned ID, with its own scope) without touching existing sub-phases — fewer tokens, less risk of breaking the plan. The plan status is set to 'pending' (user must re-approve).
+**Editing the plan later**: NEVER resubmit the whole plan with `workspace_set_plan` to change one part of it — use the granular tool that matches what actually changed:
+- `workspace_extend_plan` — append a new sub-phase (auto-assigned ID, with its own scope) without touching existing ones. Use when the user requests additional changes within the same ticket, or new work warrants a new sub-phase.
+- `workspace_update_subphase` — patch one existing sub-phase's name, tasks and/or scope in place. Fields you omit stay as they are; IDs are never renumbered.
+- `workspace_delete_subphase` — remove one sub-phase and renumber the rest so IDs stay sequential. Refused for the last remaining sub-phase.
+- `workspace_set_plan_diagrams` — replace (default) or append the `systemDiagram` entries.
+- `workspace_set_plan_description` — replace the plan's top-level description.
+
+The structural tools (`extend_plan`, `update_subphase`, `delete_subphase`) set the plan status to 'pending' — the user must re-approve, and until they do the agent cannot edit files. The documentation tools (`set_plan_diagrams`, `set_plan_description`) deliberately leave the approval intact, so they are safe to call mid-execution. Reserve `workspace_set_plan` for the initial plan and for genuine full rewrites.
 
 **User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. Approving the plan also approves its scope and accepts all proposed acceptance criteria — it is the single approval. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0` (the first execution item) — there is no separate 2.1 gate phase. If the user rejects, the plan status goes back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan`, then call `workspace_advance` again.
 

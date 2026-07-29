@@ -34,7 +34,7 @@ When reviewing the orchestrator's high-level plan:
    - Dependencies: does this task depend on another that runs in the same group?
    - Gaps: does the research reveal something this task doesn't address?
    - Task titles: human-readable summary? Technical details in description, not title?
-3. Send your review as a numbered list. Per task: verdict (OK or CONCERN) with reasoning for concerns. Then list any cross-cutting issues (group ordering, missing tasks, overall gaps).
+3. Send your review as a numbered list. Per task: verdict (OK or CONCERN) with reasoning for concerns. Then list any cross-cutting issues (group ordering, missing tasks, overall gaps). Any claim of the form "there is no X in this codebase" (e.g. no precedent, no existing call sites) must state the exact grep/glob pattern you ran and the paths covered — unverified absence claims are the single most common failure mode in this workflow.
 4. Orchestrator responds to each concern — accept/adjust or reject with reason.
 5. Discuss until consensus on each point. Be critical but constructive.
 6. After consensus: expand the plan with technical details. The orchestrator calls `workspace_set_plan` to set the finalized plan via MCP. Each execution item in the plan must include a `scope` field (must/may) — scope is embedded in the plan, not set separately.
