@@ -342,6 +342,7 @@
   "diff.baseDefault": "База по умолчанию",
   "diff.baseNotFound": "Базовая ветка не найдена в этом репозитории",
   "diff.loadFailed": "Не удалось загрузить дифф",
+  "diff.noMatches": "Нет совпадений",
 
   "explorer.projectFiles": "Файлы проекта",
   "explorer.selectFile": "Выберите файл для просмотра содержимого",

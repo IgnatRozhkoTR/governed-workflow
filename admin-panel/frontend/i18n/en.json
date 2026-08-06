@@ -342,6 +342,7 @@
   "diff.baseDefault": "Default base",
   "diff.baseNotFound": "Base branch not found in this repository",
   "diff.loadFailed": "Failed to load diff",
+  "diff.noMatches": "No matches",
 
   "explorer.projectFiles": "Project Files",
   "explorer.selectFile": "Select a file to view its contents",

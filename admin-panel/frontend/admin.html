@@ -70,7 +70,7 @@
 <link rel="stylesheet" href="css/comments-ui.css?v=11">
 <link rel="stylesheet" href="css/modals.css?v=11">
 <link rel="stylesheet" href="css/context.css?v=11">
-<link rel="stylesheet" href="css/diff-viewer.css?v=12">
+<link rel="stylesheet" href="css/diff-viewer.css?v=13">
 <link rel="stylesheet" href="css/preplanning.css?v=11">
 <link rel="stylesheet" href="css/terminal.css?v=11">
 <link rel="stylesheet" href="css/verification.css?v=11">
@@ -607,7 +607,10 @@
   <div class="tab-panel" id="panel-changes">
     <div class="card">
       <div class="diff-controls">
-        <select id="diffRepoSelect" class="ws-input" data-i18n-title="diff.repository" onchange="setDiffRepo(this.value)"></select>
+        <div class="filter-select" id="diffRepoSelect" data-i18n-title="diff.repository">
+          <input type="text" class="ws-input filter-select-input" autocomplete="off" spellcheck="false">
+          <div class="filter-select-menu" hidden></div>
+        </div>
         <div class="toggle-group" id="viewModeToggle">
           <button class="toggle-opt active" data-mode="tree" onclick="setFileView('tree')" data-i18n="diff.tree">Tree</button>
           <button class="toggle-opt" data-mode="flat" onclick="setFileView('flat')" data-i18n="diff.list">List</button>
@@ -621,7 +624,10 @@
           <button class="toggle-opt" data-mode="uncommitted" onclick="setDiffSource('uncommitted')" data-i18n="diff.uncommitted">Uncommitted</button>
           <button class="toggle-opt" data-mode="commit" onclick="setDiffSource('commit')" data-i18n="diff.commit">Commit</button>
         </div>
-        <select id="diffBaseSelect" class="ws-input" data-i18n-title="diff.diffAgainst" onchange="setDiffBase(this.value)"></select>
+        <div class="filter-select" id="diffBaseSelect" data-i18n-title="diff.diffAgainst">
+          <input type="text" class="ws-input filter-select-input" autocomplete="off" spellcheck="false">
+          <div class="filter-select-menu" hidden></div>
+        </div>
         <input type="text" id="diffFileSearch" class="ws-input" placeholder="Filter files..." data-i18n-placeholder="diff.filterFiles" style="flex: 1; max-width: 300px; height: 28px; font-size: 0.75rem;" oninput="filterDiffFiles(this.value)">
         <button class="btn btn-sm" id="historyToggleBtn" onclick="toggleHistoryPanel()" data-i18n="diff.historyToggle">History</button>
         <button class="btn btn-sm" id="viewFileBtn" style="display: none;" onclick="openSelectedFile()" data-i18n="buttons.viewFile">View File</button>
@@ -803,7 +809,7 @@
 <script src="js/scope.js?v=10"></script>
 <script src="js/tree-utils.js?v=10"></script>
 <script src="js/research.js?v=10"></script>
-<script src="js/diff-viewer.js?v=12"></script>
+<script src="js/diff-viewer.js?v=13"></script>
 <script src="js/monaco-editor.js?v=11"></script>
 <script src="js/lsp-shortcuts.js?v=10"></script>
 <script src="js/lsp-client.js?v=11"></script>
