@@ -37,6 +37,15 @@
   overflow: hidden;
 }
 
+.diff-controls select.ws-input {
+  width: auto;
+  max-width: 200px;
+  height: 28px;
+  padding: 0 6px;
+  line-height: 1;
+  font-size: 0.75rem;
+}
+
 .toggle-opt {
   font-family: var(--font-sans);
   font-size: 0.72rem;

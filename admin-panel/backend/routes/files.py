@@ -29,15 +29,21 @@ def _has_git_marker(path: Path) -> bool:
     return git_entry.is_dir() or git_entry.is_file()
 
 
-def _resolve_repo_dir(working_dir: str, repo_param: str) -> tuple[str | None, str | None]:
-    """Resolve an optional inner-repository subpath to an absolute directory."""
+def _resolve_repo_dir(working_dir: str, project_path: str, repo_param: str) -> tuple[str | None, str | None]:
+    """Resolve an optional inner-repository subpath to an absolute directory.
+
+    "." (or omitted) means the workspace working_dir itself. Any other value is
+    resolved against the project path, since inner repositories only ever exist
+    there (the working_dir may be a worktree that only contains the parent
+    repo's tracked files).
+    """
     if not repo_param or repo_param == ".":
         return str(Path(working_dir)), None
 
     if Path(repo_param).is_absolute() or ".." in Path(repo_param).parts:
         return None, "invalid_repo"
 
-    root = Path(working_dir).resolve()
+    root = Path(project_path).resolve()
     candidate = (root / repo_param).resolve()
     if not _is_within(candidate, root):
         return None, "invalid_repo"
@@ -216,11 +222,10 @@ def list_files(db, ws, project):
 @bp.route("/api/ws/<project_id>/<path:branch>/repos", methods=["GET"])
 @with_workspace
 def get_repos(db, ws, project):
-    """List the workspace root plus any immediate subdirectories that are git repositories."""
-    working_dir = ws["working_dir"]
-    root = Path(working_dir)
+    """List the workspace root plus any immediate subdirectories of the project path that are git repositories."""
+    root = Path(project["path"])
 
-    repos = [{"path": ".", "name": root.name}]
+    repos = [{"path": ".", "name": Path(project["path"]).name}]
 
     if not root.is_dir():
         return jsonify({"repos": repos})
@@ -310,7 +315,7 @@ def _try_history_refs(working_dir, source_branch, log_format):
 @with_workspace
 def get_history(db, ws, project):
     repo = request.args.get("repo", "").strip()
-    working_dir, err = _resolve_repo_dir(ws["working_dir"], repo)
+    working_dir, err = _resolve_repo_dir(ws["working_dir"], project["path"], repo)
     if err:
         return jsonify({"error": err}), 400
 
@@ -332,7 +337,7 @@ def get_history(db, ws, project):
 @with_workspace
 def get_branches(db, ws, project):
     repo = request.args.get("repo", "").strip()
-    working_dir, err = _resolve_repo_dir(ws["working_dir"], repo)
+    working_dir, err = _resolve_repo_dir(ws["working_dir"], project["path"], repo)
     if err:
         return jsonify({"error": err}), 400
 
@@ -471,7 +476,7 @@ def get_diff(db, ws, project):
         }), 400
 
     repo = request.args.get("repo", "").strip()
-    working_dir, err = _resolve_repo_dir(working_dir, repo)
+    working_dir, err = _resolve_repo_dir(working_dir, project["path"], repo)
     if err:
         return jsonify({"error": err}), 400
 

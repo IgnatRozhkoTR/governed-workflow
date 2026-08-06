@@ -414,11 +414,16 @@ async function loadDiffRepos() {
       localStorage.removeItem('diff_repo');
     }
     select.value = state.diffRepo;
-    select.style.display = repos.length <= 1 ? 'none' : '';
   } catch (e) {
     console.warn('Failed to load repos:', e.message);
-    select.style.display = 'none';
     state.diffRepo = '.';
+    if (!select.options.length) {
+      var fallbackOption = document.createElement('option');
+      fallbackOption.value = '.';
+      fallbackOption.textContent = t('diff.repository');
+      select.appendChild(fallbackOption);
+      select.value = '.';
+    }
   }
 }
 
@@ -427,15 +432,16 @@ async function loadDiffBases() {
   if (!select) return;
   var ctx = getWorkspaceContext();
   if (!ctx) return;
+
+  select.innerHTML = '';
+  var defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = t('diff.baseDefault');
+  select.appendChild(defaultOption);
+
   try {
     var data = await apiGetBranches(ctx.projectId, ctx.branch, state.diffRepo);
     var branches = data.branches || [];
-    select.innerHTML = '';
-
-    var defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.textContent = t('diff.baseDefault');
-    select.appendChild(defaultOption);
 
     branches.forEach(function(branch) {
       var option = document.createElement('option');
@@ -474,6 +480,8 @@ async function setDiffBase(name) {
   if (state.diffSource === 'branch') {
     await _loadDiff(state.diffSource);
     renderFileList();
+  } else {
+    await setDiffSource('branch');
   }
 }
 
@@ -481,9 +489,6 @@ async function setDiffSource(mode) {
   localStorage.setItem('diff_diffSource', mode);
   state.diffSource = mode;
   document.querySelectorAll('#diffSourceToggle .toggle-opt').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-
-  var baseSelect = document.getElementById('diffBaseSelect');
-  if (baseSelect) baseSelect.disabled = (mode !== 'branch');
 
   if (mode !== 'commit') {
     state.activeCommit = null;

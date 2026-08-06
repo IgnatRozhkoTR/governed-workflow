@@ -147,9 +147,6 @@ async function initApp() {
   document.querySelectorAll('#diffSourceToggle .toggle-opt').forEach(function(b) {
     b.classList.toggle('active', b.dataset.mode === state.diffSource);
   });
-  var diffBaseSelect = document.getElementById('diffBaseSelect');
-  if (diffBaseSelect) diffBaseSelect.disabled = (state.diffSource !== 'branch');
-
   hideProjectSelector();
   setupCollapsibleCards();
   _initialLoad = false;
