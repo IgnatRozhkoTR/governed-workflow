@@ -593,6 +593,7 @@
   <div class="tab-panel" id="panel-changes">
     <div class="card">
       <div class="diff-controls">
+        <select id="diffRepoSelect" class="ws-input" data-i18n-title="diff.repository" style="height: 28px; font-size: 0.75rem; width: auto; max-width: 200px;" onchange="setDiffRepo(this.value)"></select>
         <div class="toggle-group" id="viewModeToggle">
           <button class="toggle-opt active" data-mode="tree" onclick="setFileView('tree')" data-i18n="diff.tree">Tree</button>
           <button class="toggle-opt" data-mode="flat" onclick="setFileView('flat')" data-i18n="diff.list">List</button>
@@ -606,6 +607,7 @@
           <button class="toggle-opt" data-mode="uncommitted" onclick="setDiffSource('uncommitted')" data-i18n="diff.uncommitted">Uncommitted</button>
           <button class="toggle-opt" data-mode="commit" onclick="setDiffSource('commit')" data-i18n="diff.commit">Commit</button>
         </div>
+        <select id="diffBaseSelect" class="ws-input" data-i18n-title="diff.diffAgainst" style="height: 28px; font-size: 0.75rem; width: auto; max-width: 200px;" onchange="setDiffBase(this.value)"></select>
         <input type="text" id="diffFileSearch" class="ws-input" placeholder="Filter files..." data-i18n-placeholder="diff.filterFiles" style="flex: 1; max-width: 300px; height: 28px; font-size: 0.75rem;" oninput="filterDiffFiles(this.value)">
         <button class="btn btn-sm" id="historyToggleBtn" onclick="toggleHistoryPanel()" data-i18n="diff.historyToggle">History</button>
         <button class="btn btn-sm" id="viewFileBtn" style="display: none;" onclick="openSelectedFile()" data-i18n="buttons.viewFile">View File</button>
@@ -771,23 +773,23 @@
 <script src="js/vendor/idiomorph.min.js?v=10"></script>
 <script src="js/event-bus.js?v=10"></script>
 <script src="js/i18n.js?v=10"></script>
-<script src="js/api.js?v=11"></script>
+<script src="js/api.js?v=12"></script>
 <script src="js/auth.js?v=11"></script>
 <script src="js/toast.js?v=10"></script>
-<script src="js/state.js?v=10"></script>
+<script src="js/state.js?v=11"></script>
 <script src="js/review-thread.js?v=10"></script>
 <script src="js/review-tab.js?v=10"></script>
 <script src="js/proposals.js?v=1"></script>
 <script src="js/comments.js?v=10"></script>
 <script src="js/theme.js?v=10"></script>
 <script src="js/terminal.js?v=10"></script>
-<script src="js/tabs.js?v=10"></script>
+<script src="js/tabs.js?v=11"></script>
 <script src="js/phase.js?v=10"></script>
 <script src="js/plan.js?v=10"></script>
 <script src="js/scope.js?v=10"></script>
 <script src="js/tree-utils.js?v=10"></script>
 <script src="js/research.js?v=10"></script>
-<script src="js/diff-viewer.js?v=10"></script>
+<script src="js/diff-viewer.js?v=11"></script>
 <script src="js/monaco-editor.js?v=11"></script>
 <script src="js/lsp-shortcuts.js?v=10"></script>
 <script src="js/lsp-client.js?v=11"></script>
@@ -806,7 +808,7 @@
 <script src="js/advance-modes.js?v=1"></script>
 <script src="js/review-pipeline.js?v=1"></script>
 <script src="js/actions.js?v=10"></script>
-<script src="js/app.js?v=10"></script>
+<script src="js/app.js?v=11"></script>
 <script src="js/workspace.js?v=10"></script>
 
 <div id="diagramOverlay" class="diagram-overlay" style="display:none" onclick="closeDiagramOverlay(event)">

@@ -22,7 +22,9 @@ async function refreshTabData() {
     EventBus.emit('state:refreshed', stateData);
   } catch(e) { console.warn('Refresh state failed:', e.message); }
   try {
-    var diffData = await apiGetDiff(ctx.projectId, ctx.branch, state.diffSource);
+    if (typeof loadDiffRepos === 'function') await loadDiffRepos();
+    if (typeof loadDiffBases === 'function') await loadDiffBases();
+    var diffData = await apiGetDiff(ctx.projectId, ctx.branch, state.diffSource, null, state.diffRepo, state.diffBase);
     if (diffData && diffData.files) { AppState.diff = diffData; DIFF_DATA = AppState.diff; }
   } catch(e) { console.warn('Refresh diff failed:', e.message); }
   try {

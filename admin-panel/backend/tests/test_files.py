@@ -602,3 +602,272 @@ def test_write_file_path_traversal_returns_403(client, workspace):
     )
 
     assert r.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# get_repos endpoint tests
+# ---------------------------------------------------------------------------
+
+def test_get_repos_root_entry_is_first(client, workspace):
+    r = client.get("/api/ws/test-project/feature/test/repos")
+    assert r.status_code == 200
+    repos = r.json["repos"]
+    assert repos[0]["path"] == "."
+
+
+def test_get_repos_lists_subdir_with_git_directory(client, workspace):
+    sub = Path(workspace["working_dir"]) / "sub_repo"
+    sub.mkdir()
+    _git(sub, "init")
+
+    r = client.get("/api/ws/test-project/feature/test/repos")
+
+    assert r.status_code == 200
+    paths = [repo["path"] for repo in r.json["repos"]]
+    assert "sub_repo" in paths
+
+
+def test_get_repos_lists_subdir_with_git_file_worktree(client, workspace):
+    sub = Path(workspace["working_dir"]) / "worktree_repo"
+    sub.mkdir()
+    (sub / ".git").write_text("gitdir: ../.git/worktrees/worktree_repo\n")
+
+    r = client.get("/api/ws/test-project/feature/test/repos")
+
+    assert r.status_code == 200
+    paths = [repo["path"] for repo in r.json["repos"]]
+    assert "worktree_repo" in paths
+
+
+def test_get_repos_excludes_subdir_without_git(client, workspace):
+    (Path(workspace["working_dir"]) / "plain_dir").mkdir()
+
+    r = client.get("/api/ws/test-project/feature/test/repos")
+
+    assert r.status_code == 200
+    paths = [repo["path"] for repo in r.json["repos"]]
+    assert "plain_dir" not in paths
+
+
+def test_get_repos_excludes_hidden_dir_with_git(client, workspace):
+    hidden = Path(workspace["working_dir"]) / ".hidden_repo"
+    hidden.mkdir()
+    _git(hidden, "init")
+
+    r = client.get("/api/ws/test-project/feature/test/repos")
+
+    assert r.status_code == 200
+    paths = [repo["path"] for repo in r.json["repos"]]
+    assert ".hidden_repo" not in paths
+
+
+def test_get_repos_excludes_node_modules_with_git(client, workspace):
+    node_modules = Path(workspace["working_dir"]) / "node_modules"
+    node_modules.mkdir()
+    _git(node_modules, "init")
+
+    r = client.get("/api/ws/test-project/feature/test/repos")
+
+    assert r.status_code == 200
+    paths = [repo["path"] for repo in r.json["repos"]]
+    assert "node_modules" not in paths
+
+
+def test_get_repos_subdirs_sorted_alphabetically(client, workspace):
+    wd = Path(workspace["working_dir"])
+    for name in ("zeta_repo", "alpha_repo", "mid_repo"):
+        sub = wd / name
+        sub.mkdir()
+        _git(sub, "init")
+
+    r = client.get("/api/ws/test-project/feature/test/repos")
+
+    assert r.status_code == 200
+    paths = [repo["path"] for repo in r.json["repos"]]
+    assert paths == [".", "alpha_repo", "mid_repo", "zeta_repo"]
+
+
+def test_get_repos_excludes_depth_two_repo(client, workspace):
+    nested = Path(workspace["working_dir"]) / "outer_dir" / "inner_repo"
+    nested.mkdir(parents=True)
+    _git(nested, "init")
+
+    r = client.get("/api/ws/test-project/feature/test/repos")
+
+    assert r.status_code == 200
+    paths = [repo["path"] for repo in r.json["repos"]]
+    assert "outer_dir" not in paths
+    assert not any("inner_repo" in p for p in paths)
+
+
+# ---------------------------------------------------------------------------
+# repo= param validation shared across diff / branches / history
+# ---------------------------------------------------------------------------
+
+REPO_SCOPED_ENDPOINTS = ("diff", "branches", "history")
+
+
+def test_repo_param_dot_and_omitted_are_equivalent(client, workspace):
+    r_omitted = client.get("/api/ws/test-project/feature/test/branches")
+    r_dot = client.get("/api/ws/test-project/feature/test/branches?repo=.")
+
+    assert r_omitted.status_code == 200
+    assert r_dot.status_code == 200
+    assert r_omitted.json == r_dot.json
+
+
+def test_repo_param_parent_traversal_returns_invalid_repo(client, workspace):
+    for endpoint in REPO_SCOPED_ENDPOINTS:
+        r = client.get(f"/api/ws/test-project/feature/test/{endpoint}?repo=../something")
+        assert r.status_code == 400, endpoint
+        assert r.json["error"] == "invalid_repo", endpoint
+
+
+def test_repo_param_absolute_path_returns_invalid_repo(client, workspace):
+    for endpoint in REPO_SCOPED_ENDPOINTS:
+        r = client.get(f"/api/ws/test-project/feature/test/{endpoint}?repo=/etc")
+        assert r.status_code == 400, endpoint
+        assert r.json["error"] == "invalid_repo", endpoint
+
+
+def test_repo_param_existing_dir_without_git_returns_repo_not_found(client, workspace):
+    (Path(workspace["working_dir"]) / "no_git_here").mkdir()
+
+    for endpoint in REPO_SCOPED_ENDPOINTS:
+        r = client.get(f"/api/ws/test-project/feature/test/{endpoint}?repo=no_git_here")
+        assert r.status_code == 400, endpoint
+        assert r.json["error"] == "repo_not_found", endpoint
+
+
+def test_repo_param_nonexistent_dir_returns_repo_not_found(client, workspace):
+    for endpoint in REPO_SCOPED_ENDPOINTS:
+        r = client.get(f"/api/ws/test-project/feature/test/{endpoint}?repo=does_not_exist")
+        assert r.status_code == 400, endpoint
+        assert r.json["error"] == "repo_not_found", endpoint
+
+
+# ---------------------------------------------------------------------------
+# repo= param actually scopes git operations to the inner repository
+# ---------------------------------------------------------------------------
+
+def _init_inner_repo(root_wd, name, branch="inner-main"):
+    """Create a nested git repository (separate from the root repo) with an initial commit."""
+    inner = Path(root_wd) / name
+    inner.mkdir()
+    _git(inner, "init")
+    _git(inner, "checkout", "-b", branch)
+    _git(inner, "config", "user.name", "Inner")
+    _git(inner, "config", "user.email", "inner@test.com")
+    (inner / "inner_seed.py").write_text("seed = 1\n")
+    _git(inner, "add", "inner_seed.py")
+    _git(inner, "commit", "-m", "Inner initial commit")
+    return inner
+
+
+def test_repo_param_scopes_uncommitted_diff_to_inner_repo(client, workspace):
+    wd = Path(workspace["working_dir"])
+    (wd / "root_uncommitted.py").write_text("root = 1\n")
+
+    inner = _init_inner_repo(wd, "inner_repo")
+    (inner / "inner_uncommitted.py").write_text("inner = 1\n")
+
+    r = client.get("/api/ws/test-project/feature/test/diff?mode=uncommitted&repo=inner_repo")
+
+    assert r.status_code == 200
+    paths = [f["path"] for f in r.json["files"]]
+    assert "inner_uncommitted.py" in paths
+    assert "root_uncommitted.py" not in paths
+    assert "inner_repo/inner_uncommitted.py" not in paths
+
+
+def test_repo_param_scopes_branches_to_inner_repo(client, workspace):
+    wd = Path(workspace["working_dir"])
+    inner = _init_inner_repo(wd, "inner_repo2", branch="inner-main")
+    _git(inner, "branch", "inner-feature")
+
+    r = client.get("/api/ws/test-project/feature/test/branches?repo=inner_repo2")
+
+    assert r.status_code == 200
+    names = [b["name"] for b in r.json["branches"]]
+    assert "inner-main" in names
+    assert "inner-feature" in names
+    assert "develop" not in names
+
+
+# ---------------------------------------------------------------------------
+# base= override for mode=branch diffs
+# ---------------------------------------------------------------------------
+
+def test_diff_branch_mode_response_includes_source_branch_as_base_when_no_override(client, workspace):
+    r = client.get("/api/ws/test-project/feature/test/diff?mode=branch")
+
+    assert r.status_code == 200
+    assert r.json["base"] == "develop"
+
+
+def test_diff_base_override_computes_against_chosen_branch(client, workspace):
+    wd = workspace["working_dir"]
+    _commit_file(wd, "on_develop.py", "d = 1\n", "Develop-only file")
+
+    _git(wd, "checkout", "-b", "other-base")
+    _commit_file(wd, "on_other_base.py", "o = 1\n", "Other-base-only file")
+
+    _git(wd, "checkout", "-b", "feature/test", "develop")
+    _commit_file(wd, "on_feature.py", "f = 1\n", "Feature-only file")
+
+    r_default = client.get("/api/ws/test-project/feature/test/diff?mode=branch")
+    assert r_default.status_code == 200
+    default_paths = {f["path"] for f in r_default.json["files"]}
+    assert "on_feature.py" in default_paths
+    assert "on_other_base.py" not in default_paths
+    assert r_default.json["base"] == "develop"
+
+    r_base = client.get("/api/ws/test-project/feature/test/diff?mode=branch&base=other-base")
+    assert r_base.status_code == 200
+    base_paths = {f["path"] for f in r_base.json["files"]}
+    assert "on_feature.py" in base_paths
+    assert "on_other_base.py" in base_paths
+    assert r_base.json["base"] == "other-base"
+
+
+def test_diff_base_override_with_no_differences_returns_empty_files(client, workspace):
+    wd = workspace["working_dir"]
+    _git(wd, "checkout", "-b", "same-as-feature")
+    _git(wd, "checkout", "-b", "feature/test")
+
+    r = client.get("/api/ws/test-project/feature/test/diff?mode=branch&base=same-as-feature")
+
+    assert r.status_code == 200
+    assert r.json["files"] == []
+    assert r.json["base"] == "same-as-feature"
+
+
+def test_diff_base_override_unknown_ref_returns_400(client, workspace):
+    r = client.get("/api/ws/test-project/feature/test/diff?mode=branch&base=does-not-exist")
+
+    assert r.status_code == 400
+    assert r.json == {"error": "base_ref_not_found", "base": "does-not-exist"}
+
+
+def test_diff_base_ignored_for_uncommitted_mode(client, workspace):
+    wd = workspace["working_dir"]
+    Path(wd).joinpath("scratch.py").write_text("s = 1\n")
+
+    r = client.get("/api/ws/test-project/feature/test/diff?mode=uncommitted&base=does-not-exist")
+
+    assert r.status_code == 200
+    assert r.json["mode"] == "uncommitted"
+    paths = [f["path"] for f in r.json["files"]]
+    assert "scratch.py" in paths
+
+
+def test_diff_base_ignored_for_commit_mode(client, workspace):
+    wd = workspace["working_dir"]
+    sha = _commit_file(wd, "committed.py", "c = 1\n", "Commit for base-ignore test")
+
+    r = client.get(f"/api/ws/test-project/feature/test/diff?mode=commit&commit={sha}&base=does-not-exist")
+
+    assert r.status_code == 200
+    assert r.json["mode"] == "commit"
+    paths = [f["path"] for f in r.json["files"]]
+    assert "committed.py" in paths

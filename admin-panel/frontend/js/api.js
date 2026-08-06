@@ -91,6 +91,7 @@ function _apiError(res, payload) {
     : res.statusText;
   const err = new Error(message);
   err.status = res.status;
+  err.payload = payload;
   return err;
 }
 
@@ -320,23 +321,34 @@ function apiWriteFile(projectId, branch, filePath, content) {
   return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/file', { path: filePath, content: content });
 }
 
-function apiGetDiff(projectId, branch, mode, commit) {
+function apiGetDiff(projectId, branch, mode, commit, repo, base) {
   var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/diff';
   var q = [];
   if (mode && mode !== 'branch') q.push('mode=' + encodeURIComponent(mode));
   if (commit) q.push('commit=' + encodeURIComponent(commit));
+  if (repo && repo !== '.') q.push('repo=' + encodeURIComponent(repo));
+  if (base && (!mode || mode === 'branch')) q.push('base=' + encodeURIComponent(base));
   if (q.length) url += '?' + q.join('&');
   return apiGet(url);
 }
 
-function apiGetCommitHistory(projectId, branch, ref) {
+function apiGetCommitHistory(projectId, branch, ref, repo) {
   var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/history';
-  if (ref) url += '?ref=' + encodeURIComponent(ref);
+  var q = [];
+  if (ref) q.push('ref=' + encodeURIComponent(ref));
+  if (repo && repo !== '.') q.push('repo=' + encodeURIComponent(repo));
+  if (q.length) url += '?' + q.join('&');
   return apiGet(url);
 }
 
-function apiGetBranches(projectId, branch) {
+function apiGetBranches(projectId, branch, repo) {
   var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/branches';
+  if (repo && repo !== '.') url += '?repo=' + encodeURIComponent(repo);
+  return apiGet(url);
+}
+
+function apiGetRepos(projectId, branch) {
+  var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/repos';
   return apiGet(url);
 }
 

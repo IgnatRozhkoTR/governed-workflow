@@ -1,5 +1,6 @@
 """File read and diff routes."""
 import logging
+import os
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
@@ -20,6 +21,31 @@ def _is_within(path: Path, root: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _has_git_marker(path: Path) -> bool:
+    """Return True if path contains a .git entry (dir for a normal repo, file for a worktree)."""
+    git_entry = path / ".git"
+    return git_entry.is_dir() or git_entry.is_file()
+
+
+def _resolve_repo_dir(working_dir: str, repo_param: str) -> tuple[str | None, str | None]:
+    """Resolve an optional inner-repository subpath to an absolute directory."""
+    if not repo_param or repo_param == ".":
+        return str(Path(working_dir)), None
+
+    if Path(repo_param).is_absolute() or ".." in Path(repo_param).parts:
+        return None, "invalid_repo"
+
+    root = Path(working_dir).resolve()
+    candidate = (root / repo_param).resolve()
+    if not _is_within(candidate, root):
+        return None, "invalid_repo"
+
+    if not candidate.is_dir() or not _has_git_marker(candidate):
+        return None, "repo_not_found"
+
+    return str(candidate), None
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/file", methods=["GET"])
@@ -187,6 +213,37 @@ def list_files(db, ws, project):
     return jsonify(result)
 
 
+@bp.route("/api/ws/<project_id>/<path:branch>/repos", methods=["GET"])
+@with_workspace
+def get_repos(db, ws, project):
+    """List the workspace root plus any immediate subdirectories that are git repositories."""
+    working_dir = ws["working_dir"]
+    root = Path(working_dir)
+
+    repos = [{"path": ".", "name": root.name}]
+
+    if not root.is_dir():
+        return jsonify({"repos": repos})
+
+    subdirs = []
+    try:
+        with os.scandir(root) as entries:
+            for entry in entries:
+                if not entry.is_dir():
+                    continue
+                if entry.name.startswith(".") or entry.name == "node_modules":
+                    continue
+                if _has_git_marker(Path(entry.path)):
+                    subdirs.append(entry.name)
+    except OSError:
+        return jsonify({"repos": repos})
+
+    for name in sorted(subdirs):
+        repos.append({"path": name, "name": name})
+
+    return jsonify({"repos": repos})
+
+
 _LOG_FORMAT = "%H%x00%h%x00%s%x00%an%x00%ae%x00%aI%x00%b%x1e"
 
 
@@ -252,7 +309,10 @@ def _try_history_refs(working_dir, source_branch, log_format):
 @bp.route("/api/ws/<project_id>/<path:branch>/history", methods=["GET"])
 @with_workspace
 def get_history(db, ws, project):
-    working_dir = ws["working_dir"]
+    repo = request.args.get("repo", "").strip()
+    working_dir, err = _resolve_repo_dir(ws["working_dir"], repo)
+    if err:
+        return jsonify({"error": err}), 400
 
     ref_param = request.args.get("ref")
     if ref_param:
@@ -271,7 +331,11 @@ def get_history(db, ws, project):
 @bp.route("/api/ws/<project_id>/<path:branch>/branches", methods=["GET"])
 @with_workspace
 def get_branches(db, ws, project):
-    working_dir = ws["working_dir"]
+    repo = request.args.get("repo", "").strip()
+    working_dir, err = _resolve_repo_dir(ws["working_dir"], repo)
+    if err:
+        return jsonify({"error": err}), 400
+
     ok, out, _ = run_git(working_dir, "branch", "-a", "--sort=-committerdate", "--format=%(refname:short)")
     if not ok:
         return jsonify({"branches": []})
@@ -316,8 +380,28 @@ def _diff_for_commit(working_dir, sha):
     return _parse_diff(diff_output if ok else "")
 
 
-def _diff_for_branch(working_dir, source_branch):
-    """Return diff output against the source branch, trying origin first then local fallbacks."""
+def _resolve_explicit_base_ref(working_dir, base_override):
+    """Return the first ref (origin/<base> then <base>) that verifies as a commit, or None."""
+    for ref in (f"origin/{base_override}", base_override):
+        ok, _, _ = run_git(working_dir, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+        if ok:
+            return ref
+    return None
+
+
+def _diff_for_branch(working_dir, source_branch, base_override=None):
+    """Return diff output against the source branch, or an explicit base ref if provided.
+
+    Returns None when base_override was given but no matching ref could be verified,
+    to distinguish that failure from a genuinely empty diff ("").
+    """
+    if base_override:
+        ref = _resolve_explicit_base_ref(working_dir, base_override)
+        if ref is None:
+            return None
+        ok, diff_output, _ = run_git(working_dir, "diff", "--find-renames", ref)
+        return diff_output if ok else ""
+
     for ref in (f"origin/{source_branch}", source_branch, "HEAD", None):
         if ref is not None:
             ok, diff_output, _ = run_git(working_dir, "diff", "--find-renames", ref)
@@ -386,6 +470,13 @@ def get_diff(db, ws, project):
             "details": f"workspace directory does not exist: {working_dir}",
         }), 400
 
+    repo = request.args.get("repo", "").strip()
+    working_dir, err = _resolve_repo_dir(working_dir, repo)
+    if err:
+        return jsonify({"error": err}), 400
+
+    base = request.args.get("base", "").strip()
+
     try:
         if mode == "commit":
             sha = request.args.get("commit", "").strip()
@@ -395,7 +486,9 @@ def get_diff(db, ws, project):
             return jsonify({"files": result, "mode": "commit", "commit": sha})
 
         if mode == "branch":
-            diff_output = _diff_for_branch(working_dir, source_branch)
+            diff_output = _diff_for_branch(working_dir, source_branch, base_override=base or None)
+            if diff_output is None:
+                return jsonify({"error": "base_ref_not_found", "base": base}), 400
         else:
             ok, diff_output, _ = run_git(working_dir, "diff", "--find-renames", "HEAD")
             if not ok:
@@ -403,7 +496,11 @@ def get_diff(db, ws, project):
 
         files = _parse_diff(diff_output)
         files.extend(_untracked_files_diff(working_dir, mode, {f["path"] for f in files}))
-        return jsonify({"files": files, "mode": mode})
+
+        response = {"files": files, "mode": mode}
+        if mode == "branch":
+            response["base"] = base or source_branch
+        return jsonify(response)
     except Exception as exc:
         logger.exception(
             "diff handler failed for %s/%s mode=%s",

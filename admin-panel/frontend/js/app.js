@@ -73,7 +73,9 @@ async function initApp() {
   }
 
   try {
-    const diffData = await apiGetDiff(ctx.projectId, ctx.branch, state.diffSource);
+    if (typeof loadDiffRepos === 'function') await loadDiffRepos();
+    if (typeof loadDiffBases === 'function') await loadDiffBases();
+    const diffData = await apiGetDiff(ctx.projectId, ctx.branch, state.diffSource, null, state.diffRepo, state.diffBase);
     if (diffData && diffData.files) {
       AppState.diff = diffData;
       DIFF_DATA = AppState.diff;
@@ -144,6 +146,8 @@ async function initApp() {
   document.querySelectorAll('#diffSourceToggle .toggle-opt').forEach(function(b) {
     b.classList.toggle('active', b.dataset.mode === state.diffSource);
   });
+  var diffBaseSelect = document.getElementById('diffBaseSelect');
+  if (diffBaseSelect) diffBaseSelect.disabled = (state.diffSource !== 'branch');
 
   hideProjectSelector();
   setupCollapsibleCards();

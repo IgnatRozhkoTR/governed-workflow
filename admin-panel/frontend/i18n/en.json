@@ -323,6 +323,11 @@
   "diff.historyToggle": "History",
   "diff.movedFrom": "moved from",
   "diff.to": "to",
+  "diff.repository": "Repository",
+  "diff.diffAgainst": "Diff against",
+  "diff.baseDefault": "Default base",
+  "diff.baseNotFound": "Base branch not found in this repository",
+  "diff.loadFailed": "Failed to load diff",
 
   "explorer.projectFiles": "Project Files",
   "explorer.selectFile": "Select a file to view its contents",

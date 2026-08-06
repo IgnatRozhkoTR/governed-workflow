@@ -374,7 +374,7 @@ async function _loadDiff(mode, commitSha) {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
   try {
-    var diffData = await apiGetDiff(ctx.projectId, ctx.branch, mode, commitSha);
+    var diffData = await apiGetDiff(ctx.projectId, ctx.branch, mode, commitSha, state.diffRepo, state.diffBase);
     if (diffData) {
       AppState.diff = diffData;
       DIFF_DATA = AppState.diff;
@@ -384,6 +384,96 @@ async function _loadDiff(mode, commitSha) {
     // Clear diff data on error so stale files don't linger
     AppState.diff = { files: [] };
     DIFF_DATA = AppState.diff;
+    if (e && e.payload && e.payload.error === 'base_ref_not_found') {
+      showToast(t('diff.baseNotFound'));
+    } else {
+      showToast(t('diff.loadFailed'));
+    }
+  }
+}
+
+async function loadDiffRepos() {
+  var select = document.getElementById('diffRepoSelect');
+  if (!select) return;
+  var ctx = getWorkspaceContext();
+  if (!ctx) return;
+  try {
+    var data = await apiGetRepos(ctx.projectId, ctx.branch);
+    var repos = data.repos || [];
+    select.innerHTML = '';
+    repos.forEach(function(repo) {
+      var option = document.createElement('option');
+      option.value = repo.path;
+      option.textContent = repo.name;
+      select.appendChild(option);
+    });
+
+    var validPaths = repos.map(function(repo) { return repo.path; });
+    if (validPaths.indexOf(state.diffRepo) === -1) {
+      state.diffRepo = '.';
+      localStorage.removeItem('diff_repo');
+    }
+    select.value = state.diffRepo;
+    select.style.display = repos.length <= 1 ? 'none' : '';
+  } catch (e) {
+    console.warn('Failed to load repos:', e.message);
+    select.style.display = 'none';
+    state.diffRepo = '.';
+  }
+}
+
+async function loadDiffBases() {
+  var select = document.getElementById('diffBaseSelect');
+  if (!select) return;
+  var ctx = getWorkspaceContext();
+  if (!ctx) return;
+  try {
+    var data = await apiGetBranches(ctx.projectId, ctx.branch, state.diffRepo);
+    var branches = data.branches || [];
+    select.innerHTML = '';
+
+    var defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = t('diff.baseDefault');
+    select.appendChild(defaultOption);
+
+    branches.forEach(function(branch) {
+      var option = document.createElement('option');
+      option.value = branch.name;
+      option.textContent = branch.name;
+      select.appendChild(option);
+    });
+
+    var validNames = branches.map(function(branch) { return branch.name; });
+    if (state.diffBase && validNames.indexOf(state.diffBase) === -1) {
+      state.diffBase = '';
+      localStorage.removeItem('diff_base');
+    }
+    select.value = state.diffBase;
+  } catch (e) {
+    console.warn('Failed to load base branches:', e.message);
+  }
+}
+
+async function setDiffRepo(path) {
+  localStorage.setItem('diff_repo', path);
+  state.diffRepo = path;
+  state.activeCommit = null;
+  state.historyCommits = [];
+  state.selectedFile = null;
+
+  await loadDiffBases();
+  await setDiffSource(state.diffSource);
+  renderFileList();
+}
+
+async function setDiffBase(name) {
+  localStorage.setItem('diff_base', name);
+  state.diffBase = name;
+
+  if (state.diffSource === 'branch') {
+    await _loadDiff(state.diffSource);
+    renderFileList();
   }
 }
 
@@ -391,6 +481,9 @@ async function setDiffSource(mode) {
   localStorage.setItem('diff_diffSource', mode);
   state.diffSource = mode;
   document.querySelectorAll('#diffSourceToggle .toggle-opt').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+
+  var baseSelect = document.getElementById('diffBaseSelect');
+  if (baseSelect) baseSelect.disabled = (mode !== 'branch');
 
   if (mode !== 'commit') {
     state.activeCommit = null;
@@ -452,7 +545,7 @@ async function loadCommitHistory() {
   renderHistoryPanel();
   try {
     var ref = (state.activeBranch && state.activeBranch !== ctx.branch) ? state.activeBranch : null;
-    var data = await apiGetCommitHistory(ctx.projectId, ctx.branch, ref);
+    var data = await apiGetCommitHistory(ctx.projectId, ctx.branch, ref, state.diffRepo);
     state.historyCommits = data.commits || [];
     state.historySourceBranch = state.activeBranch || ctx.branch;
     if (state.branches.length === 0) {
@@ -470,7 +563,7 @@ async function loadHistoryBranches() {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
   try {
-    var data = await apiGetBranches(ctx.projectId, ctx.branch);
+    var data = await apiGetBranches(ctx.projectId, ctx.branch, state.diffRepo);
     state.branches = data.branches || [];
     renderHistoryBranches();
   } catch (e) {
@@ -507,7 +600,7 @@ async function selectHistoryBranch(ref, displayName) {
   if (!ctx) return;
   try {
     var refParam = (ref && ref !== ctx.branch) ? ref : null;
-    var data = await apiGetCommitHistory(ctx.projectId, ctx.branch, refParam);
+    var data = await apiGetCommitHistory(ctx.projectId, ctx.branch, refParam, state.diffRepo);
     state.historyCommits = data.commits || [];
     var label = document.getElementById('diffHistoryBranchLabel');
     if (label) label.textContent = displayName;

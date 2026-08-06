@@ -45,6 +45,8 @@ var AppState = {
     diffMode: localStorage.getItem('diff_diffMode') || 'side-by-side',
     fileView: localStorage.getItem('diff_fileView') || 'tree',
     diffSource: localStorage.getItem('diff_diffSource') || 'branch',
+    diffRepo: localStorage.getItem('diff_repo') || '.',
+    diffBase: localStorage.getItem('diff_base') || '',
     selectedFile: null,
     theme: 'dark',
     historyPanelOpen: false,
@@ -191,6 +193,8 @@ function resetAppState() {
   // Reset UI state
   state.phase = "0";
   state.diffSource = localStorage.getItem('diff_diffSource') || 'branch';
+  state.diffRepo = localStorage.getItem('diff_repo') || '.';
+  state.diffBase = localStorage.getItem('diff_base') || '';
 
   // Dispatch event so components can reset themselves
   document.dispatchEvent(new CustomEvent('workspace-reset'));

@@ -323,6 +323,11 @@
   "diff.historyToggle": "История",
   "diff.movedFrom": "перемещено из",
   "diff.to": "в",
+  "diff.repository": "Репозиторий",
+  "diff.diffAgainst": "Сравнить с",
+  "diff.baseDefault": "База по умолчанию",
+  "diff.baseNotFound": "Базовая ветка не найдена в этом репозитории",
+  "diff.loadFailed": "Не удалось загрузить дифф",
 
   "explorer.projectFiles": "Файлы проекта",
   "explorer.selectFile": "Выберите файл для просмотра содержимого",
