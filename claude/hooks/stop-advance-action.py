@@ -110,11 +110,16 @@ if action == "clear":
         sys.exit(0)
 
     flag_file = os.path.join(STATE_DIR, "force-new-session")
+    kickoff_file = os.path.join(STATE_DIR, "kickoff-pending")
     try:
         os.makedirs(STATE_DIR, exist_ok=True)
         open(flag_file, "w").close()
+        # Signal the admin panel's session-start handler to auto-submit a
+        # continue prompt once the relaunched session is ready. Without it the
+        # cleared session restarts but waits idle for human input.
+        open(kickoff_file, "w").close()
     except OSError as exc:
-        logger.warning("could not write force-new-session flag: %s", exc)
+        logger.warning("could not write clear-action flags: %s", exc)
 
     delete_action_file()
     send_tmux_keys(pane, "/exit")

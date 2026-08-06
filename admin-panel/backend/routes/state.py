@@ -20,6 +20,7 @@ from services import plan_service
 from services import progress_service
 from services import research_service
 from services import scope_service
+from services import workflow_mode_service
 from services.phase_sequencer import resolve_phase_sequence
 
 def _group_comments(comments):
@@ -104,6 +105,8 @@ def get_workspace_state(db, ws, project):
         "plan": plan,
         "plan_status": ws["plan_status"],
         "phase_sequence": phase_sequence,
+        "workflow_mode": ws_field(ws, "workflow_mode", "standard"),
+        "enabled_phases": phase_sequence,
         "locale": ws["locale"],
         "session_id": ws["session_id"],
         "working_dir": ws["working_dir"],
@@ -156,6 +159,19 @@ def set_yolo_mode(db, ws, project):
     db.execute("UPDATE workspaces SET yolo_mode = ? WHERE id = ?", (enabled, ws["id"]))
     db.commit()
     return jsonify({"ok": True, "yolo_mode": bool(enabled)})
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/workflow-mode", methods=["PUT"])
+@with_workspace
+def set_workflow_mode(db, ws, project):
+    body = request.get_json(silent=True) or {}
+    mode = str(body.get("mode", "")).strip()
+    try:
+        workflow_mode_service.set_workspace_mode(db, project, ws, mode)
+    except ValueError:
+        return jsonify({"error": t("api.error.invalidWorkflowMode")}), 400
+    db.commit()
+    return jsonify({"ok": True, "mode": mode})
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/scope", methods=["PUT"])

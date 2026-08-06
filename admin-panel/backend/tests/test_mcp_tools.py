@@ -663,7 +663,7 @@ class TestCriteria:
         assert result["ok"]
         assert result["criterion"]["details"] == {"file": "tests/test_user.py", "test_names": ["test_create_user"]}
 
-        criteria = workspace_get_criteria()
+        criteria = workspace_get_criteria()["criteria"]
         match = next(c for c in criteria if c["id"] == result["criterion"]["id"])
         assert match["details"] == {"file": "tests/test_user.py", "test_names": ["test_create_user"]}
 
@@ -714,15 +714,17 @@ class TestCriteria:
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_get_criteria
         result = workspace_get_criteria()
-        assert len(result) == 2
+        assert result["count"] == 2
+        assert len(result["criteria"]) == 2
         result2 = workspace_get_criteria(status="accepted")
-        assert len(result2) == 1
+        assert result2["count"] == 1
+        assert result2["criteria"][0]["status"] == "accepted"
 
     def test_get_criteria_empty(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_get_criteria
         result = workspace_get_criteria()
-        assert result == []
+        assert result == {"criteria": [], "count": 0}
 
     def test_update_criteria(self, workspace, monkeypatch):
         cid = add_criterion(workspace["id"])
@@ -929,6 +931,192 @@ class TestExtendPlan:
         )
         assert "error" in result
         assert result["errorCategory"] == "validation"
+
+
+class TestGranularPlanEdits:
+    def _seed_plan(self, workspace, num_phases=3):
+        set_phase(workspace["id"], "2.0", plan_json=make_plan_json(num_phases),
+                  plan_status="approved")
+
+    def _plan_status(self, workspace):
+        from core.db import get_db
+        db = get_db()
+        try:
+            return db.execute(
+                "SELECT plan_status FROM workspaces WHERE id = ?", (workspace["id"],)
+            ).fetchone()["plan_status"]
+        finally:
+            db.close()
+
+    def test_update_subphase_patches_one_item(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace)
+        from mcp_server import workspace_update_subphase, workspace_get_plan
+        result = workspace_update_subphase(subphase_id="3.2", name="Reworked")
+
+        assert result["ok"] is True
+        assert result["plan_status"] == "pending"
+        items = workspace_get_plan()["execution"]
+        assert items[1]["name"] == "Reworked"
+        assert items[1]["tasks"][0]["title"] == "Task 2"
+        assert items[0]["name"] == "Sub-phase 1"
+        assert self._plan_status(workspace) == "pending"
+
+    def test_update_subphase_unknown_id_is_not_found(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace)
+        from mcp_server import workspace_update_subphase
+        result = workspace_update_subphase(subphase_id="3.9", name="Nope")
+
+        assert result["errorCategory"] == "not_found"
+        assert result["isRetryable"] is False
+
+    def test_update_subphase_without_fields_is_validation_error(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace)
+        from mcp_server import workspace_update_subphase
+        result = workspace_update_subphase(subphase_id="3.1")
+
+        assert result["errorCategory"] == "validation"
+
+    def test_update_subphase_blocked_before_planning(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_update_subphase
+        result = workspace_update_subphase(subphase_id="3.1", name="Too early")
+
+        assert result["errorCategory"] == "validation"
+
+    def test_delete_subphase_renumbers_remaining(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace)
+        from mcp_server import workspace_delete_subphase, workspace_get_plan
+        result = workspace_delete_subphase(subphase_id="3.1")
+
+        assert result["ok"] is True
+        assert result["execution_ids"] == ["3.1", "3.2"]
+        items = workspace_get_plan()["execution"]
+        assert [item["name"] for item in items] == ["Sub-phase 2", "Sub-phase 3"]
+        assert self._plan_status(workspace) == "pending"
+
+    def test_delete_subphase_refuses_last_item(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace, num_phases=1)
+        from mcp_server import workspace_delete_subphase, workspace_get_plan
+        result = workspace_delete_subphase(subphase_id="3.1")
+
+        assert result["errorCategory"] == "business"
+        assert len(workspace_get_plan()["execution"]) == 1
+
+    def test_delete_subphase_unknown_id_is_not_found(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace)
+        from mcp_server import workspace_delete_subphase
+        result = workspace_delete_subphase(subphase_id="3.8")
+
+        assert result["errorCategory"] == "not_found"
+
+    def test_delete_subphase_blocked_before_planning(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_delete_subphase
+        result = workspace_delete_subphase(subphase_id="3.1")
+
+        assert result["errorCategory"] == "validation"
+
+    def test_set_plan_diagrams_replaces_and_keeps_approval(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace, num_phases=1)
+        from mcp_server import workspace_set_plan_diagrams, workspace_get_plan
+        diagrams = [{"title": "Class Diagram", "diagram": "classDiagram\n  A --> B"}]
+        result = workspace_set_plan_diagrams(diagrams=diagrams)
+
+        assert result == {"ok": True, "diagram_count": 1}
+        assert workspace_get_plan()["systemDiagram"] == diagrams
+        assert self._plan_status(workspace) == "approved"
+
+    def test_set_plan_diagrams_appends(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace, num_phases=1)
+        from mcp_server import workspace_set_plan_diagrams, workspace_get_plan
+        workspace_set_plan_diagrams(diagrams=[{"title": "First", "diagram": "graph TD"}])
+        result = workspace_set_plan_diagrams(
+            diagrams=[{"title": "Second", "diagram": "sequenceDiagram\n  A ->> B: hi"}],
+            replace=False,
+        )
+
+        assert result["diagram_count"] == 2
+        titles = [d["title"] for d in workspace_get_plan()["systemDiagram"]]
+        assert titles == ["First", "Second"]
+
+    def test_set_plan_diagrams_rejects_malformed_entries(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace, num_phases=1)
+        from mcp_server import workspace_set_plan_diagrams
+        result = workspace_set_plan_diagrams(diagrams=[{"title": "No body"}])
+
+        assert result["errorCategory"] == "validation"
+
+    def test_set_plan_diagrams_blocked_before_planning(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_set_plan_diagrams
+        result = workspace_set_plan_diagrams(
+            diagrams=[{"title": "T", "diagram": "graph TD"}])
+
+        assert result["errorCategory"] == "validation"
+
+    def test_set_plan_description_keeps_approval(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace, num_phases=2)
+        from mcp_server import workspace_set_plan_description, workspace_get_plan
+        result = workspace_set_plan_description(description="Reworded plan")
+
+        assert result["ok"] is True
+        plan = workspace_get_plan()
+        assert plan["description"] == "Reworded plan"
+        assert len(plan["execution"]) == 2
+        assert self._plan_status(workspace) == "approved"
+
+    def test_set_plan_description_rejects_blank(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        self._seed_plan(workspace, num_phases=1)
+        from mcp_server import workspace_set_plan_description
+        result = workspace_set_plan_description(description="   ")
+
+        assert result["errorCategory"] == "validation"
+
+    def test_set_plan_description_blocked_before_planning(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_set_plan_description
+        result = workspace_set_plan_description(description="Too early")
+
+        assert result["errorCategory"] == "validation"
+
+
+class TestDeleteCriteria:
+    def test_delete_proposed_criterion(self, workspace, monkeypatch):
+        cid = add_criterion(workspace["id"], status="proposed")
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_delete_criteria, workspace_get_criteria
+        result = workspace_delete_criteria(criterion_id=cid)
+
+        assert result == {"ok": True, "deleted_id": cid}
+        assert workspace_get_criteria() == {"criteria": [], "count": 0}
+
+    def test_delete_accepted_criterion_is_refused(self, workspace, monkeypatch):
+        cid = add_criterion(workspace["id"], status="accepted")
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_delete_criteria, workspace_get_criteria
+        result = workspace_delete_criteria(criterion_id=cid)
+
+        assert result["errorCategory"] == "business"
+        assert result["isRetryable"] is False
+        assert workspace_get_criteria()["count"] == 1
+
+    def test_delete_unknown_criterion_is_not_found(self, workspace, monkeypatch):
+        monkeypatch.chdir(workspace["working_dir"])
+        from mcp_server import workspace_delete_criteria
+        result = workspace_delete_criteria(criterion_id=987654)
+
+        assert result["errorCategory"] == "not_found"
 
 
 class TestDeleteResearch:
@@ -1210,6 +1398,10 @@ EXPECTED_ANNOTATIONS = {
     "workspace_set_plan": (False, False, False),
     "workspace_get_plan": (True, True, False),
     "workspace_extend_plan": (False, False, False),
+    "workspace_update_subphase": (False, True, False),
+    "workspace_delete_subphase": (False, False, True),
+    "workspace_set_plan_diagrams": (False, True, False),
+    "workspace_set_plan_description": (False, True, False),
     "workspace_post_discussion": (False, False, False),
     "workspace_save_research": (False, False, False),
     "workspace_list_research": (True, True, False),
@@ -1228,6 +1420,7 @@ EXPECTED_ANNOTATIONS = {
     "workspace_propose_criteria": (False, False, False),
     "workspace_get_criteria": (True, True, False),
     "workspace_update_criteria": (False, True, False),
+    "workspace_delete_criteria": (False, False, True),
     "workspace_get_verification_results": (True, True, False),
     "workspace_get_verification_profiles": (True, True, False),
     "workspace_create_verification_profile": (False, False, False),
@@ -1255,7 +1448,7 @@ class TestMcpToolContracts:
     def test_all_tools_have_annotations(self):
         from mcp.types import ToolAnnotations
         tools = self._tools()
-        assert len(tools) == 39, f"expected 39 registered tools, got {len(tools)}"
+        assert len(tools) == 44, f"expected 44 registered tools, got {len(tools)}"
         for name, tool in tools.items():
             ann = tool.annotations
             assert ann is not None, f"{name} missing annotations"

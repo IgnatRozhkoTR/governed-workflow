@@ -144,12 +144,12 @@ def workspace_get_criteria(
         Optional[_CRITERIA_TYPE],
         Field(description="Filter by criterion kind. Omit or pass None to return all."),
     ] = None,
-) -> list:
+) -> dict:
     """Get acceptance criteria for the current workspace.
 
     Purpose
       Returns criteria records, optionally narrowed by status and/or type.
-      An empty list means no criteria match the filter — not an error.
+      count=0 means no criteria match the filter — not an error.
       Use workspace_propose_criteria to add new criteria.
 
     Parameters
@@ -157,7 +157,8 @@ def workspace_get_criteria(
       type: unit_test | integration_test | bdd_scenario | custom. None returns all types.
 
     Returns
-      List of {id, type, description, details, source, status, validated, validation_message}.
+      {criteria: [{id, type, description, details, source, status, validated,
+       validation_message}], count: int}
 
     Example
       workspace_get_criteria()
@@ -171,9 +172,10 @@ def workspace_get_criteria(
             retryable=False,
         )
 
-    return criteria_service.get_criteria(
+    criteria = criteria_service.get_criteria(
         db, ws["id"], status=status or None, criterion_type=type or None
     )
+    return {"criteria": criteria, "count": len(criteria)}
 
 
 @mcp.tool(
@@ -260,3 +262,70 @@ def workspace_update_criteria(
         )
     db.commit()
     return result
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Delete acceptance criterion",
+        readOnlyHint=False,
+        idempotentHint=False,
+        destructiveHint=True,
+    )
+)
+@with_mcp_workspace
+def workspace_delete_criteria(
+    ws,
+    project,
+    db,
+    locale,
+    criterion_id: Annotated[
+        int,
+        Field(description="Numeric ID of the criterion to delete.", ge=1),
+    ],
+) -> dict:
+    """Delete an acceptance criterion that has not been accepted yet.
+
+    Purpose
+      Use this to drop a criterion that turned out to be wrong or redundant while
+      it is still proposed or rejected. Plan approval accepts all proposed
+      criteria in one step, and once a criterion is accepted you (the agent) can
+      no longer delete it — ask the user to reject it first. A human can still
+      remove an accepted criterion directly from the admin panel.
+
+    Parameters
+      criterion_id: ID of the criterion to delete (from workspace_get_criteria).
+
+    Returns
+      {ok: True, deleted_id: int}
+
+    Errors
+      not_found — criterion_id does not exist in this workspace.
+      business  — the criterion has been accepted and cannot be deleted by the agent.
+
+    Example
+      workspace_delete_criteria(criterion_id=3)
+    """
+    if project["simple_planning"]:
+        return mcp_error(
+            "business",
+            "Acceptance criteria are not used in simple planning mode.",
+            retryable=False,
+        )
+
+    criterion = criteria_service.get_criterion(db, criterion_id, ws["id"])
+    if criterion is None:
+        return mcp_error(
+            "not_found",
+            t("mcp.error.criterionNotFound", locale, criterion_id=criterion_id),
+            retryable=False,
+        )
+    if criterion["status"] == "accepted":
+        return mcp_error(
+            "business",
+            t("mcp.error.cannotDeleteAcceptedCriteria", locale),
+            retryable=False,
+        )
+
+    criteria_service.delete_criterion(db, criterion_id, ws["id"])
+    db.commit()
+    return {"ok": True, "deleted_id": criterion_id}

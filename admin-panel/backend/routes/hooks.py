@@ -7,8 +7,33 @@ from flask import Blueprint, jsonify, request
 from core.db import get_db
 from core.helpers import find_workspace, run_git, workspace_dir
 from core.i18n import t
+from core.terminal import session_name, send_prompt_when_ready
 
 bp = Blueprint("hooks", __name__)
+
+_KICKOFF_PROMPT = "Continue with the next phase."
+
+
+def _maybe_dispatch_kickoff(project_id, ws):
+    """Auto-submit the continue prompt after a `clear`-mode advance.
+
+    The clear-mode Stop hook leaves a kickoff-pending marker in the
+    workspace state dir before relaunching a fresh session. Detect and
+    consume it, then submit the continue prompt once Claude is ready —
+    mirroring what `compact` mode does inline.
+    """
+    working_dir = ws["working_dir"]
+    if not working_dir:
+        return
+    marker = Path(working_dir) / ".claude" / "state" / "kickoff-pending"
+    if not marker.exists():
+        return
+    try:
+        marker.unlink()
+    except OSError:
+        pass
+    target = session_name(project_id, ws["sanitized_branch"])
+    send_prompt_when_ready(target, _KICKOFF_PROMPT)
 
 
 @bp.route("/api/hook/session-start", methods=["POST"])
@@ -69,6 +94,8 @@ def session_start_hook():
             )
         db.execute("UPDATE workspaces SET session_id = ? WHERE id = ?", (session_id, ws["id"]))
         db.commit()
+
+        _maybe_dispatch_kickoff(project["id"], ws)
 
         ws_path = workspace_dir(project["path"], branch_name)
         return jsonify({"ok": True, "workspace": str(ws_path)})

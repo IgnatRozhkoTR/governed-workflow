@@ -1,6 +1,8 @@
 """Terminal WebSocket and REST routes for tmux session management."""
 import json
 import re
+import uuid
+from pathlib import Path
 
 from flask import Blueprint, request, jsonify
 from flask_sock import Sock
@@ -21,6 +23,7 @@ from core.terminal import (
     session_exists,
     session_name,
     tmux_available,
+    write_launch_env_file,
 )
 from core.db import get_db_ctx, ws_field
 from core.helpers import find_workspace
@@ -118,6 +121,7 @@ def terminal_start(project, branch):
 
         label = ws['sanitized_branch'] or branch
         create_session(name, working_dir, env={'WORKSPACE': label})
+        write_launch_env_file(working_dir, ws_field(ws, 'env_vars', ''))
         mark_new_session(working_dir)
         send_keys(name, build_claude_command(ws, channels=channels))
 
@@ -149,6 +153,7 @@ def terminal_resume(project, branch):
         if not session_exists(name):
             label = ws['sanitized_branch'] or branch
             create_session(name, working_dir, env={'WORKSPACE': label})
+            write_launch_env_file(working_dir, ws_field(ws, 'env_vars', ''))
             send_keys(name, build_claude_command(ws, resume=True, channels=channels))
             created = True
 
@@ -169,7 +174,8 @@ def get_command_config(project, branch):
             'claude_command': ws['claude_command'] or 'claude',
             'skip_permissions': bool(ws['skip_permissions']),
             'restrict_to_workspace': bool(ws_field(ws, 'restrict_to_workspace', 1)),
-            'allowed_external_paths': ws_field(ws, 'allowed_external_paths', '/tmp/')
+            'allowed_external_paths': ws_field(ws, 'allowed_external_paths', '/tmp/'),
+            'env_vars': ws_field(ws, 'env_vars', ''),
         })
 
 
@@ -198,6 +204,10 @@ def update_command_config(project, branch):
             updates.append('allowed_external_paths = ?')
             params.append((data['allowed_external_paths'] or '').strip() or '/tmp/')
 
+        if 'env_vars' in data:
+            updates.append('env_vars = ?')
+            params.append(data['env_vars'] or '')
+
         if not updates:
             return jsonify({'error': 'No fields to update'}), 400
 
@@ -208,6 +218,9 @@ def update_command_config(project, branch):
         params.append(ws['id'])
         db.execute("UPDATE workspaces SET " + ", ".join(updates) + " WHERE id = ?", params)
         db.commit()
+
+        if 'env_vars' in data and ws['working_dir']:
+            write_launch_env_file(ws['working_dir'], data['env_vars'] or '')
 
         return jsonify({'ok': True})
 
@@ -267,3 +280,31 @@ def terminal_kill(project, branch):
     if session_exists(name):
         kill_session(name)
     return jsonify({'ok': True, 'status': 'killed', 'kind': session_kind})
+
+
+@bp.route('/api/ws/<project>/<path:branch>/terminal/paste-image', methods=['POST'])
+def terminal_paste_image(project, branch):
+    """Persist an uploaded image and return a path Claude Code can attach."""
+    with get_db_ctx() as db:
+        ws = find_workspace(db, project, branch)
+        if not ws:
+            return jsonify({'error': 'Workspace not found'}), 404
+        working_dir = ws['working_dir']
+
+    file = request.files.get('image')
+    if file is None or not file.filename:
+        return jsonify({'error': 'No image provided'}), 400
+
+    content_type = (file.mimetype or '').lower()
+    if not content_type.startswith('image/'):
+        return jsonify({'error': 'Uploaded file is not an image'}), 400
+
+    ext = {'image/png': '.png', 'image/jpeg': '.jpg', 'image/jpg': '.jpg',
+           'image/gif': '.gif', 'image/webp': '.webp'}.get(content_type, '.png')
+
+    dest_dir = Path(working_dir) / '.claude' / 'state' / 'pasted-images'
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / (uuid.uuid4().hex + ext)
+    file.save(str(dest))
+
+    return jsonify({'ok': True, 'path': str(dest)})

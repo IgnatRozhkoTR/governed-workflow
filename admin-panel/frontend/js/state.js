@@ -14,7 +14,9 @@ var AppState = {
       working_dir: null,
       sessions: [],
       locale: null,
-      yolo_mode: false
+      yolo_mode: false,
+      workflow_mode: "standard",
+      enabled_phases: []
     },
   plan: {
     description: "",
@@ -123,6 +125,8 @@ function applyStateData(stateData) {
   LOCK_DATA.plan_status = stateData.plan_status || "pending";
   LOCK_DATA.locale = stateData.locale || null;
   LOCK_DATA.yolo_mode = !!stateData.yolo_mode;
+  LOCK_DATA.workflow_mode = stateData.workflow_mode || "standard";
+  LOCK_DATA.enabled_phases = stateData.enabled_phases || [];
 
   // Plan — single source is AppState.plan; keep LOCK_DATA.plan as alias
   if (stateData.plan) {
@@ -169,6 +173,8 @@ function resetAppState() {
   LOCK_DATA.sessions = [];
   LOCK_DATA.locale = null;
   LOCK_DATA.yolo_mode = false;
+  LOCK_DATA.workflow_mode = "standard";
+  LOCK_DATA.enabled_phases = [];
 
   // Reset plan
   PLAN_DATA.description = "";

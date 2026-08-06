@@ -44,6 +44,14 @@ Each sub-phase has `id`, `name`, `tasks`, and `scope`. Sub-phases map to executi
 
 **The litmus test: will the reviewer get lost?** If the combined diff would be large and span multiple concerns (backend AND frontend AND E2E), split it. If the reviewer can follow the changes as a single coherent unit, keep it together. When in doubt, one sub-phase is always the right answer for anything backend-only or small.
 
+**Remember the cost of splitting**: a sub-phase is a full cycle that ends in the user manually reviewing and approving a diff. Two sub-phases means the user stops twice — every split you propose is spending the user's attention, not just yours.
+
+**Compile-coupling check — required before finalising any multi-sub-phase split**: verify each sub-phase leaves the tree compiling on its own. Check module dependency direction in the build files. If anything in sub-phase N only compiles once sub-phase N+1 exists, the boundary is wrong and the task must move to the sub-phase where it actually compiles. (On a real ticket this caught a properties file assigned to the data-layer sub-phase that in fact lived in the UI module.)
+
+**Two more anti-patterns:**
+- If a unit is merely LARGE, split it into more TASKS inside one sub-phase, not into more sub-phases — task-level splitting gives review granularity at zero gate cost, and is almost always the right move.
+- NEVER split along a build-order dependency chain (entity → repository → service → view). That is one feature arriving in dependency order, not several independently reviewable units.
+
 ### Tasks — two-layer structure
 
 Every task has a human layer and an agent layer:
@@ -79,6 +87,28 @@ Format:
   {"title": "Auth Flow", "diagram": "sequenceDiagram\n  Client->>+API: POST /login\n  API->>+UserService: authenticate()"}
 ]
 ```
+
+#### Mermaid syntax caution
+
+A malformed diagram fails to render in the admin panel with a parse error — exactly at the moment the user is trying to review the plan. Avoid this:
+
+- **No `;` inside message or node labels.** Mermaid treats `;` as a statement separator, not punctuation. `Detail-->>Admin: notify; checkbox reverts to false` breaks parsing — rewrite as `notify, checkbox reverts to false` or split into two lines.
+- **Be careful with `:` and quote characters inside labels.** `:` after the arrow already separates the label from the syntax — an extra `:` or a stray `"`/`'` inside the label text can be misread as a new token. When a label needs punctuation, prefer commas and plain prose.
+- **Diagram strings are embedded in JSON.** Any line break inside a diagram must be a `\n` escape, not a literal newline — a literal newline breaks the JSON, not just the diagram.
+
+### Editing an existing plan — prefer the granular tool
+
+`workspace_set_plan` resubmits the WHOLE plan. When changing only one part of an already-drafted or already-approved plan, prefer the tool scoped to that change — it is less error-prone and, for two of them, does not force the user to re-approve:
+
+| Tool | What it does | Resets plan approval? |
+|------|---------------|------------------------|
+| `workspace_update_subphase(subphase_id, name?, tasks?, scope?)` | Patches ONE execution item in place, including its scope, without resubmitting the plan | Yes |
+| `workspace_delete_subphase(subphase_id)` | Removes an execution item; remaining items are renumbered to stay sequential. Cannot delete the last remaining sub-phase | Yes |
+| `workspace_set_plan_diagrams(diagrams, replace=True)` | Replaces or appends the plan's `systemDiagram` list | No |
+| `workspace_set_plan_description(description)` | Replaces the plan's `description` | No |
+| `workspace_set_plan` | Replaces the whole plan | Yes |
+
+**Resetting plan approval blocks file edits until the user re-approves** — do not use a whole-plan-replacing tool for a change that a targeted tool covers, or you will force an unnecessary re-approval wait.
 
 ---
 
@@ -124,6 +154,23 @@ Call `workspace_get_criteria()` for the full criteria list. The user may have de
 ### Proposing additional criteria
 
 Call `workspace_propose_criteria` for any gaps. Supported types:
+
+#### Feasibility check — confirm before proposing, not after
+
+Before proposing any test criterion, confirm a test of that KIND already exists in this repo — not merely that the naming convention matches. Grep for an existing test of the same layer (view, controller, repository, scheduled job, migration). A real ticket proposed criteria targeting Vaadin view classes in a repo where every test under a `view` package actually targeted an extracted pure helper — zero real view tests existed, so the criteria were unsatisfiable as written and the implementer would have had to fake them or fail the gate.
+
+If no test of that kind exists, exactly one of three things is true, and you must pick one explicitly:
+
+1. **The layer is testable and simply untested** — proceed and say so.
+2. **The layer is not testable as written**, and the plan must include the change that makes it testable — add it as a plan task; do not leave it to the implementer to discover mid-execution.
+3. **It genuinely cannot be automated** — make it a `custom` criterion with manual steps, and do not disguise a manual check as a test.
+
+**Making a layer testable does not mean extracting a new class.** When logic must move to become testable, prefer moving it into an EXISTING collaborator that is already covered by tests over creating a new class. Create a new type only when the logic is complex enough to deserve its own name. "It needs a unit test" is not by itself a reason for a new class — check first whether an existing service, and its existing test class, can host it.
+
+**Shape assertions adversarially.** Prefer the assertion that fails on the specific bug you are guarding against, not the one that merely exercises the feature. If a criterion would pass on the broken version of the code, it is not a criterion — it is decoration.
+
+- *Public image URL*: assert on the CONSTRUCTED URL STRING, not on upload success. An upload-success test passes while the feature is broken, because the file uploads fine and only the derived URL is malformed.
+- *Styled dropdown value*: assert the CLOSED/SELECTED field is styled, not the open dropdown list. In the failure mode being guarded against, the open dropdown looks right and only the closed value loses styling — so the obvious check passes on broken code.
 
 **For `unit_test` or `integration_test`:**
 
@@ -177,28 +224,41 @@ workspace_propose_criteria(
 
 ### Gate rule
 
-All acceptance criteria must be accepted (or deleted) before the plan can advance to user review. Criteria with status `proposed` or `rejected` will block advancement.
+All acceptance criteria must be accepted (or deleted) before the plan can advance to user review. Criteria with status `proposed` or `rejected` will block advancement. To remove one you no longer want, call `workspace_delete_criteria(criterion_id)` — this is only allowed while the criterion is not yet accepted; once plan approval accepts all proposed criteria, deletion is refused, so clean up unwanted criteria before the plan is approved.
 
 ---
 
 ## Collaboration with Plan-Advisor
 
-The plan-advisor is a persistent teammate, not a sub-agent. It was spawned in Phase 0 and must be resumed, never re-spawned.
+The plan-advisor is a persistent teammate, not a sub-agent. It was spawned in Phase 0 and must be resumed via `SendMessage(to: "plan-advisor", ...)`, never re-spawned.
+
+### Scope decisions are not only in the ticket
+
+Ticket text is not the only source of scope. Decisions the user makes during preparation review are equally binding, and an advisor reading only the ticket will flag them as scope creep. When you carry such a decision into the plan, record the rationale in the task description so downstream reviewers do not re-litigate it. The converse also holds: a user decision is not immune from review. Decisions get recorded WITH their reasoning, so whoever meets them next can evaluate the reasoning rather than guess at intent.
 
 ### Step 1 — Resume and present
 
-Resume the plan-advisor with a high-level plan outline:
+Resume the plan-advisor with a **structured brief that enumerates every deliverable** — a free-form "review this" prompt is measurably weaker. On a real plan, a free-form pass caught 5 issues but also asserted a confidently wrong fact; the structured brief below, run against the same plan, caught 8 ticket requirements (including an entire feature's worth of audit-log events) that no task in the plan owned.
 
 ```
-Agent(
-  resume: {plan_advisor_id},
+SendMessage(
+  to: "plan-advisor",
   prompt: "We are in the planning phase. Review the research findings via workspace_get_state.
            Here is my proposed plan outline:
            {outline — sub-phases, task summaries, scope boundaries}
-           Review every task: agent selection, file scope, task clarity, dependencies, gaps.
-           Send your review as a numbered list with verdict per task (OK or CONCERN)."
+
+           Deliver each of the following, labeled:
+           1. VERDICT — per task, OK or CONCERN with reasoning.
+           2. COMPILE-COUPLING AUDIT — for any module boundary crossed by the split, confirm each sub-phase compiles standalone.
+           3. TEST CONVENTIONS — the verbatim naming pattern grepped from real test files in this repo, cited as file:line.
+           4. PARALLEL GROUPS — group assignment for parallel tasks, stating the shared-file constraint that justifies (or forbids) each grouping.
+           5. SIZE/PLACEMENT — any oversized or misplaced task.
+           6. UNCOVERED REQUIREMENTS — list every ticket requirement that no task in the plan currently owns. This is the highest-yield check — do not skip it.
+           7. SETTLED — the following are final, do not relitigate: {list, e.g. sub-phase count, chosen architecture, decisions made during preparation review with their rationale}."
 )
 ```
+
+Marking settled decisions explicitly worked in practice: the advisor accepted the sub-phase count as final and spent its effort on task contents instead of re-arguing structure.
 
 ### Step 2 — Review and discuss
 
@@ -219,7 +279,7 @@ Review the expansion. Send numbered remarks on specific tasks if needed. The pla
 ### Step 5 — Finalize
 
 Execute in order:
-1. `workspace_set_plan` — full plan JSON with execution items, each carrying its own `scope` (must/may). Resets plan approval status to pending.
+1. `workspace_set_plan` — full plan JSON with execution items, each carrying its own `scope` (must/may). Resets plan approval status to pending. If you are only correcting one sub-phase, its diagrams, or its description after this point, use `workspace_update_subphase`, `workspace_set_plan_diagrams`, or `workspace_set_plan_description` instead of resubmitting the whole plan.
 2. `workspace_update_progress` for phase `"2"` with a summary of the plan.
 3. `workspace_advance` — this enters the user review wait at 2.0. The workspace stays at 2.0 while the user reviews and approves the plan in the admin panel. Approving the plan also approves scope and cascades all proposed acceptance criteria to accepted. Once approved, the backend advances directly to 3.1.0.
 
@@ -234,6 +294,8 @@ Execute in order:
 | Stuff technical details into task titles | Titles are for humans — keep them business-level |
 | Create a sub-phase per file | Sub-phases are for logical chunks — layers, modules, concerns |
 | Inflate the plan with unnecessary sub-phases | Fewer sub-phases is better; one is fine for simple tasks |
+| Split along a build-order dependency chain (entity → repository → service → view) | That's one feature arriving in dependency order, not several reviewable units — split into tasks within one sub-phase instead |
+| Propose a test criterion for a layer with no test of that kind in the repo | Confirm feasibility first — proceed and say so, add a plan task to make it testable, or use a `custom` criterion |
 | Skip acceptance criteria | They are validated programmatically — missing criteria means gaps slip through |
 | Combine "implement + write tests" in one task | Always separate — different agents, different perspectives |
 | Use `proposed` or `rejected` criteria status at advance time | All criteria must be `accepted` or deleted before advancing |

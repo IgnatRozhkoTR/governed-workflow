@@ -175,9 +175,9 @@ function apiListWorkspaces(projectId) {
   return apiGet('/api/projects/' + encodeURIComponent(projectId) + '/workspaces');
 }
 
-function apiCreateWorkspace(projectId, branch, source, worktree) {
+function apiCreateWorkspace(projectId, branch, source, worktree, workflowMode) {
   return apiPost('/api/projects/' + encodeURIComponent(projectId) + '/workspaces', {
-    branch, source, worktree
+    branch, source, worktree, workflow_mode: workflowMode
   });
 }
 
@@ -200,6 +200,10 @@ function apiSetScope(projectId, branch, scope) {
 
 function apiSetPhase(projectId, branch, phase) {
   return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/phase', { phase: phase });
+}
+
+function apiSetWorkflowMode(projectId, branch, mode) {
+  return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/workflow-mode', { mode: mode });
 }
 
 function apiAddComment(projectId, branch, scope, target, text, filePath, lineStart, lineEnd, lHash) {

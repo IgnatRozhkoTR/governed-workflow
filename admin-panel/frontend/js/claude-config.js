@@ -18,6 +18,8 @@ function loadClaudeCommand() {
       }
       var pathsInput = document.getElementById('allowedExternalPathsInput');
       if (pathsInput) pathsInput.value = data.allowed_external_paths || '/tmp/';
+      var envInput = document.getElementById('envVarsInput');
+      if (envInput) envInput.value = data.env_vars || '';
     })
     .catch(function(e) { console.warn('claude-config loadClaudeCommand failed:', e && e.message); });
 }
@@ -30,6 +32,7 @@ function saveClaudeCommand() {
   var checkbox = document.getElementById('skipPermissionsCheck');
   var restrictCheck = document.getElementById('restrictToWorkspaceCheck');
   var pathsInput = document.getElementById('allowedExternalPathsInput');
+  var envInput = document.getElementById('envVarsInput');
 
   var cmd = input ? input.value.trim() : 'claude';
   var skip = checkbox ? checkbox.checked : true;
@@ -38,7 +41,8 @@ function saveClaudeCommand() {
     claude_command: cmd,
     skip_permissions: skip,
     restrict_to_workspace: restrictCheck ? restrictCheck.checked : true,
-    allowed_external_paths: pathsInput ? pathsInput.value.trim() : '/tmp/'
+    allowed_external_paths: pathsInput ? pathsInput.value.trim() : '/tmp/',
+    env_vars: envInput ? envInput.value : ''
   })
   .then(function(data) {
     if (data.ok) {
@@ -54,6 +58,63 @@ function saveClaudeCommand() {
     showToast('Save failed: ' + e.message);
   });
 }
+
+// ═══════════════════════════════════════════════
+//  WORKFLOW MODE (dashboard)
+// ═══════════════════════════════════════════════
+
+function renderWorkflowModeCard() {
+  var body = document.getElementById('workflowModeCardBody');
+  var headerBadge = document.getElementById('headerWorkflowModeBadge');
+  if (!body) return;
+
+  var isFast = LOCK_DATA.workflow_mode === 'fast';
+  var badgeHtml = isFast
+    ? '<span class="badge badge-warning">' + escapeHtml(t('badges.fastMode')) + '</span>'
+    : '<span class="badge" style="background:var(--bg-raised);color:var(--text-secondary);">' + escapeHtml(t('badges.standardMode')) + '</span>';
+  var toggleLabel = isFast ? t('buttons.switchToStandard') : t('buttons.switchToFast');
+
+  body.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' + badgeHtml + '</div>' +
+    '<p style="margin:0 0 10px;color:var(--text-muted);font-size:0.78rem;">' + escapeHtml(t('config.workflowModeHint')) + '</p>' +
+    '<div style="display:flex;justify-content:flex-end;">' +
+      '<button class="btn btn-sm" id="workflowModeToggleBtn" onclick="onWorkflowModeToggleClick()">' + escapeHtml(toggleLabel) + '</button>' +
+    '</div>';
+
+  if (headerBadge) {
+    if (isFast) {
+      headerBadge.textContent = t('badges.fastMode');
+      headerBadge.style.display = '';
+    } else {
+      headerBadge.style.display = 'none';
+    }
+  }
+}
+
+async function onWorkflowModeToggleClick() {
+  var ctx = getWorkspaceContext();
+  if (!ctx) return;
+
+  var nextMode = LOCK_DATA.workflow_mode === 'fast' ? 'standard' : 'fast';
+  var confirmMessage = nextMode === 'fast' ? t('config.fastModeConfirm') : t('config.standardModeConfirm');
+  if (!confirm(confirmMessage)) return;
+
+  var btn = document.getElementById('workflowModeToggleBtn');
+  if (btn) btn.disabled = true;
+
+  try {
+    await apiSetWorkflowMode(ctx.projectId, ctx.branch, nextMode);
+    await refreshState();
+    renderWorkflowModeCard();
+    showToast(t(nextMode === 'fast' ? 'messages.fastModeEnabled' : 'messages.fastModeDisabled'));
+  } catch (e) {
+    showToast(t('messages.failedToUpdate', {error: e.message}));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+EventBus.on('state:refreshed', renderWorkflowModeCard);
 
 function loadChannelsPreference() {
   var defaultValue = 'plugin:telegram@claude-plugins-official';

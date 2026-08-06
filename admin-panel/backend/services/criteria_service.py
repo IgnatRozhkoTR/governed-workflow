@@ -207,6 +207,21 @@ def validate_criterion_manual(db, criterion_id, workspace_id, passed, message=No
     return {"ok": True}
 
 
+def get_criterion(db, criterion_id, workspace_id):
+    """Fetch a single criterion by ID, scoped to a workspace.
+
+    Returns a criterion dict, or None if it does not exist in this workspace.
+    """
+    row = db.execute(
+        "SELECT id, type, description, details_json, source, status, validated, validation_message "
+        "FROM acceptance_criteria WHERE id = ? AND workspace_id = ?",
+        (criterion_id, workspace_id)
+    ).fetchone()
+    if not row:
+        return None
+    return _format_criterion(row)
+
+
 def delete_criterion(db, criterion_id, workspace_id):
     """Delete a criterion by ID.
 

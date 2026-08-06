@@ -508,6 +508,72 @@ Call `workspace_advance` when both implementation and tests are complete.
 **Advance 3.N.0 → 3.N.1** requires: at least 1 file changed per `must`-scope entry."""
 
 
+_IMPLEMENTATION_FAST_DESCRIPTION = """\
+## 3.N.0 Implementation
+
+**Actors**: Engineer sub-agents, then test engineer sub-agents | **Code edits: ON (in sub-phase scope)**
+
+Deploy in two stages:
+
+**Stage 1 — Production code**: Deploy engineer sub-agent(s) for the implementation tasks.
+
+**Stage 2 — Tests**: After engineers complete, deploy test engineer sub-agent(s) to write tests for the new/changed code. Test engineers read the implementation but write tests independently — they are NOT briefed on "how the code works", only on "what it should do" (from the task description and scope).
+
+If during implementation an issue arises that requires changing the approach or scope, message the plan-advisor to discuss:
+
+```
+SendMessage(
+  to: "plan-advisor",
+  content: "Implementation issue in sub-phase {N}: {describe the problem}.
+            The original plan assumed {X} but we found {Y}. What's the best path forward?"
+)
+```
+
+If the user requests additional work or new requirements emerge, use `workspace_extend_plan` to add a new sub-phase rather than rewriting the entire plan. This preserves existing sub-phases and their progress.
+
+Call `workspace_advance` when both implementation and tests are complete. Fast mode has no verification (3.N.1), fixes (3.N.2), or commit-approval gate (3.N.3) — advancing here goes straight to commit.
+
+**Advance 3.N.0 → 3.N.4** requires: at least 1 file changed per `must`-scope entry."""
+
+
+_IMPLEMENTATION_FAST_SIMPLE_DESCRIPTION = """\
+## 3.N.0 Implementation
+
+**Actors**: Engineer sub-agents, then test engineer sub-agents | **Code edits: ON (in sub-phase scope)**
+
+Deploy in two stages:
+
+**Stage 1 — Production code**: Deploy engineer sub-agent(s) for the implementation tasks.
+
+**Stage 2 — Tests**: After engineers complete, deploy test engineer sub-agent(s) to write tests for the new/changed code. Test engineers read the implementation but write tests independently — they are NOT briefed on "how the code works", only on "what it should do" (from the task description and scope).
+
+If during implementation an issue arises that requires changing the approach or scope, message the plan-advisor to discuss:
+
+```
+SendMessage(
+  to: "plan-advisor",
+  content: "Implementation issue in sub-phase {N}: {describe the problem}.
+            The original plan assumed {X} but we found {Y}. What's the best path forward?"
+)
+```
+
+Call `workspace_advance` when both implementation and tests are complete. Fast mode has no verification (3.N.1), fixes (3.N.2), or commit-approval gate (3.N.3) — advancing here goes straight to commit.
+
+**Advance 3.N.0 → 3.N.4** requires: at least 1 file changed per `must`-scope entry."""
+
+
+_COMMIT_FAST_DESCRIPTION = """\
+## 3.N.4 Commit
+
+**Actor**: Engineer sub-agent | **Commits: ON**
+
+Commit all changes. Use the commit message from `workspace_get_state` (`context.commit_message`) or generate one per git-rules.md.
+
+Call `workspace_advance(commit_hash="{hash}")`.
+
+**Advance 3.N.4 → next** requires: valid commit hash + progress entry `"3.N"`. Backend routes to `3.(N+1).0` or `4.1` if last sub-phase — fast mode has no 4.0 review pipeline."""
+
+
 class _ExecutionTemplatePhase(Phase):
     """Structural placeholder for an execution sub-step parameterized by item.
 
@@ -539,11 +605,15 @@ class _ExecutionTemplatePhase(Phase):
     def short_description(self) -> str:
         return _TEMPLATE_SHORT_DESCRIPTIONS.get(self._k, "")
 
-    def description_for_skill(self, simple_planning: bool = False) -> str:
-        description = _TEMPLATE_SKILL_DESCRIPTIONS.get(self._k, "")
-        if simple_planning and self._k == 0:
-            return _IMPLEMENTATION_SIMPLE_DESCRIPTION
-        return description
+    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+        is_fast = workflow_mode == "fast"
+        if self._k == 0:
+            if is_fast:
+                return _IMPLEMENTATION_FAST_SIMPLE_DESCRIPTION if simple_planning else _IMPLEMENTATION_FAST_DESCRIPTION
+            return _IMPLEMENTATION_SIMPLE_DESCRIPTION if simple_planning else _TEMPLATE_SKILL_DESCRIPTIONS[0]
+        if self._k == 4 and is_fast:
+            return _COMMIT_FAST_DESCRIPTION
+        return _TEMPLATE_SKILL_DESCRIPTIONS.get(self._k, "")
 
     def validate(self, ws, body, project_path):
         raise NotImplementedError(

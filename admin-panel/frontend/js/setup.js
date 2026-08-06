@@ -295,12 +295,7 @@ function removeCustomProfile(index) {
 async function deleteVerificationProfile(profileId) {
   if (!confirm('Delete this profile and all its steps? This cannot be undone.')) return;
   try {
-    var resp = await fetch('/api/verification/profiles/' + profileId, { method: 'DELETE' });
-    var data = await resp.json();
-    if (!resp.ok) {
-      if (typeof showToast === 'function') showToast('Delete failed: ' + (data.error || 'unknown error'));
-      return;
-    }
+    await apiDelete('/api/verification/profiles/' + profileId);
     _setupCachedProfiles = _setupCachedProfiles.filter(function(p) { return p.id !== profileId; });
     _reRenderLanguages();
   } catch (e) {

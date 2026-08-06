@@ -1,4 +1,7 @@
 """Tests for session hook routes."""
+from pathlib import Path
+from unittest.mock import patch
+
 from testing_utils import _git, set_phase
 
 
@@ -216,3 +219,48 @@ def test_edit_tool_allowed_inside_governed_workflow_self_workspace(
     # blocked by the new governed-workflow path guard.
     assert r.status_code == 200
     assert r.json["allowed"] is True
+
+
+def test_session_start_dispatches_kickoff_when_marker_present(client, workspace):
+    """When a kickoff-pending marker exists in the workspace state dir,
+    session_start_hook deletes it and calls send_prompt_when_ready with the
+    correct session name and continue prompt."""
+    from core.terminal import session_name
+
+    _git(workspace["working_dir"], "checkout", "-b", "feature/test")
+
+    marker = Path(workspace["working_dir"]) / ".claude" / "state" / "kickoff-pending"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("")
+
+    expected_session = session_name(workspace["project_id"], workspace["sanitized_branch"])
+
+    with patch("routes.hooks.send_prompt_when_ready") as mock_send:
+        r = client.post(
+            "/api/hook/session-start",
+            json={"session_id": "sess-kickoff", "cwd": workspace["working_dir"]},
+        )
+
+    assert r.status_code == 200
+    assert r.json["ok"] is True
+    mock_send.assert_called_once_with(expected_session, "Continue with the next phase.")
+    assert not marker.exists()
+
+
+def test_session_start_no_kickoff_without_marker(client, workspace):
+    """When no kickoff-pending marker exists, send_prompt_when_ready is not
+    called during session_start_hook."""
+    _git(workspace["working_dir"], "checkout", "-b", "feature/test")
+
+    marker = Path(workspace["working_dir"]) / ".claude" / "state" / "kickoff-pending"
+    assert not marker.exists()
+
+    with patch("routes.hooks.send_prompt_when_ready") as mock_send:
+        r = client.post(
+            "/api/hook/session-start",
+            json={"session_id": "sess-no-kickoff", "cwd": workspace["working_dir"]},
+        )
+
+    assert r.status_code == 200
+    assert r.json["ok"] is True
+    mock_send.assert_not_called()

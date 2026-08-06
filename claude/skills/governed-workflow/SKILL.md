@@ -330,7 +330,14 @@ When plan is agreed:
 3. Call `workspace_update_progress` for phase `"2"`
 4. Call `workspace_advance`
 
-**Extending the plan later**: If during execution the user requests additional changes within the same ticket, or new work is discovered that warrants a new sub-phase, use `workspace_extend_plan` instead of rewriting the entire plan with `workspace_set_plan`. This appends a new sub-phase (auto-assigned ID, with its own scope) without touching existing sub-phases — fewer tokens, less risk of breaking the plan. The plan status is set to 'pending' (user must re-approve).
+**Editing the plan later**: NEVER resubmit the whole plan with `workspace_set_plan` to change one part of it — use the granular tool that matches what actually changed:
+- `workspace_extend_plan` — append a new sub-phase (auto-assigned ID, with its own scope) without touching existing ones. Use when the user requests additional changes within the same ticket, or new work warrants a new sub-phase.
+- `workspace_update_subphase` — patch one existing sub-phase's name, tasks and/or scope in place. Fields you omit stay as they are; IDs are never renumbered.
+- `workspace_delete_subphase` — remove one sub-phase and renumber the rest so IDs stay sequential. Refused for the last remaining sub-phase.
+- `workspace_set_plan_diagrams` — replace (default) or append the `systemDiagram` entries.
+- `workspace_set_plan_description` — replace the plan's top-level description.
+
+The structural tools (`extend_plan`, `update_subphase`, `delete_subphase`) set the plan status to 'pending' — the user must re-approve, and until they do the agent cannot edit files. The documentation tools (`set_plan_diagrams`, `set_plan_description`) deliberately leave the approval intact, so they are safe to call mid-execution. Reserve `workspace_set_plan` for the initial plan and for genuine full rewrites.
 
 **User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. Approving the plan also approves its scope and accepts all proposed acceptance criteria — it is the single approval. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0` (the first execution item) — there is no separate 2.1 gate phase. If the user rejects, the plan status goes back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan`, then call `workspace_advance` again.
 
@@ -535,7 +542,12 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 | `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules. Required arguments vary by phase — consult the per-phase blocks below for what to pass at each advance. |
 | `workspace_set_plan` | Writes or replaces the execution plan. Each execution item carries a `scope` field (must/may) — there is no separate scope call. Planning-phase only; switches `plan_status` back to `pending`. |
 | `workspace_extend_plan` | Appends a sub-phase to an already-approved plan. Each new item carries its own `scope`. Use instead of `workspace_set_plan` when execution surfaces new work — avoids invalidating prior sub-phases. |
+| `workspace_update_subphase` | Patches ONE execution item in place (name/tasks/scope) without resubmitting the whole plan. Prefer this over `workspace_set_plan` for a single-item fix. Resets `plan_status` to `pending`. |
+| `workspace_delete_subphase` | Removes one execution item; remaining items are renumbered to stay sequential. Cannot delete the last remaining sub-phase. Resets `plan_status` to `pending`. |
+| `workspace_set_plan_diagrams` | Replaces or appends the plan's `systemDiagram` list. Does NOT reset plan approval. |
+| `workspace_set_plan_description` | Replaces the plan's `description`. Does NOT reset plan approval. |
 | `workspace_propose_criteria` | Records acceptance criteria the user reviews at the plan approval gate. Valid from phase 2.0 only; required before advancing past 2.0. |
+| `workspace_delete_criteria` | Deletes a proposed acceptance criterion. Allowed only while it is not yet accepted — plan approval accepts all proposed criteria, after which deletion is refused. |
 | `workspace_post_discussion` | Raises an architectural or research question the user resolves in the admin panel. Required by some advance guards (e.g. open research discussion at 1.0). |
 | `workspace_resolve_review_issue` | Resolve one or more review issues in a single call (pass an array of ids). Agents set resolution (`fixed` / `false_positive` / `out_of_scope`) on findings. The user still has to mark each one resolved in the panel — this only records what was done. |
 | `workspace_get_reflection_context` | Returns the scope, branch diff, review findings, and filtered transcript fed to the reflector at 5.1. Call once on entry. |

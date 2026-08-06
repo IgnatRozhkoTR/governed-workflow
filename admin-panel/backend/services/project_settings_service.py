@@ -30,3 +30,27 @@ def set_simple_planning(db: sqlite3.Connection, project_id: str, enabled: bool) 
         raise ProjectSettingsError(
             f"Project '{project_id}' not found.", code="project_not_found"
         )
+
+
+def get_fast_mode_default(db: sqlite3.Connection, project_id: str) -> bool:
+    """Return the fast_mode_default flag for the given project."""
+    row = db.execute(
+        "SELECT fast_mode_default FROM projects WHERE id = ?", (project_id,)
+    ).fetchone()
+    if row is None:
+        raise ProjectSettingsError(
+            f"Project '{project_id}' not found.", code="project_not_found"
+        )
+    return bool(row["fast_mode_default"])
+
+
+def set_fast_mode_default(db: sqlite3.Connection, project_id: str, enabled: bool) -> None:
+    """Persist the fast_mode_default flag for the given project."""
+    result = db.execute(
+        "UPDATE projects SET fast_mode_default = ? WHERE id = ?",
+        (1 if enabled else 0, project_id),
+    )
+    if result.rowcount == 0:
+        raise ProjectSettingsError(
+            f"Project '{project_id}' not found.", code="project_not_found"
+        )

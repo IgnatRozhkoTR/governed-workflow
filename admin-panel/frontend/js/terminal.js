@@ -6,6 +6,31 @@ var fitAddon = null;
 var terminalWs = null;
 var terminalConnected = false;
 
+function _uploadPastedImage(file, ws) {
+  var ctx = (typeof getWorkspaceContext === 'function') ? getWorkspaceContext() : null;
+  if (!ctx) return;
+  var form = new FormData();
+  form.append('image', file, file.name || 'pasted.png');
+  var url = '/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/terminal/paste-image';
+  var headers = {};
+  var token = (typeof getAuthToken === 'function') ? getAuthToken() : null;
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  fetch(url, { method: 'POST', headers: headers, body: form })
+    .then(function(r) { return r.json().then(function(d){ return { ok: r.ok, body: d }; }); })
+    .then(function(res) {
+      if (res.ok && res.body && res.body.path && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(res.body.path);
+        if (typeof showToast === 'function') showToast(t('terminal.imagePasted') || 'Image attached');
+      } else {
+        var msg = (res.body && res.body.error) ? res.body.error : 'Image paste failed';
+        if (typeof showToast === 'function') showToast(msg);
+      }
+    })
+    .catch(function(err) {
+      if (typeof showToast === 'function') showToast('Image paste failed: ' + err.message);
+    });
+}
+
 function _getActiveTerminalKind() {
   return typeof ACTIVE_TERMINAL_KIND === 'string' && ACTIVE_TERMINAL_KIND ? ACTIVE_TERMINAL_KIND : 'claude';
 }
@@ -131,8 +156,27 @@ function _createTerminal(containerId, wsRef) {
 
   container.addEventListener('paste', function(e) {
     var ws = wsRef();
+    var cd = e.clipboardData || window.clipboardData;
+    if (!cd) { e.preventDefault(); return; }
+
+    var items = cd.items ? Array.prototype.slice.call(cd.items) : [];
+    var imageItem = null;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file' && items[i].type && items[i].type.indexOf('image/') === 0) {
+        imageItem = items[i];
+        break;
+      }
+    }
+
+    if (imageItem) {
+      e.preventDefault();
+      var file = imageItem.getAsFile();
+      if (file) _uploadPastedImage(file, ws);
+      return;
+    }
+
     if (ws && ws.readyState === WebSocket.OPEN) {
-      var text = (e.clipboardData || window.clipboardData).getData('text');
+      var text = cd.getData('text');
       if (text) ws.send(text);
     }
     e.preventDefault();

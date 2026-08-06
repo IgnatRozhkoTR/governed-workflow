@@ -131,6 +131,7 @@ async function initApp() {
   loadGitRules();
   loadRules();
   loadClaudeCommand();
+  if (typeof renderWorkflowModeCard === 'function') renderWorkflowModeCard();
   loadChannelsPreference();
   loadModulesCard();
   if (typeof renderNetworkMode === 'function') renderNetworkMode();

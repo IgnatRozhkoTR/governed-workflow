@@ -27,6 +27,7 @@ from core.paths import (
 from core.terminal import session_name
 from services.git_rules_service import migrate_legacy_git_rules
 from services import comment_service, proposal_service, review_pipeline_service
+from services import workflow_mode_service
 from services.configurator_service import ConfiguratorChain
 
 bp = Blueprint("workspaces", __name__)
@@ -414,22 +415,29 @@ def _merge_project_assets(project_path: str, workspace_path: Path):
     # Pass 1: fill missing files from repo defaults
     _fill_missing_repo_defaults(workspace_path)
 
-    # Pass 2: project-local content overwrites workspace copies (project wins)
-    for project_subdir, dst_rel in [
-        (project / ".claude", workspace_path / ".claude"),
-    ]:
-        if not project_subdir.exists():
-            continue
-        for src_file in project_subdir.rglob("*"):
-            if not src_file.is_file():
+    # Pass 2: project-local content overwrites workspace copies (project wins).
+    # Prune the worktrees storage root BEFORE descending — it holds a full
+    # checkout per workspace (hundreds of thousands of files) and walking it
+    # only to skip it made creation slower with every workspace added.
+    project_claude = project / ".claude"
+    workspace_claude = workspace_path / ".claude"
+    if project_claude.exists():
+        for entry in project_claude.iterdir():
+            if entry.name == "worktrees":
                 continue
-            rel = src_file.relative_to(project_subdir)
-            # Never merge content from the worktrees storage root
-            if rel.parts and rel.parts[0] == "worktrees":
+            if entry.is_file():
+                dst_file = workspace_claude / entry.name
+                dst_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(entry, dst_file)
                 continue
-            dst_file = dst_rel / rel
-            dst_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_file, dst_file)
+            if entry.is_dir():
+                for src_file in entry.rglob("*"):
+                    if not src_file.is_file():
+                        continue
+                    rel = src_file.relative_to(project_claude)
+                    dst_file = workspace_claude / rel
+                    dst_file.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src_file, dst_file)
 
 
 @bp.route("/api/projects/<project_id>/branches", methods=["GET"])
@@ -474,7 +482,8 @@ def list_workspaces(project_id):
             return jsonify({"error": t("api.error.projectNotFound")}), 404
 
         rows = db.execute(
-            "SELECT id, sanitized_branch, branch, session_id, working_dir, phase, status, created "
+            "SELECT id, sanitized_branch, branch, session_id, working_dir, phase, status, "
+            "created, workflow_mode "
             "FROM workspaces WHERE project_id = ? ORDER BY created",
             (project_id,)
         ).fetchall()
@@ -505,6 +514,7 @@ def list_workspaces(project_id):
                 "working_dir": row["working_dir"],
                 "status": row["status"],
                 "created": row["created"],
+                "workflow_mode": row["workflow_mode"],
                 "sessions": sessions_by_ws.get(row["id"], []),
             })
 
@@ -683,20 +693,22 @@ def _install_git_hooks(dst_claude, working_dir):
 
 def _register_workspace(
     db, project_id, branch, sanitized, working_dir, source, locale, project_path,
+    workflow_mode,
 ):
-    """Insert workspace into DB and return the creation-response body dict."""
+    """Insert workspace into DB and return the (response-body dict, workspace id)."""
     ws_path = workspace_dir(project_path, branch)
     ws_path.mkdir(parents=True, exist_ok=True)
 
     created = datetime.now().isoformat()
 
-    db.execute(
+    cursor = db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, session_id, "
-        "working_dir, created, status, phase, plan_json, source_branch, locale) "
-        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?)",
+        "working_dir, created, status, phase, plan_json, source_branch, locale, workflow_mode) "
+        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?)",
         (project_id, branch, sanitized, str(working_dir), created,
-         '{"description":"","systemDiagram":"","execution":[]}', source, locale)
+         '{"description":"","systemDiagram":"","execution":[]}', source, locale, workflow_mode)
     )
+    workspace_id = cursor.lastrowid
     db.commit()
 
     tmux_name = session_name(project_id, sanitized)
@@ -707,7 +719,7 @@ def _register_workspace(
         "working_dir": working_dir,
         "branch": branch,
         "command": command,
-    }
+    }, workspace_id
 
 
 @bp.route("/api/projects/<project_id>/workspaces", methods=["POST"])
@@ -725,6 +737,14 @@ def create_workspace(project_id):
 
         if not branch:
             return jsonify({"error": t("api.error.branchNameRequired")}), 400
+
+        requested_mode = body.get("workflow_mode")
+        if isinstance(requested_mode, str):
+            requested_mode = requested_mode.strip()
+        try:
+            workflow_mode = workflow_mode_service.resolve_default_mode(project, requested_mode)
+        except ValueError:
+            return jsonify({"error": t("api.error.invalidWorkflowMode")}), 400
 
         project_path = project["path"]
         sanitized = sanitize_branch(branch)
@@ -764,10 +784,12 @@ def create_workspace(project_id):
                 return err
             _install_checkout_configs(project_path)
 
-        body = _register_workspace(
+        body, workspace_id = _register_workspace(
             db, project_id, branch, sanitized, working_dir, source, locale,
-            project_path,
+            project_path, workflow_mode,
         )
+        workflow_mode_service.apply_mode_phase_settings(db, workspace_id, workflow_mode)
+        db.commit()
         try:
             results = ConfiguratorChain.default().run(db, project_id, project_path)
             warnings = [r for r in results if r["action"] != "rendered"]
