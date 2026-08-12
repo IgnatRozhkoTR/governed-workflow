@@ -395,13 +395,20 @@
   border-color: var(--border) !important;
 }
 
-/* Fix: word-level highlight suppression */
+/* Word-level (intra-line) diff highlighting */
 .d2h-ins .d2h-code-line-ctn ins,
-.d2h-del .d2h-code-line-ctn del,
-.d2h-ins .d2h-code-side-line-ctn ins,
-.d2h-del .d2h-code-side-line-ctn del {
-  background: none !important;
+.d2h-ins .d2h-code-side-line-ctn ins {
+  background: var(--diff-add-word-bg) !important;
   text-decoration: none !important;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.d2h-del .d2h-code-line-ctn del,
+.d2h-del .d2h-code-side-line-ctn del {
+  background: var(--diff-del-word-bg) !important;
+  text-decoration: none !important;
+  border-radius: 2px;
+  padding: 0 1px;
 }
 
 /* ─── DARK THEME ─── */

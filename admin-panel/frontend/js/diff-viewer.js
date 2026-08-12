@@ -315,7 +315,7 @@ function renderDiff(path) {
 
   const ui = new Diff2HtmlUI(targetEl, file.diff, {
     drawFileList: false,
-    matching: 'none',
+    matching: 'words',
     renderNothingWhenEmpty: true,
     outputFormat: state.diffMode,
     highlight: true,
