@@ -464,6 +464,7 @@
   "terminal.sessionClosed": "Connection to session closed.",
   "terminal.sessionError": "Failed to attach to session.",
   "terminal.killFailed": "Kill failed",
+  "terminal.sessionListError": "Failed to display terminal sessions",
 
   "cards.verificationProfiles": "Verification Profiles",
   "cards.verificationResults": "Verification Results",

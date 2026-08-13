@@ -429,16 +429,22 @@ function onTerminalTabActivated() {
 // ═══════════════════════════════════════════════
 var _sessionListInterval = null;
 var _sessionListSignature = null;
+var _sessionListErrorShown = false;
 
 function loadTerminalSessions() {
   apiGet('/api/terminal/sessions')
     .then(function(sessions) {
       // Only a successful listing is authoritative — a failed poll must not tear
       // down terminals for sessions that are still alive.
-      _closeVanishedSessionTabs(sessions);
+      try {
+        _closeVanishedSessionTabs(sessions);
+      } catch (e) {
+        console.error('[chips] closing vanished session tabs failed', e);
+      }
       renderSessionList(sessions);
     })
-    .catch(function() {
+    .catch(function(e) {
+      console.warn('[chips] session poll failed', e);
       renderSessionList([]);
     });
 }
@@ -447,19 +453,33 @@ function renderSessionList(sessions) {
   var container = document.getElementById('terminalSessionList');
   if (!container) return;
 
-  var signature = _sessionChipSignature(sessions);
+  try {
+    if (!Array.isArray(sessions)) {
+      console.warn('[chips] unexpected payload', sessions);
+      sessions = [];
+    }
 
-  // The signature is a claim about what the container currently holds, so it is
-  // recorded only once the rebuild has actually produced those chips, and it is
-  // distrusted whenever the container is empty. Recording it up front would make
-  // a single interrupted rebuild permanent: every later poll carries the same
-  // signature, skips the rebuild and leaves the toolbar blank for good.
-  if (signature !== _sessionListSignature || !container.firstChild) {
-    _rebuildSessionChips(container, sessions);
-    _sessionListSignature = signature;
+    var signature = _sessionChipSignature(sessions);
+
+    // The signature is a claim about what the container currently holds, so it is
+    // recorded only once the rebuild has actually produced those chips, and it is
+    // distrusted whenever the container is empty. Recording it up front would make
+    // a single interrupted rebuild permanent: every later poll carries the same
+    // signature, skips the rebuild and leaves the toolbar blank for good.
+    if (signature !== _sessionListSignature || !container.firstChild) {
+      _rebuildSessionChips(container, sessions);
+      _sessionListSignature = signature;
+    }
+
+    _updateSessionChipStates();
+  } catch (e) {
+    console.error('[chips] render failed', e);
+    _sessionListSignature = null;
+    if (!_sessionListErrorShown) {
+      _sessionListErrorShown = true;
+      if (typeof showToast === 'function') showToast(t('terminal.sessionListError'));
+    }
   }
-
-  _updateSessionChipStates();
 }
 
 function _sessionChipSignature(sessions) {
@@ -471,20 +491,22 @@ function _sessionChipSignature(sessions) {
 // Chips are built as DOM nodes rather than markup so tmux-supplied session names
 // never have to survive a round trip through HTML/attribute escaping.
 function _rebuildSessionChips(container, sessions) {
-  container.textContent = '';
-  container.appendChild(_buildWorkspaceChip());
+  var frag = document.createDocumentFragment();
+  frag.appendChild(_buildWorkspaceChip());
 
   if (!sessions.length) {
     var empty = document.createElement('span');
     empty.className = 'session-list-empty';
     empty.textContent = t('terminal.noSessions');
-    container.appendChild(empty);
-    return;
+    frag.appendChild(empty);
+  } else {
+    sessions.forEach(function(session) {
+      frag.appendChild(_buildSessionChip(session));
+    });
   }
 
-  sessions.forEach(function(session) {
-    container.appendChild(_buildSessionChip(session));
-  });
+  container.textContent = '';
+  container.appendChild(frag);
 }
 
 function _buildWorkspaceChip() {
@@ -662,6 +684,10 @@ function closeAllSessionTabs() {
 }
 
 function _closeVanishedSessionTabs(sessions) {
+  if (!Array.isArray(sessions)) {
+    console.warn('[chips] unexpected payload', sessions);
+    sessions = [];
+  }
   var alive = {};
   sessions.forEach(function(s) { alive[s.name] = true; });
   Object.keys(_sessionTabs).forEach(function(name) {
