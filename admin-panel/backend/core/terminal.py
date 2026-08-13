@@ -11,6 +11,7 @@ import shutil
 import signal
 import struct
 import subprocess
+import sys
 import tempfile
 import termios
 import threading
@@ -174,6 +175,55 @@ def send_prompt(name, text):
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+
+def copy_image_to_host_clipboard(path):
+    """Best-effort attempt to place a PNG file on the host system clipboard.
+
+    macOS uses `osascript` to load the image data as a PNG clipboard item.
+    Linux is deliberately unsupported: xclip's `-i` mode forks and detaches
+    to keep serving clipboard requests in the background, and there is no
+    reliable way to confirm the write succeeded without waiting on that
+    detached process — waiting risks hanging the request thread, so we
+    return False and let the caller fall back to the path-based flow.
+    Any other platform (including WSL) also returns False.
+
+    Never raises: a failure here must degrade to the fallback, not error out.
+    """
+    if sys.platform == "darwin":
+        return _copy_image_to_clipboard_macos(path)
+    return False
+
+
+def _copy_image_to_clipboard_macos(path):
+    """Run the osascript incantation that loads a PNG file onto the clipboard."""
+    if '"' in path or '\\' in path:
+        logger.warning("Refusing clipboard image copy: unsafe path %r", path)
+        return False
+
+    script = f'set the clipboard to (read (POSIX file "{path}") as «class PNGf»)'
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            timeout=10,
+        )
+        return result.returncode == 0
+    except Exception:
+        logger.warning("Failed to copy image to macOS clipboard", exc_info=True)
+        return False
+
+
+def send_paste_keystroke(name):
+    """Send Ctrl+V into a tmux pane, triggering Claude Code's native paste."""
+    if not session_exists(name):
+        return False
+    try:
+        result = subprocess.run(['tmux', 'send-keys', '-t', name, 'C-v'], timeout=5)
+        return result.returncode == 0
+    except Exception:
+        logger.warning("Failed to send paste keystroke to %s", name, exc_info=True)
+        return False
 
 
 def notify_workspace(ws, message):

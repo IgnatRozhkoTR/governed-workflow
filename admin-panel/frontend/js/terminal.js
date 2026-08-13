@@ -5,6 +5,10 @@ var term = null;
 var fitAddon = null;
 var terminalWs = null;
 var terminalConnected = false;
+var _lastPastedImageKey = '';
+var _lastPastedImageAt = 0;
+var PASTED_IMAGE_DEDUPE_WINDOW_MS = 10000;
+var _IS_MAC = /Mac/.test(navigator.platform || navigator.userAgent || '');
 
 function _uploadPastedImage(file, ws) {
   var ctx = (typeof getWorkspaceContext === 'function') ? getWorkspaceContext() : null;
@@ -18,9 +22,17 @@ function _uploadPastedImage(file, ws) {
   fetch(url, { method: 'POST', headers: headers, body: form })
     .then(function(r) { return r.json().then(function(d){ return { ok: r.ok, body: d }; }); })
     .then(function(res) {
-      if (res.ok && res.body && res.body.path && ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(res.body.path);
-        if (typeof showToast === 'function') showToast(t('terminal.imagePasted') || 'Image attached');
+      if (res.ok && res.body && res.body.path) {
+        var mode = res.body.mode;
+        if (mode === 'clipboard') {
+          if (typeof showToast === 'function') showToast(t('terminal.imagePasted') || 'Image attached');
+        } else if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send('@' + res.body.path);
+          if (typeof showToast === 'function') showToast(t('terminal.imagePasted') || 'Image attached');
+        } else {
+          var msg = 'Image paste failed';
+          if (typeof showToast === 'function') showToast(msg);
+        }
       } else {
         var msg = (res.body && res.body.error) ? res.body.error : 'Image paste failed';
         if (typeof showToast === 'function') showToast(msg);
@@ -132,6 +144,17 @@ function _createTerminal(containerId, wsRef) {
       }
       return false;
     }
+    // On Windows/Linux, plain Ctrl+V is the paste shortcut. xterm maps it to a
+    // control character and cancels the keydown, which suppresses the browser's
+    // native paste event. Returning false here makes xterm bail out before it
+    // cancels the event, so the browser's default paste proceeds normally.
+    // On macOS, Ctrl+V is left alone since paste is Cmd+V there and Ctrl+V is
+    // the terminal's "quoted insert" shortcut.
+    var isPlainCtrlV = e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey &&
+      (e.keyCode === 86 || (typeof e.key === 'string' && e.key.toLowerCase() === 'v'));
+    if (!_IS_MAC && isPlainCtrlV) {
+      return false;
+    }
     return true;
   });
 
@@ -161,6 +184,9 @@ function _createTerminal(containerId, wsRef) {
     var cd = e.clipboardData || window.clipboardData;
     if (!cd) { return; }
 
+    var pastedText = cd.getData ? cd.getData('text') : '';
+    if (pastedText && pastedText.length > 0) { return; }
+
     var items = cd.items ? Array.prototype.slice.call(cd.items) : [];
     var imageItem = null;
     for (var i = 0; i < items.length; i++) {
@@ -171,10 +197,20 @@ function _createTerminal(containerId, wsRef) {
     }
 
     if (imageItem) {
+      var file = imageItem.getAsFile();
+      if (!file) { return; }
+
+      var imageKey = file.size + ':' + file.type + ':' + (file.lastModified || 0) + ':' + (file.name || '');
+      var now = Date.now();
+      if (imageKey === _lastPastedImageKey && (now - _lastPastedImageAt) < PASTED_IMAGE_DEDUPE_WINDOW_MS) {
+        return;
+      }
+
       e.preventDefault();
       e.stopPropagation();
-      var file = imageItem.getAsFile();
-      if (file) _uploadPastedImage(file, ws);
+      _lastPastedImageKey = imageKey;
+      _lastPastedImageAt = now;
+      _uploadPastedImage(file, ws);
       return;
     }
   }, true);

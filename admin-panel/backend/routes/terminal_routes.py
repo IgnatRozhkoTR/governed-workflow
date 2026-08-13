@@ -12,6 +12,7 @@ from core.terminal import (
     SESSION_KIND_CLAUDE,
     TMUX_NOT_INSTALLED,
     build_claude_command,
+    copy_image_to_host_clipboard,
     create_session,
     get_session_command,
     kill_session,
@@ -19,6 +20,7 @@ from core.terminal import (
     mark_new_session,
     run_pty_websocket,
     send_keys,
+    send_paste_keystroke,
     send_prompt,
     session_exists,
     session_name,
@@ -307,4 +309,10 @@ def terminal_paste_image(project, branch):
     dest = dest_dir / (uuid.uuid4().hex + ext)
     file.save(str(dest))
 
-    return jsonify({'ok': True, 'path': str(dest)})
+    mode = 'path'
+    if copy_image_to_host_clipboard(str(dest)):
+        name = session_name(project, branch)
+        if session_exists(name) and send_paste_keystroke(name):
+            mode = 'clipboard'
+
+    return jsonify({'ok': True, 'mode': mode, 'path': str(dest)})
