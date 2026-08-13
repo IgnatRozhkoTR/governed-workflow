@@ -109,7 +109,7 @@ function _createTerminal(containerId, wsRef) {
     theme: getTerminalTheme(),
     allowProposedApi: true,
     scrollback: 5000,
-    copyOnSelect: true
+    copyOnSelect: false
   });
 
   var addon = new FitAddon.FitAddon();
@@ -139,8 +139,10 @@ function _createTerminal(containerId, wsRef) {
     terminal.parser.registerOscHandler(52, function(data) {
       var parts = data.split(';');
       if (parts.length >= 2) {
+        var payload = parts[parts.length - 1];
+        if (payload === '?') { return true; }
         try {
-          var decoded = atob(parts[parts.length - 1]);
+          var decoded = atob(payload);
           if (typeof safeCopyToClipboard === 'function') {
             safeCopyToClipboard(decoded);
           }
@@ -157,7 +159,7 @@ function _createTerminal(containerId, wsRef) {
   container.addEventListener('paste', function(e) {
     var ws = wsRef();
     var cd = e.clipboardData || window.clipboardData;
-    if (!cd) { e.preventDefault(); return; }
+    if (!cd) { return; }
 
     var items = cd.items ? Array.prototype.slice.call(cd.items) : [];
     var imageItem = null;
@@ -170,17 +172,12 @@ function _createTerminal(containerId, wsRef) {
 
     if (imageItem) {
       e.preventDefault();
+      e.stopPropagation();
       var file = imageItem.getAsFile();
       if (file) _uploadPastedImage(file, ws);
       return;
     }
-
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      var text = cd.getData('text');
-      if (text) ws.send(text);
-    }
-    e.preventDefault();
-  });
+  }, true);
 
   terminal.onData(function(data) {
     var ws = wsRef();
