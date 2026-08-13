@@ -422,6 +422,7 @@ function onTerminalTabActivated() {
   }
   _fitActiveTerminalSoon(true);
   startSessionListPolling();
+  _refreshWorkspaceSessionName();
 }
 
 // ═══════════════════════════════════════════════
@@ -430,6 +431,28 @@ function onTerminalTabActivated() {
 var _sessionListInterval = null;
 var _sessionListSignature = null;
 var _sessionListErrorShown = false;
+var _workspaceSessionName = null;
+var _lastSessionListPayload = [];
+
+// Learns the exact tmux session name the workspace terminal is backed by, so the
+// by-name chip for that same session can be suppressed instead of showing the
+// workspace's own terminal twice in the toolbar.
+function _refreshWorkspaceSessionName() {
+  var ctx = (typeof getWorkspaceContext === 'function') ? getWorkspaceContext() : null;
+  if (!ctx) return;
+
+  var url = '/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) +
+             '/terminal/status?kind=' + encodeURIComponent(_getActiveTerminalKind());
+
+  apiGet(url)
+    .then(function(data) {
+      _workspaceSessionName = (data && data.session) ? data.session : null;
+      renderSessionList(_lastSessionListPayload);
+    })
+    .catch(function(e) {
+      console.warn('[chips] workspace session name lookup failed', e);
+    });
+}
 
 function loadTerminalSessions() {
   apiGet('/api/terminal/sessions')
@@ -458,6 +481,7 @@ function renderSessionList(sessions) {
       console.warn('[chips] unexpected payload', sessions);
       sessions = [];
     }
+    _lastSessionListPayload = sessions;
 
     var signature = _sessionChipSignature(sessions);
 
@@ -483,7 +507,7 @@ function renderSessionList(sessions) {
 }
 
 function _sessionChipSignature(sessions) {
-  return I18N_LOCALE + '\u0002' + sessions.map(function(s) {
+  return I18N_LOCALE + '\u0002' + (_workspaceSessionName || '') + '\u0002' + sessions.map(function(s) {
     return s.name + '\u0001' + (s.attached ? '1' : '0') + '\u0001' + (s.command || '');
   }).join('\u0002');
 }
@@ -494,13 +518,19 @@ function _rebuildSessionChips(container, sessions) {
   var frag = document.createDocumentFragment();
   frag.appendChild(_buildWorkspaceChip());
 
-  if (!sessions.length) {
+  // The workspace terminal chip already represents this session, so listing it
+  // again by name would open a second tmux client attached to the same session.
+  var otherSessions = sessions.filter(function(session) {
+    return session.name !== _workspaceSessionName;
+  });
+
+  if (!otherSessions.length) {
     var empty = document.createElement('span');
     empty.className = 'session-list-empty';
     empty.textContent = t('terminal.noSessions');
     frag.appendChild(empty);
   } else {
-    sessions.forEach(function(session) {
+    otherSessions.forEach(function(session) {
       frag.appendChild(_buildSessionChip(session));
     });
   }
@@ -512,7 +542,9 @@ function _rebuildSessionChips(container, sessions) {
 function _buildWorkspaceChip() {
   var chip = document.createElement('div');
   chip.className = 'session-item';
-  chip.title = t('terminal.workspaceSession');
+  chip.title = _workspaceSessionName
+    ? t('terminal.workspaceSession') + ' (' + _workspaceSessionName + ')'
+    : t('terminal.workspaceSession');
 
   var label = document.createElement('span');
   label.className = 'session-name';
@@ -895,6 +927,7 @@ document.addEventListener('workspace-reset', function() {
   if (typeof disconnectTerminal === 'function') disconnectTerminal();
   closeAllSessionTabs();
   _sessionListSignature = null;
+  _workspaceSessionName = null;
   if (typeof disconnectSplitTerminal === 'function') disconnectSplitTerminal();
   if (term) { term.clear(); term.dispose(); term = null; fitAddon = null; }
   if (typeof splitTerm !== 'undefined' && splitTerm) { splitTerm.clear(); splitTerm.dispose(); splitTerm = null; splitFitAddon = null; }
