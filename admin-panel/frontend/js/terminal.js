@@ -447,16 +447,25 @@ function renderSessionList(sessions) {
   var container = document.getElementById('terminalSessionList');
   if (!container) return;
 
-  var signature = I18N_LOCALE + '\u0002' + sessions.map(function(s) {
-    return s.name + '\u0001' + (s.attached ? '1' : '0') + '\u0001' + (s.command || '');
-  }).join('\u0002');
+  var signature = _sessionChipSignature(sessions);
 
-  if (signature !== _sessionListSignature) {
-    _sessionListSignature = signature;
+  // The signature is a claim about what the container currently holds, so it is
+  // recorded only once the rebuild has actually produced those chips, and it is
+  // distrusted whenever the container is empty. Recording it up front would make
+  // a single interrupted rebuild permanent: every later poll carries the same
+  // signature, skips the rebuild and leaves the toolbar blank for good.
+  if (signature !== _sessionListSignature || !container.firstChild) {
     _rebuildSessionChips(container, sessions);
+    _sessionListSignature = signature;
   }
 
   _updateSessionChipStates();
+}
+
+function _sessionChipSignature(sessions) {
+  return I18N_LOCALE + '\u0002' + sessions.map(function(s) {
+    return s.name + '\u0001' + (s.attached ? '1' : '0') + '\u0001' + (s.command || '');
+  }).join('\u0002');
 }
 
 // Chips are built as DOM nodes rather than markup so tmux-supplied session names
