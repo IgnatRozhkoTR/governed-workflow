@@ -49,30 +49,58 @@ def _terminal_session_name(project, branch, session_kind):
     return session_name(project, branch, kind=kind)
 
 
+def _websocket_auth_ok() -> bool:
+    with get_db_ctx() as db:
+        return websocket_auth_ok(db, request.args.get('token', ''))
+
+
+def _attach_terminal_ws(ws, project, branch, session_kind):
+    if not _websocket_auth_ok():
+        ws.send(json.dumps({'error': 'authentication_required'}))
+        return
+
+    if not tmux_available():
+        ws.send(json.dumps({'error': TMUX_NOT_INSTALLED}))
+        return
+
+    name = _terminal_session_name(project, branch, session_kind)
+    if not name:
+        ws.send(json.dumps({'error': 'Unsupported terminal session kind'}))
+        return
+
+    if not session_exists(name):
+        ws.send(json.dumps({'error': 'No tmux session. Use Start or Resume first.'}))
+        return
+
+    run_pty_websocket(ws, name)
+
+
+def _attach_terminal_ws_by_name(ws, name):
+    """Attach to a tmux session by its exact name.
+
+    Validates against ``list_sessions()`` rather than ``session_exists()``:
+    ``tmux has-session`` performs prefix matching on the target name, which
+    would let a client attach to an unintended session by supplying a prefix
+    of a real session name. The REST listing endpoint already treats
+    ``list_sessions()`` as the authoritative set of attachable sessions, so
+    reusing it here keeps the allowlist exact and consistent with what the
+    frontend displays.
+    """
+    if not _websocket_auth_ok():
+        ws.send(json.dumps({'error': 'authentication_required'}))
+        return
+
+    live_session_names = {session['name'] for session in list_sessions()}
+    if name not in live_session_names:
+        ws.send(json.dumps({'error': 'No tmux session. Use Start or Resume first.'}))
+        return
+
+    run_pty_websocket(ws, name)
+
+
 def register_terminal_ws(app):
     """Register WebSocket routes on the Flask app."""
     sock = Sock(app)
-
-    def _attach_terminal_ws(ws, project, branch, session_kind):
-        with get_db_ctx() as db:
-            if not websocket_auth_ok(db, request.args.get('token', '')):
-                ws.send(json.dumps({'error': 'authentication_required'}))
-                return
-
-        if not tmux_available():
-            ws.send(json.dumps({'error': TMUX_NOT_INSTALLED}))
-            return
-
-        name = _terminal_session_name(project, branch, session_kind)
-        if not name:
-            ws.send(json.dumps({'error': 'Unsupported terminal session kind'}))
-            return
-
-        if not session_exists(name):
-            ws.send(json.dumps({'error': 'No tmux session. Use Start or Resume first.'}))
-            return
-
-        run_pty_websocket(ws, name)
 
     @sock.route('/ws/terminal/<project>/<path:branch>')
     def terminal_ws(ws, project, branch):
@@ -81,6 +109,10 @@ def register_terminal_ws(app):
     @sock.route('/ws/terminal/<project>/<path:branch>/<session_kind>')
     def terminal_ws_kind(ws, project, branch, session_kind):
         _attach_terminal_ws(ws, project, branch, session_kind)
+
+    @sock.route('/ws/terminal-session/<name>')
+    def terminal_ws_by_name(ws, name):
+        _attach_terminal_ws_by_name(ws, name)
 
 
 @bp.route('/api/terminal/sessions', methods=['GET'])

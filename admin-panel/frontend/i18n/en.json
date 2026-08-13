@@ -460,6 +460,10 @@
   "terminal.imagePasted": "Image attached",
   "terminal.detached": "detached",
   "terminal.killSession": "Kill session",
+  "terminal.workspaceSession": "Workspace terminal",
+  "terminal.sessionClosed": "Connection to session closed.",
+  "terminal.sessionError": "Failed to attach to session.",
+  "terminal.killFailed": "Kill failed",
 
   "cards.verificationProfiles": "Verification Profiles",
   "cards.verificationResults": "Verification Results",

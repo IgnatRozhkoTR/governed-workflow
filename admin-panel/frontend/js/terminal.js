@@ -47,13 +47,23 @@ function _getActiveTerminalKind() {
   return typeof ACTIVE_TERMINAL_KIND === 'string' && ACTIVE_TERMINAL_KIND ? ACTIVE_TERMINAL_KIND : 'claude';
 }
 
-function _buildTerminalWsUrl(projectId, branch) {
+function _terminalWsOrigin() {
   var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  var base = protocol + '//' + window.location.host + '/ws/terminal/' +
+  return protocol + '//' + window.location.host;
+}
+
+function _buildTerminalWsUrl(projectId, branch) {
+  var base = _terminalWsOrigin() + '/ws/terminal/' +
              encodeURIComponent(projectId) + '/' + encodeURIComponent(branch);
   var kind = _getActiveTerminalKind();
   var withKind = kind && kind !== 'claude' ? base + '/' + encodeURIComponent(kind) : base;
   return _appendTokenToWsUrl(withKind);
+}
+
+function _buildSessionTerminalWsUrl(sessionName) {
+  return _appendTokenToWsUrl(
+    _terminalWsOrigin() + '/ws/terminal-session/' + encodeURIComponent(sessionName)
+  );
 }
 
 var TERMINAL_THEMES = {
@@ -283,8 +293,8 @@ function initTerminal() {
   fitAddon = result.fitAddon;
 
   window.addEventListener('resize', function() {
-    if (fitAddon && document.getElementById('panel-terminal').classList.contains('active')) {
-      fitAddon.fit();
+    if (document.getElementById('panel-terminal').classList.contains('active')) {
+      _fitAndPushSize(_activeTerminalTarget());
     }
     if (splitFitAddon && document.getElementById('splitContainer') &&
         document.getElementById('splitContainer').classList.contains('split-active')) {
@@ -299,6 +309,7 @@ function connectTerminal() {
   if (!term) {
     initTerminal();
   }
+  showWorkspaceTerminalView();
 
   var ctx = getWorkspaceContext();
   if (!ctx) {
@@ -399,15 +410,17 @@ function updateTerminalTheme() {
   if (splitTerm) {
     splitTerm.options.theme = getTerminalTheme();
   }
+  Object.keys(_sessionTabs).forEach(function(name) {
+    var tab = _sessionTabs[name];
+    if (tab.terminal) tab.terminal.options.theme = getTerminalTheme();
+  });
 }
 
 function onTerminalTabActivated() {
   if (!term) {
     initTerminal();
   }
-  if (fitAddon) {
-    setTimeout(function() { fitAddon.fit(); if (term) term.focus(); }, 50);
-  }
+  _fitActiveTerminalSoon(true);
   startSessionListPolling();
 }
 
@@ -415,10 +428,14 @@ function onTerminalTabActivated() {
 //  SESSION LIST
 // ═══════════════════════════════════════════════
 var _sessionListInterval = null;
+var _sessionListSignature = null;
 
 function loadTerminalSessions() {
   apiGet('/api/terminal/sessions')
     .then(function(sessions) {
+      // Only a successful listing is authoritative — a failed poll must not tear
+      // down terminals for sessions that are still alive.
+      _closeVanishedSessionTabs(sessions);
       renderSessionList(sessions);
     })
     .catch(function() {
@@ -430,29 +447,106 @@ function renderSessionList(sessions) {
   var container = document.getElementById('terminalSessionList');
   if (!container) return;
 
+  var signature = I18N_LOCALE + '\u0002' + sessions.map(function(s) {
+    return s.name + '\u0001' + (s.attached ? '1' : '0') + '\u0001' + (s.command || '');
+  }).join('\u0002');
+
+  if (signature !== _sessionListSignature) {
+    _sessionListSignature = signature;
+    _rebuildSessionChips(container, sessions);
+  }
+
+  _updateSessionChipStates();
+}
+
+// Chips are built as DOM nodes rather than markup so tmux-supplied session names
+// never have to survive a round trip through HTML/attribute escaping.
+function _rebuildSessionChips(container, sessions) {
+  container.textContent = '';
+  container.appendChild(_buildWorkspaceChip());
+
   if (!sessions.length) {
-    container.innerHTML = '<span style="color: var(--text-muted); font-size: 0.75rem;">' + t('terminal.noSessions') + '</span>';
+    var empty = document.createElement('span');
+    empty.className = 'session-list-empty';
+    empty.textContent = t('terminal.noSessions');
+    container.appendChild(empty);
     return;
   }
 
-  var html = '';
-  sessions.forEach(function(s) {
-    var statusClass = s.attached ? 'session-attached' : 'session-detached';
-    var statusText = s.attached ? t('terminal.attached') : t('terminal.detached');
-    html += '<div class="session-item" title="' + escapeHtml(s.command || s.name) + '">' +
-      '<span class="session-status-dot ' + statusClass + '"></span>' +
-      '<span class="session-name">' + escapeHtml(s.name) + '</span>' +
-      '<span class="session-status-label">' + statusText + '</span>' +
-      '<button class="session-kill-btn" onclick="killSessionByName(\'' + escapeAttr(s.name) + '\')" title="' + t('terminal.killSession') + '">&times;</button>' +
-      '</div>';
+  sessions.forEach(function(session) {
+    container.appendChild(_buildSessionChip(session));
   });
-  container.innerHTML = html;
+}
+
+function _buildWorkspaceChip() {
+  var chip = document.createElement('div');
+  chip.className = 'session-item';
+  chip.title = t('terminal.workspaceSession');
+
+  var label = document.createElement('span');
+  label.className = 'session-name';
+  label.textContent = t('terminal.workspaceSession');
+  chip.appendChild(label);
+
+  chip.addEventListener('click', showWorkspaceTerminalView);
+  return chip;
+}
+
+function _buildSessionChip(session) {
+  var chip = document.createElement('div');
+  chip.className = 'session-item';
+  chip.dataset.session = session.name;
+  chip.title = session.command || session.name;
+
+  var dot = document.createElement('span');
+  dot.className = 'session-status-dot ' + (session.attached ? 'session-attached' : 'session-detached');
+  chip.appendChild(dot);
+
+  var name = document.createElement('span');
+  name.className = 'session-name';
+  name.textContent = session.name;
+  chip.appendChild(name);
+
+  var status = document.createElement('span');
+  status.className = 'session-status-label';
+  status.textContent = session.attached ? t('terminal.attached') : t('terminal.detached');
+  chip.appendChild(status);
+
+  var killBtn = document.createElement('button');
+  killBtn.className = 'session-kill-btn';
+  killBtn.title = t('terminal.killSession');
+  killBtn.innerHTML = '&times;';
+  killBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    killSessionByName(session.name);
+  });
+  chip.appendChild(killBtn);
+
+  chip.addEventListener('click', function() { openSessionTab(session.name); });
+  return chip;
+}
+
+function _updateSessionChipStates() {
+  var container = document.getElementById('terminalSessionList');
+  if (!container) return;
+  container.querySelectorAll('.session-item').forEach(function(chip) {
+    var name = chip.dataset.session || null;
+    var tab = name ? _sessionTabs[name] : null;
+    chip.classList.toggle('active', name === _activeSessionTabName);
+    chip.classList.toggle('open', !!(tab && tab.ws && tab.ws.readyState === WebSocket.OPEN));
+  });
 }
 
 function killSessionByName(name) {
   apiPost('/api/terminal/sessions/' + encodeURIComponent(name) + '/kill', {})
-    .then(function() { loadTerminalSessions(); })
-    .catch(function() {});
+    .then(function() {
+      closeSessionTab(name);
+      loadTerminalSessions();
+    })
+    .catch(function(e) {
+      if (typeof showToast === 'function') showToast(t('terminal.killFailed') + ': ' + e.message);
+      loadTerminalSessions();
+    });
 }
 
 function startSessionListPolling() {
@@ -466,6 +560,149 @@ function stopSessionListPolling() {
     clearInterval(_sessionListInterval);
     _sessionListInterval = null;
   }
+}
+
+// ═══════════════════════════════════════════════
+//  SESSION TERMINAL TABS
+// ═══════════════════════════════════════════════
+var _sessionTabs = {};
+var _activeSessionTabName = null;
+var _sessionViewCounter = 0;
+
+function openSessionTab(name) {
+  var tab = _sessionTabs[name] || _createSessionTabView(name);
+  if (!tab) return;
+
+  _showTerminalView(name);
+
+  if (!tab.terminal) {
+    var created = _createTerminal(tab.viewId, function() { return tab.ws; });
+    if (!created) {
+      closeSessionTab(name);
+      return;
+    }
+    tab.terminal = created.terminal;
+    tab.fitAddon = created.fitAddon;
+  }
+
+  if (!tab.ws || tab.ws.readyState > WebSocket.OPEN) {
+    _connectSessionTab(tab);
+  }
+
+  _fitActiveTerminalSoon(true);
+}
+
+function _createSessionTabView(name) {
+  var container = document.getElementById('terminalContainer');
+  if (!container) return null;
+
+  _sessionViewCounter += 1;
+  var view = document.createElement('div');
+  view.className = 'terminal-view';
+  view.id = 'sessionTerminalView' + _sessionViewCounter;
+  container.appendChild(view);
+
+  var tab = { name: name, viewId: view.id, viewEl: view, terminal: null, fitAddon: null, ws: null };
+  _sessionTabs[name] = tab;
+  return tab;
+}
+
+function _connectSessionTab(tab) {
+  tab.ws = _connectTerminal(tab.terminal, tab.fitAddon, _buildSessionTerminalWsUrl(tab.name), {
+    focusOnOpen: _activeSessionTabName === tab.name,
+    onConnected: _updateSessionChipStates,
+    onDisconnected: function() {
+      if (tab.terminal) tab.terminal.writeln('\r\n\x1b[33m' + t('terminal.sessionClosed') + '\x1b[0m');
+      _updateSessionChipStates();
+    },
+    onError: function() {
+      if (tab.terminal) tab.terminal.writeln('\r\n\x1b[31m' + t('terminal.sessionError') + '\x1b[0m');
+      _updateSessionChipStates();
+    }
+  });
+}
+
+function closeSessionTab(name) {
+  var tab = _sessionTabs[name];
+  if (!tab) return;
+
+  if (tab.ws) {
+    tab.ws.onopen = null;
+    tab.ws.onmessage = null;
+    tab.ws.onclose = null;
+    tab.ws.onerror = null;
+    tab.ws.close();
+    tab.ws = null;
+  }
+  if (tab.terminal) {
+    tab.terminal.dispose();
+    tab.terminal = null;
+  }
+  if (tab.viewEl && tab.viewEl.parentNode) {
+    tab.viewEl.parentNode.removeChild(tab.viewEl);
+  }
+  delete _sessionTabs[name];
+
+  if (_activeSessionTabName === name) {
+    showWorkspaceTerminalView();
+  }
+}
+
+function closeAllSessionTabs() {
+  Object.keys(_sessionTabs).forEach(closeSessionTab);
+}
+
+function _closeVanishedSessionTabs(sessions) {
+  var alive = {};
+  sessions.forEach(function(s) { alive[s.name] = true; });
+  Object.keys(_sessionTabs).forEach(function(name) {
+    if (!alive[name]) closeSessionTab(name);
+  });
+}
+
+function showWorkspaceTerminalView() {
+  _showTerminalView(null);
+  _fitActiveTerminalSoon(true);
+}
+
+function _showTerminalView(name) {
+  _activeSessionTabName = name;
+
+  var container = document.getElementById('terminalContainer');
+  if (container) container.classList.toggle('session-view-active', !!name);
+
+  Object.keys(_sessionTabs).forEach(function(key) {
+    _sessionTabs[key].viewEl.classList.toggle('active', key === name);
+  });
+
+  _updateSessionChipStates();
+}
+
+function _activeTerminalTarget() {
+  var tab = _activeSessionTabName ? _sessionTabs[_activeSessionTabName] : null;
+  if (tab) return tab;
+  return { terminal: term, fitAddon: fitAddon, ws: terminalWs };
+}
+
+// A hidden xterm cannot measure itself, so every reveal must re-fit and tell the
+// backend pty about the dimensions it ended up with.
+function _fitAndPushSize(target) {
+  if (!target || !target.fitAddon) return;
+  target.fitAddon.fit();
+  var dims = target.fitAddon.proposeDimensions();
+  if (!dims || !dims.cols || !dims.rows) return;
+  var ws = target.ws;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ resize: [dims.cols, dims.rows] }));
+  }
+}
+
+function _fitActiveTerminalSoon(shouldFocus) {
+  setTimeout(function() {
+    var target = _activeTerminalTarget();
+    _fitAndPushSize(target);
+    if (shouldFocus && target.terminal) target.terminal.focus();
+  }, 50);
 }
 
 // ═══════════════════════════════════════════════
@@ -621,6 +858,8 @@ function updateSplitTerminalStatus(status) {
 
 document.addEventListener('workspace-reset', function() {
   if (typeof disconnectTerminal === 'function') disconnectTerminal();
+  closeAllSessionTabs();
+  _sessionListSignature = null;
   if (typeof disconnectSplitTerminal === 'function') disconnectSplitTerminal();
   if (term) { term.clear(); term.dispose(); term = null; fitAddon = null; }
   if (typeof splitTerm !== 'undefined' && splitTerm) { splitTerm.clear(); splitTerm.dispose(); splitTerm = null; splitFitAddon = null; }

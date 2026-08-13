@@ -460,6 +460,10 @@
   "terminal.imagePasted": "Изображение прикреплено",
   "terminal.detached": "отключена",
   "terminal.killSession": "Завершить сессию",
+  "terminal.workspaceSession": "Терминал рабочего пространства",
+  "terminal.sessionClosed": "Соединение с сессией закрыто.",
+  "terminal.sessionError": "Не удалось подключиться к сессии.",
+  "terminal.killFailed": "Не удалось завершить сессию",
 
   "cards.verificationProfiles": "Профили верификации",
   "cards.verificationResults": "Результаты верификации",

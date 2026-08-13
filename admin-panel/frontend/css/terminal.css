@@ -52,11 +52,29 @@
   border-radius: var(--radius-sm);
   font-size: 0.72rem;
   white-space: nowrap;
-  cursor: default;
+  cursor: pointer;
 }
 
 .session-item:hover {
   border-color: var(--accent);
+}
+
+.session-item.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.session-item.active .session-name {
+  color: var(--accent);
+}
+
+.session-item.open .session-name {
+  font-weight: 600;
+}
+
+.session-list-empty {
+  color: var(--text-muted);
+  font-size: 0.75rem;
 }
 
 .session-status-dot {
@@ -114,6 +132,21 @@
 
 #terminalContainer .xterm-viewport {
   overflow-y: auto !important;
+}
+
+/* One child view per attached tmux session; only the active one is laid out so
+   xterm can measure itself when it becomes visible */
+.terminal-view {
+  display: none;
+  height: 100%;
+}
+
+.terminal-view.active {
+  display: block;
+}
+
+#terminalContainer.session-view-active > .xterm {
+  display: none;
 }
 
 #panel-terminal {
@@ -220,6 +253,15 @@
 [data-theme="light"] #splitTerminalContainer .xterm-fg-153,
 [data-theme="light"] .xterm-rows .xterm-fg-153 {
   color: #0369a1 !important;
+}
+
+/* Near-white text (231) is unreadable on the light page unless it sits on one of
+   the dark backgrounds rescued below, so default it to the light foreground. The
+   background-paired rules that follow carry one extra class and therefore win. */
+[data-theme="light"] #terminalContainer .xterm-fg-231,
+[data-theme="light"] #splitTerminalContainer .xterm-fg-231,
+[data-theme="light"] .xterm-rows .xterm-fg-231 {
+  color: #1a1a18 !important;
 }
 
 /* User message background — green accent matching the app logo */
