@@ -63,6 +63,12 @@ async function switchTab(tabId) {
 
   await refreshTabData();
 
+  _activateTabHooks(tabId);
+}
+
+// Per-tab activation hooks, shared by switchTab (click path) and the
+// hash-restore path on page load, so the two can never drift apart.
+function _activateTabHooks(tabId) {
   if (tabId === 'dashboard') {
     if (typeof renderContext === 'function') renderContext();
     if (typeof loadVerificationData === 'function') loadVerificationData();
@@ -108,7 +114,12 @@ document.querySelectorAll('.sidebar-btn[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
-// Restore tab from URL hash on load (sync-only, no data refresh)
+// Restore tab from URL hash on load: sync the active classes immediately
+// (no full refreshTabData(), since state hasn't loaded yet), then run the
+// same per-tab activation hooks switchTab() would run for a click. The
+// hooks are deferred to DOMContentLoaded because most tab modules
+// (plan.js, file-explorer.js, etc.) load AFTER tabs.js and aren't defined
+// yet at parse time of this IIFE.
 (function() {
   var hash = location.hash.replace('#', '');
   if (hash && document.getElementById('panel-' + hash)) {
@@ -123,5 +134,9 @@ document.querySelectorAll('.sidebar-btn[data-tab]').forEach(btn => {
     if (splitMain && (hash === 'files' || hash === 'changes' || hash === 'terminal')) {
       splitMain.classList.add('no-padding');
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      _activateTabHooks(hash);
+    });
   }
 })();
