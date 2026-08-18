@@ -4,15 +4,38 @@
 var SETTINGS_SECTIONS = ['task', 'workflow', 'phases', 'review', 'verification', 'rules', 'git', 'claude', 'system', 'interface'];
 var SETTINGS_DEFAULT_SECTION = 'task';
 
+// ─── Per-workspace "last settings section" persistence ──────────────────
+function _settingsSectionStorageKey(ctx) {
+  return 'ui_last_settings_section:' + ctx.projectId + '/' + ctx.branch;
+}
+
+function _storeLastSettingsSection(section) {
+  var ctx = typeof getWorkspaceContext === 'function' ? getWorkspaceContext() : null;
+  if (!ctx) return;
+  try { localStorage.setItem(_settingsSectionStorageKey(ctx), section); } catch (e) {}
+}
+
+function _loadLastSettingsSection() {
+  var ctx = typeof getWorkspaceContext === 'function' ? getWorkspaceContext() : null;
+  if (!ctx) return null;
+  try { return localStorage.getItem(_settingsSectionStorageKey(ctx)); } catch (e) { return null; }
+}
+
 function _currentSettingsSection() {
   var parts = location.hash.slice(1).split('/');
-  var section = parts[0] === 'dashboard' ? parts[1] : null;
-  return (section && SETTINGS_SECTIONS.indexOf(section) !== -1) ? section : SETTINGS_DEFAULT_SECTION;
+  var hashSection = parts[0] === 'dashboard' ? parts[1] : null;
+  if (hashSection && SETTINGS_SECTIONS.indexOf(hashSection) !== -1) return hashSection;
+
+  var storedSection = _loadLastSettingsSection();
+  if (storedSection && SETTINGS_SECTIONS.indexOf(storedSection) !== -1) return storedSection;
+
+  return SETTINGS_DEFAULT_SECTION;
 }
 
 function switchSettingsSection(section) {
   if (SETTINGS_SECTIONS.indexOf(section) === -1) return;
   history.replaceState(null, '', '#dashboard/' + section);
+  _storeLastSettingsSection(section);
   settingsOnActivate();
 }
 

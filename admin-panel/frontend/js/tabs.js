@@ -67,10 +67,38 @@ async function switchTab(tabId) {
     if (currentParts[0] === 'dashboard' && currentParts[1]) newHash += '/' + currentParts[1];
   }
   history.replaceState(null, '', newHash);
+  _storeLastTab(tabId);
 
   await refreshTabData();
 
   _activateTabHooks(tabId);
+}
+
+// ─── Per-workspace "last tab" persistence ───────────────────────────────
+function _tabStorageKey(ctx) {
+  return 'ui_last_tab:' + ctx.projectId + '/' + ctx.branch;
+}
+
+function _storeLastTab(tabId) {
+  var ctx = typeof getWorkspaceContext === 'function' ? getWorkspaceContext() : null;
+  if (!ctx) return;
+  try { localStorage.setItem(_tabStorageKey(ctx), tabId); } catch (e) {}
+}
+
+function _loadLastTab(ctx) {
+  if (!ctx) return null;
+  try { return localStorage.getItem(_tabStorageKey(ctx)); } catch (e) { return null; }
+}
+
+// Reads the last settings section stored for this workspace, without
+// depending on settings.js (which loads after this file and defines the
+// canonical SETTINGS_SECTIONS list). Loose format validation only; the
+// section is re-validated against SETTINGS_SECTIONS once settings.js runs.
+function _loadLastSettingsSectionRaw(ctx) {
+  if (!ctx) return null;
+  var stored;
+  try { stored = localStorage.getItem('ui_last_settings_section:' + ctx.projectId + '/' + ctx.branch); } catch (e) { return null; }
+  return (stored && /^[a-z0-9_-]+$/i.test(stored)) ? stored : null;
 }
 
 // Per-tab activation hooks, shared by switchTab (click path) and the
@@ -120,29 +148,56 @@ document.querySelectorAll('.sidebar-btn[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
-// Restore tab from URL hash on load: sync the active classes immediately
-// (no full refreshTabData(), since state hasn't loaded yet), then run the
-// same per-tab activation hooks switchTab() would run for a click. The
-// hooks are deferred to DOMContentLoaded because most tab modules
-// (plan.js, file-explorer.js, etc.) load AFTER tabs.js and aren't defined
-// yet at parse time of this IIFE.
+// Restore tab on load: sync the active classes immediately (no full
+// refreshTabData(), since state hasn't loaded yet), then run the same
+// per-tab activation hooks switchTab() would run for a click. The hooks
+// are deferred to DOMContentLoaded because most tab modules (plan.js,
+// file-explorer.js, etc.) load AFTER tabs.js and aren't defined yet at
+// parse time of this IIFE.
+//
+// Resolution order: (a) a URL hash naming a valid panel always wins; (b)
+// else the last tab used in this workspace, if any; (c) else — first ever
+// visit to this workspace — the settings tab. With no workspace context
+// (project-selector view) and no hash, nothing is restored: the
+// statically-active panel in the HTML stands.
 (function() {
-  var hash = location.hash.slice(1).split('/')[0];
-  if (hash && document.getElementById('panel-' + hash)) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === hash));
-    document.querySelectorAll('.sidebar-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === hash));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + hash));
+  var ctx = typeof getWorkspaceContext === 'function' ? getWorkspaceContext() : null;
+  var hashTab = location.hash.slice(1).split('/')[0];
+  var hashIsValid = !!(hashTab && document.getElementById('panel-' + hashTab));
 
-    var mainEl = document.querySelector('.main');
-    if (mainEl && hash === 'terminal') mainEl.classList.add('terminal-active');
-
-    var splitMain = document.getElementById('splitMain');
-    if (splitMain && (hash === 'files' || hash === 'changes' || hash === 'terminal')) {
-      splitMain.classList.add('no-padding');
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-      _activateTabHooks(hash);
-    });
+  var tabId, writeResolvedHash;
+  if (hashIsValid) {
+    tabId = hashTab;
+    writeResolvedHash = false;
+  } else {
+    var lastTab = _loadLastTab(ctx);
+    var lastTabIsValid = !!(lastTab && document.getElementById('panel-' + lastTab));
+    if (!lastTabIsValid && !ctx) return; // no hash, no workspace: keep the static default panel
+    tabId = lastTabIsValid ? lastTab : 'dashboard';
+    writeResolvedHash = true;
   }
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  document.querySelectorAll('.sidebar-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tabId));
+
+  var mainEl = document.querySelector('.main');
+  if (mainEl && tabId === 'terminal') mainEl.classList.add('terminal-active');
+
+  var splitMain = document.getElementById('splitMain');
+  if (splitMain && (tabId === 'files' || tabId === 'changes' || tabId === 'terminal')) {
+    splitMain.classList.add('no-padding');
+  }
+
+  if (writeResolvedHash) {
+    var newHash = '#' + tabId;
+    if (tabId === 'dashboard') {
+      newHash += '/' + (_loadLastSettingsSectionRaw(ctx) || 'task');
+    }
+    history.replaceState(null, '', newHash);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    _activateTabHooks(tabId);
+  });
 })();
