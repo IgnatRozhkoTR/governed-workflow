@@ -54,6 +54,16 @@
   cursor: pointer;
 }
 
+#diffFileSearch {
+  flex: 0 0 auto;
+  width: 200px;
+  height: 28px;
+  padding: 5px 10px;
+  line-height: 1;
+  font-size: 0.75rem;
+  box-sizing: border-box;
+}
+
 .filter-select-menu {
   position: absolute;
   top: calc(100% + 4px);

@@ -169,6 +169,29 @@ document.addEventListener('click', function(e) {
 initFilterSelect('diffRepoSelect', function(value) { setDiffRepo(value); });
 initFilterSelect('diffBaseSelect', function(value) { setDiffBase(value); });
 
+document.addEventListener('keydown', function(e) {
+  var searchInput = document.getElementById('diffFileSearch');
+  if (!searchInput) return;
+
+  if (document.activeElement === searchInput && e.key === 'Escape') {
+    searchInput.value = '';
+    filterDiffFiles('');
+    searchInput.blur();
+    return;
+  }
+
+  var panelChanges = document.getElementById('panel-changes');
+  if (!panelChanges || !panelChanges.classList.contains('active')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+  if (e.key.length !== 1 || e.key === ' ') return;
+
+  var target = e.target;
+  var tagName = target && target.tagName;
+  if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || (target && target.isContentEditable)) return;
+
+  searchInput.focus();
+});
+
 // ═══════════════════════════════════════════════
 //  DIFF FILE LIST
 // ═══════════════════════════════════════════════
