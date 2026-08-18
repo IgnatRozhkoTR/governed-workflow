@@ -65,10 +65,10 @@ async function loadSetupData() {
   var languagesEl = document.getElementById('setup-languages');
 
   if (modulesEl) {
-    modulesEl.innerHTML = '<div style="color: var(--text-muted); padding: 12px 18px;">' + t('research.loading') + '</div>';
+    modulesEl.innerHTML = '<div class="setup-empty-msg">' + t('research.loading') + '</div>';
   }
   if (languagesEl) {
-    languagesEl.innerHTML = '<div style="color: var(--text-muted); padding: 12px 18px;">' + t('research.loading') + '</div>';
+    languagesEl.innerHTML = '<div class="setup-empty-msg">' + t('research.loading') + '</div>';
   }
 
   var modules = [];
@@ -113,17 +113,19 @@ function renderSetupPage() {
     + '<button class="ws-back-btn" onclick="hideSetupPage()">'
     + '<span class="ws-back-arrow">&larr;</span> ' + t('setup.backToProjects')
     + '</button>'
-    + '<h2 style="margin: 16px 0 4px;">' + t('setup.title') + '</h2>'
-    + '<p style="color: var(--text-muted); margin: 0 0 20px; font-size: 0.875rem;">' + t('setup.subtitle') + '</p>'
+    + '<div class="setup-header">'
+    + '<div class="setup-title">' + t('setup.title') + '</div>'
+    + '<div class="setup-subtitle">' + t('setup.subtitle') + '</div>'
+    + '</div>'
 
     + '<div class="setup-section">'
     + '<div class="setup-section-title">' + t('setup.modulesTitle') + '</div>'
-    + '<div id="setup-modules"><div style="color: var(--text-muted); padding: 12px 18px;">' + t('research.loading') + '</div></div>'
+    + '<div id="setup-modules"><div class="setup-empty-msg">' + t('research.loading') + '</div></div>'
     + '</div>'
 
     + '<div class="setup-section">'
     + '<div class="setup-section-title">' + t('setup.profilesTitle') + '</div>'
-    + '<div id="setup-languages"><div style="color: var(--text-muted); padding: 12px 18px;">' + t('research.loading') + '</div></div>'
+    + '<div id="setup-languages"><div class="setup-empty-msg">' + t('research.loading') + '</div></div>'
 
     + '<div class="setup-custom-form">'
     + '<div class="setup-section-title" style="margin-top: 16px;">' + t('setup.customProfileTitle') + '</div>'
@@ -134,13 +136,6 @@ function renderSetupPage() {
     + '<input id="setup-custom-lsp-command" class="ws-input" style="margin-bottom: 8px;" placeholder="' + t('setup.lspCommandPlaceholder') + '">'
     + '<input id="setup-custom-lsp-install-command" class="ws-input" style="margin-bottom: 8px;" placeholder="' + t('setup.lspInstallCommandPlaceholder') + '">'
     + '<button class="btn btn-sm" style="margin-top: 8px;" onclick="addCustomProfile()">' + t('setup.addProfileBtn') + '</button>'
-    + '</div>'
-    + '</div>'
-
-    + '<div class="setup-section">'
-    + '<div class="setup-section-title">LSP Keyboard Shortcuts</div>'
-    + '<div id="setup-shortcuts">'
-    + (typeof renderSetupShortcutsSection === 'function' ? renderSetupShortcutsSection() : '')
     + '</div>'
     + '</div>'
 
@@ -169,74 +164,74 @@ function renderSetupPage() {
 
 function renderSetupModules(modules, enabledModules) {
   if (modules.length === 0) {
-    return '<div style="color: var(--text-muted); padding: 12px 18px; font-style: italic;">' + t('setup.noModules') + '</div>';
+    return '<div class="setup-empty-msg">' + t('setup.noModules') + '</div>';
   }
 
   var enabledSet = {};
   enabledModules.forEach(function(id) { enabledSet[id] = true; });
 
-  return modules.map(function(mod) {
+  var itemsHtml = modules.map(function(mod) {
     var id = mod.id || mod.name || mod;
     var label = mod.label || mod.name || mod;
     var description = mod.description || '';
     var isChecked = enabledSet[id] ? 'checked' : '';
 
     var descHtml = description
-      ? '<div style="color: var(--text-muted); font-size: 0.78rem; margin-top: 2px;">' + _wsEscape(description) + '</div>'
+      ? '<span class="setup-module-desc">' + _wsEscape(description) + '</span>'
       : '';
 
-    return '<label class="ws-checkbox-label" style="display: flex; align-items: flex-start; gap: 8px; padding: 10px 18px; cursor: pointer;">'
-      + '<input type="checkbox" class="setup-module-checkbox" data-module-id="' + _wsEscape(id) + '" ' + isChecked + ' style="margin-top: 2px;">'
-      + '<div>'
-      + '<div>' + _wsEscape(label) + '</div>'
+    return '<div class="setup-module-item">'
+      + '<input type="checkbox" id="setup-module-' + _wsEscape(id) + '" class="setup-module-checkbox" data-module-id="' + _wsEscape(id) + '" ' + isChecked + '>'
+      + '<label for="setup-module-' + _wsEscape(id) + '">'
+      + '<span>' + _wsEscape(label) + '</span>'
       + descHtml
-      + '</div>'
-      + '</label>';
+      + '</label>'
+      + '</div>';
   }).join('');
+
+  return '<div class="setup-module-list">' + itemsHtml + '</div>';
 }
 
 function renderSetupLanguages(profiles) {
-  var defaultsHtml = '';
-
   if (profiles.length === 0 && _setupCustomProfiles.length === 0) {
-    defaultsHtml = '<div style="color: var(--text-muted); padding: 12px 18px; font-style: italic;">' + t('setup.noLanguageProfiles') + '</div>';
-  } else {
-    defaultsHtml = profiles.map(function(profile) {
-      var id = profile.id;
-      var name = _wsEscape(profile.name || '');
-      var language = _wsEscape(profile.language || '');
-      var lspCommand = profile.lsp_command ? _wsEscape(profile.lsp_command) : '';
-
-      var lspBadge = lspCommand
-        ? '<span class="badge" style="font-size: 0.65rem; padding: 1px 6px; background: var(--info, #0d6efd); color: #fff; border-radius: 3px; margin-left: 4px;" title="' + lspCommand + '">LSP</span>'
-        : '';
-
-      return '<div style="display: flex; align-items: center; gap: 8px; padding: 10px 18px;">'
-        + '<label class="ws-checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1;">'
-        + '<input type="checkbox" class="setup-language-checkbox" data-profile-id="' + id + '">'
-        + '<span>' + name + '</span>'
-        + (language ? '<span style="color: var(--text-muted); font-size: 0.78rem;">(' + language + ')</span>' : '')
-        + lspBadge
-        + '</label>'
-        + '<button class="btn btn-sm btn-outline" style="font-size: 0.72rem; color: var(--danger, #dc3545); border-color: var(--danger, #dc3545);" onclick="deleteVerificationProfile(' + id + ')">&times;</button>'
-        + '</div>';
-    }).join('');
+    return '<div class="setup-empty-msg">' + t('setup.noLanguageProfiles') + '</div>';
   }
+
+  var defaultsHtml = profiles.map(function(profile) {
+    var id = profile.id;
+    var name = _wsEscape(profile.name || '');
+    var language = _wsEscape(profile.language || '');
+    var lspCommand = profile.lsp_command ? _wsEscape(profile.lsp_command) : '';
+
+    var lspBadge = lspCommand
+      ? '<span class="badge setup-lsp-badge" title="' + lspCommand + '">LSP</span>'
+      : '';
+
+    return '<div class="setup-lang-item" style="display: flex; align-items: center; gap: 8px;">'
+      + '<label class="ws-checkbox-label" style="flex: 1;">'
+      + '<input type="checkbox" class="setup-language-checkbox" data-profile-id="' + id + '">'
+      + '<span>' + name + '</span>'
+      + (language ? '<span style="color: var(--text-muted); font-size: 0.78rem;">(' + language + ')</span>' : '')
+      + lspBadge
+      + '</label>'
+      + '<button class="btn btn-sm btn-outline" style="font-size: 0.72rem; color: var(--danger, #dc3545); border-color: var(--danger, #dc3545);" onclick="deleteVerificationProfile(' + id + ')">&times;</button>'
+      + '</div>';
+  }).join('');
 
   var customHtml = _setupCustomProfiles.map(function(cp, index) {
     var lspBadge = cp.lsp_command
-      ? '<span class="badge" style="font-size: 0.65rem; padding: 1px 6px; background: var(--info, #0d6efd); color: #fff; border-radius: 3px; margin-left: 4px;" title="' + _wsEscape(cp.lsp_command) + '">LSP</span>'
+      ? '<span class="badge setup-lsp-badge" title="' + _wsEscape(cp.lsp_command) + '">LSP</span>'
       : '';
-    return '<div style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-top: 1px solid var(--border);">'
+    return '<div class="setup-lang-item" style="display: flex; align-items: center; gap: 8px;">'
       + '<span style="font-size: 0.82rem;">' + _wsEscape(cp.name) + '</span>'
       + (cp.config ? '<span style="color: var(--text-muted); font-size: 0.78rem;">(' + _wsEscape(cp.config) + ')</span>' : '')
-      + '<span class="badge" style="font-size: 0.65rem; padding: 1px 6px; background: var(--accent); color: var(--accent-text); border-radius: 3px; margin-left: 4px;">custom</span>'
+      + '<span class="badge setup-custom-badge">custom</span>'
       + lspBadge
       + '<button class="btn btn-sm btn-outline" style="margin-left: auto; font-size: 0.72rem;" onclick="removeCustomProfile(' + index + ')">' + t('setup.removeToolBtn') + '</button>'
       + '</div>';
   }).join('');
 
-  return defaultsHtml + customHtml;
+  return '<div class="setup-lang-list">' + defaultsHtml + customHtml + '</div>';
 }
 
 // ─── Custom profile form ───
@@ -293,13 +288,13 @@ function removeCustomProfile(index) {
 }
 
 async function deleteVerificationProfile(profileId) {
-  if (!confirm('Delete this profile and all its steps? This cannot be undone.')) return;
+  if (!confirm(t('setup.deleteProfileConfirm'))) return;
   try {
     await apiDelete('/api/verification/profiles/' + profileId);
     _setupCachedProfiles = _setupCachedProfiles.filter(function(p) { return p.id !== profileId; });
     _reRenderLanguages();
   } catch (e) {
-    if (typeof showToast === 'function') showToast('Delete failed: ' + e.message);
+    if (typeof showToast === 'function') showToast(t('setup.deleteProfileFailed') + ': ' + e.message);
   }
 }
 
@@ -337,10 +332,6 @@ async function startSetup() {
   if (errorEl) errorEl.textContent = '';
 
   var config = getSetupConfig();
-
-  if (typeof collectSetupShortcuts === 'function' && typeof saveLspShortcuts === 'function') {
-    saveLspShortcuts(collectSetupShortcuts());
-  }
 
   try {
     await apiPost('/api/modules/enabled', { modules: config.modules });

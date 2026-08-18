@@ -128,22 +128,22 @@
   color: var(--text-primary);
 }
 
-.setup-lang-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-  margin-left: 23px;
+.setup-lsp-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  background: var(--info, #0d6efd);
+  color: #fff;
+  border-radius: 3px;
+  margin-left: 4px;
 }
 
-.setup-lang-tool-tag {
-  padding: 2px 8px;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--text-secondary);
+.setup-custom-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  border-radius: 3px;
+  margin-left: 4px;
 }
 
 /* ─── Custom language form ────────────────────── */
@@ -154,20 +154,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.setup-custom-row {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-}
-
-.setup-custom-row .ws-form-row {
-  flex: 1;
-}
-
-.setup-custom-row .btn {
-  flex-shrink: 0;
 }
 
 /* ─── Start button ────────────────────────────── */
