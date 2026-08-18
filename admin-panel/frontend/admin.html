@@ -80,6 +80,7 @@
 <link rel="stylesheet" href="css/workspace.css?v=11">
 <link rel="stylesheet" href="css/phase-settings.css?v=1">
 <link rel="stylesheet" href="css/proposals.css?v=1">
+<link rel="stylesheet" href="css/settings.css?v=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -113,7 +114,7 @@
   <div class="header-right">
     <span class="badge badge-warning mobile-phase-badge" id="phaseLabelMobile"></span>
     <div class="mobile-yolo" style="display: flex; align-items: center; gap: 4px;">
-      <input type="checkbox" id="yoloCheck" onchange="toggleYoloMode(this.checked)" style="margin: 0;">
+      <input type="checkbox" id="yoloCheck" onchange="onYoloCheckboxChange(this.checked,'yoloCheck')" style="margin: 0;">
       <label for="yoloCheck" style="font-size: 0.7rem; cursor: pointer; color: var(--text-muted); user-select: none;" data-i18n="config.yoloMode">YOLO</label>
     </div>
     <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()">&#8942;</button>
@@ -160,7 +161,7 @@
   <button class="sidebar-btn" data-tab="changes" title="Code Changes" data-i18n-title="sidebar.changes">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
   </button>
-  <button class="sidebar-btn" data-tab="dashboard" title="Configuration" data-i18n-title="tabs.configuration">
+  <button class="sidebar-btn" data-tab="dashboard" title="Settings" data-i18n-title="tabs.settings">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
   </button>
   <button class="sidebar-btn" data-tab="review" title="Review" data-i18n-title="tabs.review">
@@ -200,7 +201,7 @@
 <div class="split-container" id="splitContainer">
 <div class="split-main" id="splitMain">
 
-  <!-- ─── DASHBOARD ─── -->
+  <!-- ─── SETTINGS (was DASHBOARD/Configuration) ─── -->
   <div class="tab-panel" id="panel-dashboard">
 
     <!-- Commands -->
@@ -213,216 +214,243 @@
 	          <button class="btn-dropdown-item" onclick="doStart('split')" data-i18n="actions.sidePanel">Side panel</button>
 	        </div>
 	      </div>
-	      <div id="sessionsHistoryBlock" style="display:none;">
-	        <button class="btn btn-sm" title="Browse session history" id="sessionsHistoryBtn" data-i18n="buttons.sessions">Sessions</button>
-	      </div>
       <button class="btn btn-sm btn-outline" onclick="copyWorkspacePath()" id="copyPathBtn" data-i18n="actions.copyPath">Path</button>
     </div>
-    <div id="sessionsHistoryDropdown" style="display:none; margin-bottom:12px; padding:8px 12px; background:var(--bg-raised); border:1px solid var(--border); border-radius:var(--radius-sm); max-height:200px; overflow-y:auto;"></div>
 
-    <!-- Task Context (moved from Context tab) -->
-    <div class="card collapsed">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.taskContext">Task Context</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body">
-        <div class="context-fields">
-          <div class="context-row">
+    <div class="settings-layout">
+      <nav class="settings-nav" id="settingsNav">
+        <div class="settings-nav-group">
+          <div class="settings-nav-group-title" data-i18n="settings.group.task">Task</div>
+          <button type="button" class="settings-nav-item active" data-section="task" data-i18n="settings.nav.task">Task</button>
+        </div>
+        <div class="settings-nav-group">
+          <div class="settings-nav-group-title" data-i18n="settings.group.workflow">Workflow</div>
+          <button type="button" class="settings-nav-item" data-section="workflow" data-i18n="settings.nav.workflow">Workflow</button>
+          <button type="button" class="settings-nav-item" data-section="verification" data-i18n="settings.nav.verification">Verification</button>
+          <button type="button" class="settings-nav-item" data-section="rules" data-i18n="settings.nav.rules">Rules</button>
+        </div>
+        <div class="settings-nav-group">
+          <div class="settings-nav-group-title" data-i18n="settings.group.system">System</div>
+          <button type="button" class="settings-nav-item" data-section="git" data-i18n="settings.nav.git">Git</button>
+          <button type="button" class="settings-nav-item" data-section="claude" data-i18n="settings.nav.claude">Claude</button>
+          <button type="button" class="settings-nav-item" data-section="system" data-i18n="settings.nav.system">System</button>
+          <button type="button" class="settings-nav-item" data-section="interface" data-i18n="settings.nav.interface">Interface</button>
+        </div>
+      </nav>
+
+      <div class="settings-content" id="settingsContent">
+
+        <!-- Task -->
+        <section class="settings-section active" data-section="task">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.task.title">Task Context</h2>
+            <span class="settings-scope-badge" data-i18n="settings.scope.workspace">Workspace</span>
+          </div>
+          <p class="settings-section-desc" data-i18n="settings.section.task.desc">Ticket details and task description for this workspace.</p>
+
+          <div class="context-fields">
+            <div class="context-row">
+              <div class="context-field">
+                <label class="context-label" data-i18n="labels.ticketId">Ticket ID</label>
+                <input type="text" class="context-input" id="contextTicketId" readonly>
+              </div>
+              <div class="context-field context-field-grow">
+                <label class="context-label" data-i18n="labels.ticketName">Ticket Name</label>
+                <input type="text" class="context-input" id="contextTicketName" placeholder="Enter ticket/task name..." data-i18n-placeholder="placeholders.enterTicketName">
+              </div>
+            </div>
             <div class="context-field">
-              <label class="context-label" data-i18n="labels.ticketId">Ticket ID</label>
-              <input type="text" class="context-input" id="contextTicketId" readonly>
+              <label class="context-label" data-i18n="labels.context">Context</label>
+              <textarea class="context-textarea" id="contextText" placeholder="Describe the task, requirements, acceptance criteria..." data-i18n-placeholder="placeholders.describeTask"></textarea>
             </div>
-            <div class="context-field context-field-grow">
-              <label class="context-label" data-i18n="labels.ticketName">Ticket Name</label>
-              <input type="text" class="context-input" id="contextTicketName" placeholder="Enter ticket/task name..." data-i18n-placeholder="placeholders.enterTicketName">
+            <div class="context-field" style="margin-top: 4px;">
+              <label class="context-label" data-i18n="labels.fileDirectoryReferences">File &amp; Directory References</label>
+              <div style="position: relative;">
+                <input type="text" id="contextRefSearch" class="context-input"
+                       placeholder="Type to search files and directories..."
+                       data-i18n-placeholder="placeholders.searchFilesAndDirs"
+                       autocomplete="off"
+                       oninput="searchContextRefs(this.value)"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();addManualContextRef(this.value);}">
+                <div id="contextRefDropdown" class="ref-dropdown" style="display:none;"></div>
+              </div>
+              <div id="contextRefsList" class="refs-list" style="margin-top: 8px;"></div>
             </div>
-          </div>
-          <div class="context-field">
-            <label class="context-label" data-i18n="labels.context">Context</label>
-            <textarea class="context-textarea" id="contextText" placeholder="Describe the task, requirements, acceptance criteria..." data-i18n-placeholder="placeholders.describeTask"></textarea>
-          </div>
-          <div class="context-field" style="margin-top: 4px;">
-            <label class="context-label" data-i18n="labels.fileDirectoryReferences">File &amp; Directory References</label>
-            <div style="position: relative;">
-              <input type="text" id="contextRefSearch" class="context-input"
-                     placeholder="Type to search files and directories..."
-                     data-i18n-placeholder="placeholders.searchFilesAndDirs"
-                     autocomplete="off"
-                     oninput="searchContextRefs(this.value)"
-                     onkeydown="if(event.key==='Enter'){event.preventDefault();addManualContextRef(this.value);}">
-              <div id="contextRefDropdown" class="ref-dropdown" style="display:none;"></div>
-            </div>
-            <div id="contextRefsList" class="refs-list" style="margin-top: 8px;"></div>
-          </div>
-          <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
-            <button class="btn btn-sm" onclick="saveContext()" data-i18n="buttons.saveContext">Save Context</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Verification Profiles -->
-    <div class="card">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.verificationProfiles">Verification Profiles</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body">
-        <div id="verificationAssigned"></div>
-        <div class="verification-assign-row">
-          <select id="verificationProfileSelect"></select>
-          <input type="text" id="verificationSubpath" placeholder="subpath (default: .)" title="Subpath (default: .)">
-          <button class="btn btn-sm" onclick="assignVerificationProfile()" data-i18n="verification.assign">Assign</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Git Configuration -->
-    <div class="card collapsed">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.gitConfiguration">Git Configuration</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body">
-        <div class="context-fields">
-          <div class="context-row">
-            <div class="context-field">
-              <label class="context-label" data-i18n="labels.provider">Provider</label>
-              <select class="context-input" id="gitProvider" style="min-width: 140px;" onchange="toggleGitLabFields()">
-                <option value="local" data-i18n="gitProvider.local">Local</option>
-                <option value="github" data-i18n="gitProvider.github">GitHub</option>
-                <option value="gitlab" data-i18n="gitProvider.gitlab">GitLab</option>
-              </select>
-            </div>
-            <div id="gitLabFields" style="display:none; gap: inherit; flex: 1; flex-wrap: wrap;">
-            <div class="context-field context-field-grow">
-              <label class="context-label" data-i18n="labels.host">Host</label>
-              <input type="text" class="context-input" id="gitHost" placeholder="e.g. gitlab.example.com" data-i18n-placeholder="placeholders.gitHost">
-            </div>
-            <div class="context-field context-field-grow">
-              <label class="context-label" data-i18n="labels.apiToken">API Token</label>
-              <input type="password" class="context-input" id="gitToken" placeholder="Enter token..." data-i18n-placeholder="placeholders.enterToken">
-            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+              <button class="btn btn-sm" onclick="saveContext()" data-i18n="buttons.saveContext">Save Context</button>
             </div>
           </div>
-          <div class="context-row">
-            <div class="context-field">
-              <label class="context-label" data-i18n="labels.defaultBranch">Default Branch</label>
-              <input type="text" class="context-input" id="gitDefaultBranch" placeholder="develop" style="width: 160px;" data-i18n-placeholder="placeholders.develop">
+
+          <details class="settings-details">
+            <summary data-i18n="cards.savedContextRaw">Saved Context (raw)</summary>
+            <pre class="context-raw" id="contextRaw"></pre>
+          </details>
+        </section>
+
+        <!-- Workflow -->
+        <section class="settings-section" data-section="workflow">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.workflow.title">Workflow Mode</h2>
+            <span class="settings-scope-badge" data-i18n="settings.scope.workspace">Workspace</span>
+          </div>
+          <p class="settings-section-desc" data-i18n="settings.section.workflow.desc">Control how strictly this workspace enforces the governed workflow.</p>
+
+          <div id="workflowModeCardBody"></div>
+
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label" data-i18n="config.yoloMode">YOLO</div>
+              <div class="settings-row-desc" data-i18n="settings.section.workflow.yoloDesc">Skip confirmation prompts before phase and gate transitions.</div>
             </div>
-            <div style="margin-left: auto; display: flex; align-items: flex-end;">
-              <button class="btn btn-sm btn-primary" onclick="saveGitConfig()" data-i18n="buttons.saveGitConfig">Save Git Config</button>
+            <div class="settings-row-control">
+              <input type="checkbox" id="settingsYoloCheck" onchange="onYoloCheckboxChange(this.checked,'settingsYoloCheck')">
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+        </section>
 
-    <!-- Git Rules (placeholder) -->
-    <div class="card collapsed">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.gitRules">Git Rules</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body">
-        <div style="margin-bottom: 8px; font-size: 0.75rem; color: var(--text-muted);" id="gitRulesSource">Source: Not configured</div>
-        <textarea class="context-textarea" id="gitRulesContent" style="width: 100%; min-height: 300px; font-family: monospace; font-size: 13px;" placeholder="Git rules will appear here..." data-i18n-placeholder="placeholders.gitRules"></textarea>
-        <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-          <button class="btn btn-sm btn-primary" onclick="saveGitRules()" data-i18n="buttons.saveRules">Save Rules</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Rules -->
-    <div class="card collapsed">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.rules">Rules</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body">
-        <div id="rulesList"></div>
-        <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-          <button class="btn btn-sm btn-primary" onclick="openRuleModal()" data-i18n="buttons.newRule">New rule</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Workflow Mode -->
-    <div class="card collapsed" id="workflowModeCard">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.workflowMode">Workflow Mode</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body" id="workflowModeCardBody"></div>
-    </div>
-
-    <!-- Claude Command -->
-    <div class="card collapsed">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.claudeCommand">Claude Command</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body">
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <div>
-            <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.commandLabel">Command</label>
-            <input type="text" class="context-input" id="claudeCommandInput" placeholder="claude" style="width: 100%;">
+        <!-- Verification -->
+        <section class="settings-section" data-section="verification">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.verification.title">Verification Profiles</h2>
+            <span class="settings-scope-badge" data-i18n="settings.scope.project">Project</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="skipPermissionsCheck" checked>
-            <label for="skipPermissionsCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.skipPermissions">Include --dangerously-skip-permissions flag</label>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-            <input type="checkbox" id="restrictToWorkspaceCheck" checked>
-            <label for="restrictToWorkspaceCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.restrictToWorkspace">Restrict file modifications to workspace directory</label>
-          </div>
-          <div style="margin-top: 8px;">
-            <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.externalPaths">Allowed external paths (comma-separated)</label>
-            <input type="text" class="context-input" id="allowedExternalPathsInput" placeholder="/tmp/, /var/log/" style="width: 100%;">
-          </div>
-          <div style="margin-top: 8px;">
-            <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.envVars">Environment variables (KEY=VALUE per line)</label>
-            <textarea class="context-input" id="envVarsInput" rows="4" placeholder="API_KEY=sk-...&#10;DEBUG=1" style="width: 100%; font-family: var(--font-mono); resize: vertical;"></textarea>
-          </div>
-          <div style="display: flex; gap: 6px; justify-content: flex-end;">
-            <button class="btn btn-sm" onclick="saveClaudeCommand()" data-i18n="buttons.save">Save</button>
-          </div>
-        </div>
-      </div>
-    </div>
+          <p class="settings-section-desc" data-i18n="settings.section.verification.desc">Assign verification profiles and manage checks for this project.</p>
 
-    <!-- Network Mode -->
-    <div class="card" id="networkModeCard"></div>
+          <div id="verificationAssigned"></div>
+          <div class="verification-assign-row">
+            <select id="verificationProfileSelect"></select>
+            <input type="text" id="verificationSubpath" placeholder="subpath (default: .)" title="Subpath (default: .)">
+            <button class="btn btn-sm" onclick="assignVerificationProfile()" data-i18n="verification.assign">Assign</button>
+          </div>
+        </section>
 
-    <!-- LSP Shortcuts -->
-    <div class="card collapsed" id="lspShortcutsCard">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title">LSP Shortcuts</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body" id="lspShortcutsBody">
-      </div>
-    </div>
+        <!-- Rules -->
+        <section class="settings-section" data-section="rules">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.rules.title">Rules</h2>
+            <span class="settings-scope-badge" data-i18n="settings.scope.project">Project</span>
+          </div>
+          <p class="settings-section-desc" data-i18n="settings.section.rules.desc">Project-specific rules enforced during implementation and review.</p>
 
-    <!-- Modules -->
-    <div class="card" id="modulesCard" style="display: none;">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title">Modules</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body" id="modulesCardBody">
-      </div>
-    </div>
+          <div id="rulesList"></div>
+          <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+            <button class="btn btn-sm btn-primary" onclick="openRuleModal()" data-i18n="buttons.newRule">New rule</button>
+          </div>
 
-    <!-- Saved Context (raw) -->
-    <div class="card collapsed">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.savedContextRaw">Saved Context (raw)</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body">
-        <pre class="context-raw" id="contextRaw"></pre>
+          <div class="settings-subsection">
+            <div class="settings-subsection-title" data-i18n="cards.gitRules">Git Rules</div>
+            <div style="margin-bottom: 8px; font-size: 0.75rem; color: var(--text-muted);" id="gitRulesSource">Source: Not configured</div>
+            <textarea class="context-textarea" id="gitRulesContent" style="width: 100%; min-height: 300px; font-family: monospace; font-size: 13px;" placeholder="Git rules will appear here..." data-i18n-placeholder="placeholders.gitRules"></textarea>
+            <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+              <button class="btn btn-sm btn-primary" onclick="saveGitRules()" data-i18n="buttons.saveRules">Save Rules</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Git -->
+        <section class="settings-section" data-section="git">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.git.title">Git Configuration</h2>
+            <span class="settings-scope-badge" data-i18n="settings.scope.project">Project</span>
+          </div>
+          <p class="settings-section-desc" data-i18n="settings.section.git.desc">Configure how this project connects to its Git remote.</p>
+
+          <div class="context-fields">
+            <div class="context-row">
+              <div class="context-field">
+                <label class="context-label" data-i18n="labels.provider">Provider</label>
+                <select class="context-input" id="gitProvider" style="min-width: 140px;" onchange="toggleGitLabFields()">
+                  <option value="local" data-i18n="gitProvider.local">Local</option>
+                  <option value="github" data-i18n="gitProvider.github">GitHub</option>
+                  <option value="gitlab" data-i18n="gitProvider.gitlab">GitLab</option>
+                </select>
+              </div>
+              <div id="gitLabFields" style="display:none; gap: inherit; flex: 1; flex-wrap: wrap;">
+              <div class="context-field context-field-grow">
+                <label class="context-label" data-i18n="labels.host">Host</label>
+                <input type="text" class="context-input" id="gitHost" placeholder="e.g. gitlab.example.com" data-i18n-placeholder="placeholders.gitHost">
+              </div>
+              <div class="context-field context-field-grow">
+                <label class="context-label" data-i18n="labels.apiToken">API Token</label>
+                <input type="password" class="context-input" id="gitToken" placeholder="Enter token..." data-i18n-placeholder="placeholders.enterToken">
+              </div>
+              </div>
+            </div>
+            <div class="context-row">
+              <div class="context-field">
+                <label class="context-label" data-i18n="labels.defaultBranch">Default Branch</label>
+                <input type="text" class="context-input" id="gitDefaultBranch" placeholder="develop" style="width: 160px;" data-i18n-placeholder="placeholders.develop">
+              </div>
+              <div style="margin-left: auto; display: flex; align-items: flex-end;">
+                <button class="btn btn-sm btn-primary" onclick="saveGitConfig()" data-i18n="buttons.saveGitConfig">Save Git Config</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Claude -->
+        <section class="settings-section" data-section="claude">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.claude.title">Claude Command</h2>
+            <span class="settings-scope-badge" data-i18n="settings.scope.workspace">Workspace</span>
+          </div>
+          <p class="settings-section-desc" data-i18n="settings.section.claude.desc">Control how the Claude CLI is launched for this workspace.</p>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div>
+              <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.commandLabel">Command</label>
+              <input type="text" class="context-input" id="claudeCommandInput" placeholder="claude" style="width: 100%;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="skipPermissionsCheck" checked>
+              <label for="skipPermissionsCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.skipPermissions">Include --dangerously-skip-permissions flag</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+              <input type="checkbox" id="restrictToWorkspaceCheck" checked>
+              <label for="restrictToWorkspaceCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.restrictToWorkspace">Restrict file modifications to workspace directory</label>
+            </div>
+            <div style="margin-top: 8px;">
+              <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.externalPaths">Allowed external paths (comma-separated)</label>
+              <input type="text" class="context-input" id="allowedExternalPathsInput" placeholder="/tmp/, /var/log/" style="width: 100%;">
+            </div>
+            <div style="margin-top: 8px;">
+              <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.envVars">Environment variables (KEY=VALUE per line)</label>
+              <textarea class="context-input" id="envVarsInput" rows="4" placeholder="API_KEY=sk-...&#10;DEBUG=1" style="width: 100%; font-family: var(--font-mono); resize: vertical;"></textarea>
+            </div>
+            <div style="display: flex; gap: 6px; justify-content: flex-end;">
+              <button class="btn btn-sm" onclick="saveClaudeCommand()" data-i18n="buttons.save">Save</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- System -->
+        <section class="settings-section" data-section="system">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.system.title">System</h2>
+            <span class="settings-scope-badge" data-i18n="settings.scope.device">Device</span>
+          </div>
+          <p class="settings-section-desc" data-i18n="settings.section.system.desc">Device-wide network and module settings.</p>
+
+          <div id="networkModeCard"></div>
+
+          <div class="settings-subsection" id="modulesCard" style="display: none;">
+            <div class="settings-subsection-title" data-i18n="settings.section.system.modulesTitle">Modules</div>
+            <div id="modulesCardBody"></div>
+          </div>
+        </section>
+
+        <!-- Interface -->
+        <section class="settings-section" data-section="interface">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.interface.title">Interface</h2>
+            <span class="settings-scope-badge" data-i18n="settings.scope.browser">Browser</span>
+          </div>
+          <p class="settings-section-desc" data-i18n="settings.section.interface.desc">Browser-local editor preferences.</p>
+
+          <div class="settings-subsection-title" data-i18n="settings.section.interface.lspShortcutsTitle" style="margin-bottom: 12px;">LSP Keyboard Shortcuts</div>
+          <div id="lspShortcutsBody"></div>
+        </section>
+
       </div>
     </div>
 
@@ -803,7 +831,7 @@
 <script src="js/comments.js?v=10"></script>
 <script src="js/theme.js?v=10"></script>
 <script src="js/terminal.js?v=20"></script>
-<script src="js/tabs.js?v=12"></script>
+<script src="js/tabs.js?v=13"></script>
 <script src="js/phase.js?v=11"></script>
 <script src="js/plan.js?v=10"></script>
 <script src="js/scope.js?v=10"></script>
@@ -818,7 +846,7 @@
 <script src="js/git-config.js?v=10"></script>
 <script src="js/rules.js?v=1"></script>
 <script src="js/claude-config.js?v=12"></script>
-<script src="js/network-mode.js?v=11"></script>
+<script src="js/network-mode.js?v=12"></script>
 <script src="js/context.js?v=10"></script>
 <script src="js/criteria.js?v=10"></script>
 <script src="js/preplanning.js?v=10"></script>
@@ -828,6 +856,7 @@
 <script src="js/advance-modes.js?v=1"></script>
 <script src="js/review-pipeline.js?v=1"></script>
 <script src="js/actions.js?v=10"></script>
+<script src="js/settings.js?v=1"></script>
 <script src="js/app.js?v=12"></script>
 <script src="js/workspace.js?v=11"></script>
 

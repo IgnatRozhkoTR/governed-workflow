@@ -1,6 +1,7 @@
 {
   "tabs.mainPage": "Main Page",
   "tabs.configuration": "Configuration",
+  "tabs.settings": "Settings",
   "tabs.preplanning": "Pre-planning",
   "tabs.research": "Research",
   "tabs.phaseControl": "Phase Control",
@@ -647,5 +648,50 @@
   "proposals.type.agent_update": "Agent update",
   "proposals.type.skill_new": "New skill",
   "proposals.type.skill_update": "Skill update",
-  "proposals.type.workflow_improvement": "Workflow improvement"
+  "proposals.type.workflow_improvement": "Workflow improvement",
+
+  "settings.nav.task": "Task",
+  "settings.nav.workflow": "Workflow",
+  "settings.nav.verification": "Verification",
+  "settings.nav.rules": "Rules",
+  "settings.nav.git": "Git",
+  "settings.nav.claude": "Claude",
+  "settings.nav.system": "System",
+  "settings.nav.interface": "Interface",
+
+  "settings.group.task": "Task",
+  "settings.group.workflow": "Workflow",
+  "settings.group.system": "System",
+
+  "settings.scope.device": "Device",
+  "settings.scope.project": "Project",
+  "settings.scope.workspace": "Workspace",
+  "settings.scope.browser": "Browser",
+
+  "settings.section.task.title": "Task Context",
+  "settings.section.task.desc": "Ticket details and task description for this workspace.",
+
+  "settings.section.workflow.title": "Workflow Mode",
+  "settings.section.workflow.desc": "Control how strictly this workspace enforces the governed workflow.",
+  "settings.section.workflow.yoloDesc": "Skip confirmation prompts before phase and gate transitions.",
+
+  "settings.section.verification.title": "Verification Profiles",
+  "settings.section.verification.desc": "Assign verification profiles and manage checks for this project.",
+
+  "settings.section.rules.title": "Rules",
+  "settings.section.rules.desc": "Project-specific rules enforced during implementation and review.",
+
+  "settings.section.git.title": "Git Configuration",
+  "settings.section.git.desc": "Configure how this project connects to its Git remote.",
+
+  "settings.section.claude.title": "Claude Command",
+  "settings.section.claude.desc": "Control how the Claude CLI is launched for this workspace.",
+
+  "settings.section.system.title": "System",
+  "settings.section.system.desc": "Device-wide network and module settings.",
+  "settings.section.system.modulesTitle": "Modules",
+
+  "settings.section.interface.title": "Interface",
+  "settings.section.interface.desc": "Browser-local editor preferences.",
+  "settings.section.interface.lspShortcutsTitle": "LSP Keyboard Shortcuts"
 }

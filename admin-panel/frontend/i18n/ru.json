@@ -1,6 +1,7 @@
 {
   "tabs.mainPage": "Главная",
   "tabs.configuration": "Конфигурация",
+  "tabs.settings": "Настройки",
   "tabs.preplanning": "Предпланирование",
   "tabs.research": "Исследование",
   "tabs.phaseControl": "Управление фазами",
@@ -647,5 +648,50 @@
   "proposals.type.agent_update": "Обновление агента",
   "proposals.type.skill_new": "Новый навык",
   "proposals.type.skill_update": "Обновление навыка",
-  "proposals.type.workflow_improvement": "Улучшение процесса"
+  "proposals.type.workflow_improvement": "Улучшение процесса",
+
+  "settings.nav.task": "Задача",
+  "settings.nav.workflow": "Процесс",
+  "settings.nav.verification": "Верификация",
+  "settings.nav.rules": "Правила",
+  "settings.nav.git": "Git",
+  "settings.nav.claude": "Claude",
+  "settings.nav.system": "Система",
+  "settings.nav.interface": "Интерфейс",
+
+  "settings.group.task": "Задача",
+  "settings.group.workflow": "Процесс",
+  "settings.group.system": "Система",
+
+  "settings.scope.device": "Устройство",
+  "settings.scope.project": "Проект",
+  "settings.scope.workspace": "Рабочее пространство",
+  "settings.scope.browser": "Браузер",
+
+  "settings.section.task.title": "Контекст задачи",
+  "settings.section.task.desc": "Данные тикета и описание задачи для этого рабочего пространства.",
+
+  "settings.section.workflow.title": "Режим работы",
+  "settings.section.workflow.desc": "Настройте, насколько строго это рабочее пространство соблюдает управляемый процесс.",
+  "settings.section.workflow.yoloDesc": "Пропускать подтверждения при переходах между фазами и шлюзами.",
+
+  "settings.section.verification.title": "Профили верификации",
+  "settings.section.verification.desc": "Назначайте профили верификации и управляйте проверками для этого проекта.",
+
+  "settings.section.rules.title": "Правила",
+  "settings.section.rules.desc": "Правила проекта, применяемые при реализации и ревью.",
+
+  "settings.section.git.title": "Конфигурация Git",
+  "settings.section.git.desc": "Настройте подключение этого проекта к удалённому репозиторию Git.",
+
+  "settings.section.claude.title": "Команда Claude",
+  "settings.section.claude.desc": "Настройте способ запуска Claude CLI для этого рабочего пространства.",
+
+  "settings.section.system.title": "Система",
+  "settings.section.system.desc": "Настройки сети и модулей на уровне устройства.",
+  "settings.section.system.modulesTitle": "Модули",
+
+  "settings.section.interface.title": "Интерфейс",
+  "settings.section.interface.desc": "Локальные настройки редактора в браузере.",
+  "settings.section.interface.lspShortcutsTitle": "Горячие клавиши LSP"
 }
