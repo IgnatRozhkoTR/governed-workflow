@@ -44,5 +44,6 @@ claude/skills/postman-collection/
 admin-panel/backend/projects.json
 admin-panel/.reviews/
 admin-panel/backend/sdkman*/
-claude/tools/
+claude/tools/*
+!claude/tools/kotlin-lsp-launcher.py
 claude/modules-local/

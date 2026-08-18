@@ -24,6 +24,7 @@ _request_id_lock = threading.Lock()
 _request_id_counter = 0
 
 LSP_CACHE_DIR_PLACEHOLDER = "{lsp_cache_dir}"
+LSP_TOOLS_DIR_PLACEHOLDER = "{tools_dir}"
 
 
 def _next_request_id():
@@ -131,8 +132,7 @@ def _process_key(project_id, profile_id):
 
 def _lsp_cache_root():
     """Return the root directory for persistent per-instance LSP cache dirs."""
-    tools_dir = os.environ.get("GOVERNED_WORKFLOW_TOOLS_DIR") or str(paths.DEFAULT_TOOLS_DIR)
-    return Path(tools_dir) / "lsp-cache"
+    return paths.tools_dir() / "lsp-cache"
 
 
 def lsp_cache_dir(project_id, profile_id):
@@ -175,6 +175,25 @@ def remove_lsp_cache_dirs(project_id):
         shutil.rmtree(project_cache_dir)
     except OSError:
         logger.warning("Failed to remove LSP cache dir %s", project_cache_dir, exc_info=True)
+
+
+def _resolve_lsp_command(command):
+    """Resolve a profile's lsp_command into the argv prefix used to spawn it.
+
+    Substitutes the ``{tools_dir}`` placeholder with the repo's tools
+    directory (``paths.tools_dir``). The resolved path is invoked via
+    ``python3`` when it lacks the executable bit -- git does not reliably
+    preserve file permissions across every checkout method (zip downloads,
+    some CI checkouts), so relying solely on the bit being set would be
+    fragile. Commands without the placeholder are returned unchanged,
+    matching prior behavior for tools resolved via PATH.
+    """
+    if LSP_TOOLS_DIR_PLACEHOLDER not in command:
+        return [command]
+    resolved = command.replace(LSP_TOOLS_DIR_PLACEHOLDER, str(paths.tools_dir()))
+    if os.access(resolved, os.X_OK):
+        return [resolved]
+    return ["python3", resolved]
 
 
 def _is_pid_alive(pid):
@@ -501,7 +520,7 @@ def _start_lsp_server_body(db, project_id, profile_id, workspace_path, key):
     lsp_args = _substitute_lsp_cache_dir(
         json.loads(profile["lsp_args"] or "[]"), project_id, profile_id
     )
-    cmd = [profile["lsp_command"]] + lsp_args
+    cmd = _resolve_lsp_command(profile["lsp_command"]) + lsp_args
     logger.info("Starting LSP server: %s (project=%s, profile=%s)", cmd, project_id, profile_id)
 
     try:
