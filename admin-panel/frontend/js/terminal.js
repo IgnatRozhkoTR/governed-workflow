@@ -11,6 +11,35 @@ var PASTED_IMAGE_DEDUPE_WINDOW_MS = 10000;
 var _lastTerminalEnterAt = 0;
 var POST_ENTER_PASTE_SUPPRESS_MS = 500;
 var _IS_MAC = /Mac/.test(navigator.platform || navigator.userAgent || '');
+var _terminalInstanceCounter = 0;
+var _typedBurstTimestamps = [];
+var _typedBurstActive = false;
+var _typedBurstQuietTimer = null;
+var RAPID_BURST_WINDOW_MS = 400;
+var RAPID_BURST_THRESHOLD = 40;
+var RAPID_BURST_QUIET_MS = 1000;
+
+// Tracks single-character onData events in a rolling window so simulated/automated
+// keystroke floods (which never fire a real 'paste' event) still surface in the logs.
+function _trackRapidTypedBurst() {
+  var now = Date.now();
+  _typedBurstTimestamps.push(now);
+  if (_typedBurstTimestamps.length > 60) {
+    _typedBurstTimestamps.shift();
+  }
+  while (_typedBurstTimestamps.length && now - _typedBurstTimestamps[0] > RAPID_BURST_WINDOW_MS) {
+    _typedBurstTimestamps.shift();
+  }
+  if (_typedBurstTimestamps.length > RAPID_BURST_THRESHOLD && !_typedBurstActive) {
+    _typedBurstActive = true;
+    console.log('[paste-guard] rapid typed burst: ' + _typedBurstTimestamps.length + ' chars in ' + RAPID_BURST_WINDOW_MS + 'ms');
+  }
+  if (_typedBurstQuietTimer) clearTimeout(_typedBurstQuietTimer);
+  _typedBurstQuietTimer = setTimeout(function() {
+    _typedBurstActive = false;
+    _typedBurstTimestamps.length = 0;
+  }, RAPID_BURST_QUIET_MS);
+}
 
 function _uploadPastedImage(file, ws) {
   var ctx = (typeof getWorkspaceContext === 'function') ? getWorkspaceContext() : null;
@@ -126,6 +155,23 @@ function _createTerminal(containerId, wsRef) {
   var container = document.getElementById(containerId);
   if (!container) return null;
 
+  // The container element (e.g. 'terminalContainer', 'splitTerminalContainer') is a
+  // static node in admin.html that survives a workspace-reset — only the Terminal
+  // object gets disposed and nulled. Terminal.dispose() tears down xterm's own
+  // internal renderer DOM but never touches listeners this function attached
+  // directly to the container, so a reconnect that calls _createTerminal again on
+  // the same container would otherwise stack a second 'paste'/'wheel' listener
+  // pair. Remove any prior listeners and stale DOM before wiring up fresh ones.
+  if (container._pasteGuardPasteHandler) {
+    container.removeEventListener('paste', container._pasteGuardPasteHandler, true);
+    container._pasteGuardPasteHandler = null;
+  }
+  if (container._pasteGuardWheelHandler) {
+    container.removeEventListener('wheel', container._pasteGuardWheelHandler);
+    container._pasteGuardWheelHandler = null;
+  }
+  container.innerHTML = '';
+
   var terminal = new Terminal({
     cursorBlink: true,
     fontSize: 13,
@@ -190,11 +236,13 @@ function _createTerminal(containerId, wsRef) {
     });
   }
 
-  container.addEventListener('wheel', function(e) {
+  var wheelHandler = function(e) {
     e.stopPropagation();
-  }, { passive: true });
+  };
+  container.addEventListener('wheel', wheelHandler, { passive: true });
+  container._pasteGuardWheelHandler = wheelHandler;
 
-  container.addEventListener('paste', function(e) {
+  var pasteHandler = function(e) {
     var ws = wsRef();
     var cd = e.clipboardData || window.clipboardData;
     if (!cd) { return; }
@@ -237,14 +285,24 @@ function _createTerminal(containerId, wsRef) {
       _uploadPastedImage(file, ws);
       return;
     }
-  }, true);
+  };
+  container.addEventListener('paste', pasteHandler, true);
+  container._pasteGuardPasteHandler = pasteHandler;
 
+  _terminalInstanceCounter += 1;
+  console.log('[paste-guard] terminal created for #' + containerId + ' (instance ' + _terminalInstanceCounter + ')');
   console.log('[paste-guard] armed, window=' + POST_ENTER_PASTE_SUPPRESS_MS + 'ms');
 
   terminal.onData(function(data) {
     var ws = wsRef();
     if (data === '\r') {
       _lastTerminalEnterAt = Date.now();
+    }
+    if (data.length > 8) {
+      var bracketed = data.indexOf('\x1b[200~') !== -1;
+      console.log('[paste-guard] onData chunk ' + data.length + ' chars' + (bracketed ? ' (bracketed)' : '') + ', ' + (Date.now() - _lastTerminalEnterAt) + 'ms after last Enter');
+    } else if (data.length === 1) {
+      _trackRapidTypedBurst();
     }
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(data);
