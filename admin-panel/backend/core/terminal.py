@@ -15,6 +15,7 @@ import sys
 import tempfile
 import termios
 import threading
+import uuid
 from pathlib import Path
 
 from core.db import ws_field
@@ -137,6 +138,10 @@ def create_session(name, working_dir, env=None):
     # Intuitive pane split shortcuts
     subprocess.run(['tmux', 'bind-key', 'h', 'split-window', '-h'], capture_output=True)
     subprocess.run(['tmux', 'bind-key', 'v', 'split-window', '-v'], capture_output=True)
+    # The stock middle-click binding pastes whatever sits atop the server-global
+    # tmux buffer stack into the pane, which can re-inject a stale or unrelated
+    # prompt from another session into this one via an accidental wheel-click.
+    subprocess.run(['tmux', 'unbind-key', '-T', 'root', 'MouseDown2Pane'], capture_output=True)
 
 
 def send_keys(name, command):
@@ -152,22 +157,30 @@ def send_prompt(name, text):
 
     Unlike send_keys which interprets newlines as Enter keystrokes,
     this uses tmux load-buffer + paste-buffer for clean multi-line delivery.
+
+    tmux buffers live on a server-global stack shared by every session, so a
+    named buffer (rather than the default unnamed one) is required: without
+    it, concurrent calls from different sessions can interleave their
+    load/paste pairs and paste each other's text, and a stale entry can
+    linger on the stack to be replayed by a later, unrelated paste.
     """
     if not session_exists(name):
         return False
 
     tmp_path = None
+    buf = 'gw-prompt-' + uuid.uuid4().hex
     try:
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
             f.write(text)
             tmp_path = f.name
 
-        subprocess.run(['tmux', 'load-buffer', tmp_path], check=True)
-        subprocess.run(['tmux', 'paste-buffer', '-t', name], check=True)
+        subprocess.run(['tmux', 'load-buffer', '-b', buf, tmp_path], check=True)
+        subprocess.run(['tmux', 'paste-buffer', '-d', '-b', buf, '-t', name], check=True)
         subprocess.run(['tmux', 'send-keys', '-t', name, 'Enter'])
         return True
     except Exception:
         logger.warning("Failed to send prompt to %s", name, exc_info=True)
+        subprocess.run(['tmux', 'delete-buffer', '-b', buf], capture_output=True)
         return False
     finally:
         if tmp_path:
@@ -211,6 +224,29 @@ def _copy_image_to_clipboard_macos(path):
         return result.returncode == 0
     except Exception:
         logger.warning("Failed to copy image to macOS clipboard", exc_info=True)
+        return False
+
+
+def copy_text_to_host_clipboard(text):
+    """Best-effort attempt to place text on the host system clipboard.
+
+    macOS uses `pbcopy`, fed the text over stdin. Non-macOS platforms return
+    False immediately — there is no single reliable clipboard CLI across
+    Linux window managers, so this is treated purely as a macOS nicety.
+
+    Never raises: a failure here must degrade to False, not error out.
+    """
+    if sys.platform != "darwin":
+        return False
+    try:
+        result = subprocess.run(
+            ["pbcopy"],
+            input=text.encode("utf-8"),
+            timeout=5,
+        )
+        return result.returncode == 0
+    except Exception:
+        logger.warning("Failed to copy text to macOS clipboard", exc_info=True)
         return False
 
 

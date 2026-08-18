@@ -14,9 +14,11 @@ from core.terminal import (
     _is_claude_ready,
     build_claude_command,
     copy_image_to_host_clipboard,
+    create_session,
     mark_new_session,
     parse_env_vars,
     send_paste_keystroke,
+    send_prompt,
     write_launch_env_file,
 )
 
@@ -270,3 +272,97 @@ def test_send_paste_keystroke_sends_ctrl_v_when_session_exists(monkeypatch):
     send_keys_calls = [c for c in calls if c[:2] == ["tmux", "send-keys"]]
     assert len(send_keys_calls) == 1
     assert "C-v" in send_keys_calls[0]
+
+
+def test_send_prompt_uses_named_buffer_for_load_and_paste(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", fake_run)
+
+    assert send_prompt("ws-exists", "hello\nworld") is True
+
+    load_calls = [c for c in calls if c[:2] == ["tmux", "load-buffer"]]
+    paste_calls = [c for c in calls if c[:2] == ["tmux", "paste-buffer"]]
+    assert len(load_calls) == 1
+    assert len(paste_calls) == 1
+
+    load_cmd = load_calls[0]
+    assert load_cmd[2] == "-b"
+    buf_name = load_cmd[3]
+    assert buf_name.startswith("gw-prompt-")
+
+    paste_cmd = paste_calls[0]
+    assert "-d" in paste_cmd
+    assert "-b" in paste_cmd
+    assert paste_cmd[paste_cmd.index("-b") + 1] == buf_name
+    assert "-t" in paste_cmd
+    assert paste_cmd[paste_cmd.index("-t") + 1] == "ws-exists"
+
+
+def test_send_prompt_uses_distinct_buffer_names_across_calls(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", fake_run)
+
+    send_prompt("ws-exists", "first")
+    send_prompt("ws-exists", "second")
+
+    load_calls = [c for c in calls if c[:2] == ["tmux", "load-buffer"]]
+    buffer_names = [c[3] for c in load_calls]
+    assert len(buffer_names) == 2
+    assert buffer_names[0] != buffer_names[1]
+
+
+def test_send_prompt_deletes_buffer_on_failure(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[:2] == ["tmux", "paste-buffer"]:
+            raise subprocess.CalledProcessError(1, cmd)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", fake_run)
+
+    assert send_prompt("ws-exists", "hello") is False
+
+    delete_calls = [c for c in calls if c[:2] == ["tmux", "delete-buffer"]]
+    assert len(delete_calls) == 1
+    assert "-b" in delete_calls[0]
+
+    load_cmd = next(c for c in calls if c[:2] == ["tmux", "load-buffer"])
+    buf_name = load_cmd[3]
+    assert delete_calls[0][delete_calls[0].index("-b") + 1] == buf_name
+
+
+def test_send_prompt_returns_false_when_session_missing(monkeypatch):
+    monkeypatch.setattr(
+        terminal_module.subprocess, "run",
+        lambda cmd, **k: SimpleNamespace(returncode=1),
+    )
+
+    assert send_prompt("ws-missing", "hello") is False
+
+
+def test_create_session_unbinds_middle_click_paste(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", fake_run)
+
+    create_session("ws-new", "/tmp/some-workspace")
+
+    unbind_calls = [c for c in calls if c[:2] == ["tmux", "unbind-key"]]
+    assert len(unbind_calls) == 1
+    assert unbind_calls[0] == ["tmux", "unbind-key", "-T", "root", "MouseDown2Pane"]

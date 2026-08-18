@@ -239,3 +239,73 @@ def test_paste_image_refuses_native_injection_when_working_dir_has_unsafe_chars(
     assert r.status_code == 200
     assert r.json["mode"] == "path"
     assert not any(c[0] == "osascript" for c in calls)
+
+
+CLIPBOARD_URL = "/api/clipboard"
+
+
+def test_clipboard_requires_auth(raw_client):
+    r = raw_client.post(CLIPBOARD_URL, json={"text": "hello"})
+
+    assert r.status_code == 401
+    assert r.json["error"] == "authentication_required"
+
+
+def test_clipboard_copies_text_on_macos(client, monkeypatch):
+    monkeypatch.setattr(terminal_module.sys, "platform", "darwin")
+
+    def pbcopy_run(cmd, *args, **kwargs):
+        if cmd == ["pbcopy"]:
+            return SimpleNamespace(returncode=0, args=cmd)
+        raise AssertionError(f"Unexpected subprocess call: {cmd}")
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", pbcopy_run)
+
+    r = client.post(CLIPBOARD_URL, json={"text": "hello clipboard"})
+
+    assert r.status_code == 200
+    assert r.json == {"ok": True}
+
+
+def test_clipboard_reports_failure_when_pbcopy_fails(client, monkeypatch):
+    monkeypatch.setattr(terminal_module.sys, "platform", "darwin")
+
+    def pbcopy_run(cmd, *args, **kwargs):
+        if cmd == ["pbcopy"]:
+            return SimpleNamespace(returncode=1, args=cmd)
+        return _REAL_SUBPROCESS_RUN(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", pbcopy_run)
+
+    r = client.post(CLIPBOARD_URL, json={"text": "hello"})
+
+    assert r.status_code == 200
+    assert r.json == {"ok": False}
+
+
+def test_clipboard_rejects_non_string_text(client):
+    r = client.post(CLIPBOARD_URL, json={"text": 12345})
+
+    assert r.status_code == 400
+    assert r.json["ok"] is False
+
+
+def test_clipboard_rejects_oversize_text(client):
+    oversized = "a" * (1024 * 1024 + 1)
+
+    r = client.post(CLIPBOARD_URL, json={"text": oversized})
+
+    assert r.status_code == 413
+    assert r.json["ok"] is False
+
+
+def test_clipboard_non_darwin_returns_unsupported(client, monkeypatch):
+    monkeypatch.setattr(terminal_module.sys, "platform", "win32")
+    run, calls = _recording_fake_run({})
+    monkeypatch.setattr(terminal_module.subprocess, "run", run)
+
+    r = client.post(CLIPBOARD_URL, json={"text": "hello"})
+
+    assert r.status_code == 200
+    assert r.json == {"ok": False, "reason": "unsupported"}
+    assert calls == []

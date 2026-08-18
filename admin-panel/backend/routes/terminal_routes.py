@@ -1,6 +1,7 @@
 """Terminal WebSocket and REST routes for tmux session management."""
 import json
 import re
+import sys
 import uuid
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from core.terminal import (
     TMUX_NOT_INSTALLED,
     build_claude_command,
     copy_image_to_host_clipboard,
+    copy_text_to_host_clipboard,
     create_session,
     get_session_command,
     kill_session,
@@ -32,6 +34,7 @@ from core.helpers import find_workspace
 
 _SAFE_NOTIFY_RE = re.compile(r'[^a-zA-Z0-9 .,!?\-_\'\"():;/]')
 _MAX_NOTIFY_LENGTH = 300
+_MAX_CLIPBOARD_BYTES = 1024 * 1024
 
 bp = Blueprint('terminal', __name__)
 
@@ -348,3 +351,29 @@ def terminal_paste_image(project, branch):
             mode = 'clipboard'
 
     return jsonify({'ok': True, 'mode': mode, 'path': str(dest)})
+
+
+@bp.route('/api/clipboard', methods=['POST'])
+def copy_to_host_clipboard():
+    """Copy arbitrary text to the host Mac's system clipboard via pbcopy.
+
+    The admin panel is sometimes reached over an insecure origin (e.g. a LAN
+    IP), where navigator.clipboard is unavailable in the browser and the
+    document.execCommand fallback is unreliable outside direct user
+    gestures. The panel server runs on the same Mac that owns the
+    clipboard, so writing it here fixes clipboard copies regardless of
+    which origin the browser used.
+    """
+    data = request.get_json(silent=True) or {}
+    text = data.get('text')
+
+    if not isinstance(text, str):
+        return jsonify({'ok': False, 'reason': 'text must be a string'}), 400
+
+    if len(text.encode('utf-8')) > _MAX_CLIPBOARD_BYTES:
+        return jsonify({'ok': False, 'reason': 'text too large'}), 413
+
+    if sys.platform != 'darwin':
+        return jsonify({'ok': False, 'reason': 'unsupported'})
+
+    return jsonify({'ok': copy_text_to_host_clipboard(text)})

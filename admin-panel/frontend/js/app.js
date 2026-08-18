@@ -159,12 +159,27 @@ async function initApp() {
 // ═══════════════════════════════════════════════
 
 function safeCopyToClipboard(text) {
+  _serverCopyToClipboard(text);
   if (navigator.clipboard && navigator.clipboard.writeText) {
     return navigator.clipboard.writeText(text).catch(function() {
       return fallbackCopy(text);
     });
   }
   return fallbackCopy(text);
+}
+
+// Insecure origins (e.g. a LAN IP instead of localhost) leave
+// navigator.clipboard undefined and restrict document.execCommand('copy')
+// to direct user gestures, so browser-side copies can silently fail there.
+// The admin panel server runs on the same Mac that owns the system
+// clipboard, so a best-effort server-side copy fixes it regardless of
+// origin or browser API support. Fire-and-forget: never affects the
+// promise callers already chain off safeCopyToClipboard.
+function _serverCopyToClipboard(text) {
+  if (typeof apiPost !== 'function') return;
+  apiPost('/api/clipboard', { text: text }).catch(function(e) {
+    console.debug('Server-side clipboard copy failed:', e && e.message);
+  });
 }
 
 function fallbackCopy(text) {
