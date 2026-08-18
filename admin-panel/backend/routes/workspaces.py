@@ -693,6 +693,80 @@ def _install_git_hooks(dst_claude, working_dir):
         run_git(working_dir, "config", "--worktree", "core.hooksPath", str(hooks_dir))
 
 
+def _branch_checked_out_anywhere(project_path, branch):
+    """True if `branch` is HEAD in the main repo or any registered worktree.
+
+    `git fetch origin <branch>:<branch>` refuses to update a checked-out
+    branch's ref, so this lets us report a clean skip reason instead of
+    surfacing that failure to the user.
+    """
+    ok_list, output, _ = run_git(project_path, "worktree", "list", "--porcelain")
+    if not ok_list:
+        return False
+    branch_line = f"branch refs/heads/{branch}"
+    return any(line.strip() == branch_line for line in output.splitlines())
+
+
+def _sync_local_base_branch(project_path, base):
+    """Best-effort fast-forward of the local `base` branch after workspace creation.
+
+    Worktrees and non-worktree workspaces alike are always created from
+    `origin/<base>`; the local `base` branch itself is never checked out or
+    pulled, so it silently goes stale. `git fetch origin <base>:<base>`
+    fast-forwards a local branch that is not currently checked out and fails
+    cleanly (non-zero, no partial state) when it isn't a fast-forward, so it
+    is safe to attempt without ever risking data loss.
+    """
+    ok_local, _, _ = run_git(project_path, "rev-parse", "--verify", f"refs/heads/{base}")
+    if not ok_local:
+        return {"attempted": False, "updated": False, "reason": "no-local-branch"}
+
+    if _branch_checked_out_anywhere(project_path, base):
+        return {"attempted": False, "updated": False, "reason": "skipped-checked-out"}
+
+    _, before_sha, _ = run_git(project_path, "rev-parse", "--short", f"refs/heads/{base}")
+    before_sha = before_sha.strip()
+
+    ok, _, stderr = run_git(project_path, "fetch", "origin", f"{base}:{base}")
+    if not ok:
+        stderr = stderr or ""
+        if "checked out at" in stderr:
+            reason = "skipped-checked-out"
+        elif "non-fast-forward" in stderr or "fast-forward" in stderr:
+            reason = "not-fast-forward"
+        else:
+            reason = "fetch-failed"
+        return {"attempted": True, "updated": False, "reason": reason}
+
+    _, after_sha, _ = run_git(project_path, "rev-parse", "--short", f"refs/heads/{base}")
+    after_sha = after_sha.strip()
+
+    if after_sha == before_sha:
+        return {"attempted": True, "updated": False, "reason": "up-to-date"}
+
+    return {
+        "attempted": True,
+        "updated": True,
+        "reason": f"updated-from {before_sha} to {after_sha}",
+        "before": before_sha,
+        "after": after_sha,
+    }
+
+
+def _resolve_base_sync(project_path, source, source_from_origin):
+    """Report whether the local `source` branch was fast-forwarded.
+
+    Wrapped so a failure here can never block or fail workspace creation.
+    """
+    if not source_from_origin:
+        return {"attempted": False, "updated": False, "reason": "not-remote-based"}
+    try:
+        return _sync_local_base_branch(project_path, source)
+    except Exception:
+        logger.exception("Failed to sync local base branch %r after workspace creation", source)
+        return {"attempted": False, "updated": False, "reason": "sync-error"}
+
+
 def _register_workspace(
     db, project_id, branch, sanitized, working_dir, source, locale, project_path,
     workflow_mode, review_mode,
@@ -774,6 +848,7 @@ def create_workspace(project_id):
 
         source_ref = f"origin/{source}"
         ok, _, _ = run_git(project_path, "rev-parse", "--verify", source_ref)
+        source_from_origin = ok
         if not ok:
             ok, _, _ = run_git(project_path, "rev-parse", "--verify", source)
             if not ok:
@@ -804,6 +879,7 @@ def create_workspace(project_id):
         )
         workflow_mode_service.apply_mode_phase_settings(db, workspace_id, workflow_mode)
         db.commit()
+        body["base_sync"] = _resolve_base_sync(project_path, source, source_from_origin)
         try:
             results = ConfiguratorChain.default().run(db, project_id, project_path)
             warnings = [r for r in results if r["action"] != "rendered"]

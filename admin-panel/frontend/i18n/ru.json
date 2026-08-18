@@ -198,6 +198,8 @@
   "messages.fileSaveFailed": "Не удалось сохранить файл",
   "messages.fastModeEnabled": "Быстрый режим включён",
   "messages.fastModeDisabled": "Стандартный режим включён",
+  "messages.baseSyncUpdated": "Локальная база {branch} перемотана вперёд",
+  "messages.baseSyncNotUpdated": "Локальная база {branch} не обновлена: {reason}",
 
   "errors.unknownError": "Неизвестная ошибка",
   "errors.failedToSetPhase": "Ошибка установки фазы: {error}",

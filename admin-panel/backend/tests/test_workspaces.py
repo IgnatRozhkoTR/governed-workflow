@@ -220,6 +220,182 @@ def test_create_workspace_friendly_error_when_worktree_path_exists(
     assert r.json["details"] == "fatal: '/some/path' already exists"
 
 
+# ─── BASE BRANCH SYNC TESTS ───────────────────────────────────────────────────
+
+from testing_utils import GIT_ENV
+
+
+@pytest.fixture
+def project_with_origin(project, tmp_path):
+    """Point the project's local repo at a real origin remote for base-sync tests."""
+    origin_path = tmp_path / "origin.git"
+    _git(project["path"], "init", "--bare", str(origin_path))
+    _git(project["path"], "remote", "add", "origin", str(origin_path))
+    _git(project["path"], "push", "origin", "develop:develop")
+    return project
+
+
+def _head_sha(repo_path):
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=str(repo_path), capture_output=True, text=True, env=GIT_ENV
+    ).stdout.strip()
+
+
+def test_create_workspace_base_sync_fast_forwards_stale_local_branch(client, project_with_origin):
+    project = project_with_origin
+    project_path = project["path"]
+
+    _git(project_path, "checkout", "-b", "main")
+    old_sha = _head_sha(project_path)
+    (Path(project_path) / "advance.txt").write_text("advance main")
+    _git(project_path, "add", "advance.txt")
+    _git(project_path, "commit", "-m", "advance main")
+    new_sha = _head_sha(project_path)
+    _git(project_path, "push", "origin", "main:main")
+    _git(project_path, "reset", "--hard", old_sha)
+    _git(project_path, "checkout", "develop")
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/from-main", "source": "main", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    base_sync = r.json["base_sync"]
+    assert base_sync["attempted"] is True
+    assert base_sync["updated"] is True
+    assert base_sync["reason"] == f"updated-from {old_sha[:7]} to {new_sha[:7]}"
+    assert base_sync["before"] == old_sha[:7]
+    assert base_sync["after"] == new_sha[:7]
+
+    local_main = subprocess.run(
+        ["git", "rev-parse", "refs/heads/main"], cwd=project_path, capture_output=True, text=True, env=GIT_ENV
+    ).stdout.strip()
+    assert local_main == new_sha
+
+
+def test_create_workspace_base_sync_skips_when_base_checked_out(client, project_with_origin):
+    project = project_with_origin
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/from-develop", "source": "develop", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    assert r.json["base_sync"] == {
+        "attempted": False,
+        "updated": False,
+        "reason": "skipped-checked-out",
+    }
+
+
+def test_create_workspace_base_sync_reports_not_fast_forward_when_diverged(client, project_with_origin, tmp_path):
+    project = project_with_origin
+    project_path = project["path"]
+
+    _git(project_path, "checkout", "-b", "main")
+    base_sha = _head_sha(project_path)
+    _git(project_path, "push", "origin", "main:main")
+
+    clone_dir = tmp_path / "clone"
+    subprocess.run(
+        ["git", "clone", str(Path(project_path).parent / "origin.git"), str(clone_dir)],
+        check=True, capture_output=True, env=GIT_ENV,
+    )
+    _git(clone_dir, "checkout", "main")
+    (clone_dir / "origin_change.txt").write_text("origin advances")
+    _git(clone_dir, "add", "origin_change.txt")
+    _git(clone_dir, "commit", "-m", "advance origin main")
+    _git(clone_dir, "push", "origin", "main")
+
+    (Path(project_path) / "local_change.txt").write_text("local diverges")
+    _git(project_path, "add", "local_change.txt")
+    _git(project_path, "commit", "-m", "diverge local main")
+    diverged_sha = _head_sha(project_path)
+    _git(project_path, "checkout", "develop")
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/from-diverged-main", "source": "main", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    base_sync = r.json["base_sync"]
+    assert base_sync["attempted"] is True
+    assert base_sync["updated"] is False
+    assert base_sync["reason"] == "not-fast-forward"
+
+    local_main = subprocess.run(
+        ["git", "rev-parse", "refs/heads/main"], cwd=project_path, capture_output=True, text=True, env=GIT_ENV
+    ).stdout.strip()
+    assert local_main == diverged_sha
+
+
+def test_create_workspace_base_sync_reports_no_local_branch(client, project_with_origin):
+    project = project_with_origin
+    project_path = project["path"]
+
+    _git(project_path, "checkout", "-b", "release")
+    _git(project_path, "push", "origin", "release:release")
+    _git(project_path, "checkout", "develop")
+    _git(project_path, "branch", "-D", "release")
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/from-release", "source": "release", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    assert r.json["base_sync"] == {
+        "attempted": False,
+        "updated": False,
+        "reason": "no-local-branch",
+    }
+
+
+def test_create_workspace_base_sync_not_attempted_without_remote(client, project):
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/no-remote", "source": "develop", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    assert r.json["base_sync"] == {
+        "attempted": False,
+        "updated": False,
+        "reason": "not-remote-based",
+    }
+
+
+def test_create_workspace_base_sync_failure_does_not_block_creation(client, project_with_origin, monkeypatch):
+    from core.db import get_db
+    from routes import workspaces as workspaces_module
+
+    def boom(project_path, base):
+        raise RuntimeError("simulated git failure")
+
+    monkeypatch.setattr(workspaces_module, "_sync_local_base_branch", boom)
+
+    r = client.post(
+        f"/api/projects/{project_with_origin['id']}/workspaces",
+        json={"branch": "feature/sync-boom", "source": "develop", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    assert r.json["base_sync"] == {"attempted": False, "updated": False, "reason": "sync-error"}
+
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id FROM workspaces WHERE project_id = ? AND branch = ?",
+            (project_with_origin["id"], "feature/sync-boom"),
+        ).fetchone()
+    finally:
+        db.close()
+    assert row is not None
+
+
 # ─── 3.2 MERGE LAYER TESTS ────────────────────────────────────────────────────
 
 REPO_ROOT = Path(__file__).resolve().parents[3]  # worktrees/Restructuring

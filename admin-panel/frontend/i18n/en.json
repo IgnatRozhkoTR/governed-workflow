@@ -198,6 +198,8 @@
   "messages.fileSaveFailed": "Failed to save file",
   "messages.fastModeEnabled": "Fast mode enabled",
   "messages.fastModeDisabled": "Standard mode enabled",
+  "messages.baseSyncUpdated": "Local base {branch} fast-forwarded",
+  "messages.baseSyncNotUpdated": "Local base {branch} not updated: {reason}",
 
   "errors.unknownError": "Unknown error",
   "errors.failedToSetPhase": "Failed to set phase: {error}",

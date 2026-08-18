@@ -328,6 +328,8 @@ async function createWorkspace(projectId) {
   resultEl.innerHTML = resultHtml;
   branchInput.value = '';
 
+  _wsNotifyBaseSync(result.base_sync, source);
+
   try {
     const workspaceListEl = document.getElementById('ws-workspace-cards');
     const wsData2 = await apiListWorkspaces(projectId);
@@ -336,6 +338,20 @@ async function createWorkspace(projectId) {
   } catch (err) {
     _wsShowError('ws-workspace-error', err.message);
   }
+}
+
+function _wsNotifyBaseSync(baseSync, baseBranch) {
+  if (!baseSync) return;
+
+  if (baseSync.updated) {
+    showToast(t('messages.baseSyncUpdated', {branch: baseBranch}));
+    return;
+  }
+
+  const trivialReasons = ['no-local-branch', 'not-remote-based'];
+  if (trivialReasons.indexOf(baseSync.reason) !== -1) return;
+
+  showToast(t('messages.baseSyncNotUpdated', {branch: baseBranch, reason: baseSync.reason}));
 }
 
 async function _wsArchiveWorkspace(projectId, branch, event) {
