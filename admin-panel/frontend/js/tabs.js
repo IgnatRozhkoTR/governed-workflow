@@ -150,6 +150,42 @@ document.querySelectorAll('.sidebar-btn[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
+// Resolves which panel a given workspace context should show (last tab used
+// in that workspace, or 'dashboard' on first ever visit) and applies it:
+// writes the resolved hash first (so a stale hash from a previously active
+// context never leaks into hash-reading code like _currentSettingsSection()),
+// then syncs the active classes and .main/splitMain state exactly as
+// switchTab() does. Does NOT call _storeLastTab — restoring isn't a user
+// choice. Does NOT call _activateTabHooks — callers invoke that themselves,
+// since the page-load path needs it deferred to DOMContentLoaded (most tab
+// modules load after tabs.js and aren't defined yet at parse time) while a
+// SPA workspace switch can call it immediately (all modules are already
+// loaded by then).
+function applyStoredTabForContext(ctx) {
+  var lastTab = _loadLastTab(ctx);
+  var tabId = (lastTab && document.getElementById('panel-' + lastTab)) ? lastTab : 'dashboard';
+
+  var newHash = '#' + tabId;
+  if (tabId === 'dashboard') {
+    newHash += '/' + (_loadLastSettingsSectionRaw(ctx) || 'task');
+  }
+  history.replaceState(null, '', newHash);
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  document.querySelectorAll('.sidebar-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tabId));
+
+  var mainEl = document.querySelector('.main');
+  if (mainEl) mainEl.classList.toggle('terminal-active', tabId === 'terminal');
+
+  var splitMain = document.getElementById('splitMain');
+  if (splitMain) {
+    splitMain.classList.toggle('no-padding', tabId === 'files' || tabId === 'changes' || tabId === 'terminal');
+  }
+
+  return tabId;
+}
+
 // Restore tab on load: sync the active classes immediately (no full
 // refreshTabData(), since state hasn't loaded yet), then run the same
 // per-tab activation hooks switchTab() would run for a click. The hooks
@@ -167,36 +203,26 @@ document.querySelectorAll('.sidebar-btn[data-tab]').forEach(btn => {
   var hashTab = location.hash.slice(1).split('/')[0];
   var hashIsValid = !!(hashTab && document.getElementById('panel-' + hashTab));
 
-  var tabId, writeResolvedHash;
+  var tabId;
   if (hashIsValid) {
     tabId = hashTab;
-    writeResolvedHash = false;
+
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+    document.querySelectorAll('.sidebar-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tabId));
+
+    var mainEl = document.querySelector('.main');
+    if (mainEl && tabId === 'terminal') mainEl.classList.add('terminal-active');
+
+    var splitMain = document.getElementById('splitMain');
+    if (splitMain && (tabId === 'files' || tabId === 'changes' || tabId === 'terminal')) {
+      splitMain.classList.add('no-padding');
+    }
   } else {
     var lastTab = _loadLastTab(ctx);
     var lastTabIsValid = !!(lastTab && document.getElementById('panel-' + lastTab));
     if (!lastTabIsValid && !ctx) return; // no hash, no workspace: keep the static default panel
-    tabId = lastTabIsValid ? lastTab : 'dashboard';
-    writeResolvedHash = true;
-  }
-
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
-  document.querySelectorAll('.sidebar-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tabId));
-
-  var mainEl = document.querySelector('.main');
-  if (mainEl && tabId === 'terminal') mainEl.classList.add('terminal-active');
-
-  var splitMain = document.getElementById('splitMain');
-  if (splitMain && (tabId === 'files' || tabId === 'changes' || tabId === 'terminal')) {
-    splitMain.classList.add('no-padding');
-  }
-
-  if (writeResolvedHash) {
-    var newHash = '#' + tabId;
-    if (tabId === 'dashboard') {
-      newHash += '/' + (_loadLastSettingsSectionRaw(ctx) || 'task');
-    }
-    history.replaceState(null, '', newHash);
+    tabId = applyStoredTabForContext(ctx);
   }
 
   document.addEventListener('DOMContentLoaded', function() {

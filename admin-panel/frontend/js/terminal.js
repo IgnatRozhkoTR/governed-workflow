@@ -201,11 +201,13 @@ function _createTerminal(containerId, wsRef) {
 
     var pastedText = cd.getData ? cd.getData('text') : '';
     if (pastedText && pastedText.length > 0) {
-      if (Date.now() - _lastTerminalEnterAt < POST_ENTER_PASTE_SUPPRESS_MS) {
+      var delta = Date.now() - _lastTerminalEnterAt;
+      var suppressed = delta < POST_ENTER_PASTE_SUPPRESS_MS;
+      if (suppressed) {
         e.preventDefault();
         e.stopPropagation();
-        console.debug('Suppressed post-Enter paste race (' + pastedText.length + ' chars)');
       }
+      console.log('[paste-guard] text paste ' + pastedText.length + ' chars, ' + delta + 'ms after last Enter — ' + (suppressed ? 'SUPPRESSED' : 'allowed'));
       return;
     }
 
@@ -237,8 +239,13 @@ function _createTerminal(containerId, wsRef) {
     }
   }, true);
 
+  console.log('[paste-guard] armed, window=' + POST_ENTER_PASTE_SUPPRESS_MS + 'ms');
+
   terminal.onData(function(data) {
     var ws = wsRef();
+    if (data === '\r') {
+      _lastTerminalEnterAt = Date.now();
+    }
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(data);
     }

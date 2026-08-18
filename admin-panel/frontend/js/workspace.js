@@ -431,6 +431,10 @@ async function _wsArchiveWorkspace(projectId, branch, event) {
 function openWorkspace(projectId, branch) {
   setWorkspaceContext(projectId, branch);
   hideProjectSelector();
+  if (typeof applyStoredTabForContext === 'function') {
+    var tabId = applyStoredTabForContext(getWorkspaceContext());
+    if (typeof _activateTabHooks === 'function') _activateTabHooks(tabId);
+  }
   if (typeof initApp === 'function') {
     initApp();
   }
