@@ -2,6 +2,7 @@
 import json
 import pytest
 
+from services import lsp_service
 from testing_utils import set_phase
 
 
@@ -66,3 +67,26 @@ def test_delete_project_cascades(client, workspace):
     client.delete(f"/api/projects/{project_id}")
     response = client.get(f"/api/projects/{project_id}/workspaces")
     assert response.status_code == 404
+
+
+def test_delete_project_removes_lsp_cache_dirs(client, project, tmp_path, monkeypatch):
+    monkeypatch.setenv("GOVERNED_WORKFLOW_TOOLS_DIR", str(tmp_path))
+    cache_dir = lsp_service.lsp_cache_dir(project["id"], 1)
+    cache_dir.mkdir(parents=True)
+
+    response = client.delete(f"/api/projects/{project['id']}")
+
+    assert response.status_code == 200
+    assert not cache_dir.exists()
+
+
+def test_delete_project_succeeds_even_if_lsp_cache_cleanup_fails(client, project, monkeypatch):
+    def _boom(project_id):
+        raise OSError("cleanup exploded")
+
+    monkeypatch.setattr(lsp_service, "remove_lsp_cache_dirs", _boom)
+
+    response = client.delete(f"/api/projects/{project['id']}")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True}

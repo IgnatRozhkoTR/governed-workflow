@@ -31,6 +31,24 @@ def disable_review_pipeline_subprocesses():
 
 
 @pytest.fixture(scope="session", autouse=True)
+def disable_lsp_prewarm():
+    """Prevent workspace creation from spawning real LSP subprocesses in tests.
+
+    Tests that exercise pre-warm itself patch the async start seam directly
+    and unset this flag locally, so this default is fine to keep on across
+    the suite.
+    """
+    import os
+    previous = os.environ.get("GOVERNED_WORKFLOW_DISABLE_LSP_PREWARM")
+    os.environ["GOVERNED_WORKFLOW_DISABLE_LSP_PREWARM"] = "1"
+    yield
+    if previous is None:
+        os.environ.pop("GOVERNED_WORKFLOW_DISABLE_LSP_PREWARM", None)
+    else:
+        os.environ["GOVERNED_WORKFLOW_DISABLE_LSP_PREWARM"] = previous
+
+
+@pytest.fixture(scope="session", autouse=True)
 def setup_db(tmp_path_factory):
     """Patch DB_PATH to temp file before any app imports."""
     db_dir = tmp_path_factory.mktemp("db")

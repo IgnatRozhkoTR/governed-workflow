@@ -4,13 +4,17 @@ import json
 import logging
 import os
 import select
+import shutil
 import signal
 import subprocess
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 
+from core import paths
 from core.db import get_db_ctx
+from core.helpers import sanitize_branch
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +22,8 @@ _LSP_PROCESSES = {}
 _PROCESS_LOCKS = {}
 _request_id_lock = threading.Lock()
 _request_id_counter = 0
+
+LSP_CACHE_DIR_PLACEHOLDER = "{lsp_cache_dir}"
 
 
 def _next_request_id():
@@ -113,6 +119,62 @@ def _read_lsp_message(stdout, timeout=None):
 
 def _process_key(project_id, profile_id):
     return (str(project_id), int(profile_id))
+
+
+# ---------------------------------------------------------------------------
+# Persistent LSP cache directories
+# ---------------------------------------------------------------------------
+#
+# lsp_instances is keyed by project_id + profile_id only (no workspace/branch
+# component -- see the UNIQUE(project_id, profile_id) constraint and
+# _process_key above), so the persistent on-disk cache is scoped the same way.
+
+def _lsp_cache_root():
+    """Return the root directory for persistent per-instance LSP cache dirs."""
+    tools_dir = os.environ.get("GOVERNED_WORKFLOW_TOOLS_DIR") or str(paths.DEFAULT_TOOLS_DIR)
+    return Path(tools_dir) / "lsp-cache"
+
+
+def lsp_cache_dir(project_id, profile_id):
+    """Return the persistent cache directory path for a given (project, profile) instance.
+
+    Nested as ``<project>/<profile>`` rather than a flattened ``project-profile``
+    key so that sanitized project ids sharing a common prefix (e.g. ``proj-a``
+    and ``proj-a-extra``) can never collide, and so a whole project's cache can
+    be removed with a single directory delete.
+    """
+    return _lsp_cache_root() / sanitize_branch(str(project_id)) / str(profile_id)
+
+
+def _substitute_lsp_cache_dir(args, project_id, profile_id):
+    """Replace the ``{lsp_cache_dir}`` placeholder in profile lsp_args with a persistent dir.
+
+    Creates the directory before returning so the spawned process can write into
+    it immediately. Profiles whose args never reference the placeholder are left
+    untouched and no directory is created -- this is opt-in per profile.
+    """
+    if not any(LSP_CACHE_DIR_PLACEHOLDER in arg for arg in args):
+        return args
+    cache_dir = lsp_cache_dir(project_id, profile_id)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return [arg.replace(LSP_CACHE_DIR_PLACEHOLDER, str(cache_dir)) for arg in args]
+
+
+def remove_lsp_cache_dirs(project_id):
+    """Best-effort removal of every persistent LSP cache dir for *project_id*.
+
+    Cache dirs nest every profile under the project's own directory, so this
+    removes every profile's cache for the project in one delete. Never
+    raises: cache directories are a performance optimization, not a source
+    of truth, so removal failures are logged and swallowed.
+    """
+    project_cache_dir = _lsp_cache_root() / sanitize_branch(str(project_id))
+    if not project_cache_dir.is_dir():
+        return
+    try:
+        shutil.rmtree(project_cache_dir)
+    except OSError:
+        logger.warning("Failed to remove LSP cache dir %s", project_cache_dir, exc_info=True)
 
 
 def _is_pid_alive(pid):
@@ -436,7 +498,10 @@ def _start_lsp_server_body(db, project_id, profile_id, workspace_path, key):
             except OSError:
                 pass
 
-    cmd = [profile["lsp_command"]] + json.loads(profile["lsp_args"] or "[]")
+    lsp_args = _substitute_lsp_cache_dir(
+        json.loads(profile["lsp_args"] or "[]"), project_id, profile_id
+    )
+    cmd = [profile["lsp_command"]] + lsp_args
     logger.info("Starting LSP server: %s (project=%s, profile=%s)", cmd, project_id, profile_id)
 
     try:

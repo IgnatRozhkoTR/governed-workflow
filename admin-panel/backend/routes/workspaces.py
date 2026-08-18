@@ -1,6 +1,7 @@
 """Workspace and branch management routes."""
 import json
 import logging
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -26,7 +27,7 @@ from core.paths import (
 )
 from core.terminal import session_name
 from services.git_rules_service import migrate_legacy_git_rules
-from services import comment_service, proposal_service, review_pipeline_service
+from services import comment_service, lsp_service, proposal_service, review_pipeline_service
 from services import review_mode_service
 from services import workflow_mode_service
 from services.configurator_service import ConfiguratorChain
@@ -800,6 +801,31 @@ def _register_workspace(
     }, workspace_id
 
 
+def _prewarm_lsp_servers(db, project_id, working_dir):
+    """Best-effort kick off every LSP-enabled profile assigned to *project_id*.
+
+    Reuses the same async start machinery and per-instance locks as the
+    normal LSP start route, so a background pre-warm followed by a user
+    clicking "start" is a clean no-op. Never raises: indexing/Gradle sync
+    happening early is a nice-to-have, not something creation should fail on.
+    """
+    if os.environ.get("GOVERNED_WORKFLOW_DISABLE_LSP_PREWARM"):
+        return {"started": [], "skipped_reason": "disabled_by_env"}
+
+    try:
+        results = lsp_service.start_all_lsp_servers_async(db, project_id, working_dir)
+        db.commit()
+    except Exception:
+        logger.exception("LSP pre-warm failed for project=%s", project_id)
+        return {"started": [], "skipped_reason": "prewarm_failed"}
+
+    if not results:
+        return {"started": [], "skipped_reason": "no_lsp_enabled_profiles"}
+
+    started = [r["profile_name"] for r in results if "error" not in r]
+    return {"started": started, "skipped_reason": None}
+
+
 @bp.route("/api/projects/<project_id>/workspaces", methods=["POST"])
 def create_workspace(project_id):
     with get_db_ctx() as db:
@@ -887,6 +913,7 @@ def create_workspace(project_id):
                 body["configurator_warnings"] = warnings
         except Exception:
             logger.exception("Configurator chain failed after workspace creation; SKILL.md may be stale")
+        body["lsp_prewarm"] = _prewarm_lsp_servers(db, project_id, working_dir)
         return jsonify(body), 201
 
 
