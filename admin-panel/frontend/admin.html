@@ -66,21 +66,21 @@
 <link rel="stylesheet" href="css/scope.css?v=11">
 <link rel="stylesheet" href="css/research.css?v=11">
 <link rel="stylesheet" href="css/plan.css?v=11">
-<link rel="stylesheet" href="css/cards.css?v=11">
+<link rel="stylesheet" href="css/cards.css?v=12">
 <link rel="stylesheet" href="css/comments-ui.css?v=11">
 <link rel="stylesheet" href="css/modals.css?v=11">
-<link rel="stylesheet" href="css/context.css?v=11">
+<link rel="stylesheet" href="css/context.css?v=12">
 <link rel="stylesheet" href="css/diff-viewer.css?v=15">
 <link rel="stylesheet" href="css/preplanning.css?v=11">
 <link rel="stylesheet" href="css/terminal.css?v=13">
-<link rel="stylesheet" href="css/verification.css?v=11">
+<link rel="stylesheet" href="css/verification.css?v=12">
 <link rel="stylesheet" href="css/lsp.css?v=12">
 <link rel="stylesheet" href="css/setup.css?v=11">
 <link rel="stylesheet" href="css/mobile.css?v=11">
 <link rel="stylesheet" href="css/workspace.css?v=11">
 <link rel="stylesheet" href="css/phase-settings.css?v=1">
 <link rel="stylesheet" href="css/proposals.css?v=1">
-<link rel="stylesheet" href="css/settings.css?v=2">
+<link rel="stylesheet" href="css/settings.css?v=3">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -204,19 +204,6 @@
   <!-- ─── SETTINGS (was DASHBOARD/Configuration) ─── -->
   <div class="tab-panel" id="panel-dashboard">
 
-    <!-- Commands -->
-	    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">
-	      <span style="font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-right: 2px;" data-i18n="labels.claude">Claude</span>
-	      <div class="btn-dropdown" style="position: relative; display: inline-block;">
-	        <button class="btn btn-sm" id="startBtn" onclick="showTerminalDropdown('start', this)" data-i18n="buttons.start">Start</button>
-	        <div class="btn-dropdown-menu" id="startDropdown" style="display:none;">
-	          <button class="btn-dropdown-item" onclick="doStart('fullscreen')" data-i18n="actions.fullscreen">Full screen</button>
-	          <button class="btn-dropdown-item" onclick="doStart('split')" data-i18n="actions.sidePanel">Side panel</button>
-	        </div>
-	      </div>
-      <button class="btn btn-sm btn-outline" onclick="copyWorkspacePath()" id="copyPathBtn" data-i18n="actions.copyPath">Path</button>
-    </div>
-
     <div class="settings-layout">
       <nav class="settings-nav" id="settingsNav">
         <div class="settings-nav-group">
@@ -244,6 +231,18 @@
 
         <!-- Task -->
         <section class="settings-section active" data-section="task">
+          <div class="settings-task-commands">
+            <span class="settings-task-commands-label" data-i18n="labels.claude">Claude</span>
+            <div class="btn-dropdown" style="position: relative; display: inline-block;">
+              <button class="btn btn-sm" id="startBtn" onclick="showTerminalDropdown('start', this)" data-i18n="buttons.start">Start</button>
+              <div class="btn-dropdown-menu" id="startDropdown" style="display:none;">
+                <button class="btn-dropdown-item" onclick="doStart('fullscreen')" data-i18n="actions.fullscreen">Full screen</button>
+                <button class="btn-dropdown-item" onclick="doStart('split')" data-i18n="actions.sidePanel">Side panel</button>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-outline" onclick="copyWorkspacePath()" id="copyPathBtn" data-i18n="actions.copyPath">Path</button>
+          </div>
+
           <div class="settings-section-header">
             <h2 data-i18n="settings.section.task.title">Task Context</h2>
             <span class="settings-scope-badge" data-i18n="settings.scope.workspace">Workspace</span>
@@ -267,19 +266,19 @@
             </div>
             <div class="context-field" style="margin-top: 4px;">
               <label class="context-label" data-i18n="labels.fileDirectoryReferences">File &amp; Directory References</label>
-              <div style="position: relative;">
-                <input type="text" id="contextRefSearch" class="context-input"
-                       placeholder="Type to search files and directories..."
-                       data-i18n-placeholder="placeholders.searchFilesAndDirs"
-                       autocomplete="off"
-                       oninput="searchContextRefs(this.value)"
-                       onkeydown="if(event.key==='Enter'){event.preventDefault();addManualContextRef(this.value);}">
-                <div id="contextRefDropdown" class="ref-dropdown" style="display:none;"></div>
+              <div class="context-ref-row">
+                <div class="context-ref-input-wrap">
+                  <input type="text" id="contextRefSearch" class="context-input"
+                         placeholder="Type to search files and directories..."
+                         data-i18n-placeholder="placeholders.searchFilesAndDirs"
+                         autocomplete="off"
+                         oninput="searchContextRefs(this.value)"
+                         onkeydown="if(event.key==='Enter'){event.preventDefault();addManualContextRef(this.value);}">
+                  <div id="contextRefDropdown" class="ref-dropdown" style="display:none;"></div>
+                </div>
+                <button class="btn btn-sm" onclick="saveContext()" data-i18n="buttons.saveContext">Save Context</button>
               </div>
               <div id="contextRefsList" class="refs-list" style="margin-top: 8px;"></div>
-            </div>
-            <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
-              <button class="btn btn-sm" onclick="saveContext()" data-i18n="buttons.saveContext">Save Context</button>
             </div>
           </div>
 
@@ -490,13 +489,15 @@
               <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.commandLabel">Command</label>
               <input type="text" class="context-input" id="claudeCommandInput" placeholder="claude" style="width: 100%;">
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <input type="checkbox" id="skipPermissionsCheck" checked>
-              <label for="skipPermissionsCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.skipPermissions">Include --dangerously-skip-permissions flag</label>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-              <input type="checkbox" id="restrictToWorkspaceCheck" checked>
-              <label for="restrictToWorkspaceCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.restrictToWorkspace">Restrict file modifications to workspace directory</label>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="skipPermissionsCheck" checked>
+                <label for="skipPermissionsCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.skipPermissions">Include --dangerously-skip-permissions flag</label>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="restrictToWorkspaceCheck" checked>
+                <label for="restrictToWorkspaceCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.restrictToWorkspace">Restrict file modifications to workspace directory</label>
+              </div>
             </div>
             <div style="margin-top: 8px;">
               <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.externalPaths">Allowed external paths (comma-separated)</label>
@@ -933,7 +934,7 @@
 <script src="js/lsp-controls.js?v=11"></script>
 <script src="js/file-explorer.js?v=10"></script>
 <script src="js/git-config.js?v=10"></script>
-<script src="js/rules.js?v=1"></script>
+<script src="js/rules.js?v=2"></script>
 <script src="js/claude-config.js?v=12"></script>
 <script src="js/network-mode.js?v=12"></script>
 <script src="js/context.js?v=10"></script>

@@ -160,8 +160,9 @@
 }
 
 /* Rules list items */
-.rules-item { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; }
-.rules-item-header { display: flex; justify-content: space-between; align-items: center; }
-.rules-item-name { font-weight: 500; }
+.rules-item { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; overflow-wrap: break-word; }
+.rules-item-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; }
+.rules-item-name { font-weight: 500; overflow-wrap: break-word; }
 .rules-item-source { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: var(--bg-tertiary); color: var(--text-secondary); text-transform: uppercase; }
-.rules-item-paths { font-family: monospace; font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.rules-item-paths { font-family: monospace; font-size: 12px; color: var(--text-secondary); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+.rules-item-path-chip { padding: 1px 6px; background: var(--bg-tertiary); border-radius: 3px; word-break: break-all; overflow-wrap: break-word; max-width: 100%; }

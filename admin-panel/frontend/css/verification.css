@@ -81,19 +81,21 @@
 
 .verification-assign-row {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
     margin-top: 8px;
 }
 .verification-assign-row select, .verification-assign-row input {
-    font-size: 0.78rem;
-    padding: 4px 8px;
+    font-size: 0.8rem;
+    padding: 6px 10px;
     background: var(--bg-raised);
     color: var(--text-primary);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
 }
-.verification-assign-row input { width: 100px; }
+.verification-assign-row select { min-width: 220px; }
+.verification-assign-row input { width: 160px; }
 
 /* Results */
 .verification-run { margin-top: 8px; }
