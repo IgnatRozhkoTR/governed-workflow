@@ -208,7 +208,7 @@ function renderSetupLanguages(profiles) {
       var lspCommand = profile.lsp_command ? _wsEscape(profile.lsp_command) : '';
 
       var lspBadge = lspCommand
-        ? '<span class="badge" style="font-size: 0.65rem; padding: 1px 6px; background: var(--info, #0d6efd); color: #fff; border-radius: 3px; margin-left: 4px;">LSP: ' + lspCommand + '</span>'
+        ? '<span class="badge" style="font-size: 0.65rem; padding: 1px 6px; background: var(--info, #0d6efd); color: #fff; border-radius: 3px; margin-left: 4px;" title="' + lspCommand + '">LSP</span>'
         : '';
 
       return '<div style="display: flex; align-items: center; gap: 8px; padding: 10px 18px;">'
@@ -225,7 +225,7 @@ function renderSetupLanguages(profiles) {
 
   var customHtml = _setupCustomProfiles.map(function(cp, index) {
     var lspBadge = cp.lsp_command
-      ? '<span class="badge" style="font-size: 0.65rem; padding: 1px 6px; background: var(--info, #0d6efd); color: #fff; border-radius: 3px; margin-left: 4px;">LSP: ' + _wsEscape(cp.lsp_command) + '</span>'
+      ? '<span class="badge" style="font-size: 0.65rem; padding: 1px 6px; background: var(--info, #0d6efd); color: #fff; border-radius: 3px; margin-left: 4px;" title="' + _wsEscape(cp.lsp_command) + '">LSP</span>'
       : '';
     return '<div style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-top: 1px solid var(--border);">'
       + '<span style="font-size: 0.82rem;">' + _wsEscape(cp.name) + '</span>'

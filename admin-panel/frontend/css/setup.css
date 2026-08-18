@@ -52,6 +52,10 @@
   border-bottom: 1px solid var(--border);
 }
 
+#setup-phase-settings-body {
+  padding: 6px 18px 14px;
+}
+
 /* ─── Module list ─────────────────────────────── */
 
 .setup-module-list {
