@@ -16,6 +16,7 @@ var AppState = {
       locale: null,
       yolo_mode: false,
       workflow_mode: "standard",
+      review_mode: "files_integration",
       enabled_phases: []
     },
   plan: {
@@ -126,6 +127,7 @@ function applyStateData(stateData) {
   LOCK_DATA.locale = stateData.locale || null;
   LOCK_DATA.yolo_mode = !!stateData.yolo_mode;
   LOCK_DATA.workflow_mode = stateData.workflow_mode || "standard";
+  LOCK_DATA.review_mode = stateData.review_mode || "files_integration";
   LOCK_DATA.enabled_phases = stateData.enabled_phases || [];
 
   // Plan — single source is AppState.plan; keep LOCK_DATA.plan as alias
@@ -174,6 +176,7 @@ function resetAppState() {
   LOCK_DATA.locale = null;
   LOCK_DATA.yolo_mode = false;
   LOCK_DATA.workflow_mode = "standard";
+  LOCK_DATA.review_mode = "files_integration";
   LOCK_DATA.enabled_phases = [];
 
   // Reset plan

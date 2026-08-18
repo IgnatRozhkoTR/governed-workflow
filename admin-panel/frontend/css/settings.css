@@ -156,6 +156,77 @@
   margin-top: 10px;
 }
 
+.settings-subsection-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.settings-subsection-title-row .settings-subsection-title {
+  margin-bottom: 0;
+}
+
+.settings-inline-flash {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--success);
+  opacity: 0;
+  margin-left: 10px;
+  transition: opacity 0.25s ease;
+}
+
+.settings-inline-flash--visible {
+  opacity: 1;
+}
+
+.settings-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-radio-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: var(--transition);
+}
+
+.settings-radio-card:hover {
+  border-color: var(--border-active);
+}
+
+.settings-radio-card--selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.settings-radio-card-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-radio-card--selected .settings-radio-card-title {
+  color: var(--accent);
+}
+
+.settings-radio-card-desc {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
 @media (max-width: 800px) {
   .settings-layout {
     flex-direction: column;

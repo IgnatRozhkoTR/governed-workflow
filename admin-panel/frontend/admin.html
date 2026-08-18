@@ -80,7 +80,7 @@
 <link rel="stylesheet" href="css/workspace.css?v=11">
 <link rel="stylesheet" href="css/phase-settings.css?v=1">
 <link rel="stylesheet" href="css/proposals.css?v=1">
-<link rel="stylesheet" href="css/settings.css?v=1">
+<link rel="stylesheet" href="css/settings.css?v=2">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -226,6 +226,8 @@
         <div class="settings-nav-group">
           <div class="settings-nav-group-title" data-i18n="settings.group.workflow">Workflow</div>
           <button type="button" class="settings-nav-item" data-section="workflow" data-i18n="settings.nav.workflow">Workflow</button>
+          <button type="button" class="settings-nav-item" data-section="phases" data-i18n="settings.nav.phases">Phases</button>
+          <button type="button" class="settings-nav-item" data-section="review" data-i18n="settings.nav.review">Review</button>
           <button type="button" class="settings-nav-item" data-section="verification" data-i18n="settings.nav.verification">Verification</button>
           <button type="button" class="settings-nav-item" data-section="rules" data-i18n="settings.nav.rules">Rules</button>
         </div>
@@ -304,6 +306,93 @@
             </div>
             <div class="settings-row-control">
               <input type="checkbox" id="settingsYoloCheck" onchange="onYoloCheckboxChange(this.checked,'settingsYoloCheck')">
+            </div>
+          </div>
+
+          <div class="settings-subsection">
+            <div class="settings-subsection-title-row">
+              <div class="settings-subsection-title" data-i18n="settings.section.workflow.projectDefaultsTitle">Project defaults</div>
+              <span class="settings-scope-badge" data-i18n="settings.scope.project">Project</span>
+            </div>
+
+            <div class="settings-row">
+              <div>
+                <div class="settings-row-label" data-i18n="config.simplePlanning">Simple planning</div>
+                <div class="settings-row-desc" data-i18n="config.simplePlanningDesc">Plans use a single sub-phase with no diagrams and no acceptance criteria. Best for large but conceptually simple projects.</div>
+              </div>
+              <div class="settings-row-control">
+                <input type="checkbox" id="settingsSimplePlanningCheck" onchange="onSettingsSimplePlanningChange(this)">
+                <span class="settings-inline-flash" id="settingsSimplePlanningFlash"></span>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div>
+                <div class="settings-row-label" data-i18n="config.fastModeDefault">Always fast mode</div>
+                <div class="settings-row-desc" data-i18n="config.fastModeDefaultDesc">New workspaces created for this project default to fast mode.</div>
+              </div>
+              <div class="settings-row-control">
+                <input type="checkbox" id="settingsFastModeDefaultCheck" onchange="onSettingsFastModeDefaultChange(this)">
+                <span class="settings-inline-flash" id="settingsFastModeDefaultFlash"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-subsection">
+            <div class="settings-subsection-title-row">
+              <div class="settings-subsection-title" data-i18n="cards.advanceModes">Advance Modes</div>
+              <span class="settings-scope-badge" data-i18n="settings.scope.project">Project</span>
+            </div>
+            <div id="advanceModesSettingsBody"></div>
+          </div>
+        </section>
+
+        <!-- Phases -->
+        <section class="settings-section" data-section="phases">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.phases.title">Phase Toggles</h2>
+          </div>
+          <p class="settings-section-desc" data-i18n="settings.section.phases.desc">Enable or disable optional phases for this device and this project.</p>
+
+          <div class="settings-subsection-title-row">
+            <div class="settings-subsection-title" data-i18n="settings.section.phases.deviceTitle">Device defaults</div>
+            <span class="settings-scope-badge" data-i18n="settings.scope.device">Device</span>
+          </div>
+          <div id="phaseSettingsDeviceBody"></div>
+
+          <div class="settings-subsection">
+            <div class="settings-subsection-title-row">
+              <div class="settings-subsection-title" data-i18n="settings.section.phases.projectTitle">This project</div>
+              <span class="settings-scope-badge" data-i18n="settings.scope.project">Project</span>
+            </div>
+            <div id="phaseSettingsSectionProjectBody"></div>
+          </div>
+        </section>
+
+        <!-- Review -->
+        <section class="settings-section" data-section="review">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.review.title">Review Mode</h2>
+            <span class="settings-scope-badge" data-i18n="settings.scope.workspace">Workspace</span>
+          </div>
+          <p class="settings-section-desc" data-i18n="settings.section.review.desc">Choose which automatic reviewers run against the diff before you review it.</p>
+
+          <div class="settings-radio-group" id="reviewModeWorkspaceGroup"></div>
+          <span class="settings-inline-flash" id="reviewModeFlash"></span>
+
+          <div class="settings-subsection">
+            <div class="settings-subsection-title-row">
+              <div class="settings-subsection-title" data-i18n="settings.section.review.projectDefaultTitle">Project default</div>
+              <span class="settings-scope-badge" data-i18n="settings.scope.project">Project</span>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-row-label" data-i18n="settings.section.review.projectDefaultLabel">Default review mode for new workspaces</div>
+              </div>
+              <div class="settings-row-control">
+                <select id="reviewModeProjectDefaultSelect" class="context-input" onchange="onReviewModeProjectDefaultChange(this)"></select>
+                <span class="settings-inline-flash" id="reviewModeProjectDefaultFlash"></span>
+              </div>
             </div>
           </div>
         </section>
@@ -821,10 +910,10 @@
 <script src="js/vendor/idiomorph.min.js?v=10"></script>
 <script src="js/event-bus.js?v=10"></script>
 <script src="js/i18n.js?v=11"></script>
-<script src="js/api.js?v=12"></script>
+<script src="js/api.js?v=13"></script>
 <script src="js/auth.js?v=11"></script>
 <script src="js/toast.js?v=10"></script>
-<script src="js/state.js?v=11"></script>
+<script src="js/state.js?v=12"></script>
 <script src="js/review-thread.js?v=10"></script>
 <script src="js/review-tab.js?v=10"></script>
 <script src="js/proposals.js?v=1"></script>
@@ -854,9 +943,9 @@
 <script src="js/setup.js?v=11"></script>
 <script src="js/phase-settings.js?v=10"></script>
 <script src="js/advance-modes.js?v=1"></script>
-<script src="js/review-pipeline.js?v=1"></script>
+<script src="js/review-pipeline.js?v=2"></script>
 <script src="js/actions.js?v=10"></script>
-<script src="js/settings.js?v=1"></script>
+<script src="js/settings.js?v=2"></script>
 <script src="js/app.js?v=12"></script>
 <script src="js/workspace.js?v=11"></script>
 

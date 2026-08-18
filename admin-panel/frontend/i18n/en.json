@@ -603,6 +603,7 @@
   "reviewPipeline.state.filtering": "Filtering",
   "reviewPipeline.state.file_stage": "File Review",
   "reviewPipeline.state.integration_stage": "Integration Review",
+  "reviewPipeline.state.adjudication_stage": "Adjudication",
   "reviewPipeline.state.done": "Done",
   "reviewPipeline.state.failed": "Failed",
   "reviewPipeline.fileStatus.pending": "Pending",
@@ -615,11 +616,22 @@
   "reviewPipeline.elapsed": "Elapsed: {seconds}s",
   "reviewPipeline.filesSection": "Files",
   "reviewPipeline.integrationSection": "Integration",
+  "reviewPipeline.adjudicationSection": "Adjudication",
+  "reviewPipeline.adjudicationLabel": "Adjudication reviewer",
   "reviewPipeline.runButton": "Run review",
   "reviewPipeline.runConfirm": "Re-run review pipeline? This may consume API tokens.",
   "reviewPipeline.runStarting": "Starting…",
   "reviewPipeline.runStarted": "Review pipeline started.",
   "reviewPipeline.runFailed": "Failed to start review pipeline: {error}",
+
+  "reviewMode.manual.label": "Manual",
+  "reviewMode.manual.desc": "No automatic reviewers. You review everything yourself at the gates.",
+  "reviewMode.integration.label": "Integration",
+  "reviewMode.integration.desc": "Two blind integration reviewers (architecture + correctness) on the full diff.",
+  "reviewMode.filesIntegration.label": "Files + Integration",
+  "reviewMode.filesIntegration.desc": "Per-file reviewers fan out across the diff, then the integration pair. Default.",
+  "reviewMode.full.label": "Full",
+  "reviewMode.full.desc": "Everything, plus a resolution reviewer that adjudicates findings as false-positive or out-of-scope before you see them.",
 
   "review.resolveAll": "Resolve all open ({count})",
   "review.resolveAllConfirm": "Resolve {count} open review issues as out-of-scope?",
@@ -652,6 +664,8 @@
 
   "settings.nav.task": "Task",
   "settings.nav.workflow": "Workflow",
+  "settings.nav.phases": "Phases",
+  "settings.nav.review": "Review",
   "settings.nav.verification": "Verification",
   "settings.nav.rules": "Rules",
   "settings.nav.git": "Git",
@@ -668,12 +682,25 @@
   "settings.scope.workspace": "Workspace",
   "settings.scope.browser": "Browser",
 
+  "settings.saved": "Saved",
+
   "settings.section.task.title": "Task Context",
   "settings.section.task.desc": "Ticket details and task description for this workspace.",
 
   "settings.section.workflow.title": "Workflow Mode",
   "settings.section.workflow.desc": "Control how strictly this workspace enforces the governed workflow.",
   "settings.section.workflow.yoloDesc": "Skip confirmation prompts before phase and gate transitions.",
+  "settings.section.workflow.projectDefaultsTitle": "Project defaults",
+
+  "settings.section.phases.title": "Phase Toggles",
+  "settings.section.phases.desc": "Enable or disable optional phases for this device and this project.",
+  "settings.section.phases.deviceTitle": "Device defaults",
+  "settings.section.phases.projectTitle": "This project",
+
+  "settings.section.review.title": "Review Mode",
+  "settings.section.review.desc": "Choose which automatic reviewers run against the diff before you review it.",
+  "settings.section.review.projectDefaultTitle": "Project default",
+  "settings.section.review.projectDefaultLabel": "Default review mode for new workspaces",
 
   "settings.section.verification.title": "Verification Profiles",
   "settings.section.verification.desc": "Assign verification profiles and manage checks for this project.",

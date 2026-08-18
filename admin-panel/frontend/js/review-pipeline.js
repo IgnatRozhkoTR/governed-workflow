@@ -4,17 +4,18 @@
 
 var _rpPollingTimers = {};
 
-var _RP_ACTIVE_STATES = new Set(['queued', 'filtering', 'file_stage', 'integration_stage']);
+var _RP_ACTIVE_STATES = new Set(['queued', 'filtering', 'file_stage', 'integration_stage', 'adjudication_stage']);
 
 function _rpStateBadgeClass(state) {
   switch (state) {
-    case 'done':               return 'rp-badge--done';
-    case 'failed':             return 'rp-badge--failed';
-    case 'queued':             return 'rp-badge--queued';
-    case 'filtering':          return 'rp-badge--filtering';
-    case 'file_stage':         return 'rp-badge--file-stage';
-    case 'integration_stage':  return 'rp-badge--integration-stage';
-    default:                   return 'rp-badge--queued';
+    case 'done':                return 'rp-badge--done';
+    case 'failed':              return 'rp-badge--failed';
+    case 'queued':              return 'rp-badge--queued';
+    case 'filtering':           return 'rp-badge--filtering';
+    case 'file_stage':          return 'rp-badge--file-stage';
+    case 'integration_stage':   return 'rp-badge--integration-stage';
+    case 'adjudication_stage':  return 'rp-badge--integration-stage';
+    default:                    return 'rp-badge--queued';
   }
 }
 
@@ -98,6 +99,29 @@ function _rpIntegrationHtml(integration) {
     + '</div>';
 }
 
+function _rpAdjudicationHtml(adjudication, adjudicationError) {
+  if (!adjudication || adjudication === 'skipped') return '';
+
+  var statusLabel = t('reviewPipeline.fileStatus.' + adjudication) || adjudication;
+  var errorHtml = adjudicationError
+    ? '<div class="rp-file-error">' + escapeHtml(adjudicationError) + '</div>'
+    : '';
+
+  return '<div class="rp-section">'
+    + '<div class="rp-section-header">'
+    + '<span class="rp-section-label">' + t('reviewPipeline.adjudicationSection') + '</span>'
+    + '</div>'
+    + '<div class="rp-integration-list">'
+    + '<div class="rp-integration-row">'
+    + _rpReviewerStatusIcon(adjudication)
+    + '<span class="rp-reviewer-name">' + escapeHtml(t('reviewPipeline.adjudicationLabel')) + '</span>'
+    + '<span class="rp-reviewer-status">' + escapeHtml(statusLabel) + '</span>'
+    + '</div>'
+    + errorHtml
+    + '</div>'
+    + '</div>';
+}
+
 function _rpRenderStatus(container, data) {
   var elapsedHtml = data.started_at
     ? '<div class="rp-elapsed">' + escapeHtml(_rpElapsed(data.started_at, data.finished_at)) + '</div>'
@@ -117,6 +141,7 @@ function _rpRenderStatus(container, data) {
     + errorHtml
     + _rpFilesHtml(data.files)
     + _rpIntegrationHtml(data.integration)
+    + _rpAdjudicationHtml(data.adjudication, data.adjudication_error)
     + '</div>';
 
   _rpRenderRunButton(container, data.state);

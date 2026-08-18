@@ -603,6 +603,7 @@
   "reviewPipeline.state.filtering": "Фильтрация",
   "reviewPipeline.state.file_stage": "Ревью файлов",
   "reviewPipeline.state.integration_stage": "Интеграционное ревью",
+  "reviewPipeline.state.adjudication_stage": "Арбитраж",
   "reviewPipeline.state.done": "Завершено",
   "reviewPipeline.state.failed": "Ошибка",
   "reviewPipeline.fileStatus.pending": "Ожидание",
@@ -615,11 +616,22 @@
   "reviewPipeline.elapsed": "Прошло: {seconds}с",
   "reviewPipeline.filesSection": "Файлы",
   "reviewPipeline.integrationSection": "Интеграция",
+  "reviewPipeline.adjudicationSection": "Арбитраж",
+  "reviewPipeline.adjudicationLabel": "Ревьюер-арбитр",
   "reviewPipeline.runButton": "Запустить ревью",
   "reviewPipeline.runConfirm": "Перезапустить пайплайн ревью? Это потратит API-токены.",
   "reviewPipeline.runStarting": "Запуск…",
   "reviewPipeline.runStarted": "Пайплайн ревью запущен.",
   "reviewPipeline.runFailed": "Не удалось запустить пайплайн ревью: {error}",
+
+  "reviewMode.manual.label": "Вручную",
+  "reviewMode.manual.desc": "Без автоматических ревьюеров. Вы проверяете всё сами на шлюзах.",
+  "reviewMode.integration.label": "Интеграция",
+  "reviewMode.integration.desc": "Два слепых интеграционных ревьюера (архитектура + корректность) по всему диффу.",
+  "reviewMode.filesIntegration.label": "Файлы + интеграция",
+  "reviewMode.filesIntegration.desc": "Пофайловые ревьюеры проходят по диффу, затем интеграционная пара. По умолчанию.",
+  "reviewMode.full.label": "Полный",
+  "reviewMode.full.desc": "Всё вышеперечисленное, плюс ревьюер-арбитр, который помечает замечания как ложные срабатывания или вне рамок задачи до того, как вы их увидите.",
 
   "review.resolveAll": "Разрешить все открытые ({count})",
   "review.resolveAllConfirm": "Разрешить {count} открытых замечаний ревью как out-of-scope?",
@@ -652,6 +664,8 @@
 
   "settings.nav.task": "Задача",
   "settings.nav.workflow": "Процесс",
+  "settings.nav.phases": "Фазы",
+  "settings.nav.review": "Ревью",
   "settings.nav.verification": "Верификация",
   "settings.nav.rules": "Правила",
   "settings.nav.git": "Git",
@@ -668,12 +682,25 @@
   "settings.scope.workspace": "Рабочее пространство",
   "settings.scope.browser": "Браузер",
 
+  "settings.saved": "Сохранено",
+
   "settings.section.task.title": "Контекст задачи",
   "settings.section.task.desc": "Данные тикета и описание задачи для этого рабочего пространства.",
 
   "settings.section.workflow.title": "Режим работы",
   "settings.section.workflow.desc": "Настройте, насколько строго это рабочее пространство соблюдает управляемый процесс.",
   "settings.section.workflow.yoloDesc": "Пропускать подтверждения при переходах между фазами и шлюзами.",
+  "settings.section.workflow.projectDefaultsTitle": "Настройки проекта по умолчанию",
+
+  "settings.section.phases.title": "Переключатели фаз",
+  "settings.section.phases.desc": "Включите или отключите необязательные фазы для этого устройства и этого проекта.",
+  "settings.section.phases.deviceTitle": "Настройки устройства по умолчанию",
+  "settings.section.phases.projectTitle": "Этот проект",
+
+  "settings.section.review.title": "Режим ревью",
+  "settings.section.review.desc": "Выберите, какие автоматические ревьюеры проверяют дифф перед тем, как вы его увидите.",
+  "settings.section.review.projectDefaultTitle": "Значение по умолчанию для проекта",
+  "settings.section.review.projectDefaultLabel": "Режим ревью по умолчанию для новых рабочих пространств",
 
   "settings.section.verification.title": "Профили верификации",
   "settings.section.verification.desc": "Назначайте профили верификации и управляйте проверками для этого проекта.",

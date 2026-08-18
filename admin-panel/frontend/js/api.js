@@ -206,6 +206,10 @@ function apiSetWorkflowMode(projectId, branch, mode) {
   return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/workflow-mode', { mode: mode });
 }
 
+function apiSetReviewMode(projectId, branch, mode) {
+  return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/review-mode', { mode: mode });
+}
+
 function apiAddComment(projectId, branch, scope, target, text, filePath, lineStart, lineEnd, lHash) {
   var body = { scope: scope, target: target, text: text };
   if (filePath) body.file_path = filePath;
