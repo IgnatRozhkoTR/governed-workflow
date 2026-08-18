@@ -13,6 +13,7 @@ from core.decorators import with_project
 from core.helpers import run_git, write_json
 from core.i18n import t
 from core.paths import DEFAULT_GIT_RULES
+from services import lsp_service
 from services.advance_mode_service import seed_default_modes
 from services.configurator_service import ConfiguratorChain
 from services.project_settings_service import (
@@ -179,9 +180,11 @@ def get_project_settings(db, project):
 @with_project
 def put_project_settings(db, project):
     body = request.get_json(silent=True) or {}
-    if "simple_planning" not in body:
-        return jsonify({"error": "simple_planning field is required"}), 400
-    if not isinstance(body["simple_planning"], bool):
+    if not body:
+        return jsonify({"error": "at least one of simple_planning, fast_mode_default, review_mode_default is required"}), 400
+
+    simple_planning = body.get("simple_planning")
+    if simple_planning is not None and not isinstance(simple_planning, bool):
         return jsonify({"error": "simple_planning must be a boolean"}), 400
 
     fast_mode_default = body.get("fast_mode_default")
@@ -193,7 +196,8 @@ def put_project_settings(db, project):
         return jsonify({"error": "review_mode_default must be a string"}), 400
 
     try:
-        set_simple_planning(db, project["id"], body["simple_planning"])
+        if simple_planning is not None:
+            set_simple_planning(db, project["id"], simple_planning)
         if fast_mode_default is not None:
             set_fast_mode_default(db, project["id"], fast_mode_default)
         if review_mode_default is not None:
@@ -212,7 +216,7 @@ def put_project_settings(db, project):
 
     response = {
         "ok": True,
-        "simple_planning": body["simple_planning"],
+        "simple_planning": get_simple_planning(db, project["id"]),
         "fast_mode_default": get_fast_mode_default(db, project["id"]),
         "review_mode_default": get_review_mode_default(db, project["id"]),
     }
@@ -227,6 +231,10 @@ def delete_project(project_id):
     try:
         db.execute("DELETE FROM projects WHERE id = ?", (project_id,))
         db.commit()
+        try:
+            lsp_service.remove_lsp_cache_dirs(project_id)
+        except Exception:
+            log.exception("Failed to clean up LSP cache dirs for project=%s", project_id)
         return jsonify({"ok": True})
     finally:
         db.close()
