@@ -32,7 +32,7 @@ function _trackRapidTypedBurst() {
   }
   if (_typedBurstTimestamps.length > RAPID_BURST_THRESHOLD && !_typedBurstActive) {
     _typedBurstActive = true;
-    console.log('[paste-guard] rapid typed burst: ' + _typedBurstTimestamps.length + ' chars in ' + RAPID_BURST_WINDOW_MS + 'ms');
+    console.debug('[paste-guard] rapid typed burst: ' + _typedBurstTimestamps.length + ' chars in ' + RAPID_BURST_WINDOW_MS + 'ms');
   }
   if (_typedBurstQuietTimer) clearTimeout(_typedBurstQuietTimer);
   _typedBurstQuietTimer = setTimeout(function() {
@@ -254,8 +254,10 @@ function _createTerminal(containerId, wsRef) {
       if (suppressed) {
         e.preventDefault();
         e.stopPropagation();
+        console.log('[paste-guard] text paste ' + pastedText.length + ' chars, ' + delta + 'ms after last Enter — SUPPRESSED');
+      } else {
+        console.debug('[paste-guard] text paste ' + pastedText.length + ' chars, ' + delta + 'ms after last Enter — allowed');
       }
-      console.log('[paste-guard] text paste ' + pastedText.length + ' chars, ' + delta + 'ms after last Enter — ' + (suppressed ? 'SUPPRESSED' : 'allowed'));
       return;
     }
 
@@ -298,11 +300,16 @@ function _createTerminal(containerId, wsRef) {
     if (data === '\r') {
       _lastTerminalEnterAt = Date.now();
     }
-    if (data.length > 8) {
-      var bracketed = data.indexOf('\x1b[200~') !== -1;
-      console.log('[paste-guard] onData chunk ' + data.length + ' chars' + (bracketed ? ' (bracketed)' : '') + ', ' + (Date.now() - _lastTerminalEnterAt) + 'ms after last Enter');
-    } else if (data.length === 1) {
-      _trackRapidTypedBurst();
+    // SGR mouse-tracking (\x1b[<) and legacy mouse (\x1b[M) sequences fire on every
+    // mouse move and would otherwise dominate the chunk log — exclude them entirely.
+    var isMouseTracking = data.indexOf('\x1b[<') === 0 || data.indexOf('\x1b[M') === 0;
+    if (!isMouseTracking) {
+      if (data.length > 8) {
+        var bracketed = data.indexOf('\x1b[200~') !== -1;
+        console.debug('[paste-guard] onData chunk ' + data.length + ' chars' + (bracketed ? ' (bracketed)' : '') + ', ' + (Date.now() - _lastTerminalEnterAt) + 'ms after last Enter');
+      } else if (data.length === 1) {
+        _trackRapidTypedBurst();
+      }
     }
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(data);
