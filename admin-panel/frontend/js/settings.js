@@ -54,9 +54,9 @@ function _loadSettingsSectionData(section) {
     if (typeof loadVerificationData === 'function') loadVerificationData();
   } else if (section === 'rules') {
     if (typeof loadRules === 'function') loadRules();
-    if (typeof loadGitRules === 'function') loadGitRules();
   } else if (section === 'git') {
     if (typeof loadGitConfig === 'function') loadGitConfig();
+    if (typeof loadGitRules === 'function') loadGitRules();
   } else if (section === 'claude') {
     if (typeof loadClaudeCommand === 'function') loadClaudeCommand();
   } else if (section === 'system') {

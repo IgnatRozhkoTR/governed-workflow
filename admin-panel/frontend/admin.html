@@ -424,15 +424,6 @@
           <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
             <button class="btn btn-sm btn-primary" onclick="openRuleModal()" data-i18n="buttons.newRule">New rule</button>
           </div>
-
-          <div class="settings-subsection">
-            <div class="settings-subsection-title" data-i18n="cards.gitRules">Git Rules</div>
-            <div style="margin-bottom: 8px; font-size: 0.75rem; color: var(--text-muted);" id="gitRulesSource">Source: Not configured</div>
-            <textarea class="context-textarea" id="gitRulesContent" style="width: 100%; min-height: 300px; font-family: monospace; font-size: 13px;" placeholder="Git rules will appear here..." data-i18n-placeholder="placeholders.gitRules"></textarea>
-            <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-              <button class="btn btn-sm btn-primary" onclick="saveGitRules()" data-i18n="buttons.saveRules">Save Rules</button>
-            </div>
-          </div>
         </section>
 
         <!-- Git -->
@@ -472,6 +463,15 @@
               <div style="margin-left: auto; display: flex; align-items: flex-end;">
                 <button class="btn btn-sm btn-primary" onclick="saveGitConfig()" data-i18n="buttons.saveGitConfig">Save Git Config</button>
               </div>
+            </div>
+          </div>
+
+          <div class="settings-subsection">
+            <div class="settings-subsection-title" data-i18n="cards.gitRules">Git Rules</div>
+            <div style="margin-bottom: 8px; font-size: 0.75rem; color: var(--text-muted);" id="gitRulesSource">Source: Not configured</div>
+            <textarea class="context-textarea" id="gitRulesContent" style="width: 100%; min-height: 300px; font-family: monospace; font-size: 13px;" placeholder="Git rules will appear here..." data-i18n-placeholder="placeholders.gitRules"></textarea>
+            <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+              <button class="btn btn-sm btn-primary" onclick="saveGitRules()" data-i18n="buttons.saveRules">Save Rules</button>
             </div>
           </div>
         </section>
@@ -946,7 +946,7 @@
 <script src="js/advance-modes.js?v=1"></script>
 <script src="js/review-pipeline.js?v=2"></script>
 <script src="js/actions.js?v=10"></script>
-<script src="js/settings.js?v=3"></script>
+<script src="js/settings.js?v=4"></script>
 <script src="js/app.js?v=12"></script>
 <script src="js/workspace.js?v=12"></script>
 
