@@ -61,11 +61,13 @@ function _lspIsTransitioning(status) {
 
 function _lspButtonLabel(status) {
   switch (status) {
-    case 'starting': return t('lsp.button.starting');
-    case 'stopping': return t('lsp.button.stopping');
-    case 'running': return t('lsp.button.stop');
-    case 'error': return t('lsp.button.retry');
-    default: return t('lsp.button.start');
+    case 'stopping':
+    case 'running':
+      return t('lsp.button.stop');
+    case 'error':
+      return t('lsp.button.retry');
+    default:
+      return t('lsp.button.start');
   }
 }
 
@@ -189,13 +191,15 @@ function renderLspDropdown() {
     return;
   }
 
-  var anyStarting = false;
-  var anyStopping = false;
+  var runningCount = 0;
+  var startingCount = 0;
+  var stoppingCount = 0;
 
   _lspProfiles.forEach(function(p) {
     var status = _lspProfileStatus(p);
-    if (status === 'starting') anyStarting = true;
-    if (status === 'stopping') anyStopping = true;
+    if (status === 'running') runningCount++;
+    if (status === 'starting') startingCount++;
+    if (status === 'stopping') stoppingCount++;
 
     var safeProfileId = parseInt(p.profile_id, 10);
     if (isNaN(safeProfileId)) return;
@@ -212,16 +216,16 @@ function renderLspDropdown() {
     html += _lspErrorLineHtml(status, p.error_message);
   });
 
-  var startAllDisabled = anyStarting;
-  var stopAllDisabled = anyStopping;
-  var startAllLabel = anyStarting ? t('lsp.button.starting') : t('lsp.button.startAll');
-  var stopAllLabel = anyStopping ? t('lsp.button.stopping') : t('lsp.button.stopAll');
+  var allRunning = runningCount === _lspProfiles.length;
+  var noneRunningOrStarting = runningCount === 0 && startingCount === 0;
+  var startAllDisabled = startingCount > 0 || allRunning;
+  var stopAllDisabled = stoppingCount > 0 || noneRunningOrStarting;
 
   html += '<div class="lsp-dropdown-actions">'
     + '<button class="lsp-btn start"' + (startAllDisabled ? ' disabled' : '')
-    + ' onclick="startAllLsp(); event.stopPropagation();">' + escapeHtml(startAllLabel) + '</button>'
+    + ' onclick="startAllLsp(); event.stopPropagation();">' + escapeHtml(t('lsp.button.startAll')) + '</button>'
     + '<button class="lsp-btn stop"' + (stopAllDisabled ? ' disabled' : '')
-    + ' onclick="stopAllLsp(); event.stopPropagation();">' + escapeHtml(stopAllLabel) + '</button>'
+    + ' onclick="stopAllLsp(); event.stopPropagation();">' + escapeHtml(t('lsp.button.stopAll')) + '</button>'
     + '</div>';
 
   dropdown.innerHTML = html;

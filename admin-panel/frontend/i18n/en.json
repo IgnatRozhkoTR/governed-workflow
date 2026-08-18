@@ -729,8 +729,6 @@
   "lsp.errorPrefix": "Error: ",
   "lsp.button.start": "Start",
   "lsp.button.stop": "Stop",
-  "lsp.button.starting": "Starting…",
-  "lsp.button.stopping": "Stopping…",
   "lsp.button.retry": "Retry",
   "lsp.button.startAll": "Start All",
   "lsp.button.stopAll": "Stop All",
