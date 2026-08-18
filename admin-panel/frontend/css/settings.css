@@ -285,6 +285,394 @@
   line-height: 1.4;
 }
 
+/* ═══════════════════════════════════════════════ */
+/*  BUTTON VARIANTS (outline / ghost)              */
+/* ═══════════════════════════════════════════════ */
+.btn-outline {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.btn-outline:hover {
+  color: var(--text-primary);
+  border-color: var(--border-active);
+  background: var(--bg-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+  padding: 5px 10px;
+}
+
+.btn-ghost:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+/* ═══════════════════════════════════════════════ */
+/*  GIT COCKPIT (multi-repo overview / PRs / repos)*/
+/* ═══════════════════════════════════════════════ */
+.gc-empty-state {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-style: italic;
+  padding: 10px 0;
+}
+
+.gc-hint-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.gc-mono {
+  font-family: var(--font-mono);
+}
+
+/* ─── Overview ─── */
+.gc-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gc-overview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.gc-overview-row:last-child {
+  border-bottom: none;
+}
+
+.gc-overview-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.gc-overview-value {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  text-align: right;
+  word-break: break-all;
+}
+
+.gc-arrow {
+  color: var(--text-muted);
+  margin: 0 2px;
+}
+
+/* ─── Badges ─── */
+.gc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.gc-badge--single {
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.gc-badge--multi {
+  background: var(--info-dim);
+  color: var(--info);
+}
+
+.gc-badge--attached {
+  background: var(--success-dim);
+  color: var(--success);
+}
+
+.gc-badge--detached {
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* ─── Pull requests ─── */
+.gc-pr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.gc-pr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.gc-pr-row:last-child {
+  border-bottom: none;
+}
+
+.gc-pr-chip {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.gc-pr-link {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gc-pr-link:hover {
+  text-decoration: underline;
+}
+
+.gc-pr-delete {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: var(--transition);
+}
+
+.gc-pr-delete:hover {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: var(--danger-dim);
+}
+
+.gc-pr-add-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.gc-pr-url-input {
+  flex: 2;
+  min-width: 200px;
+}
+
+.gc-pr-repo-select {
+  flex: 1;
+  min-width: 140px;
+}
+
+.gc-pr-title-input {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* ─── Repositories ─── */
+.gc-repo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gc-repo-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.gc-repo-row:last-child {
+  border-bottom: none;
+}
+
+.gc-repo-row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gc-repo-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 120px;
+  flex: 1;
+}
+
+.gc-repo-name {
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--text-primary);
+}
+
+.gc-repo-relpath,
+.gc-checklist-relpath {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.gc-repo-base-input {
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.gc-repo-actions-row {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.gc-override-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gc-override-textarea {
+  width: 100%;
+  min-height: 120px;
+  font-size: 12px;
+}
+
+.gc-override-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.gc-override-loading,
+.gc-override-error {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.gc-override-error {
+  color: var(--danger);
+}
+
+.gc-override-btn-label {
+  display: inline-block;
+}
+
+.gc-override-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* ─── Convert-multi / edit-selection checklist ─── */
+.gc-checklist-panel {
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.gc-checklist-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.gc-checklist-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gc-checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gc-checklist-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 160px;
+  font-size: 0.84rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.gc-checklist-check input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.gc-checklist-name {
+  font-weight: 500;
+}
+
+.gc-checklist-base-input {
+  width: 160px;
+  flex-shrink: 0;
+}
+
+.gc-checklist-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.gc-checklist-loading {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.gc-checklist-rows--compact {
+  padding: 8px 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 160px;
+  overflow-y: auto;
+}
+
 @media (max-width: 800px) {
   .settings-layout {
     flex-direction: column;
@@ -323,5 +711,31 @@
   .settings-task-commands {
     padding-bottom: 12px;
     margin-bottom: 14px;
+  }
+
+  .gc-overview-row {
+    align-items: flex-start;
+  }
+
+  .gc-overview-value {
+    text-align: left;
+  }
+
+  .gc-repo-row-main {
+    align-items: stretch;
+  }
+
+  .gc-repo-base-input {
+    width: 100%;
+  }
+
+  .gc-pr-url-input,
+  .gc-pr-repo-select,
+  .gc-pr-title-input {
+    flex-basis: 100%;
+  }
+
+  .gc-checklist-base-input {
+    width: 100%;
   }
 }

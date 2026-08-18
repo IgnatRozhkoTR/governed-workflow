@@ -20,6 +20,14 @@ def test_get_workspace_state(client, workspace):
     assert "progress" in data
 
 
+def test_get_workspace_state_includes_source_branch_and_project_type(client, workspace):
+    response = client.get(_ws_url(workspace, "state"))
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["source_branch"] == "develop"
+    assert data["project_type"] == "single"
+
+
 def test_get_workspace_state_returns_etag(client, workspace):
     """State endpoint returns a stable ETag header for the JSON payload."""
     response = client.get(_ws_url(workspace, "state"))

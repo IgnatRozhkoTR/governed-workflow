@@ -113,6 +113,8 @@ def get_workspace_state(db, ws, project):
         "session_id": ws["session_id"],
         "working_dir": ws["working_dir"],
         "branch": ws["branch"],
+        "source_branch": ws["source_branch"],
+        "project_type": project["project_type"],
         "claude_command": ws["claude_command"] or "claude",
         "skip_permissions": bool(ws["skip_permissions"]),
         "restrict_to_workspace": bool(ws_field(ws, "restrict_to_workspace", 1)),

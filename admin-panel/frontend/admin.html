@@ -80,7 +80,7 @@
 <link rel="stylesheet" href="css/workspace.css?v=11">
 <link rel="stylesheet" href="css/phase-settings.css?v=1">
 <link rel="stylesheet" href="css/proposals.css?v=1">
-<link rel="stylesheet" href="css/settings.css?v=4">
+<link rel="stylesheet" href="css/settings.css?v=5">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -434,40 +434,69 @@
           </div>
           <p class="settings-section-desc" data-i18n="settings.section.git.desc">Configure how this project connects to its Git remote.</p>
 
-          <div class="context-fields">
-            <div class="context-row">
-              <div class="context-field">
-                <label class="context-label" data-i18n="labels.provider">Provider</label>
-                <select class="context-input" id="gitProvider" style="min-width: 140px;" onchange="toggleGitLabFields()">
-                  <option value="local" data-i18n="gitProvider.local">Local</option>
-                  <option value="github" data-i18n="gitProvider.github">GitHub</option>
-                  <option value="gitlab" data-i18n="gitProvider.gitlab">GitLab</option>
-                </select>
-              </div>
-              <div id="gitLabFields" style="display:none; gap: inherit; flex: 1; flex-wrap: wrap;">
-              <div class="context-field context-field-grow">
-                <label class="context-label" data-i18n="labels.host">Host</label>
-                <input type="text" class="context-input" id="gitHost" placeholder="e.g. gitlab.example.com" data-i18n-placeholder="placeholders.gitHost">
-              </div>
-              <div class="context-field context-field-grow">
-                <label class="context-label" data-i18n="labels.apiToken">API Token</label>
-                <input type="password" class="context-input" id="gitToken" placeholder="Enter token..." data-i18n-placeholder="placeholders.enterToken">
-              </div>
-              </div>
-            </div>
-            <div class="context-row">
-              <div class="context-field">
-                <label class="context-label" data-i18n="labels.defaultBranch">Default Branch</label>
-                <input type="text" class="context-input" id="gitDefaultBranch" placeholder="develop" style="width: 160px;" data-i18n-placeholder="placeholders.develop">
-              </div>
-              <div style="margin-left: auto; display: flex; align-items: flex-end;">
-                <button class="btn btn-sm btn-primary" onclick="saveGitConfig()" data-i18n="buttons.saveGitConfig">Save Git Config</button>
-              </div>
+          <div class="settings-subsection" style="margin-top:0; padding-top:0; border-top:none;">
+            <div class="settings-subsection-title" data-i18n="gitCockpit.overview.title">Overview</div>
+            <div class="gc-overview-list" id="gcOverviewBody"></div>
+          </div>
+
+          <div class="settings-subsection" id="gcPrsSection">
+            <div class="settings-subsection-title" data-i18n="gitCockpit.prs.title">Pull Requests</div>
+            <div class="gc-pr-list" id="gcPrsList"></div>
+            <div class="gc-pr-add-row">
+              <input type="text" class="context-input gc-pr-url-input" id="gcPrUrlInput" placeholder="https://…" data-i18n-placeholder="gitCockpit.prs.urlPlaceholder">
+              <select class="context-input gc-pr-repo-select" id="gcPrRepoSelect" style="display:none;"></select>
+              <input type="text" class="context-input gc-pr-title-input" id="gcPrTitleInput" placeholder="Title" data-i18n-placeholder="gitCockpit.prs.titlePlaceholder">
+              <button class="btn btn-sm btn-primary" onclick="gcAddPr()" data-i18n="gitCockpit.prs.add">Add</button>
             </div>
           </div>
 
           <div class="settings-subsection">
+            <div class="settings-subsection-title" data-i18n="gitCockpit.repos.title">Repositories</div>
+
+            <div class="context-fields">
+              <div class="context-row">
+                <div class="context-field">
+                  <label class="context-label" data-i18n="labels.provider">Provider</label>
+                  <select class="context-input" id="gitProvider" style="min-width: 140px;" onchange="toggleGitLabFields()">
+                    <option value="local" data-i18n="gitProvider.local">Local</option>
+                    <option value="github" data-i18n="gitProvider.github">GitHub</option>
+                    <option value="gitlab" data-i18n="gitProvider.gitlab">GitLab</option>
+                  </select>
+                </div>
+                <div id="gitLabFields" style="display:none; gap: inherit; flex: 1; flex-wrap: wrap;">
+                <div class="context-field context-field-grow">
+                  <label class="context-label" data-i18n="labels.host">Host</label>
+                  <input type="text" class="context-input" id="gitHost" placeholder="e.g. gitlab.example.com" data-i18n-placeholder="placeholders.gitHost">
+                </div>
+                <div class="context-field context-field-grow">
+                  <label class="context-label" data-i18n="labels.apiToken">API Token</label>
+                  <input type="password" class="context-input" id="gitToken" placeholder="Enter token..." data-i18n-placeholder="placeholders.enterToken">
+                </div>
+                </div>
+              </div>
+              <div class="context-row">
+                <div class="context-field" id="gitDefaultBranchRow">
+                  <label class="context-label" data-i18n="labels.defaultBranch">Default Branch</label>
+                  <input type="text" class="context-input" id="gitDefaultBranch" placeholder="develop" style="width: 160px;" data-i18n-placeholder="placeholders.develop">
+                </div>
+                <div style="margin-left: auto; display: flex; align-items: flex-end;">
+                  <button class="btn btn-sm btn-primary" onclick="saveGitConfig()" data-i18n="buttons.saveGitConfig">Save Git Config</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="gcConvertBtnWrap" style="margin-top: 14px;">
+              <button class="btn btn-sm btn-outline" onclick="gcOpenConvertPanel('convert')" data-i18n="gitCockpit.repos.convertBtn">Convert to multi-repo</button>
+            </div>
+
+            <div id="gcConvertPanel" class="gc-checklist-panel" style="display:none;"></div>
+
+            <div id="gcMultiReposBody" style="display:none;"></div>
+          </div>
+
+          <div class="settings-subsection">
             <div class="settings-subsection-title" data-i18n="cards.gitRules">Git Rules</div>
+            <p class="settings-row-desc" style="margin: -6px 0 10px;" data-i18n="gitCockpit.rules.shadowNote">Repo overrides above take precedence over this project default when set.</p>
             <div style="margin-bottom: 8px; font-size: 0.75rem; color: var(--text-muted);" id="gitRulesSource">Source: Not configured</div>
             <textarea class="context-textarea" id="gitRulesContent" style="width: 100%; min-height: 300px; font-family: monospace; font-size: 13px;" placeholder="Git rules will appear here..." data-i18n-placeholder="placeholders.gitRules"></textarea>
             <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
@@ -911,7 +940,7 @@
 <script src="js/vendor/idiomorph.min.js?v=10"></script>
 <script src="js/event-bus.js?v=10"></script>
 <script src="js/i18n.js?v=11"></script>
-<script src="js/api.js?v=13"></script>
+<script src="js/api.js?v=14"></script>
 <script src="js/auth.js?v=11"></script>
 <script src="js/toast.js?v=10"></script>
 <script src="js/state.js?v=12"></script>
@@ -920,8 +949,8 @@
 <script src="js/proposals.js?v=1"></script>
 <script src="js/comments.js?v=10"></script>
 <script src="js/theme.js?v=10"></script>
-<script src="js/terminal.js?v=20"></script>
-<script src="js/tabs.js?v=14"></script>
+<script src="js/terminal.js?v=21"></script>
+<script src="js/tabs.js?v=15"></script>
 <script src="js/phase.js?v=11"></script>
 <script src="js/plan.js?v=10"></script>
 <script src="js/scope.js?v=10"></script>
@@ -933,7 +962,8 @@
 <script src="js/lsp-client.js?v=11"></script>
 <script src="js/lsp-controls.js?v=12"></script>
 <script src="js/file-explorer.js?v=10"></script>
-<script src="js/git-config.js?v=10"></script>
+<script src="js/git-config.js?v=11"></script>
+<script src="js/git-cockpit.js?v=1"></script>
 <script src="js/rules.js?v=2"></script>
 <script src="js/claude-config.js?v=12"></script>
 <script src="js/network-mode.js?v=12"></script>
@@ -946,9 +976,9 @@
 <script src="js/advance-modes.js?v=1"></script>
 <script src="js/review-pipeline.js?v=2"></script>
 <script src="js/actions.js?v=10"></script>
-<script src="js/settings.js?v=4"></script>
+<script src="js/settings.js?v=5"></script>
 <script src="js/app.js?v=12"></script>
-<script src="js/workspace.js?v=12"></script>
+<script src="js/workspace.js?v=13"></script>
 
 <div id="diagramOverlay" class="diagram-overlay" style="display:none" onclick="closeDiagramOverlay(event)">
   <div class="diagram-overlay-content" onclick="event.stopPropagation()">

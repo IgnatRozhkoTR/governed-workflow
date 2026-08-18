@@ -57,6 +57,7 @@ function _loadSettingsSectionData(section) {
   } else if (section === 'git') {
     if (typeof loadGitConfig === 'function') loadGitConfig();
     if (typeof loadGitRules === 'function') loadGitRules();
+    if (typeof loadGitCockpit === 'function') loadGitCockpit();
   } else if (section === 'claude') {
     if (typeof loadClaudeCommand === 'function') loadClaudeCommand();
   } else if (section === 'system') {

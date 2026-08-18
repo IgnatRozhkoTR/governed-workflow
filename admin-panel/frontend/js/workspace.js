@@ -4,6 +4,7 @@ let _wsSelectedProjectName = null;
 let _wsShowArchived = false;
 let _wsSimplePlanningPrior = false;
 let _wsFastModeDefaultPrior = false;
+let _wsSelectedProjectType = 'single';
 
 function showProjectSelector() {
   resetUrlToSelector();
@@ -211,8 +212,10 @@ async function openProject(projectId) {
     const project = projects.find(p => p.id === projectId);
     _wsSelectedProjectName = project ? project.name : projectId;
     headerEl.textContent = _wsSelectedProjectName;
+    await _wsApplyProjectTypeToCreateForm(project);
   } catch (err) {
     headerEl.textContent = projectId;
+    await _wsApplyProjectTypeToCreateForm(null);
   }
 
   var activeWorkspaceNumericId = null;
@@ -280,6 +283,48 @@ async function loadBranches(projectId) {
   }
 }
 
+async function _wsApplyProjectTypeToCreateForm(project) {
+  _wsSelectedProjectType = (project && project.project_type) || 'single';
+
+  const worktreeCheckbox = document.getElementById('ws-worktree');
+  const forcedNote = document.getElementById('wsWorktreeForcedNote');
+  const attachRow = document.getElementById('wsRepoAttachRow');
+  const attachList = document.getElementById('wsRepoAttachList');
+
+  if (_wsSelectedProjectType !== 'multi') {
+    if (worktreeCheckbox) worktreeCheckbox.disabled = false;
+    if (forcedNote) forcedNote.style.display = 'none';
+    if (attachRow) attachRow.style.display = 'none';
+    if (attachList) attachList.innerHTML = '';
+    return;
+  }
+
+  if (worktreeCheckbox) { worktreeCheckbox.checked = true; worktreeCheckbox.disabled = true; }
+  if (forcedNote) forcedNote.style.display = '';
+  if (attachRow) attachRow.style.display = '';
+  if (attachList) attachList.innerHTML = '<div class="gc-empty-state">' + t('research.loading') + '</div>';
+
+  try {
+    const data = await apiGetProjectRepos(project.id);
+    const repos = (data.repos || []).filter(function(r) { return r.enabled; });
+    if (!attachList) return;
+    attachList.innerHTML = repos.length
+      ? repos.map(function(r) {
+          const relPathHtml = r.rel_path !== r.name
+            ? ' <span class="gc-checklist-relpath">' + _wsEscape(r.rel_path) + '</span>'
+            : '';
+          return '<label class="ws-checkbox-label">' +
+            '<input type="checkbox" class="ws-repo-attach-check" value="' + r.id + '">' +
+            _wsEscape(r.name) + relPathHtml +
+          '</label>';
+        }).join('')
+      : '<div class="gc-empty-state">' + t('gitCockpit.create.noReposEnabled') + '</div>';
+  } catch (err) {
+    if (attachRow) attachRow.style.display = 'none';
+    if (attachList) attachList.innerHTML = '';
+  }
+}
+
 async function createWorkspace(projectId) {
   const branchInput = document.getElementById('ws-new-branch');
   const sourceSelect = document.getElementById('ws-source-branch');
@@ -291,6 +336,9 @@ async function createWorkspace(projectId) {
   const source = sourceSelect.value;
   const worktree = worktreeCheckbox.checked;
   const workflowMode = fastModeCheckbox && fastModeCheckbox.checked ? 'fast' : 'standard';
+  const repos = Array.from(document.querySelectorAll('.ws-repo-attach-check:checked')).map(function(el) {
+    return parseInt(el.value, 10);
+  });
 
   _wsClearError('ws-create-error');
   resultEl.innerHTML = '';
@@ -302,7 +350,7 @@ async function createWorkspace(projectId) {
 
   let result;
   try {
-    result = await apiCreateWorkspace(projectId, branch, source, worktree, workflowMode);
+    result = await apiCreateWorkspace(projectId, branch, source, worktree, workflowMode, repos);
   } catch (err) {
     resultEl.innerHTML = '';
     _wsShowError('ws-create-error', err.message);
@@ -329,6 +377,7 @@ async function createWorkspace(projectId) {
   branchInput.value = '';
 
   _wsNotifyBaseSync(result.base_sync, source);
+  _wsNotifyAttachedRepos(result.attached_repos);
 
   try {
     const workspaceListEl = document.getElementById('ws-workspace-cards');
@@ -343,15 +392,28 @@ async function createWorkspace(projectId) {
 function _wsNotifyBaseSync(baseSync, baseBranch) {
   if (!baseSync) return;
 
+  const branchLabel = baseSync.branch || baseBranch;
+
   if (baseSync.updated) {
-    showToast(t('messages.baseSyncUpdated', {branch: baseBranch}));
+    showToast(t('messages.baseSyncUpdated', {branch: branchLabel}));
     return;
   }
 
   const trivialReasons = ['no-local-branch', 'not-remote-based'];
   if (trivialReasons.indexOf(baseSync.reason) !== -1) return;
 
-  showToast(t('messages.baseSyncNotUpdated', {branch: baseBranch, reason: baseSync.reason}));
+  showToast(t('messages.baseSyncNotUpdated', {branch: branchLabel, reason: baseSync.reason}));
+}
+
+// Notifies base-sync results for each repo attached at workspace-creation time
+// (multi-repo projects). Mirrors _wsNotifyBaseSync's single-repo semantics,
+// one toast per repo (later toasts replace earlier ones per showToast's
+// single-instance behavior, so only the last notable result is visible).
+function _wsNotifyAttachedRepos(attachedRepos) {
+  if (!attachedRepos || !attachedRepos.length) return;
+  attachedRepos.forEach(function(item) {
+    _wsNotifyBaseSync(item.base_sync, item.rel_path);
+  });
 }
 
 async function _wsArchiveWorkspace(projectId, branch, event) {
@@ -470,11 +532,18 @@ function _wsInitSelector() {
                 ${t('labels.createAsGitWorktree')}
               </label>
             </div>
+            <div class="ws-form-row" id="wsWorktreeForcedNote" style="display:none;">
+              <span class="gc-hint-text">${t('gitCockpit.create.worktreeForced')}</span>
+            </div>
             <div class="ws-form-row">
               <label class="ws-checkbox-label">
                 <input type="checkbox" id="ws-fast-mode">
                 ${t('labels.fastMode')}
               </label>
+            </div>
+            <div class="ws-form-row" id="wsRepoAttachRow" style="display:none;">
+              <label class="ws-label">${t('gitCockpit.create.attachRepos')}</label>
+              <div id="wsRepoAttachList" class="gc-checklist-rows gc-checklist-rows--compact"></div>
             </div>
             <button class="btn btn-primary" onclick="createWorkspace(_wsSelectedProjectId)">${t('buttons.createWorkspace')}</button>
           </div>

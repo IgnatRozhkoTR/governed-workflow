@@ -237,7 +237,7 @@ class DonePhase(Phase):
         return """\
 ## 6 Done
 
-Push and MR/PR creation allowed. Task complete."""
+Push and MR/PR creation allowed. Task complete. Right after the MR/PR is created, call `workspace_save_pr` with the resulting URL (and the repo name in multi-repo workspaces) so the admin panel can link to it."""
 
     def validate(self, ws, body, project_path):
         locale = ws["locale"]

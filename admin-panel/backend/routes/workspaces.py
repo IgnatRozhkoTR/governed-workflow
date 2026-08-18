@@ -29,7 +29,9 @@ from core.paths import (
 )
 from core.terminal import session_name
 from services.git_rules_service import migrate_legacy_git_rules
+from services import base_sync_service
 from services import comment_service, lsp_service, proposal_service, review_pipeline_service
+from services import pr_service, repo_service
 from services import review_mode_service
 from services import workflow_mode_service
 from services.configurator_service import ConfiguratorChain
@@ -594,6 +596,24 @@ def _setup_worktree_workspace(project_path, branch, sanitized, source_ref):
     return str(wt_path), None
 
 
+def _setup_multi_workspace(project_path, sanitized):
+    """Create the composite worktree directory for a multi-repo workspace.
+
+    Unlike the single-repo worktree, this is a plain directory (no repo is
+    attached yet), so there is no git worktree cleanup to perform — a
+    non-empty leftover is treated as a conflict rather than recovered from.
+
+    Returns (working_dir, error_response) where error_response is None on success.
+    """
+    composite_path = Path(project_path) / ".claude" / "worktrees" / sanitized
+    if composite_path.exists() and any(composite_path.iterdir()):
+        error_msg = t("api.error.worktreeTargetPathExists", path=str(composite_path))
+        return None, (jsonify({"error": error_msg}), 409)
+
+    composite_path.mkdir(parents=True, exist_ok=True)
+    return str(composite_path), None
+
+
 def _setup_checkout_workspace(project_path, branch, source_ref):
     """Checkout (or create) a branch in the main repo for non-worktree mode.
 
@@ -611,8 +631,13 @@ def _setup_checkout_workspace(project_path, branch, source_ref):
     return project_path, None
 
 
-def _install_worktree_configs(db, project_path, wt_path):
-    """Populate the worktree with a merged .claude/ from repo defaults and project."""
+def _install_worktree_configs(db, project_path, wt_path, install_git_hooks=True):
+    """Populate the worktree with a merged .claude/ from repo defaults and project.
+
+    ``install_git_hooks`` is False for a freshly created multi-repo composite
+    directory, which is a plain directory (not a git worktree) until repos are
+    attached — there is nothing for ``git config --worktree`` to target yet.
+    """
     wt_path = Path(wt_path)
     dst_claude = wt_path / ".claude"
     src_claude = Path(project_path) / ".claude"
@@ -660,7 +685,8 @@ def _install_worktree_configs(db, project_path, wt_path):
         dst_funnel.symlink_to(src_funnel)
 
     # g) Install phase-gated git hooks into the worktree
-    _install_git_hooks(dst_claude, str(wt_path))
+    if install_git_hooks:
+        _install_git_hooks(dst_claude, str(wt_path))
 
 
 def _install_checkout_configs(db, project_path):
@@ -728,63 +754,11 @@ def _install_git_hooks(dst_claude, working_dir):
 
 
 def _branch_checked_out_anywhere(project_path, branch):
-    """True if `branch` is HEAD in the main repo or any registered worktree.
-
-    `git fetch origin <branch>:<branch>` refuses to update a checked-out
-    branch's ref, so this lets us report a clean skip reason instead of
-    surfacing that failure to the user.
-    """
-    ok_list, output, _ = run_git(project_path, "worktree", "list", "--porcelain")
-    if not ok_list:
-        return False
-    branch_line = f"branch refs/heads/{branch}"
-    return any(line.strip() == branch_line for line in output.splitlines())
+    return base_sync_service.branch_checked_out_anywhere(project_path, branch)
 
 
 def _sync_local_base_branch(project_path, base):
-    """Best-effort fast-forward of the local `base` branch after workspace creation.
-
-    Worktrees and non-worktree workspaces alike are always created from
-    `origin/<base>`; the local `base` branch itself is never checked out or
-    pulled, so it silently goes stale. `git fetch origin <base>:<base>`
-    fast-forwards a local branch that is not currently checked out and fails
-    cleanly (non-zero, no partial state) when it isn't a fast-forward, so it
-    is safe to attempt without ever risking data loss.
-    """
-    ok_local, _, _ = run_git(project_path, "rev-parse", "--verify", f"refs/heads/{base}")
-    if not ok_local:
-        return {"attempted": False, "updated": False, "reason": "no-local-branch"}
-
-    if _branch_checked_out_anywhere(project_path, base):
-        return {"attempted": False, "updated": False, "reason": "skipped-checked-out"}
-
-    _, before_sha, _ = run_git(project_path, "rev-parse", "--short", f"refs/heads/{base}")
-    before_sha = before_sha.strip()
-
-    ok, _, stderr = run_git(project_path, "fetch", "origin", f"{base}:{base}")
-    if not ok:
-        stderr = stderr or ""
-        if "checked out at" in stderr:
-            reason = "skipped-checked-out"
-        elif "non-fast-forward" in stderr or "fast-forward" in stderr:
-            reason = "not-fast-forward"
-        else:
-            reason = "fetch-failed"
-        return {"attempted": True, "updated": False, "reason": reason}
-
-    _, after_sha, _ = run_git(project_path, "rev-parse", "--short", f"refs/heads/{base}")
-    after_sha = after_sha.strip()
-
-    if after_sha == before_sha:
-        return {"attempted": True, "updated": False, "reason": "up-to-date"}
-
-    return {
-        "attempted": True,
-        "updated": True,
-        "reason": f"updated-from {before_sha} to {after_sha}",
-        "before": before_sha,
-        "after": after_sha,
-    }
+    return base_sync_service.sync_local_base_branch(project_path, base)
 
 
 def _resolve_base_sync(project_path, source, source_from_origin):
@@ -859,6 +833,25 @@ def _prewarm_lsp_servers(db, project_id, working_dir):
     return {"started": started, "skipped_reason": None}
 
 
+def _attach_requested_repos(db, ws, project, repo_ids):
+    """Attach each requested repo id, collecting a per-repo result or error.
+
+    Never raises: a failed attach must not roll back the workspace that was
+    just created, so each failure becomes an error entry alongside successes.
+    """
+    results = []
+    for repo_id in repo_ids:
+        repo_row = repo_service.get_repo(db, project["id"], repo_id)
+        if repo_row is None:
+            results.append({"repo_id": repo_id, "error": t("api.error.repoNotFound")})
+            continue
+        try:
+            results.append(repo_service.attach_repo(db, ws, project, repo_row))
+        except repo_service.RepoServiceError as exc:
+            results.append({"repo_id": repo_id, "rel_path": repo_row["rel_path"], "error": str(exc)})
+    return results
+
+
 @bp.route("/api/projects/<project_id>/workspaces", methods=["POST"])
 def create_workspace(project_id):
     with get_db_ctx() as db:
@@ -871,9 +864,14 @@ def create_workspace(project_id):
         source = body.get("source", DEFAULT_SOURCE_BRANCH).strip()
         use_worktree = body.get("worktree", True)
         locale = body.get("locale", "en").strip()
+        requested_repo_ids = body.get("repos") or []
 
         if not branch:
             return jsonify({"error": t("api.error.branchNameRequired")}), 400
+
+        project_type = project["project_type"]
+        if project_type == "multi" and not use_worktree:
+            return jsonify({"error": t("api.error.multiRequiresWorktree")}), 400
 
         requested_mode = body.get("workflow_mode")
         if isinstance(requested_mode, str):
@@ -896,23 +894,25 @@ def create_workspace(project_id):
         project_path = project["path"]
         sanitized = sanitize_branch(branch)
 
-        ok, _, _ = run_git(project_path, "rev-parse", "--is-inside-work-tree")
-        if not ok:
-            run_git(project_path, "init")
-            run_git(project_path, "commit", "--allow-empty", "-m", "Initial commit")
-
-        has_remote, remotes, _ = run_git(project_path, "remote")
-        if has_remote and remotes.strip():
-            run_git(project_path, "fetch", "origin")
-
-        source_ref = f"origin/{source}"
-        ok, _, _ = run_git(project_path, "rev-parse", "--verify", source_ref)
-        source_from_origin = ok
-        if not ok:
-            ok, _, _ = run_git(project_path, "rev-parse", "--verify", source)
+        source_from_origin = False
+        if project_type != "multi":
+            ok, _, _ = run_git(project_path, "rev-parse", "--is-inside-work-tree")
             if not ok:
-                return jsonify({"error": t("api.error.sourceBranchNotFound", source=source)}), 404
-            source_ref = source
+                run_git(project_path, "init")
+                run_git(project_path, "commit", "--allow-empty", "-m", "Initial commit")
+
+            has_remote, remotes, _ = run_git(project_path, "remote")
+            if has_remote and remotes.strip():
+                run_git(project_path, "fetch", "origin")
+
+            source_ref = f"origin/{source}"
+            ok, _, _ = run_git(project_path, "rev-parse", "--verify", source_ref)
+            source_from_origin = ok
+            if not ok:
+                ok, _, _ = run_git(project_path, "rev-parse", "--verify", source)
+                if not ok:
+                    return jsonify({"error": t("api.error.sourceBranchNotFound", source=source)}), 404
+                source_ref = source
 
         existing = db.execute(
             "SELECT id FROM workspaces WHERE project_id = ? AND sanitized_branch = ? AND status = 'active'",
@@ -921,7 +921,12 @@ def create_workspace(project_id):
         if existing:
             return jsonify({"error": t("api.error.workspaceAlreadyExists", branch=branch)}), 409
 
-        if use_worktree:
+        if project_type == "multi":
+            working_dir, err = _setup_multi_workspace(project_path, sanitized)
+            if err:
+                return err
+            _install_worktree_configs(db, project_path, working_dir, install_git_hooks=False)
+        elif use_worktree:
             working_dir, err = _setup_worktree_workspace(project_path, branch, sanitized, source_ref)
             if err:
                 return err
@@ -938,7 +943,16 @@ def create_workspace(project_id):
         )
         workflow_mode_service.apply_mode_phase_settings(db, workspace_id, workflow_mode)
         db.commit()
-        body["base_sync"] = _resolve_base_sync(project_path, source, source_from_origin)
+
+        if project_type == "multi":
+            if requested_repo_ids:
+                ws_row = db.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
+                body["attached_repos"] = _attach_requested_repos(db, ws_row, project, requested_repo_ids)
+            body["lsp_prewarm"] = {"started": [], "skipped_reason": "multi_project"}
+        else:
+            body["base_sync"] = _resolve_base_sync(project_path, source, source_from_origin)
+            body["lsp_prewarm"] = _prewarm_lsp_servers(db, project_id, working_dir)
+
         try:
             results = ConfiguratorChain.default().run(db, project_id, project_path)
             warnings = [r for r in results if r["action"] != "rendered"]
@@ -946,7 +960,6 @@ def create_workspace(project_id):
                 body["configurator_warnings"] = warnings
         except Exception:
             logger.exception("Configurator chain failed after workspace creation; SKILL.md may be stale")
-        body["lsp_prewarm"] = _prewarm_lsp_servers(db, project_id, working_dir)
         return jsonify(body), 201
 
 
@@ -959,6 +972,18 @@ def archive_workspace(db, ws, project):
     project_path = project["path"]
     working_dir = ws["working_dir"]
     is_worktree = working_dir != project_path
+    is_multi = project["project_type"] == "multi"
+
+    if is_multi:
+        repo_rows = db.execute(
+            "SELECT pr.rel_path, wr.worktree_path FROM workspace_repos wr "
+            "JOIN project_repos pr ON pr.id = wr.repo_id WHERE wr.workspace_id = ?",
+            (ws["id"],),
+        ).fetchall()
+        for row in repo_rows:
+            repo_abs = str(Path(project_path) / row["rel_path"])
+            run_git(repo_abs, "worktree", "remove", row["worktree_path"], "--force")
+            run_git(repo_abs, "worktree", "prune")
 
     if is_worktree:
         wt_path = Path(working_dir)
@@ -972,7 +997,10 @@ def archive_workspace(db, ws, project):
                     shutil.rmtree(proj_ws_dir)
                 shutil.copytree(wt_ws_dir, proj_ws_dir)
 
-            run_git(project_path, "worktree", "remove", str(wt_path), "--force")
+            if is_multi:
+                shutil.rmtree(wt_path, ignore_errors=True)
+            else:
+                run_git(project_path, "worktree", "remove", str(wt_path), "--force")
     else:
         _restore_project_files(project_path)
 
@@ -985,6 +1013,102 @@ def archive_workspace(db, ws, project):
     db.commit()
 
     return jsonify({"status": "archived", "branch": ws["branch"]})
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/repo-state", methods=["GET"])
+@with_workspace
+def get_repo_state(db, ws, project):
+    project_type = project["project_type"]
+    if project_type != "multi":
+        return jsonify({"project_type": project_type, "attached": [], "available": []})
+
+    prs_by_repo = {
+        pr["repo_id"]: pr for pr in pr_service.list_prs(db, ws["id"]) if pr["repo_id"] is not None
+    }
+
+    attached_rows = db.execute(
+        "SELECT wr.repo_id, pr.rel_path, pr.name, wr.branch, wr.worktree_path "
+        "FROM workspace_repos wr JOIN project_repos pr ON pr.id = wr.repo_id "
+        "WHERE wr.workspace_id = ? ORDER BY pr.rel_path",
+        (ws["id"],),
+    ).fetchall()
+    attached_ids = {row["repo_id"] for row in attached_rows}
+    attached = [{
+        "repo_id": row["repo_id"],
+        "rel_path": row["rel_path"],
+        "name": row["name"],
+        "branch": row["branch"],
+        "worktree_path": row["worktree_path"],
+        "pr": prs_by_repo.get(row["repo_id"]),
+    } for row in attached_rows]
+
+    available = [
+        {"repo_id": r["id"], "rel_path": r["rel_path"], "name": r["name"], "base_branch": r["base_branch"]}
+        for r in repo_service.list_repos(db, project["id"])
+        if r["enabled"] and r["id"] not in attached_ids
+    ]
+
+    return jsonify({"project_type": project_type, "attached": attached, "available": available})
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/repos/attach", methods=["POST"])
+@with_workspace
+def attach_workspace_repo(db, ws, project):
+    if project["project_type"] != "multi":
+        return jsonify({"error": t("api.error.notMultiProject")}), 400
+
+    body = request.get_json(silent=True) or {}
+    repo_id = body.get("repo_id")
+    if repo_id is None:
+        return jsonify({"error": t("api.error.repoIdRequired")}), 400
+
+    repo_row = repo_service.get_repo(db, project["id"], repo_id)
+    if repo_row is None:
+        return jsonify({"error": t("api.error.repoNotFound")}), 400
+
+    try:
+        result = repo_service.attach_repo(db, ws, project, repo_row)
+    except repo_service.RepoServiceError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    base_sync = result.pop("base_sync")
+    return jsonify({"attached": result, "base_sync": base_sync}), 200
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/prs", methods=["GET"])
+@with_workspace
+def list_workspace_prs(db, ws, project):
+    return jsonify({"prs": pr_service.list_prs(db, ws["id"])})
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/prs", methods=["POST"])
+@with_workspace
+def save_workspace_pr(db, ws, project):
+    body = request.get_json(silent=True) or {}
+    url = (body.get("url") or "").strip()
+    repo_id = body.get("repo_id")
+    title = body.get("title") or None
+
+    if repo_id is not None:
+        repo_row = repo_service.get_repo(db, project["id"], repo_id)
+        if repo_row is None:
+            return jsonify({"error": t("api.error.repoNotFound")}), 400
+
+    try:
+        result = pr_service.save_pr(db, ws["id"], url, repo_id=repo_id, title=title)
+    except pr_service.PrServiceError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(result), 200
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/prs/<int:pr_id>", methods=["DELETE"])
+@with_workspace
+def delete_workspace_pr(db, ws, project, pr_id):
+    deleted = pr_service.delete_pr(db, ws["id"], pr_id)
+    if not deleted:
+        return jsonify({"error": t("api.error.prNotFound")}), 404
+    return jsonify({"ok": True})
 
 
 _VALID_REVIEW_RESOLUTIONS = frozenset({"fixed", "out_of_scope", "false_positive"})

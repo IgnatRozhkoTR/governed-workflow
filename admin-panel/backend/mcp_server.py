@@ -65,6 +65,10 @@ from mcp_tools.proposals import (
     workspace_list_proposals,
     workspace_resolve_proposal,
 )
+from mcp_tools.repos import (
+    workspace_attach_repo,
+    workspace_save_pr,
+)
 
 _SIMPLE_MODE_HIDDEN_TOOLS = (
     "workspace_propose_criteria",

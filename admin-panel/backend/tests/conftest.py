@@ -303,6 +303,72 @@ def workspace(project, git_repo):
     }
 
 
+def _make_sub_repo(base_dir, name, branch="develop"):
+    """Create a sub-repo of a multi-repo project base folder."""
+    repo = base_dir / name
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.name", "Test")
+    _git(repo, "config", "user.email", "test@test.com")
+    _git(repo, "checkout", "-b", branch)
+    (repo / ".gitignore").write_text("")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "Initial commit")
+    return repo
+
+
+@pytest.fixture
+def multi_project(clean_db, tmp_path):
+    """Register a multi-repo project with three sub-repos.
+
+    ``service-a`` is wired to a bare origin remote so base-sync and
+    origin-tracking-branch behavior can be exercised; ``service-b`` and
+    ``service-c`` stay purely local.
+    """
+    base = tmp_path / "base"
+    base.mkdir()
+    repo_a = _make_sub_repo(base, "service-a", branch="develop")
+    _make_sub_repo(base, "service-b", branch="develop")
+    _make_sub_repo(base, "service-c", branch="develop")
+
+    origin_path = tmp_path / "origin-a.git"
+    _git(repo_a, "init", "--bare", str(origin_path))
+    _git(repo_a, "remote", "add", "origin", str(origin_path))
+    _git(repo_a, "push", "origin", "develop:develop")
+
+    from core.db import get_db
+    from services.repo_service import list_repos, set_repos
+
+    project_id = "multi-project"
+    registered = datetime.now().isoformat()
+    db = get_db()
+    try:
+        db.execute(
+            "INSERT INTO projects (id, name, path, registered, project_type) "
+            "VALUES (?, ?, ?, ?, 'multi')",
+            (project_id, "Multi Project", str(base), registered),
+        )
+        db.commit()
+        set_repos(db, project_id, [
+            {"rel_path": "service-a", "base_branch": "develop"},
+            {"rel_path": "service-b", "base_branch": "develop"},
+            {"rel_path": "service-c", "base_branch": "develop"},
+        ])
+        repos = {r["rel_path"]: r for r in list_repos(db, project_id)}
+    finally:
+        db.close()
+
+    return {
+        "id": project_id,
+        "name": "Multi Project",
+        "path": str(base),
+        "registered": registered,
+        "project_type": "multi",
+        "repos": repos,
+        "base": base,
+    }
+
+
 @pytest.fixture
 def second_workspace(project, git_repo):
     """Create a second workspace in the same project, simulating a different branch."""

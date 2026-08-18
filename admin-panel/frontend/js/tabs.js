@@ -19,6 +19,8 @@ async function refreshTabData() {
     LOCK_DATA.session_id = stateData.session_id || null;
     LOCK_DATA.working_dir = stateData.working_dir || null;
     LOCK_DATA.sessions = stateData.sessions || [];
+    LOCK_DATA.source_branch = stateData.source_branch || null;
+    LOCK_DATA.project_type = stateData.project_type || null;
     EventBus.emit('state:refreshed', stateData);
   } catch(e) { console.warn('Refresh state failed:', e.message); }
   try {

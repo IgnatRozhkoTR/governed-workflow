@@ -426,16 +426,19 @@ Call `workspace_advance(commit_hash="{hash}")`.
 
 **Actors**: Headless review pipeline (background daemon) | **Code edits: OFF**
 
-On entry to 4.0 the admin panel **automatically launches** the headless review pipeline. Per-file reviewers fan out in parallel across the diff, then two specialised integration reviewers run concurrently:
+On entry to 4.0 the admin panel **automatically launches** the headless review pipeline, running the stages selected by the workspace's review mode:
 
-- **architecture-reviewer** — SRP/OCP, coupling, layer boundaries, clean-code principles, naming, method/class size, DRY
-- **correctness-reviewer** — business-logic correctness, edge cases, error handling, security (input validation, injection, auth/authz, secrets, sensitive data in logs, API contract leaks)
+- **Per-file fan-out** — one reviewer per changed file, local issues only
+- **Integration pair** (blind, run concurrently) — **architecture-reviewer** (SRP/OCP, coupling, layer boundaries, clean-code principles, naming, method/class size, DRY) and **correctness-reviewer** (business-logic correctness, edge cases, error handling, security)
+- **Resolution adjudicator** (only in the most thorough review mode) — runs after the integration pair and dismisses invalid findings as false_positive/out_of_scope, leaving genuinely valid findings open for you to address
 
-**Do NOT manually dispatch reviewers.** The pipeline is already running. Manual dispatch would duplicate work and confuse findings.
+Some or all of these stages may be skipped depending on the workspace's review mode — check the pipeline status to see which stages actually ran.
+
+**Do NOT manually dispatch reviewers.** The pipeline is already running (unless the workspace's review mode is `manual`, in which case no pipeline starts and this phase relies on your own review plus the user's approval). Manual dispatch would duplicate work and confuse findings.
 
 ### What you do at 4.0
 
-1. Watch the **Review Pipeline** card on the workspace page in the admin panel, or poll `GET /api/workspaces/<id>/review-pipeline-status`. States: `queued` → `filtering` → `file_stage` → `integration_stage` → `done` (or `failed`).
+1. Watch the **Review Pipeline** card on the workspace page in the admin panel, or poll `GET /api/workspaces/<id>/review-pipeline-status`. States: `queued` → `filtering` → `file_stage` → `integration_stage` → `adjudication_stage` → `done` (or `failed`) — only the stages the review mode enabled actually run.
 2. When state is `done` or `failed`:
    - Call `workspace_get_review_issues` to see the findings.
    - Call `workspace_update_progress(phase="4.0", summary="Pipeline complete. N findings.")`.
@@ -526,7 +529,7 @@ Manual proposals must be implementable purely via `.claude/` workspace metadata 
 
 ## 6 Done
 
-Push and MR/PR creation allowed. Task complete.
+Push and MR/PR creation allowed. Task complete. Right after the MR/PR is created, call `workspace_save_pr` with the resulting URL (and the repo name in multi-repo workspaces) so the admin panel can link to it.
 
 ---
 
@@ -553,6 +556,8 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 | `workspace_get_reflection_context` | Returns the scope, branch diff, review findings, and filtered transcript fed to the reflector at 5.1. Call once on entry. |
 | `workspace_list_proposals` | Reads what the reflector emitted. Filter by `implementation_kind` (`auto` to apply now, `manual` to queue for 5.2). |
 | `workspace_resolve_proposal` | Marks a proposal `executed`, `failed`, or `rejected` after acting on it. Pass `result_json` with the outcome summary. |
+| `workspace_attach_repo` | Multi-repo workspaces only. The workspace dir contains only the repo worktrees already attached — before editing a repo that isn't present yet, call this with the repo name to create its worktree and attach it. Never edit files outside the workspace dir. |
+| `workspace_save_pr` | Call immediately after creating a merge/pull request, passing the resulting URL (and the repo name in multi-repo workspaces) so the admin panel can link to it. |
 
 Full tool roster is granted via this agent's frontmatter; consult tool descriptions inline.
 

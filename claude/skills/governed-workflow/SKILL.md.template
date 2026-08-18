@@ -144,6 +144,8 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 | `workspace_get_reflection_context` | Returns the scope, branch diff, review findings, and filtered transcript fed to the reflector at 5.1. Call once on entry. |
 | `workspace_list_proposals` | Reads what the reflector emitted. Filter by `implementation_kind` (`auto` to apply now, `manual` to queue for 5.2). |
 | `workspace_resolve_proposal` | Marks a proposal `executed`, `failed`, or `rejected` after acting on it. Pass `result_json` with the outcome summary. |
+| `workspace_attach_repo` | Multi-repo workspaces only. The workspace dir contains only the repo worktrees already attached — before editing a repo that isn't present yet, call this with the repo name to create its worktree and attach it. Never edit files outside the workspace dir. |
+| `workspace_save_pr` | Call immediately after creating a merge/pull request, passing the resulting URL (and the repo name in multi-repo workspaces) so the admin panel can link to it. |
 
 Full tool roster is granted via this agent's frontmatter; consult tool descriptions inline.
 

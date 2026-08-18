@@ -10,15 +10,12 @@
   "tabs.changes": "Code Changes",
   "tabs.files": "Files",
   "tabs.review": "Review",
-
   "header.title": "Workspace Control",
   "header.switch": "Switch",
   "header.refresh": "Refresh page",
-
   "sidebar.files": "Files",
   "sidebar.changes": "Code Changes",
   "sidebar.plan": "Plan Review",
-
   "cards.claudeCommand": "Claude Command",
   "cards.phaseSettings": "Phase Toggles",
   "cards.gitConfiguration": "Git Configuration",
@@ -36,7 +33,6 @@
   "cards.researchFindings": "Research Findings",
   "cards.phaseProgression": "Phase Progression",
   "cards.approvalStatus": "Approval Status",
-
   "buttons.approve": "Approve",
   "buttons.reject": "Reject",
   "buttons.save": "Save",
@@ -83,7 +79,6 @@
   "buttons.discardPhaseSettings": "Discard",
   "buttons.switchToFast": "Switch to fast mode",
   "buttons.switchToStandard": "Switch to standard mode",
-
   "config.deviceSettings": "Device Settings",
   "config.commandLabel": "Command",
   "config.skipPermissions": "Include --dangerously-skip-permissions flag",
@@ -100,7 +95,6 @@
   "config.workflowModeHint": "Fast mode skips optional review gates for quicker iteration. Standard mode keeps the full governed workflow with all approval gates.",
   "config.fastModeConfirm": "Switch this workspace to fast mode? Some review gates will be skipped for quicker iteration.",
   "config.standardModeConfirm": "Switch this workspace back to standard mode? All review gates will be restored.",
-
   "labels.provider": "Provider",
   "labels.host": "Host",
   "labels.apiToken": "API Token",
@@ -123,7 +117,6 @@
   "labels.instruction": "Instruction",
   "labels.validationResult": "Validation Result",
   "labels.claude": "Claude",
-
   "placeholders.enterToken": "Enter token...",
   "placeholders.develop": "develop",
   "placeholders.enterTicketName": "Enter ticket/task name...",
@@ -148,7 +141,6 @@
   "placeholders.ruleBody": "# Rule title\n\nRule body here...",
   "placeholders.gitHost": "e.g. gitlab.example.com",
   "placeholders.scopePath": "path/to/files/**",
-
   "badges.verified": "verified",
   "badges.rejected": "rejected",
   "badges.pending": "pending",
@@ -172,7 +164,6 @@
   "badges.phase": "Phase {phase}",
   "badges.fastMode": "FAST",
   "badges.standardMode": "STANDARD",
-
   "messages.approved": "Approved. Phase: {phase}",
   "messages.rejected": "Rejected. Phase reverted to {phase}",
   "messages.approveFailed": "Approve failed: {error}",
@@ -200,7 +191,6 @@
   "messages.fastModeDisabled": "Standard mode enabled",
   "messages.baseSyncUpdated": "Local base {branch} fast-forwarded",
   "messages.baseSyncNotUpdated": "Local base {branch} not updated: {reason}",
-
   "errors.unknownError": "Unknown error",
   "errors.failedToSetPhase": "Failed to set phase: {error}",
   "errors.workspaceNotSelected": "No workspace selected.",
@@ -213,7 +203,6 @@
   "errors.failedToLoadSnippet": "Failed to load: {error}",
   "errors.noWorkspaceContextAvailable": "No workspace context available",
   "errors.workspaceCreationFailed": "Workspace creation failed.",
-
   "scope.mustModify": "Must Modify",
   "scope.mayModify": "May Modify",
   "scope.contract": "Scope Contract",
@@ -221,7 +210,6 @@
   "scope.scopeTab": "Scope — {id}",
   "scope.selectPhaseTab": "Select a phase tab to add scope entries",
   "scope.all": "All",
-
   "phase.init": "Init",
   "phase.assessment": "Assessment",
   "phase.research": "Research",
@@ -251,11 +239,9 @@
   "phase.execution": "Execution",
   "phase.overrideTitle": "Override phase",
   "phase.planStatus": "Plan",
-
   "status.approved": "Approved",
   "status.pending": "Pending Approval",
   "status.notSet": "Not Set",
-
   "phaseAction.planReview": "Plan Review",
   "phaseAction.planReviewDesc": "Review the execution plan and scope. Approve to begin implementation, or reject with feedback.",
   "phaseAction.codeReview": "Code Review — {phase}",
@@ -264,7 +250,6 @@
   "phaseAction.preplanningReviewDesc": "Review the research summaries, impact analysis, and discussions. Approve to proceed to planning, or reject to return to research.",
   "phaseAction.finalApproval": "Final Approval",
   "phaseAction.finalApprovalDesc": "All fixes addressed. Approve to complete the task and allow push/MR.",
-
   "preplanning.researchSummaries": "Research Summaries",
   "preplanning.impactAnalysis": "Impact Analysis",
   "preplanning.discussions": "Discussions",
@@ -275,16 +260,13 @@
   "preplanning.approvePreplanning": "Approve Pre-planning",
   "preplanning.rejectPreplanning": "Reject to Research",
   "preplanning.commentAdded": "Discussion added",
-
   "impact.affectedFlows": "Affected User Flows",
   "impact.apiChanges": "API Changes",
   "impact.dataFlowChanges": "Data Flow Changes",
   "impact.externalDeps": "External Dependencies",
   "impact.ticketGaps": "Ticket Gaps",
   "impact.openQuestions": "Open Questions",
-
   "badges.open": "open",
-
   "research.noEntries": "No research entries yet.",
   "research.untitledResearch": "Untitled Research",
   "research.findingCount": "{count} findings",
@@ -302,7 +284,6 @@
   "research.verifiedCount": "{verified}/{total} verified",
   "research.verifiedRejectedCount": "{verified}/{total} verified, {rejected} rejected",
   "research.linkedToDiscussion": "Linked to discussion #{id}",
-
   "criteria.noEntries": "No acceptance criteria defined yet.",
   "criteria.unitTest": "Unit Test",
   "criteria.integrationTest": "Integration Test",
@@ -312,7 +293,6 @@
   "criteria.acceptedOnPlanApproval": "Proposed criteria are accepted automatically when the plan is approved.",
   "criteria.viewDetails": "Click to view details",
   "criteria.detailsLink": "details",
-
   "rules.noEntries": "No rules defined yet.",
   "rules.name": "Name",
   "rules.description": "Description",
@@ -325,7 +305,6 @@
   "rules.invalidName": "Name must be lowercase letters, digits, '-', '_' (starting with a letter/digit)",
   "rules.pathsRequired": "At least one path glob is required",
   "rules.confirmDelete": "Delete rule '{name}'?",
-
   "diff.filterFiles": "Filter files...",
   "diff.changedFiles": "Changed Files",
   "diff.selectFile": "Select a file to view changes",
@@ -346,12 +325,10 @@
   "diff.baseNotFound": "Base branch not found in this repository",
   "diff.loadFailed": "Failed to load diff",
   "diff.noMatches": "No matches",
-
   "explorer.projectFiles": "Project Files",
   "explorer.selectFile": "Select a file to view its contents",
   "explorer.loading": "Loading...",
   "explorer.failedToLoad": "Failed to load file: {error}",
-
   "workspace.selectProject": "Select a project to begin",
   "workspace.workspaceControl": "Workspace Control",
   "workspace.registeredProjects": "Registered Projects",
@@ -369,24 +346,19 @@
   "workspace.noBranchesFound": "No branches found",
   "workspace.failedToLoadBranches": "Failed to load branches",
   "workspace.sourceProjectOverride": "Source: Project override",
-
   "dialog.deleteResearch": "Delete this research entry? This cannot be undone.",
   "dialog.archiveWorkspace": "Archive workspace for branch \"{branch}\"? This will remove the worktree.",
   "dialog.setPhase": "Set phase to:",
   "dialog.feedbackForRejection": "Provide feedback for rejection:",
-
   "gitRules.sourceSystemDefault": "System default (symlink)",
   "gitRules.sourceProject": "Project override",
   "gitRules.sourceNotConfigured": "Not configured",
   "gitRules.source": "Source: {label}",
-
   "gitProvider.local": "Local",
   "gitProvider.github": "GitHub",
   "gitProvider.gitlab": "GitLab",
-
   "discussionType.general": "General",
   "discussionType.research": "Research",
-
   "comments.save": "Save",
   "comments.addComment": "Add a comment...",
   "comments.addCommentOnLine": "Add a comment on line {line}...",
@@ -394,7 +366,6 @@
   "comments.title": "Comments",
   "comments.unresolve": "Unresolve",
   "comments.outdated": "⚠ outdated",
-
   "plan.noTasks": "No tasks",
   "plan.group": "Group",
   "plan.task": "Task {n}",
@@ -404,14 +375,12 @@
   "plan.subPhaseComment": "Sub-phase: {id} {name}",
   "plan.entirePlan": "Entire plan",
   "plan.progress": "{done}/{total}",
-
   "time.justNow": "just now",
   "time.minAgo": "{n} min ago",
   "time.hourAgo": "{n} hour ago",
   "time.hoursAgo": "{n} hours ago",
   "time.dayAgo": "{n} day ago",
   "time.daysAgo": "{n} days ago",
-
   "discussions.noItems": "No discussions yet. Raise one below.",
   "discussions.showHidden": "Show {count} hidden",
   "discussions.hideHidden": "Hide {count} hidden",
@@ -419,10 +388,8 @@
   "discussions.hideResolved": "Hide resolved",
   "discussions.showProven": "Show proven",
   "discussions.hideProven": "Hide proven",
-
   "buttons.hide": "Hide",
   "buttons.unhide": "Unhide",
-
   "author.agent": "Agent",
   "author.user": "You",
   "author.reviewer": "Reviewer",
@@ -432,16 +399,13 @@
   "author.code-reviewer": "Code reviewer (legacy)",
   "author.senior-code-validator": "Senior validator",
   "author.review-agent-failure": "Review agent failure",
-
   "research.viewLinked": "View linked research",
-
   "review.noComments": "No review comments yet.",
   "review.showResolved": "Show resolved",
   "review.hideResolved": "Hide resolved",
   "review.resolution.fixed": "fixed",
   "review.resolution.false_positive": "false positive",
   "review.resolution.out_of_scope": "out of scope",
-
   "actions.copyPath": "Path",
   "actions.copied": "Copied!",
   "actions.notify": "Notify",
@@ -450,7 +414,6 @@
   "actions.notifyGo": "You can proceed",
   "actions.fullscreen": "Full screen",
   "actions.sidePanel": "Side panel",
-
   "tabs.terminal": "Terminal",
   "tabs.splitTerminal": "Split Terminal",
   "terminal.connected": "Connected",
@@ -468,7 +431,6 @@
   "terminal.sessionError": "Failed to attach to session.",
   "terminal.killFailed": "Kill failed",
   "terminal.sessionListError": "Failed to display terminal sessions",
-
   "cards.verificationProfiles": "Verification Profiles",
   "cards.verificationResults": "Verification Results",
   "verification.noProfiles": "No verification profiles assigned. Select one below to get started.",
@@ -482,7 +444,6 @@
   "verification.runPassed": "Verification passed",
   "verification.runFailed": "Verification failed",
   "verification.runError": "Verification error",
-
   "setup.title": "Setup",
   "setup.subtitle": "Configure modules and verification profiles for your workspace.",
   "setup.backToProjects": "Back to projects",
@@ -509,7 +470,6 @@
   "setup.lspCommandPlaceholder": "LSP binary (e.g. gopls, jdtls)",
   "setup.lspInstallCommandPlaceholder": "Install command (e.g. go install golang.org/x/tools/gopls@latest)",
   "setup.deviceFeaturesTitle": "Device Features",
-
   "history.rename": "Rename",
   "history.undo": "Undo",
   "history.squash": "Squash",
@@ -520,7 +480,6 @@
   "history.errors.renameFailed": "Rename failed: {error}",
   "history.errors.undoFailed": "Undo failed: {error}",
   "history.errors.squashFailed": "Squash failed: {error}",
-
   "auth.title": "Admin token required",
   "auth.subtitleUnconfigured": "No token is set up on this machine. Generate one using the command below, then paste it here.",
   "auth.subtitleConfigured": "Paste your admin token to unlock the workspace.",
@@ -531,7 +490,6 @@
   "auth.placeholder": "gwf_…",
   "auth.submit": "Unlock",
   "auth.invalid": "Token invalid. Generate a new one with the command above or check for typos.",
-
   "networkMode.title": "Network Mode",
   "networkMode.allowAccess": "Allow access from other devices on this network",
   "networkMode.explain": "This exposes the admin panel to your local network. Use only on trusted LAN or behind a secure tunnel. Do not expose it directly to the public internet.",
@@ -545,20 +503,15 @@
   "networkMode.timeoutManual": "Restart is taking longer than expected. Reload manually.",
   "networkMode.unavailable": "Network mode configuration unavailable.",
   "networkMode.saveFailed": "Failed to save: {error}",
-
   "tabs.reflection": "Reflection",
   "tabs.memory": "Memory",
-
   "cards.reflection": "Reflection",
   "cards.reflectionHistory": "History",
   "cards.memoryEntries": "Memory Entries",
-
   "buttons.runReflection": "Run Reflection",
   "buttons.search": "Search",
   "buttons.refresh": "Refresh",
-
   "placeholders.searchMemories": "Search memories...",
-
   "memory.selectEntry": "Select a memory entry to view details.",
   "memory.noProviderTitle": "No memory provider configured",
   "memory.noProviderHint": "Enable a memory module in Setup to use this tab.",
@@ -578,7 +531,6 @@
   "memory.searchFailed": "Memory search failed: {error}",
   "memory.loadFailed": "Failed to load memory: {error}",
   "memory.deleteFailed": "Delete failed: {error}",
-
   "cards.advanceModes": "Advance Modes",
   "advanceModes.desc": "Choose what the agent does as it crosses each major phase boundary. The action runs the moment the agent moves along the arrow into the next phase.",
   "advanceModes.boundary1Name": "Start → Preparation",
@@ -599,7 +551,6 @@
   "advanceModes.modeCompactTitle": "Agent advances with a brief summary notification.",
   "advanceModes.modeClear": "Clear",
   "advanceModes.modeClearTitle": "Agent advances immediately without any notification.",
-
   "cards.reviewPipeline": "Review Pipeline",
   "reviewPipeline.state.queued": "Queued",
   "reviewPipeline.state.filtering": "Filtering",
@@ -625,7 +576,6 @@
   "reviewPipeline.runStarting": "Starting…",
   "reviewPipeline.runStarted": "Review pipeline started.",
   "reviewPipeline.runFailed": "Failed to start review pipeline: {error}",
-
   "reviewMode.manual.label": "Manual",
   "reviewMode.manual.desc": "No automatic reviewers. You review everything yourself at the gates.",
   "reviewMode.integration.label": "Integration",
@@ -634,12 +584,10 @@
   "reviewMode.filesIntegration.desc": "Per-file reviewers fan out across the diff, then the integration pair. Default.",
   "reviewMode.full.label": "Full",
   "reviewMode.full.desc": "Everything, plus a resolution reviewer that adjudicates findings as false-positive or out-of-scope before you see them.",
-
   "review.resolveAll": "Resolve all open ({count})",
   "review.resolveAllConfirm": "Resolve {count} open review issues as out-of-scope?",
   "review.resolveAllDone": "{count} review issues resolved.",
   "review.resolveAllNoWorkspace": "No workspace selected.",
-
   "sidebar.reflection": "Reflection",
   "proposals.empty": "No reflection proposals yet.",
   "proposals.showResolved": "Show resolved",
@@ -663,7 +611,6 @@
   "proposals.type.skill_new": "New skill",
   "proposals.type.skill_update": "Skill update",
   "proposals.type.workflow_improvement": "Workflow improvement",
-
   "settings.nav.task": "Task",
   "settings.nav.workflow": "Workflow",
   "settings.nav.phases": "Phases",
@@ -674,52 +621,39 @@
   "settings.nav.claude": "Claude",
   "settings.nav.system": "System",
   "settings.nav.interface": "Interface",
-
   "settings.group.task": "Task",
   "settings.group.workflow": "Workflow",
   "settings.group.system": "System",
-
   "settings.scope.device": "Device",
   "settings.scope.project": "Project",
   "settings.scope.workspace": "Workspace",
   "settings.scope.browser": "Browser",
-
   "settings.saved": "Saved",
-
   "settings.section.task.title": "Task Context",
   "settings.section.task.desc": "Ticket details and task description for this workspace.",
-
   "settings.section.workflow.title": "Workflow Mode",
   "settings.section.workflow.desc": "Control how strictly this workspace enforces the governed workflow.",
   "settings.section.workflow.yoloDesc": "Skip confirmation prompts before phase and gate transitions.",
   "settings.section.workflow.projectDefaultsTitle": "Project defaults",
-
   "settings.section.phases.title": "Phase Toggles",
   "settings.section.phases.desc": "Enable or disable optional phases for this device and this project.",
   "settings.section.phases.deviceTitle": "Device defaults",
   "settings.section.phases.projectTitle": "This project",
-
   "settings.section.review.title": "Review Mode",
   "settings.section.review.desc": "Choose which automatic reviewers run against the diff before you review it.",
   "settings.section.review.projectDefaultTitle": "Project default",
   "settings.section.review.projectDefaultLabel": "Default review mode for new workspaces",
-
   "settings.section.verification.title": "Verification Profiles",
   "settings.section.verification.desc": "Assign verification profiles and manage checks for this project.",
-
   "settings.section.rules.title": "Rules",
   "settings.section.rules.desc": "Project-specific rules enforced during implementation and review.",
-
   "settings.section.git.title": "Git Configuration",
   "settings.section.git.desc": "Configure how this project connects to its Git remote.",
-
   "settings.section.claude.title": "Claude Command",
   "settings.section.claude.desc": "Control how the Claude CLI is launched for this workspace.",
-
   "settings.section.system.title": "System",
   "settings.section.system.desc": "Device-wide network and module settings.",
   "settings.section.system.modulesTitle": "Modules",
-
   "settings.section.interface.title": "Interface",
   "settings.section.interface.desc": "Browser-local editor preferences.",
   "settings.section.interface.lspShortcutsTitle": "LSP Keyboard Shortcuts",
@@ -745,5 +679,52 @@
   "lsp.toast.stopFailed": "LSP stop failed: {message}",
   "lsp.toast.startAllFailed": "LSP start all failed: {message}",
   "lsp.toast.stopAllFailed": "LSP stop all failed: {message}",
-  "lsp.toast.toggleFailed": "LSP toggle failed: {message}"
+  "lsp.toast.toggleFailed": "LSP toggle failed: {message}",
+  "gitCockpit.overview.title": "Overview",
+  "gitCockpit.overview.projectType": "Project type",
+  "gitCockpit.overview.typeSingle": "Single repo",
+  "gitCockpit.overview.typeMulti": "Multi-repo",
+  "gitCockpit.overview.workspaceBranch": "Workspace branch",
+  "gitCockpit.overview.workingDir": "Working directory",
+  "gitCockpit.prs.title": "Pull Requests",
+  "gitCockpit.prs.empty": "No pull requests saved yet.",
+  "gitCockpit.prs.urlPlaceholder": "PR URL",
+  "gitCockpit.prs.titlePlaceholder": "Title (optional)",
+  "gitCockpit.prs.repoWholeProject": "Whole project",
+  "gitCockpit.prs.add": "Add",
+  "gitCockpit.prs.deleteTitle": "Remove pull request",
+  "gitCockpit.prs.confirmDelete": "Remove this pull request link?",
+  "gitCockpit.repos.title": "Repositories",
+  "gitCockpit.repos.convertBtn": "Convert to multi-repo",
+  "gitCockpit.repos.editSelectionBtn": "Edit repo selection",
+  "gitCockpit.repos.checklistTitle": "Select repositories",
+  "gitCockpit.repos.baseBranchPlaceholder": "base branch",
+  "gitCockpit.repos.confirmConvert": "Confirm",
+  "gitCockpit.repos.cancelConvert": "Cancel",
+  "gitCockpit.repos.attached": "Attached",
+  "gitCockpit.repos.notAttached": "Not attached",
+  "gitCockpit.repos.attachBtn": "Attach",
+  "gitCockpit.repos.attaching": "Attaching…",
+  "gitCockpit.repos.overrideBtn": "Override rules",
+  "gitCockpit.repos.overrideSave": "Save",
+  "gitCockpit.repos.overrideClear": "Clear",
+  "gitCockpit.repos.overridePlaceholder": "Repo-specific git rules (overrides the project default above)…",
+  "gitCockpit.repos.noRepos": "No repositories registered.",
+  "gitCockpit.rules.shadowNote": "Repo overrides above take precedence over this project default when set.",
+  "gitCockpit.create.attachRepos": "Attach repositories (optional)",
+  "gitCockpit.create.noReposEnabled": "No repositories enabled yet.",
+  "gitCockpit.create.worktreeForced": "Multi-repo workspaces are always created as git worktrees.",
+  "messages.gcPrAdded": "Pull request added",
+  "messages.gcPrAddFailed": "Failed to add pull request: {error}",
+  "messages.gcPrDeleted": "Pull request removed",
+  "messages.gcPrDeleteFailed": "Failed to remove pull request: {error}",
+  "messages.gcPrUrlRequired": "PR URL is required",
+  "messages.gcNoSubReposFound": "No sub-repositories were found.",
+  "messages.gcRepoScanFailed": "Failed to scan repositories: {error}",
+  "messages.gcConvertFailed": "Failed to convert project: {error}",
+  "messages.gcConvertSuccess": "Converted to multi-repo ({count} repos)",
+  "messages.gcRepoAttachFailed": "Failed to attach repository: {error}",
+  "messages.gcOverrideSaved": "Override rules saved",
+  "messages.gcOverrideCleared": "Override rules cleared",
+  "messages.gcSelectAtLeastOne": "Select at least one repository."
 }

@@ -8,6 +8,8 @@ var terminalConnected = false;
 var _lastPastedImageKey = '';
 var _lastPastedImageAt = 0;
 var PASTED_IMAGE_DEDUPE_WINDOW_MS = 10000;
+var _lastTerminalEnterAt = 0;
+var POST_ENTER_PASTE_SUPPRESS_MS = 500;
 var _IS_MAC = /Mac/.test(navigator.platform || navigator.userAgent || '');
 
 function _uploadPastedImage(file, ws) {
@@ -145,6 +147,9 @@ function _createTerminal(containerId, wsRef) {
 
   terminal.attachCustomKeyEventHandler(function(e) {
     if (e.type !== 'keydown') return true;
+    if (e.key === 'Enter') {
+      _lastTerminalEnterAt = Date.now();
+    }
     var isMacCopy = e.metaKey && !e.ctrlKey && e.key === 'c';
     var isCtrlShiftCopy = e.ctrlKey && e.shiftKey && e.key === 'C';
     if ((isMacCopy || isCtrlShiftCopy) && terminal.hasSelection()) {
@@ -195,7 +200,14 @@ function _createTerminal(containerId, wsRef) {
     if (!cd) { return; }
 
     var pastedText = cd.getData ? cd.getData('text') : '';
-    if (pastedText && pastedText.length > 0) { return; }
+    if (pastedText && pastedText.length > 0) {
+      if (Date.now() - _lastTerminalEnterAt < POST_ENTER_PASTE_SUPPRESS_MS) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.debug('Suppressed post-Enter paste race (' + pastedText.length + ' chars)');
+      }
+      return;
+    }
 
     var items = cd.items ? Array.prototype.slice.call(cd.items) : [];
     var imageItem = null;

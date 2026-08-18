@@ -10,15 +10,12 @@
   "tabs.changes": "Изменения кода",
   "tabs.files": "Файлы",
   "tabs.review": "Ревью",
-
   "header.title": "Управление рабочим пространством",
   "header.switch": "Переключить",
   "header.refresh": "Обновить страницу",
-
   "sidebar.files": "Файлы",
   "sidebar.changes": "Изменения кода",
   "sidebar.plan": "Обзор плана",
-
   "cards.claudeCommand": "Команда Claude",
   "cards.phaseSettings": "Переключатели фаз",
   "cards.gitConfiguration": "Конфигурация Git",
@@ -36,7 +33,6 @@
   "cards.researchFindings": "Результаты исследования",
   "cards.phaseProgression": "Прогресс фаз",
   "cards.approvalStatus": "Статус утверждения",
-
   "buttons.approve": "Одобрить",
   "buttons.reject": "Отклонить",
   "buttons.save": "Сохранить",
@@ -83,7 +79,6 @@
   "buttons.discardPhaseSettings": "Отменить",
   "buttons.switchToFast": "Переключить на быстрый режим",
   "buttons.switchToStandard": "Переключить на стандартный режим",
-
   "config.deviceSettings": "Настройки устройства",
   "config.commandLabel": "Команда",
   "config.skipPermissions": "Включить флаг --dangerously-skip-permissions",
@@ -100,7 +95,6 @@
   "config.workflowModeHint": "Быстрый режим пропускает необязательные шлюзы проверки для более быстрой итерации. Стандартный режим сохраняет полный управляемый процесс со всеми шлюзами утверждения.",
   "config.fastModeConfirm": "Переключить это рабочее пространство в быстрый режим? Некоторые шлюзы проверки будут пропущены для более быстрой итерации.",
   "config.standardModeConfirm": "Переключить это рабочее пространство обратно в стандартный режим? Все шлюзы проверки будут восстановлены.",
-
   "labels.provider": "Провайдер",
   "labels.host": "Хост",
   "labels.apiToken": "API-токен",
@@ -123,7 +117,6 @@
   "labels.instruction": "Инструкция",
   "labels.validationResult": "Результат валидации",
   "labels.claude": "Claude",
-
   "placeholders.enterToken": "Введите токен...",
   "placeholders.develop": "develop",
   "placeholders.enterTicketName": "Введите название задачи...",
@@ -148,7 +141,6 @@
   "placeholders.ruleBody": "# Rule title\n\nRule body here...",
   "placeholders.gitHost": "например gitlab.example.com",
   "placeholders.scopePath": "path/to/files/**",
-
   "badges.verified": "подтверждено",
   "badges.rejected": "отклонено",
   "badges.pending": "ожидание",
@@ -172,7 +164,6 @@
   "badges.phase": "Фаза {phase}",
   "badges.fastMode": "БЫСТРЫЙ",
   "badges.standardMode": "СТАНДАРТНЫЙ",
-
   "messages.approved": "Одобрено. Фаза: {phase}",
   "messages.rejected": "Отклонено. Фаза возвращена к {phase}",
   "messages.approveFailed": "Ошибка одобрения: {error}",
@@ -200,7 +191,6 @@
   "messages.fastModeDisabled": "Стандартный режим включён",
   "messages.baseSyncUpdated": "Локальная база {branch} перемотана вперёд",
   "messages.baseSyncNotUpdated": "Локальная база {branch} не обновлена: {reason}",
-
   "errors.unknownError": "Неизвестная ошибка",
   "errors.failedToSetPhase": "Ошибка установки фазы: {error}",
   "errors.workspaceNotSelected": "Рабочее пространство не выбрано.",
@@ -213,7 +203,6 @@
   "errors.failedToLoadSnippet": "Ошибка загрузки: {error}",
   "errors.noWorkspaceContextAvailable": "Контекст рабочего пространства недоступен",
   "errors.workspaceCreationFailed": "Не удалось создать рабочее пространство.",
-
   "scope.mustModify": "Обязательно изменить",
   "scope.mayModify": "Можно изменить",
   "scope.contract": "Scope",
@@ -221,7 +210,6 @@
   "scope.scopeTab": "Область — {id}",
   "scope.selectPhaseTab": "Выберите вкладку фазы для добавления записей области",
   "scope.all": "Все",
-
   "phase.init": "Инициализация",
   "phase.assessment": "Оценка",
   "phase.research": "Исследование",
@@ -251,11 +239,9 @@
   "phase.execution": "Реализация",
   "phase.overrideTitle": "Переопределить фазу",
   "phase.planStatus": "План",
-
   "status.approved": "Утверждено",
   "status.pending": "Ожидает утверждения",
   "status.notSet": "Не задано",
-
   "phaseAction.planReview": "Обзор плана",
   "phaseAction.planReviewDesc": "Проверьте план выполнения и область. Одобрите для начала реализации или отклоните с комментарием.",
   "phaseAction.codeReview": "Ревью кода — {phase}",
@@ -264,7 +250,6 @@
   "phaseAction.preplanningReviewDesc": "Проверьте краткие результаты исследований, анализ влияния и обсуждения. Одобрите для перехода к планированию или отклоните для возврата к исследованию.",
   "phaseAction.finalApproval": "Финальное одобрение",
   "phaseAction.finalApprovalDesc": "Все замечания устранены. Одобрите для завершения задачи и разрешения push/MR.",
-
   "preplanning.researchSummaries": "Краткие результаты исследований",
   "preplanning.impactAnalysis": "Impact Analysis",
   "preplanning.discussions": "Обсуждения",
@@ -275,16 +260,13 @@
   "preplanning.approvePreplanning": "Одобрить предпланирование",
   "preplanning.rejectPreplanning": "Вернуть к исследованию",
   "preplanning.commentAdded": "Обсуждение добавлено",
-
   "impact.affectedFlows": "Затронутые пользовательские сценарии",
   "impact.apiChanges": "Изменения API",
   "impact.dataFlowChanges": "Изменения потоков данных",
   "impact.externalDeps": "Внешние зависимости",
   "impact.ticketGaps": "Пробелы в задаче",
   "impact.openQuestions": "Открытые вопросы",
-
   "badges.open": "открыто",
-
   "research.noEntries": "Записей исследования пока нет.",
   "research.untitledResearch": "Исследование без названия",
   "research.findingCount": "Результатов: {count}",
@@ -302,7 +284,6 @@
   "research.verifiedCount": "{verified}/{total} подтверждено",
   "research.verifiedRejectedCount": "{verified}/{total} подтверждено, {rejected} отклонено",
   "research.linkedToDiscussion": "Связано с обсуждением #{id}",
-
   "criteria.noEntries": "Критерии приёмки ещё не заданы.",
   "criteria.unitTest": "Юнит-тест",
   "criteria.integrationTest": "Интеграционный тест",
@@ -312,7 +293,6 @@
   "criteria.acceptedOnPlanApproval": "Предложенные критерии автоматически принимаются при утверждении плана.",
   "criteria.viewDetails": "Нажмите для просмотра деталей",
   "criteria.detailsLink": "детали",
-
   "rules.noEntries": "Правила ещё не заданы.",
   "rules.name": "Название",
   "rules.description": "Описание",
@@ -325,7 +305,6 @@
   "rules.invalidName": "Название должно содержать только строчные буквы, цифры, '-', '_' (начинаться с буквы/цифры)",
   "rules.pathsRequired": "Требуется хотя бы один glob",
   "rules.confirmDelete": "Удалить правило '{name}'?",
-
   "diff.filterFiles": "Фильтр файлов...",
   "diff.changedFiles": "Изменённые файлы",
   "diff.selectFile": "Выберите файл для просмотра изменений",
@@ -346,12 +325,10 @@
   "diff.baseNotFound": "Базовая ветка не найдена в этом репозитории",
   "diff.loadFailed": "Не удалось загрузить дифф",
   "diff.noMatches": "Нет совпадений",
-
   "explorer.projectFiles": "Файлы проекта",
   "explorer.selectFile": "Выберите файл для просмотра содержимого",
   "explorer.loading": "Загрузка...",
   "explorer.failedToLoad": "Ошибка загрузки файла: {error}",
-
   "workspace.selectProject": "Выберите проект для начала работы",
   "workspace.workspaceControl": "Управление рабочим пространством",
   "workspace.registeredProjects": "Зарегистрированные проекты",
@@ -369,24 +346,19 @@
   "workspace.noBranchesFound": "Ветки не найдены",
   "workspace.failedToLoadBranches": "Ошибка загрузки веток",
   "workspace.sourceProjectOverride": "Источник: переопределение проекта",
-
   "dialog.deleteResearch": "Удалить эту запись исследования? Это действие нельзя отменить.",
   "dialog.archiveWorkspace": "Архивировать рабочее пространство для ветки \"{branch}\"? Это удалит worktree.",
   "dialog.setPhase": "Установить фазу:",
   "dialog.feedbackForRejection": "Укажите обратную связь для отклонения:",
-
   "gitRules.sourceSystemDefault": "Системный default (симлинк)",
   "gitRules.sourceProject": "Переопределение проекта",
   "gitRules.sourceNotConfigured": "Не настроено",
   "gitRules.source": "Источник: {label}",
-
   "gitProvider.local": "Локальный",
   "gitProvider.github": "GitHub",
   "gitProvider.gitlab": "GitLab",
-
   "discussionType.general": "Общее",
   "discussionType.research": "Исследование",
-
   "comments.save": "Сохранить",
   "comments.addComment": "Добавить комментарий...",
   "comments.addCommentOnLine": "Добавить комментарий к строке {line}...",
@@ -394,7 +366,6 @@
   "comments.title": "Комментарии",
   "comments.unresolve": "Переоткрыть",
   "comments.outdated": "⚠ устарело",
-
   "plan.noTasks": "Нет задач",
   "plan.group": "Группа",
   "plan.task": "Задача {n}",
@@ -404,14 +375,12 @@
   "plan.subPhaseComment": "Под-фаза: {id} {name}",
   "plan.entirePlan": "Весь план",
   "plan.progress": "{done}/{total}",
-
   "time.justNow": "только что",
   "time.minAgo": "{n} мин назад",
   "time.hourAgo": "{n} час назад",
   "time.hoursAgo": "{n} ч назад",
   "time.dayAgo": "{n} день назад",
   "time.daysAgo": "{n} дн назад",
-
   "discussions.noItems": "Обсуждений пока нет. Поднимите тему ниже.",
   "discussions.showHidden": "Показать {count} скрытых",
   "discussions.hideHidden": "Скрыть {count} скрытых",
@@ -419,10 +388,8 @@
   "discussions.hideResolved": "Скрыть решённые",
   "discussions.showProven": "Показать доказанные",
   "discussions.hideProven": "Скрыть доказанные",
-
   "buttons.hide": "Скрыть",
   "buttons.unhide": "Показать",
-
   "author.agent": "Агент",
   "author.user": "Вы",
   "author.reviewer": "Ревьюер",
@@ -432,16 +399,13 @@
   "author.code-reviewer": "Ревьюер кода (legacy)",
   "author.senior-code-validator": "Старший валидатор",
   "author.review-agent-failure": "Сбой ревью-агента",
-
   "research.viewLinked": "Просмотреть связанное исследование",
-
   "review.noComments": "Комментариев ревью пока нет.",
   "review.showResolved": "Показать решённые",
   "review.hideResolved": "Скрыть решённые",
   "review.resolution.fixed": "исправлено",
   "review.resolution.false_positive": "ложное срабатывание",
   "review.resolution.out_of_scope": "вне области",
-
   "actions.copyPath": "Путь",
   "actions.copied": "Скопировано!",
   "actions.notify": "Уведомить",
@@ -450,7 +414,6 @@
   "actions.notifyGo": "Можно продолжать",
   "actions.fullscreen": "Полный экран",
   "actions.sidePanel": "Боковая панель",
-
   "tabs.terminal": "Терминал",
   "tabs.splitTerminal": "Разделённый терминал",
   "terminal.connected": "Подключено",
@@ -468,7 +431,6 @@
   "terminal.sessionError": "Не удалось подключиться к сессии.",
   "terminal.killFailed": "Не удалось завершить сессию",
   "terminal.sessionListError": "Не удалось отобразить список сессий терминала",
-
   "cards.verificationProfiles": "Профили верификации",
   "cards.verificationResults": "Результаты верификации",
   "verification.noProfiles": "Профили верификации не назначены. Выберите один ниже для начала.",
@@ -482,7 +444,6 @@
   "verification.runPassed": "Верификация пройдена",
   "verification.runFailed": "Верификация не пройдена",
   "verification.runError": "Ошибка верификации",
-
   "setup.title": "Настройка",
   "setup.subtitle": "Настройте модули и профили верификации для рабочего пространства.",
   "setup.backToProjects": "Назад к проектам",
@@ -509,7 +470,6 @@
   "setup.lspCommandPlaceholder": "Исполняемый файл LSP (например gopls, jdtls)",
   "setup.lspInstallCommandPlaceholder": "Команда установки (например go install golang.org/x/tools/gopls@latest)",
   "setup.deviceFeaturesTitle": "Функции устройства",
-
   "history.rename": "Переименовать",
   "history.undo": "Отменить",
   "history.squash": "Сжать",
@@ -520,7 +480,6 @@
   "history.errors.renameFailed": "Ошибка переименования: {error}",
   "history.errors.undoFailed": "Ошибка отмены: {error}",
   "history.errors.squashFailed": "Ошибка сжатия: {error}",
-
   "auth.title": "Требуется токен администратора",
   "auth.subtitleUnconfigured": "На этом устройстве токен ещё не настроен. Сгенерируйте его командой ниже и вставьте сюда.",
   "auth.subtitleConfigured": "Вставьте токен администратора, чтобы открыть рабочее пространство.",
@@ -531,7 +490,6 @@
   "auth.placeholder": "gwf_…",
   "auth.submit": "Войти",
   "auth.invalid": "Неверный токен. Сгенерируйте новый командой выше или проверьте опечатки.",
-
   "networkMode.title": "Сетевой режим",
   "networkMode.allowAccess": "Разрешить доступ с других устройств в локальной сети",
   "networkMode.explain": "Админ-панель станет доступна в локальной сети. Используйте только в доверенной сети или через защищённый туннель. Не открывайте панель напрямую в интернет.",
@@ -545,20 +503,15 @@
   "networkMode.timeoutManual": "Перезапуск занимает больше обычного. Перезагрузите страницу вручную.",
   "networkMode.unavailable": "Настройки сетевого режима недоступны.",
   "networkMode.saveFailed": "Не удалось сохранить: {error}",
-
   "tabs.reflection": "Рефлексия",
   "tabs.memory": "Память",
-
   "cards.reflection": "Рефлексия",
   "cards.reflectionHistory": "История",
   "cards.memoryEntries": "Записи памяти",
-
   "buttons.runReflection": "Запустить рефлексию",
   "buttons.search": "Найти",
   "buttons.refresh": "Обновить",
-
   "placeholders.searchMemories": "Поиск по памяти...",
-
   "memory.selectEntry": "Выберите запись, чтобы посмотреть детали.",
   "memory.noProviderTitle": "Провайдер памяти не настроен",
   "memory.noProviderHint": "Включите модуль памяти на странице Setup, чтобы использовать вкладку.",
@@ -578,7 +531,6 @@
   "memory.searchFailed": "Ошибка поиска в памяти: {error}",
   "memory.loadFailed": "Ошибка загрузки записи: {error}",
   "memory.deleteFailed": "Ошибка удаления: {error}",
-
   "cards.advanceModes": "Режимы продвижения",
   "advanceModes.desc": "Выберите, что делает агент при пересечении каждой крупной границы фаз. Действие выполняется в момент перехода по стрелке в следующую фазу.",
   "advanceModes.boundary1Name": "Старт → Подготовка",
@@ -599,7 +551,6 @@
   "advanceModes.modeCompactTitle": "Агент продвигается с кратким уведомлением.",
   "advanceModes.modeClear": "Сразу",
   "advanceModes.modeClearTitle": "Агент продвигается немедленно без уведомления.",
-
   "cards.reviewPipeline": "Пайплайн ревью",
   "reviewPipeline.state.queued": "В очереди",
   "reviewPipeline.state.filtering": "Фильтрация",
@@ -625,7 +576,6 @@
   "reviewPipeline.runStarting": "Запуск…",
   "reviewPipeline.runStarted": "Пайплайн ревью запущен.",
   "reviewPipeline.runFailed": "Не удалось запустить пайплайн ревью: {error}",
-
   "reviewMode.manual.label": "Вручную",
   "reviewMode.manual.desc": "Без автоматических ревьюеров. Вы проверяете всё сами на шлюзах.",
   "reviewMode.integration.label": "Интеграция",
@@ -634,12 +584,10 @@
   "reviewMode.filesIntegration.desc": "Пофайловые ревьюеры проходят по диффу, затем интеграционная пара. По умолчанию.",
   "reviewMode.full.label": "Полный",
   "reviewMode.full.desc": "Всё вышеперечисленное, плюс ревьюер-арбитр, который помечает замечания как ложные срабатывания или вне рамок задачи до того, как вы их увидите.",
-
   "review.resolveAll": "Разрешить все открытые ({count})",
   "review.resolveAllConfirm": "Разрешить {count} открытых замечаний ревью как out-of-scope?",
   "review.resolveAllDone": "Разрешено замечаний: {count}.",
   "review.resolveAllNoWorkspace": "Воркспейс не выбран.",
-
   "sidebar.reflection": "Рефлексия",
   "proposals.empty": "Нет предложений по рефлексии.",
   "proposals.showResolved": "Показать закрытые",
@@ -663,7 +611,6 @@
   "proposals.type.skill_new": "Новый навык",
   "proposals.type.skill_update": "Обновление навыка",
   "proposals.type.workflow_improvement": "Улучшение процесса",
-
   "settings.nav.task": "Задача",
   "settings.nav.workflow": "Процесс",
   "settings.nav.phases": "Фазы",
@@ -674,52 +621,39 @@
   "settings.nav.claude": "Claude",
   "settings.nav.system": "Система",
   "settings.nav.interface": "Интерфейс",
-
   "settings.group.task": "Задача",
   "settings.group.workflow": "Процесс",
   "settings.group.system": "Система",
-
   "settings.scope.device": "Устройство",
   "settings.scope.project": "Проект",
   "settings.scope.workspace": "Рабочее пространство",
   "settings.scope.browser": "Браузер",
-
   "settings.saved": "Сохранено",
-
   "settings.section.task.title": "Контекст задачи",
   "settings.section.task.desc": "Данные тикета и описание задачи для этого рабочего пространства.",
-
   "settings.section.workflow.title": "Режим работы",
   "settings.section.workflow.desc": "Настройте, насколько строго это рабочее пространство соблюдает управляемый процесс.",
   "settings.section.workflow.yoloDesc": "Пропускать подтверждения при переходах между фазами и шлюзами.",
   "settings.section.workflow.projectDefaultsTitle": "Настройки проекта по умолчанию",
-
   "settings.section.phases.title": "Переключатели фаз",
   "settings.section.phases.desc": "Включите или отключите необязательные фазы для этого устройства и этого проекта.",
   "settings.section.phases.deviceTitle": "Настройки устройства по умолчанию",
   "settings.section.phases.projectTitle": "Этот проект",
-
   "settings.section.review.title": "Режим ревью",
   "settings.section.review.desc": "Выберите, какие автоматические ревьюеры проверяют дифф перед тем, как вы его увидите.",
   "settings.section.review.projectDefaultTitle": "Значение по умолчанию для проекта",
   "settings.section.review.projectDefaultLabel": "Режим ревью по умолчанию для новых рабочих пространств",
-
   "settings.section.verification.title": "Профили верификации",
   "settings.section.verification.desc": "Назначайте профили верификации и управляйте проверками для этого проекта.",
-
   "settings.section.rules.title": "Правила",
   "settings.section.rules.desc": "Правила проекта, применяемые при реализации и ревью.",
-
   "settings.section.git.title": "Конфигурация Git",
   "settings.section.git.desc": "Настройте подключение этого проекта к удалённому репозиторию Git.",
-
   "settings.section.claude.title": "Команда Claude",
   "settings.section.claude.desc": "Настройте способ запуска Claude CLI для этого рабочего пространства.",
-
   "settings.section.system.title": "Система",
   "settings.section.system.desc": "Настройки сети и модулей на уровне устройства.",
   "settings.section.system.modulesTitle": "Модули",
-
   "settings.section.interface.title": "Интерфейс",
   "settings.section.interface.desc": "Локальные настройки редактора в браузере.",
   "settings.section.interface.lspShortcutsTitle": "Горячие клавиши LSP",
@@ -745,5 +679,52 @@
   "lsp.toast.stopFailed": "Не удалось остановить LSP: {message}",
   "lsp.toast.startAllFailed": "Не удалось запустить все LSP: {message}",
   "lsp.toast.stopAllFailed": "Не удалось остановить все LSP: {message}",
-  "lsp.toast.toggleFailed": "Не удалось переключить LSP: {message}"
+  "lsp.toast.toggleFailed": "Не удалось переключить LSP: {message}",
+  "gitCockpit.overview.title": "Обзор",
+  "gitCockpit.overview.projectType": "Тип проекта",
+  "gitCockpit.overview.typeSingle": "Один репозиторий",
+  "gitCockpit.overview.typeMulti": "Мультирепозиторий",
+  "gitCockpit.overview.workspaceBranch": "Ветка рабочего пространства",
+  "gitCockpit.overview.workingDir": "Рабочая директория",
+  "gitCockpit.prs.title": "Pull Request'ы",
+  "gitCockpit.prs.empty": "Пока нет сохранённых pull request'ов.",
+  "gitCockpit.prs.urlPlaceholder": "URL pull request'а",
+  "gitCockpit.prs.titlePlaceholder": "Заголовок (опционально)",
+  "gitCockpit.prs.repoWholeProject": "Весь проект",
+  "gitCockpit.prs.add": "Добавить",
+  "gitCockpit.prs.deleteTitle": "Удалить pull request",
+  "gitCockpit.prs.confirmDelete": "Удалить ссылку на этот pull request?",
+  "gitCockpit.repos.title": "Репозитории",
+  "gitCockpit.repos.convertBtn": "Преобразовать в мультирепозиторий",
+  "gitCockpit.repos.editSelectionBtn": "Изменить выбор репозиториев",
+  "gitCockpit.repos.checklistTitle": "Выберите репозитории",
+  "gitCockpit.repos.baseBranchPlaceholder": "базовая ветка",
+  "gitCockpit.repos.confirmConvert": "Подтвердить",
+  "gitCockpit.repos.cancelConvert": "Отмена",
+  "gitCockpit.repos.attached": "Подключён",
+  "gitCockpit.repos.notAttached": "Не подключён",
+  "gitCockpit.repos.attachBtn": "Подключить",
+  "gitCockpit.repos.attaching": "Подключение…",
+  "gitCockpit.repos.overrideBtn": "Переопределить правила",
+  "gitCockpit.repos.overrideSave": "Сохранить",
+  "gitCockpit.repos.overrideClear": "Очистить",
+  "gitCockpit.repos.overridePlaceholder": "Правила git для этого репозитория (переопределяют проектные значения по умолчанию выше)…",
+  "gitCockpit.repos.noRepos": "Нет зарегистрированных репозиториев.",
+  "gitCockpit.rules.shadowNote": "Переопределения репозиториев выше имеют приоритет над этим проектным значением по умолчанию, если оно задано.",
+  "gitCockpit.create.attachRepos": "Подключить репозитории (опционально)",
+  "gitCockpit.create.noReposEnabled": "Пока нет включённых репозиториев.",
+  "gitCockpit.create.worktreeForced": "Мультирепозиторные рабочие пространства всегда создаются как git worktree.",
+  "messages.gcPrAdded": "Pull request добавлен",
+  "messages.gcPrAddFailed": "Не удалось добавить pull request: {error}",
+  "messages.gcPrDeleted": "Pull request удалён",
+  "messages.gcPrDeleteFailed": "Не удалось удалить pull request: {error}",
+  "messages.gcPrUrlRequired": "Требуется URL pull request'а",
+  "messages.gcNoSubReposFound": "Подрепозитории не найдены.",
+  "messages.gcRepoScanFailed": "Не удалось просканировать репозитории: {error}",
+  "messages.gcConvertFailed": "Не удалось преобразовать проект: {error}",
+  "messages.gcConvertSuccess": "Преобразовано в мультирепозиторий ({count} репозиториев)",
+  "messages.gcRepoAttachFailed": "Не удалось подключить репозиторий: {error}",
+  "messages.gcOverrideSaved": "Переопределение правил сохранено",
+  "messages.gcOverrideCleared": "Переопределение правил очищено",
+  "messages.gcSelectAtLeastOne": "Выберите хотя бы один репозиторий."
 }
