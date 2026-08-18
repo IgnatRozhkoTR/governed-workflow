@@ -18,8 +18,10 @@ from services.configurator_service import ConfiguratorChain
 from services.project_settings_service import (
     ProjectSettingsError,
     get_fast_mode_default,
+    get_review_mode_default,
     get_simple_planning,
     set_fast_mode_default,
+    set_review_mode_default,
     set_simple_planning,
 )
 
@@ -169,6 +171,7 @@ def get_project_settings(db, project):
     return jsonify({
         "simple_planning": get_simple_planning(db, project["id"]),
         "fast_mode_default": get_fast_mode_default(db, project["id"]),
+        "review_mode_default": get_review_mode_default(db, project["id"]),
     })
 
 
@@ -185,13 +188,20 @@ def put_project_settings(db, project):
     if fast_mode_default is not None and not isinstance(fast_mode_default, bool):
         return jsonify({"error": "fast_mode_default must be a boolean"}), 400
 
+    review_mode_default = body.get("review_mode_default")
+    if review_mode_default is not None and not isinstance(review_mode_default, str):
+        return jsonify({"error": "review_mode_default must be a string"}), 400
+
     try:
         set_simple_planning(db, project["id"], body["simple_planning"])
         if fast_mode_default is not None:
             set_fast_mode_default(db, project["id"], fast_mode_default)
+        if review_mode_default is not None:
+            set_review_mode_default(db, project["id"], review_mode_default)
         db.commit()
     except ProjectSettingsError as exc:
-        return jsonify({"error": str(exc)}), 404
+        status = 404 if exc.code == "project_not_found" else 400
+        return jsonify({"error": str(exc)}), status
 
     warnings = []
     try:
@@ -204,6 +214,7 @@ def put_project_settings(db, project):
         "ok": True,
         "simple_planning": body["simple_planning"],
         "fast_mode_default": get_fast_mode_default(db, project["id"]),
+        "review_mode_default": get_review_mode_default(db, project["id"]),
     }
     if warnings:
         response["configurator_warnings"] = warnings

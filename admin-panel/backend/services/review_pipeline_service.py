@@ -1,27 +1,39 @@
 """Headless review pipeline for phase 4.0 blind review.
 
 Triggered as a background thread by ``transition_phase`` when a workspace
-enters phase ``4.0``. The pipeline:
+enters phase ``4.0``. Which stages run is gated by the workspace's review
+mode (see :mod:`services.review_mode_service`) via the ``strategies`` set
+passed to :func:`start_in_background`:
 
-1. Resolves the reviewable file list via :mod:`services.diff_filter`.
-2. Fans out one ``claude -p --agent file-reviewer`` subprocess per file,
-   capped by ``GOVERNED_WORKFLOW_REVIEW_CONCURRENCY`` (default 8). Each
-   per-file agent returns JSON ``{file, findings: [...]}`` on stdout; the
-   findings are written to the discussions table via
-   :func:`services.comment_service.submit_review_issue`. The file stage
-   is spawned with ``--strict-mcp-config`` so the haiku-class agent never
-   loads the workspace's full MCP tool schema (which would burn opus-class
-   cache-creation tokens per invocation).
-3. Runs the two integration reviewers in parallel via ``asyncio.gather``:
-   - ``architecture-reviewer`` — architecture + clean code + SOLID
-     (SRP/OCP, layer boundaries, naming, method/class size, DRY, code smells).
-   - ``correctness-reviewer`` — business-logic correctness + edge cases +
-     error handling + security (input validation, injection, auth/authz,
-     secrets, sensitive data in logs, API contract leaks).
-   Each one self-submits findings through MCP, so the pipeline only awaits
-   their exit codes. A failure in one does not cancel the other — each
-   agent is wrapped in its own try/except and its error is captured on the
-   in-memory ``PipelineStatus``.
+- ``"files"`` — resolves the reviewable file list via
+  :mod:`services.diff_filter` and fans out one ``claude -p --agent
+  file-reviewer`` subprocess per file, capped by
+  ``GOVERNED_WORKFLOW_REVIEW_CONCURRENCY`` (default 8). Each per-file agent
+  returns JSON ``{file, findings: [...]}`` on stdout; the findings are
+  written to the discussions table via
+  :func:`services.comment_service.submit_review_issue`. The file stage is
+  spawned with ``--strict-mcp-config`` so the haiku-class agent never loads
+  the workspace's full MCP tool schema (which would burn opus-class
+  cache-creation tokens per invocation).
+- ``"integration"`` — runs the two blind integration reviewers in parallel
+  via ``asyncio.gather``:
+  - ``architecture-reviewer`` — architecture + clean code + SOLID
+    (SRP/OCP, layer boundaries, naming, method/class size, DRY, code smells).
+  - ``correctness-reviewer`` — business-logic correctness + edge cases +
+    error handling + security (input validation, injection, auth/authz,
+    secrets, sensitive data in logs, API contract leaks).
+  Each one self-submits findings through MCP, so the pipeline only awaits
+  their exit codes. A failure in one does not cancel the other — each
+  agent is wrapped in its own try/except and its error is captured on the
+  in-memory ``PipelineStatus``.
+- ``"adjudication"`` — runs after the integration stage, spawning a single
+  ``resolution-reviewer`` agent (MCP enabled) that adjudicates every open
+  finding and marks invalid ones ``false_positive``/``out_of_scope``,
+  leaving genuinely valid findings open for engineers at 4.1.
+
+Stages whose strategy is absent from the ``strategies`` set are skipped
+entirely — not run and not counted as failed. ``PipelineStatus.stages``
+records which strategies were requested for the run.
 
 Agent failures (timeout, non-zero exit, JSON parse failure) are surfaced
 only via the in-memory ``PipelineStatus`` and the
@@ -59,6 +71,7 @@ _DEFAULT_TIMEOUT_S = 300
 _INTEGRATION_TIMEOUT_MULTIPLIER = 3
 
 _FILE_REVIEWER_AGENT = "file-reviewer"
+_RESOLUTION_REVIEWER_AGENT = "resolution-reviewer"
 _INTEGRATION_AGENTS: tuple[str, ...] = (
     "architecture-reviewer",
     "correctness-reviewer",
@@ -68,16 +81,22 @@ _SELF_SUBMITTING_AGENTS: frozenset[str] = frozenset({
     "correctness-reviewer",
 })
 
+# Strategies run when a caller does not specify one explicitly — preserves
+# the pipeline's original behavior (per-file fan-out + blind pair) for
+# callers that predate review modes.
+_DEFAULT_STRATEGIES: frozenset[str] = frozenset({"files", "integration"})
+
 # Test seam: existing tests monkey-patch this private name. Keep it as a
 # module-level alias so ``patch.object(review_pipeline_service, "_spawn_claude_agent", ...)``
 # continues to substitute the implementation used internally.
 _spawn_claude_agent = spawn_claude_agent
 
 PipelineState = Literal[
-    "queued", "filtering", "file_stage", "integration_stage", "done", "failed"
+    "queued", "filtering", "file_stage", "integration_stage",
+    "adjudication_stage", "done", "failed",
 ]
 FileState = Literal["pending", "running", "done", "failed"]
-AgentState = Literal["pending", "running", "done", "failed"]
+AgentState = Literal["pending", "running", "done", "failed", "skipped"]
 
 
 def _concurrency() -> int:
@@ -115,9 +134,12 @@ class FileResult:
 class PipelineStatus:
     workspace_id: int
     state: PipelineState = "queued"
+    stages: list[str] = field(default_factory=list)
     files: dict[str, FileResult] = field(default_factory=dict)
     integration: dict[str, AgentState] = field(default_factory=dict)
     integration_errors: dict[str, str] = field(default_factory=dict)
+    adjudication: AgentState = "skipped"
+    adjudication_error: str | None = None
     started_at: float | None = None
     finished_at: float | None = None
     error: str | None = None
@@ -177,11 +199,13 @@ def status_summary(workspace_id: int) -> dict | None:
         status.state == "done"
         and file_states["failed"] == 0
         and integ_states["failed"] == 0
+        and status.adjudication != "failed"
     )
 
     return {
         "workspace_id": workspace_id,
         "state": status.state,
+        "stages": list(status.stages),
         "files_total": len(status.files),
         "files_done": file_states["done"],
         "files_failed": file_states["failed"],
@@ -194,6 +218,8 @@ def status_summary(workspace_id: int) -> dict | None:
         "integration_failed": integ_states["failed"],
         "integration_total": len(status.integration),
         "integration_errors": dict(status.integration_errors),
+        "adjudication": status.adjudication,
+        "adjudication_error": status.adjudication_error,
         "is_complete": is_complete,
         "is_ok": is_ok,
         "error": status.error,
@@ -208,7 +234,7 @@ def _set_status(status: PipelineStatus) -> None:
 
 
 _IN_PROGRESS_STATES: frozenset[PipelineState] = frozenset(
-    {"queued", "filtering", "file_stage", "integration_stage"}
+    {"queued", "filtering", "file_stage", "integration_stage", "adjudication_stage"}
 )
 
 
@@ -216,6 +242,7 @@ def start_in_background(
     workspace_id: int,
     project_path: Path,
     base_branch: str = "main",
+    strategies: frozenset[str] | None = None,
 ) -> threading.Thread | None:
     """Start the pipeline in a daemon thread and return it.
 
@@ -223,8 +250,15 @@ def start_in_background(
     request handler. The thread owns its own DB connection (Sqlite handles
     are not thread-safe across threads) and its own asyncio event loop.
 
+    ``strategies`` selects which stages run (``"files"``, ``"integration"``,
+    ``"adjudication"``); defaults to ``{"files", "integration"}`` for
+    backward compatibility with callers that predate review modes.
+
     Returns ``None`` if the pipeline is already running for this workspace.
     """
+    if strategies is None:
+        strategies = _DEFAULT_STRATEGIES
+
     with _STATUS_LOCK:
         existing = _STATUS.get(workspace_id)
         if existing is not None and existing.state in _IN_PROGRESS_STATES:
@@ -234,12 +268,16 @@ def start_in_background(
                 existing.state,
             )
             return None
-        status = PipelineStatus(workspace_id=workspace_id, started_at=time.time())
+        status = PipelineStatus(
+            workspace_id=workspace_id,
+            stages=sorted(strategies),
+            started_at=time.time(),
+        )
         _STATUS[workspace_id] = status
 
     thread = threading.Thread(
         target=_run_thread,
-        args=(workspace_id, project_path, base_branch, status),
+        args=(workspace_id, project_path, base_branch, status, strategies),
         name=f"review-pipeline-ws-{workspace_id}",
         daemon=True,
     )
@@ -252,9 +290,10 @@ def _run_thread(
     project_path: Path,
     base_branch: str,
     status: PipelineStatus,
+    strategies: frozenset[str],
 ) -> None:
     try:
-        asyncio.run(_run_async(workspace_id, project_path, base_branch, status))
+        asyncio.run(_run_async(workspace_id, project_path, base_branch, status, strategies))
     except Exception as exc:  # noqa: BLE001 - top-level guard for the daemon thread
         log.exception("review pipeline crashed for workspace %s", workspace_id)
         status.error = str(exc)
@@ -272,15 +311,18 @@ async def _run_async(
     project_path: Path,
     base_branch: str,
     status: PipelineStatus,
+    strategies: frozenset[str],
 ) -> None:
     status.state = "filtering"
     try:
         base_branch = await asyncio.to_thread(
             diff_filter.resolve_review_base, project_path, base_branch
         )
-        reviewable = await asyncio.to_thread(
-            diff_filter.list_reviewable_files, project_path, base_branch
-        )
+        reviewable = []
+        if "files" in strategies:
+            reviewable = await asyncio.to_thread(
+                diff_filter.list_reviewable_files, project_path, base_branch
+            )
     except Exception as exc:  # noqa: BLE001 - diff-filter failure is recorded, not raised
         log.exception("diff filter failed for workspace %s", workspace_id)
         status.state = "failed"
@@ -288,11 +330,17 @@ async def _run_async(
         status.finished_at = time.time()
         return
 
-    status.files = {rf.path: FileResult(file=rf.path) for rf in reviewable}
-    status.integration = {name: "pending" for name in _INTEGRATION_AGENTS}
+    if "files" in strategies:
+        status.files = {rf.path: FileResult(file=rf.path) for rf in reviewable}
+    if "integration" in strategies:
+        status.integration = {name: "pending" for name in _INTEGRATION_AGENTS}
 
-    await _run_file_stage(workspace_id, project_path, reviewable, status, base_branch)
-    await _run_integration_stage(workspace_id, project_path, status, base_branch)
+    if "files" in strategies:
+        await _run_file_stage(workspace_id, project_path, reviewable, status, base_branch)
+    if "integration" in strategies:
+        await _run_integration_stage(workspace_id, project_path, status, base_branch)
+    if "adjudication" in strategies:
+        await _run_adjudication_stage(workspace_id, project_path, status, base_branch)
 
     status.state = "done"
     status.finished_at = time.time()
@@ -341,6 +389,23 @@ async def _run_integration_stage(
         *(_run_one(name) for name in _INTEGRATION_AGENTS),
         return_exceptions=False,
     )
+
+
+async def _run_adjudication_stage(
+    workspace_id: int,
+    project_path: Path,
+    status: PipelineStatus,
+    base_ref: str,
+) -> None:
+    status.state = "adjudication_stage"
+    status.adjudication = "running"
+    try:
+        await _run_adjudication_agent(workspace_id, project_path, base_ref)
+        status.adjudication = "done"
+    except Exception as exc:  # noqa: BLE001 - matches integration-stage error isolation
+        log.exception("adjudication agent failed for workspace %s", workspace_id)
+        status.adjudication = "failed"
+        status.adjudication_error = str(exc)
 
 
 async def _review_one_file(
@@ -448,6 +513,44 @@ async def _run_integration_agent(
         max_turns=None,
         timeout_s=_timeout_s() * _INTEGRATION_TIMEOUT_MULTIPLIER,
     )
+    _check_self_submitting_envelope(agent_name, stdout)
+
+
+async def _run_adjudication_agent(
+    workspace_id: int,
+    project_path: Path,
+    base_ref: str,
+) -> None:
+    diff = await asyncio.to_thread(_get_branch_diff, project_path, base_ref)
+    prompt = (
+        "Adjudicate every OPEN review finding for this workspace.\n\n"
+        f"Branch diff (against {base_ref}), defining this ticket's scope:\n{diff}\n\n"
+        "Call workspace_get_review_issues(status='open') to list the open findings. "
+        "For each one, read the flagged file to judge it against the actual code. "
+        "Batch your resolutions in as few workspace_resolve_review_issue calls as "
+        "possible: set resolution to 'false_positive' for findings that are simply "
+        "wrong, or 'out_of_scope' for findings that are real but fall outside the "
+        "diff above. Leave genuinely valid findings untouched — their resolution "
+        "stays 'open' for engineers to fix at phase 4.1. Be conservative: when "
+        "unsure whether a finding is invalid, leave it open rather than dismiss it."
+    )
+    stdout = await _spawn_claude_agent(
+        agent=_RESOLUTION_REVIEWER_AGENT,
+        prompt=prompt,
+        project_path=project_path,
+        max_turns=None,
+        timeout_s=_timeout_s() * _INTEGRATION_TIMEOUT_MULTIPLIER,
+    )
+    _check_self_submitting_envelope(_RESOLUTION_REVIEWER_AGENT, stdout)
+
+
+def _check_self_submitting_envelope(agent_name: str, stdout: str) -> None:
+    """Raise if a self-submitting agent's envelope reports failure.
+
+    Shared by the integration reviewers and the adjudication agent — all
+    three self-submit through MCP and return an empty or ``is_error``
+    envelope rather than a payload the pipeline needs to parse.
+    """
     if not stdout.strip():
         return
     try:

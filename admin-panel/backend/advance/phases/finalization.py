@@ -16,16 +16,19 @@ class AgenticReviewPhase(Phase):
 
 **Actors**: Headless review pipeline (background daemon) | **Code edits: OFF**
 
-On entry to 4.0 the admin panel **automatically launches** the headless review pipeline. Per-file reviewers fan out in parallel across the diff, then two specialised integration reviewers run concurrently:
+On entry to 4.0 the admin panel **automatically launches** the headless review pipeline, running the stages selected by the workspace's review mode:
 
-- **architecture-reviewer** — SRP/OCP, coupling, layer boundaries, clean-code principles, naming, method/class size, DRY
-- **correctness-reviewer** — business-logic correctness, edge cases, error handling, security (input validation, injection, auth/authz, secrets, sensitive data in logs, API contract leaks)
+- **Per-file fan-out** — one reviewer per changed file, local issues only
+- **Integration pair** (blind, run concurrently) — **architecture-reviewer** (SRP/OCP, coupling, layer boundaries, clean-code principles, naming, method/class size, DRY) and **correctness-reviewer** (business-logic correctness, edge cases, error handling, security)
+- **Resolution adjudicator** (only in the most thorough review mode) — runs after the integration pair and dismisses invalid findings as false_positive/out_of_scope, leaving genuinely valid findings open for you to address
 
-**Do NOT manually dispatch reviewers.** The pipeline is already running. Manual dispatch would duplicate work and confuse findings.
+Some or all of these stages may be skipped depending on the workspace's review mode — check the pipeline status to see which stages actually ran.
+
+**Do NOT manually dispatch reviewers.** The pipeline is already running (unless the workspace's review mode is `manual`, in which case no pipeline starts and this phase relies on your own review plus the user's approval). Manual dispatch would duplicate work and confuse findings.
 
 ### What you do at 4.0
 
-1. Watch the **Review Pipeline** card on the workspace page in the admin panel, or poll `GET /api/workspaces/<id>/review-pipeline-status`. States: `queued` → `filtering` → `file_stage` → `integration_stage` → `done` (or `failed`).
+1. Watch the **Review Pipeline** card on the workspace page in the admin panel, or poll `GET /api/workspaces/<id>/review-pipeline-status`. States: `queued` → `filtering` → `file_stage` → `integration_stage` → `adjudication_stage` → `done` (or `failed`) — only the stages the review mode enabled actually run.
 2. When state is `done` or `failed`:
    - Call `workspace_get_review_issues` to see the findings.
    - Call `workspace_update_progress(phase="4.0", summary="Pipeline complete. N findings.")`.

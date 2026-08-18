@@ -182,6 +182,7 @@
   "api.error.invalidPhase": "Invalid phase format. Valid: 0, 1.0, 1.1, 1.2, 1.3, 1.4, 2.0, 2.1, 3.N.K, 4.0, 4.1, 4.2, 5",
   "api.error.invalidStatus": "Invalid status. Must be: pending, approved, rejected",
   "api.error.invalidWorkflowMode": "Invalid workflow mode. Must be: standard, fast",
+  "api.error.invalidReviewMode": "Invalid review mode. Must be: manual, integration, files_integration, full",
   "api.error.statusMustBeAcceptedOrRejected": "status must be 'accepted' or 'rejected'",
   "api.error.textRequired": "text required",
   "api.error.topicRequired": "topic or text required",

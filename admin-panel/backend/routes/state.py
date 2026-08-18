@@ -19,6 +19,7 @@ from core.terminal import notify_workspace
 from services import plan_service
 from services import progress_service
 from services import research_service
+from services import review_mode_service
 from services import scope_service
 from services import workflow_mode_service
 from services.phase_sequencer import resolve_phase_sequence
@@ -106,6 +107,7 @@ def get_workspace_state(db, ws, project):
         "plan_status": ws["plan_status"],
         "phase_sequence": phase_sequence,
         "workflow_mode": ws_field(ws, "workflow_mode", "standard"),
+        "review_mode": ws_field(ws, "review_mode", "files_integration"),
         "enabled_phases": phase_sequence,
         "locale": ws["locale"],
         "session_id": ws["session_id"],
@@ -170,6 +172,19 @@ def set_workflow_mode(db, ws, project):
         workflow_mode_service.set_workspace_mode(db, project, ws, mode)
     except ValueError:
         return jsonify({"error": t("api.error.invalidWorkflowMode")}), 400
+    db.commit()
+    return jsonify({"ok": True, "mode": mode})
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/review-mode", methods=["PUT"])
+@with_workspace
+def set_review_mode(db, ws, project):
+    body = request.get_json(silent=True) or {}
+    mode = str(body.get("mode", "")).strip()
+    try:
+        review_mode_service.set_workspace_review_mode(db, ws, mode)
+    except ValueError:
+        return jsonify({"error": t("api.error.invalidReviewMode")}), 400
     db.commit()
     return jsonify({"ok": True, "mode": mode})
 

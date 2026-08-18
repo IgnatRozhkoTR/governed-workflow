@@ -229,7 +229,10 @@ def transition_phase(db, ws, new_phase, commit_hash=None):
     validated against a concrete base.
     """
     if new_phase == "4.0":
-        _check_review_file_count(ws)
+        from services import review_mode_service
+
+        if "files" in review_mode_service.strategies_for(ws):
+            _check_review_file_count(ws)
 
     rows = db.execute(
         "UPDATE workspaces SET phase = ? WHERE id = ? AND phase = ?",
@@ -264,10 +267,23 @@ def _start_review_pipeline(ws) -> None:
     """Spawn the background headless review pipeline.
 
     Disabled when ``GOVERNED_WORKFLOW_DISABLE_REVIEW_PIPELINE`` is truthy
-    (used by tests that do not want to fork a real Claude subprocess).
-    Failures here never block the phase transition.
+    (used by tests that do not want to fork a real Claude subprocess). Also
+    skipped entirely when the workspace's review mode enables no strategies
+    (``manual`` mode) — user gates only, no automatic reviewers. Failures
+    here never block the phase transition.
     """
     if os.environ.get("GOVERNED_WORKFLOW_DISABLE_REVIEW_PIPELINE"):
+        return
+
+    from services import review_mode_service
+
+    strategies = review_mode_service.strategies_for(ws)
+    if not strategies:
+        logger.info(
+            "review mode for workspace %s enables no strategies (manual); "
+            "skipping automatic review pipeline",
+            ws["id"],
+        )
         return
 
     working_dir = ws_field(ws, "working_dir")
@@ -281,6 +297,7 @@ def _start_review_pipeline(ws) -> None:
             workspace_id=ws["id"],
             project_path=Path(working_dir),
             base_branch=ws_field(ws, "source_branch") or "main",
+            strategies=strategies,
         )
     except Exception:
         logger.exception(

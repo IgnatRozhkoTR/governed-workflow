@@ -27,6 +27,7 @@ from core.paths import (
 from core.terminal import session_name
 from services.git_rules_service import migrate_legacy_git_rules
 from services import comment_service, proposal_service, review_pipeline_service
+from services import review_mode_service
 from services import workflow_mode_service
 from services.configurator_service import ConfiguratorChain
 
@@ -483,7 +484,7 @@ def list_workspaces(project_id):
 
         rows = db.execute(
             "SELECT id, sanitized_branch, branch, session_id, working_dir, phase, status, "
-            "created, workflow_mode "
+            "created, workflow_mode, review_mode "
             "FROM workspaces WHERE project_id = ? ORDER BY created",
             (project_id,)
         ).fetchall()
@@ -515,6 +516,7 @@ def list_workspaces(project_id):
                 "status": row["status"],
                 "created": row["created"],
                 "workflow_mode": row["workflow_mode"],
+                "review_mode": row["review_mode"],
                 "sessions": sessions_by_ws.get(row["id"], []),
             })
 
@@ -693,7 +695,7 @@ def _install_git_hooks(dst_claude, working_dir):
 
 def _register_workspace(
     db, project_id, branch, sanitized, working_dir, source, locale, project_path,
-    workflow_mode,
+    workflow_mode, review_mode,
 ):
     """Insert workspace into DB and return the (response-body dict, workspace id)."""
     ws_path = workspace_dir(project_path, branch)
@@ -703,10 +705,12 @@ def _register_workspace(
 
     cursor = db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, session_id, "
-        "working_dir, created, status, phase, plan_json, source_branch, locale, workflow_mode) "
-        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?)",
+        "working_dir, created, status, phase, plan_json, source_branch, locale, workflow_mode, "
+        "review_mode) "
+        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?, ?)",
         (project_id, branch, sanitized, str(working_dir), created,
-         '{"description":"","systemDiagram":"","execution":[]}', source, locale, workflow_mode)
+         '{"description":"","systemDiagram":"","execution":[]}', source, locale, workflow_mode,
+         review_mode)
     )
     workspace_id = cursor.lastrowid
     db.commit()
@@ -745,6 +749,16 @@ def create_workspace(project_id):
             workflow_mode = workflow_mode_service.resolve_default_mode(project, requested_mode)
         except ValueError:
             return jsonify({"error": t("api.error.invalidWorkflowMode")}), 400
+
+        requested_review_mode = body.get("review_mode")
+        if isinstance(requested_review_mode, str):
+            requested_review_mode = requested_review_mode.strip()
+        try:
+            review_mode = review_mode_service.resolve_default_review_mode(
+                project, requested_review_mode
+            )
+        except ValueError:
+            return jsonify({"error": t("api.error.invalidReviewMode")}), 400
 
         project_path = project["path"]
         sanitized = sanitize_branch(branch)
@@ -786,7 +800,7 @@ def create_workspace(project_id):
 
         body, workspace_id = _register_workspace(
             db, project_id, branch, sanitized, working_dir, source, locale,
-            project_path, workflow_mode,
+            project_path, workflow_mode, review_mode,
         )
         workflow_mode_service.apply_mode_phase_settings(db, workspace_id, workflow_mode)
         db.commit()
@@ -891,7 +905,7 @@ def start_review_pipeline(workspace_id: int):
 
     with get_db_ctx() as db:
         ws = db.execute(
-            "SELECT id, phase, working_dir, source_branch FROM workspaces WHERE id = ?",
+            "SELECT id, phase, working_dir, source_branch, review_mode FROM workspaces WHERE id = ?",
             (workspace_id,)
         ).fetchone()
         if not ws:
@@ -908,11 +922,13 @@ def start_review_pipeline(workspace_id: int):
             }), 409
 
         base_branch = (base_branch_override or ws["source_branch"] or "main").strip()
+        strategies = review_mode_service.strategies_for(ws)
 
     thread = review_pipeline_service.start_in_background(
         workspace_id=workspace_id,
         project_path=Path(working_dir),
         base_branch=base_branch,
+        strategies=strategies,
     )
     if thread is None:
         return jsonify({"error": "already_running"}), 409
