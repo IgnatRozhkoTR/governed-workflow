@@ -10,6 +10,8 @@ import threading
 import time
 from datetime import datetime
 
+from core.db import get_db_ctx
+
 logger = logging.getLogger(__name__)
 
 _LSP_PROCESSES = {}
@@ -164,14 +166,20 @@ def get_lsp_status(db, project_id):
         entry = dict(row)
         if entry["status"] == "running" and entry["pid"]:
             if not _is_pid_alive(entry["pid"]):
+                key = _process_key(project_id, entry["profile_id"])
+                tracked = _LSP_PROCESSES.get(key)
+                if tracked is not None:
+                    returncode = tracked["process"].poll()
+                    error_message = f"LSP server exited with return code {returncode}"
+                else:
+                    error_message = "Process died unexpectedly"
                 db.execute(
-                    "UPDATE lsp_instances SET status = 'error', error_message = 'Process died unexpectedly' "
+                    "UPDATE lsp_instances SET status = 'error', error_message = ? "
                     "WHERE project_id = ? AND profile_id = ?",
-                    (project_id, entry["profile_id"])
+                    (error_message, project_id, entry["profile_id"])
                 )
                 entry["status"] = "error"
-                entry["error_message"] = "Process died unexpectedly"
-                key = _process_key(project_id, entry["profile_id"])
+                entry["error_message"] = error_message
                 _LSP_PROCESSES.pop(key, None)
         results.append(entry)
     return results
@@ -292,8 +300,30 @@ def _drain_stderr(process, key):
     thread.start()
 
 
-def start_lsp_server(db, project_id, profile_id, workspace_path):
-    """Spawn an LSP server for the given project/profile and track it."""
+def _current_process_status(db, project_id, profile_id):
+    """Return the DB-recorded status/pid for a profile, used for start/stop no-op replies."""
+    row = db.execute(
+        "SELECT status, pid FROM lsp_instances WHERE project_id = ? AND profile_id = ?",
+        (project_id, profile_id)
+    ).fetchone()
+    status = row["status"] if row else "stopped"
+    result = {"ok": True, "status": status, "no_op": True}
+    if row and row["pid"]:
+        result["pid"] = row["pid"]
+    return result
+
+
+def start_lsp_server_async(db, project_id, profile_id, workspace_path):
+    """Validate the profile, dedupe concurrent starts, and spawn the server in the background.
+
+    Returns immediately: ``{"error": ...}`` for validation failures (caller should
+    respond 400), ``{"ok": True, "status": "starting", ...}`` once a background
+    thread has been kicked off (caller should respond 202), or ``{"ok": True,
+    "status": <current>, "no_op": True}`` when a start/stop is already in flight
+    or the server is already running (caller should respond 200). The spawned
+    thread performs the actual Popen + initialize handshake and writes the
+    final 'running'/'error' status using its own DB connection.
+    """
     profile = db.execute(
         "SELECT * FROM verification_profiles WHERE id = ?", (profile_id,)
     ).fetchone()
@@ -304,42 +334,23 @@ def start_lsp_server(db, project_id, profile_id, workspace_path):
         return {"error": "profile_has_no_lsp_command"}
 
     key = _process_key(project_id, profile_id)
+    lock = _get_lock(key)
+    if not lock.acquire(blocking=False):
+        return _current_process_status(db, project_id, profile_id)
 
     existing = db.execute(
         "SELECT pid, status FROM lsp_instances WHERE project_id = ? AND profile_id = ?",
         (project_id, profile_id)
     ).fetchone()
-    if existing and existing["status"] == "running" and existing["pid"]:
-        if _is_pid_alive(existing["pid"]):
-            existing_key = _process_key(project_id, profile_id)
-            if existing_key in _LSP_PROCESSES:
-                return {"ok": True, "status": "already_running", "pid": existing["pid"]}
-            # Orphan: DB says running and process is alive, but the relay lost
-            # track of its stdin/stdout pipes (e.g. earlier BrokenPipeError).
-            # The unreachable child must be terminated before we spawn a fresh
-            # tracked instance, otherwise resources leak.
-            logger.warning(
-                "Found orphan LSP pid=%s for project=%s profile=%s; terminating before respawn",
-                existing["pid"], project_id, profile_id,
-            )
-            try:
-                os.kill(existing["pid"], signal.SIGTERM)
-            except OSError:
-                pass
-            # Brief wait, then SIGKILL if still alive
-            for _ in range(10):
-                if not _is_pid_alive(existing["pid"]):
-                    break
-                time.sleep(0.2)
-            else:
-                try:
-                    os.kill(existing["pid"], signal.SIGKILL)
-                except OSError:
-                    pass
-            # Fall through to spawn fresh below
-
-    cmd = [profile["lsp_command"]] + json.loads(profile["lsp_args"] or "[]")
-    logger.info("Starting LSP server: %s (project=%s, profile=%s)", cmd, project_id, profile_id)
+    if (
+        existing
+        and existing["status"] == "running"
+        and existing["pid"]
+        and key in _LSP_PROCESSES
+        and _is_pid_alive(existing["pid"])
+    ):
+        lock.release()
+        return {"ok": True, "status": "already_running", "pid": existing["pid"]}
 
     db.execute(
         "INSERT INTO lsp_instances (project_id, profile_id, status) "
@@ -348,6 +359,85 @@ def start_lsp_server(db, project_id, profile_id, workspace_path):
         (project_id, profile_id)
     )
     db.commit()
+
+    thread = threading.Thread(
+        target=_start_lsp_server_thread,
+        args=(project_id, profile_id, workspace_path, key, lock),
+        name=f"lsp-start-{project_id}-{profile_id}",
+        daemon=True,
+    )
+    thread.start()
+    return {"ok": True, "status": "starting", "profile_id": profile_id}
+
+
+def _start_lsp_server_thread(project_id, profile_id, workspace_path, key, lock):
+    """Background body of a start: spawn the process, run the handshake, record the result."""
+    try:
+        with get_db_ctx() as db:
+            _start_lsp_server_body(db, project_id, profile_id, workspace_path, key)
+    except Exception:
+        logger.exception("LSP start thread crashed (project=%s, profile=%s)", project_id, profile_id)
+        _LSP_PROCESSES.pop(key, None)
+        with get_db_ctx() as db:
+            db.execute(
+                "UPDATE lsp_instances SET status = 'error', error_message = 'LSP start thread crashed unexpectedly' "
+                "WHERE project_id = ? AND profile_id = ?",
+                (project_id, profile_id)
+            )
+            db.commit()
+    finally:
+        lock.release()
+
+
+def _start_lsp_server_body(db, project_id, profile_id, workspace_path, key):
+    """Spawn an LSP server for the given project/profile and track it.
+
+    Runs inside the background thread started by ``start_lsp_server_async``,
+    using the DB connection that thread owns.
+    """
+    profile = db.execute(
+        "SELECT * FROM verification_profiles WHERE id = ?", (profile_id,)
+    ).fetchone()
+    if not profile or not profile["lsp_command"]:
+        error_msg = "LSP profile is no longer available"
+        logger.error(error_msg)
+        db.execute(
+            "UPDATE lsp_instances SET status = 'error', error_message = ? "
+            "WHERE project_id = ? AND profile_id = ?",
+            (error_msg, project_id, profile_id)
+        )
+        db.commit()
+        return
+
+    existing = db.execute(
+        "SELECT pid, status FROM lsp_instances WHERE project_id = ? AND profile_id = ?",
+        (project_id, profile_id)
+    ).fetchone()
+    if existing and existing["pid"] and _is_pid_alive(existing["pid"]) and key not in _LSP_PROCESSES:
+        # Orphan: DB says a pid is alive, but the relay lost track of its
+        # stdin/stdout pipes (e.g. earlier BrokenPipeError). The unreachable
+        # child must be terminated before we spawn a fresh tracked instance,
+        # otherwise resources leak.
+        logger.warning(
+            "Found orphan LSP pid=%s for project=%s profile=%s; terminating before respawn",
+            existing["pid"], project_id, profile_id,
+        )
+        try:
+            os.kill(existing["pid"], signal.SIGTERM)
+        except OSError:
+            pass
+        for _ in range(10):
+            if not _is_pid_alive(existing["pid"]):
+                break
+            time.sleep(0.2)
+        else:
+            try:
+                os.kill(existing["pid"], signal.SIGKILL)
+            except OSError:
+                pass
+
+    cmd = [profile["lsp_command"]] + json.loads(profile["lsp_args"] or "[]")
+    logger.info("Starting LSP server: %s (project=%s, profile=%s)", cmd, project_id, profile_id)
 
     try:
         process = subprocess.Popen(
@@ -366,7 +456,8 @@ def start_lsp_server(db, project_id, profile_id, workspace_path):
             "WHERE project_id = ? AND profile_id = ?",
             (error_msg, project_id, profile_id)
         )
-        return {"error": error_msg}
+        db.commit()
+        return
     except OSError as exc:
         error_msg = f"Failed to start LSP server: {exc}"
         logger.error(error_msg)
@@ -375,7 +466,8 @@ def start_lsp_server(db, project_id, profile_id, workspace_path):
             "WHERE project_id = ? AND profile_id = ?",
             (error_msg, project_id, profile_id)
         )
-        return {"error": error_msg}
+        db.commit()
+        return
 
     _LSP_PROCESSES[key] = {
         "process": process,
@@ -383,7 +475,6 @@ def start_lsp_server(db, project_id, profile_id, workspace_path):
         "project_id": project_id,
         "workspace_path": workspace_path,
     }
-    _get_lock(key)
 
     try:
         _initialize_lsp_server(key, workspace_path)
@@ -391,7 +482,6 @@ def start_lsp_server(db, project_id, profile_id, workspace_path):
         error_msg = f"LSP initialization failed: {exc}"
         logger.error(error_msg)
         _LSP_PROCESSES.pop(key, None)
-        _PROCESS_LOCKS.pop(key, None)
         try:
             process.terminate()
             process.wait(timeout=5)
@@ -406,7 +496,8 @@ def start_lsp_server(db, project_id, profile_id, workspace_path):
             "WHERE project_id = ? AND profile_id = ?",
             (error_msg, project_id, profile_id),
         )
-        return {"error": error_msg}
+        db.commit()
+        return
 
     now = datetime.now().isoformat()
     db.execute(
@@ -417,14 +508,23 @@ def start_lsp_server(db, project_id, profile_id, workspace_path):
     db.commit()
 
     logger.info("LSP server started: pid=%d (project=%s, profile=%s)", process.pid, project_id, profile_id)
-    return {"ok": True, "status": "running", "pid": process.pid}
 
 
-def stop_lsp_server(db, project_id, profile_id):
-    """Gracefully stop an LSP server (SIGTERM then SIGKILL)."""
+def stop_lsp_server_async(db, project_id, profile_id):
+    """Mark an LSP server as stopping and terminate it in the background.
+
+    Returns ``{"ok": True, "status": "stopped", ...}`` immediately when there
+    is nothing tracked to stop, ``{"ok": True, "status": "stopping", ...}``
+    once a background thread has been kicked off (caller should respond 202),
+    or the current status as a no-op when a start/stop is already in flight
+    for this profile (caller should respond 200).
+    """
     key = _process_key(project_id, profile_id)
-    entry = _LSP_PROCESSES.pop(key, None)
+    lock = _get_lock(key)
+    if not lock.acquire(blocking=False):
+        return _current_process_status(db, project_id, profile_id)
 
+    entry = _LSP_PROCESSES.pop(key, None)
     if entry is None:
         db.execute(
             "UPDATE lsp_instances SET status = 'stopped', pid = NULL "
@@ -432,41 +532,72 @@ def stop_lsp_server(db, project_id, profile_id):
             (project_id, profile_id)
         )
         db.commit()
+        lock.release()
         return {"ok": True, "status": "stopped", "note": "no_tracked_process"}
 
-    process = entry["process"]
-    try:
-        process.terminate()
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        logger.warning("LSP server pid=%d did not terminate, sending SIGKILL", process.pid)
-        process.kill()
-        try:
-            process.wait(timeout=3)
-        except (subprocess.TimeoutExpired, OSError):
-            logger.warning("LSP server pid=%d did not exit after SIGKILL", process.pid)
-    except OSError:
-        pass
-
-    _PROCESS_LOCKS.pop(key, None)
-
     db.execute(
-        "UPDATE lsp_instances SET status = 'stopped', pid = NULL "
+        "UPDATE lsp_instances SET status = 'stopping' "
         "WHERE project_id = ? AND profile_id = ?",
         (project_id, profile_id)
     )
     db.commit()
 
-    logger.info("LSP server stopped (project=%s, profile=%s)", project_id, profile_id)
-    return {"ok": True, "status": "stopped"}
+    thread = threading.Thread(
+        target=_stop_lsp_server_thread,
+        args=(project_id, profile_id, entry, key, lock),
+        name=f"lsp-stop-{project_id}-{profile_id}",
+        daemon=True,
+    )
+    thread.start()
+    return {"ok": True, "status": "stopping", "profile_id": profile_id}
+
+
+def _stop_lsp_server_thread(project_id, profile_id, entry, key, lock):
+    """Background body of a stop: terminate the process (up to 8s) and record the result."""
+    try:
+        process = entry["process"]
+        try:
+            process.terminate()
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            logger.warning("LSP server pid=%d did not terminate, sending SIGKILL", process.pid)
+            process.kill()
+            try:
+                process.wait(timeout=3)
+            except (subprocess.TimeoutExpired, OSError):
+                logger.warning("LSP server pid=%d did not exit after SIGKILL", process.pid)
+        except OSError:
+            pass
+
+        with get_db_ctx() as db:
+            db.execute(
+                "UPDATE lsp_instances SET status = 'stopped', pid = NULL "
+                "WHERE project_id = ? AND profile_id = ?",
+                (project_id, profile_id)
+            )
+            db.commit()
+
+        logger.info("LSP server stopped (project=%s, profile=%s)", project_id, profile_id)
+    except Exception:
+        logger.exception("LSP stop thread crashed (project=%s, profile=%s)", project_id, profile_id)
+        with get_db_ctx() as db:
+            db.execute(
+                "UPDATE lsp_instances SET status = 'error', error_message = 'LSP stop thread crashed unexpectedly' "
+                "WHERE project_id = ? AND profile_id = ?",
+                (project_id, profile_id)
+            )
+            db.commit()
+    finally:
+        _PROCESS_LOCKS.pop(key, None)
+        lock.release()
 
 
 # ---------------------------------------------------------------------------
 # Batch operations
 # ---------------------------------------------------------------------------
 
-def start_all_lsp_servers(db, project_id, workspace_path):
-    """Start LSP servers for every enabled profile of *project_id*."""
+def start_all_lsp_servers_async(db, project_id, workspace_path):
+    """Kick off a start for every enabled profile of *project_id*, one thread each."""
     profiles = db.execute(
         "SELECT vp.id AS profile_id, vp.name "
         "FROM project_verification_profiles pp "
@@ -479,9 +610,9 @@ def start_all_lsp_servers(db, project_id, workspace_path):
     results = []
     for profile_id, profile_name in snapshot:
         try:
-            result = start_lsp_server(db, project_id, profile_id, workspace_path)
+            result = start_lsp_server_async(db, project_id, profile_id, workspace_path)
         except Exception as e:
-            logger.exception("start_all_lsp_servers failed for id=%s", profile_id)
+            logger.exception("start_all_lsp_servers_async failed for id=%s", profile_id)
             result = {"error": str(e)}
         result["profile_id"] = profile_id
         result["profile_name"] = profile_name
@@ -489,8 +620,8 @@ def start_all_lsp_servers(db, project_id, workspace_path):
     return results
 
 
-def stop_all_lsp_servers(db, project_id):
-    """Stop all running LSP servers for *project_id*."""
+def stop_all_lsp_servers_async(db, project_id):
+    """Kick off a stop for every running LSP server of *project_id*, one thread each."""
     instances = db.execute(
         "SELECT profile_id FROM lsp_instances WHERE project_id = ? AND status = 'running'",
         (project_id,)
@@ -500,9 +631,9 @@ def stop_all_lsp_servers(db, project_id):
     results = []
     for profile_id in snapshot:
         try:
-            result = stop_lsp_server(db, project_id, profile_id)
+            result = stop_lsp_server_async(db, project_id, profile_id)
         except Exception as e:
-            logger.exception("stop_all_lsp_servers failed for id=%s", profile_id)
+            logger.exception("stop_all_lsp_servers_async failed for id=%s", profile_id)
             result = {"error": str(e)}
         result["profile_id"] = profile_id
         results.append(result)

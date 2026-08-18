@@ -36,45 +36,59 @@ def get_status(db, ws, project):
 @bp.route("/api/ws/<project_id>/<path:branch>/lsp/start", methods=["POST"])
 @with_workspace
 def start_servers(db, ws, project):
-    """Start one or all LSP servers.
+    """Start one or all LSP servers, asynchronously.
 
     Body: optional ``{ "profile_id": N }`` to start a single server.
     Omit profile_id to start all enabled profiles.
+
+    A single-profile start returns immediately: 202 once a background thread
+    has been kicked off, 200 if the server was already running or a start/stop
+    was already in flight, 400 on validation failure. Polling ``lsp/status``
+    picks up the final 'running'/'error' state. Starting all profiles always
+    returns 202 since each profile spawns its own background thread.
     """
     body = request.get_json(silent=True) or {}
     profile_id = body.get("profile_id")
     workspace_path = ws["working_dir"] or project["path"]
 
     if profile_id is not None:
-        result = lsp_service.start_lsp_server(db, project["id"], profile_id, workspace_path)
-        if "error" in result:
-            db.commit()
-            return jsonify(result), 400
+        result = lsp_service.start_lsp_server_async(db, project["id"], profile_id, workspace_path)
         db.commit()
-        return jsonify(result)
+        if "error" in result:
+            return jsonify(result), 400
+        started_fresh = result.get("status") == "starting" and not result.get("no_op")
+        return jsonify(result), 202 if started_fresh else 200
 
-    results = lsp_service.start_all_lsp_servers(db, project["id"], workspace_path)
-    return jsonify(results)
+    results = lsp_service.start_all_lsp_servers_async(db, project["id"], workspace_path)
+    db.commit()
+    return jsonify(results), 202
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/lsp/stop", methods=["POST"])
 @with_workspace
 def stop_servers(db, ws, project):
-    """Stop one or all LSP servers.
+    """Stop one or all LSP servers, asynchronously.
 
     Body: optional ``{ "profile_id": N }`` to stop a single server.
     Omit profile_id to stop all running servers.
+
+    A single-profile stop returns immediately: 202 once a background thread
+    has been kicked off, 200 if there was nothing tracked to stop or a
+    start/stop was already in flight. Polling ``lsp/status`` picks up the
+    final 'stopped' state.
     """
     body = request.get_json(silent=True) or {}
     profile_id = body.get("profile_id")
 
     if profile_id is not None:
-        result = lsp_service.stop_lsp_server(db, project["id"], profile_id)
+        result = lsp_service.stop_lsp_server_async(db, project["id"], profile_id)
         db.commit()
-        return jsonify(result)
+        stopping_fresh = result.get("status") == "stopping" and not result.get("no_op")
+        return jsonify(result), 202 if stopping_fresh else 200
 
-    results = lsp_service.stop_all_lsp_servers(db, project["id"])
-    return jsonify(results)
+    results = lsp_service.stop_all_lsp_servers_async(db, project["id"])
+    db.commit()
+    return jsonify(results), 202
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/lsp/check-installed", methods=["POST"])
