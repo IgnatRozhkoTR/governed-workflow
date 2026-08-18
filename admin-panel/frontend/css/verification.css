@@ -97,6 +97,13 @@
 .verification-assign-row select { min-width: 220px; }
 .verification-assign-row input { width: 160px; }
 
+/* Match the Assign button's height to the select/input's 6px vertical
+   padding + 0.8rem font so the row doesn't look like a short button next
+   to tall controls. */
+.verification-assign-row .btn-sm {
+    padding: 7px 14px;
+}
+
 /* Results */
 .verification-run { margin-top: 8px; }
 .run-header {

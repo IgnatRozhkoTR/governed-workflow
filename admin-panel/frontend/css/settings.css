@@ -222,7 +222,7 @@
 
 .context-ref-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
   gap: 10px;
 }
@@ -235,6 +235,15 @@
 
 .context-ref-input-wrap .context-input {
   width: 100%;
+}
+
+/* Buttons sharing a row with a .context-input control (which uses 9px
+   vertical padding) are visually much shorter with the default .btn-sm
+   padding. Bump padding here to match the input's rendered height instead
+   of relying on a fixed height, which would clip the input text. */
+.context-ref-row .btn-sm,
+.context-row .btn-sm {
+  padding: 10px 16px;
 }
 
 .settings-radio-card {
