@@ -9,7 +9,7 @@ Multi-phase implementation workflow with backend-enforced transitions. Every pha
 
 **Start every session by calling `workspace_get_state`.** The `phase` field tells you where you are. The `previous_sessions_count` field tells you whether this is a fresh start or a continuation.
 
-{{#FAST_MODE}}This workspace runs in **fast mode** — a reduced phase set that skips impact analysis, the preparation review gate, the blind review pipeline, and reflection. Ask for an on-demand integration review at any time; the orchestrator spawns `integration-reviewer` and relays its findings.
+{{#FAST_MODE}}This workspace runs in **fast mode** — a reduced phase set that skips impact analysis, the preparation review gate, and the blind review pipeline. Ask for an on-demand integration review at any time; the orchestrator spawns `integration-reviewer` and relays its findings.
 
 {{/FAST_MODE}}---
 
@@ -53,8 +53,8 @@ Agents execute their task and return. The orchestrator continues them for follow
 | middle-backend-test-engineer | Phase 3.N.0 (stage 2, after engineer). Tests ONLY. |
 {{#STANDARD_MODE}}| middle-code-validator | Phase 3.N.1 |
 {{/STANDARD_MODE}}| review-validator | Phase 4.1 — after resolutions are set, verifies 'fixed' issues were actually fixed and 'false_positive' claims hold. |
-{{#STANDARD_MODE}}| reflector | Phase 5.1 — spawned once with the reflection context embedded in its prompt. |
-{{/STANDARD_MODE}}
+| reflector | Phase 5.1 — spawned once with the reflection context embedded in its prompt. |
+
 ---
 
 ## Phase Map

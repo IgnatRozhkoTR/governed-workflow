@@ -22,10 +22,10 @@ from advance.phases.planning import PlanningPhase
 from core.db import get_db
 from services import workflow_mode_service
 from services.configurator_service import SkillConfigurator
-from services.phase_settings import get_scope_settings
+from services.phase_settings import get_scope_settings, set_scope_settings
 from testing_utils import add_criterion, add_progress, make_plan_json, set_phase
 
-FAST_ROWS = {"1.3", "1.4", "3.x.1", "3.x.2", "3.x.3", "4.0", "5.1", "5.2"}
+FAST_ROWS = {"1.3", "1.4", "3.x.1", "3.x.2", "3.x.3", "4.0"}
 
 
 def _ws_url(project, path):
@@ -93,6 +93,33 @@ def test_apply_fast_writes_expected_rows_including_mirror(workspace):
         db.close()
     assert set(rows.keys()) == FAST_ROWS
     assert all(value is False for value in rows.values())
+
+
+def test_apply_fast_writes_no_reflection_disable_rows(workspace):
+    """Fast mode now includes the reflection phases, so 5.1/5.2 must stay enabled."""
+    db = get_db()
+    try:
+        workflow_mode_service.apply_mode_phase_settings(db, workspace["id"], "fast")
+        db.commit()
+        rows = get_scope_settings(db, "workspace", str(workspace["id"]))
+    finally:
+        db.close()
+    assert "5.1" not in rows
+    assert "5.2" not in rows
+
+
+def test_apply_standard_removes_legacy_reflection_disable_rows(workspace):
+    """Reverting to standard must clear legacy 5.1/5.2 rows left by pre-change fast mode."""
+    db = get_db()
+    try:
+        set_scope_settings(db, "workspace", str(workspace["id"]), {"5.1": False, "5.2": False})
+        db.commit()
+        workflow_mode_service.apply_mode_phase_settings(db, workspace["id"], "standard")
+        db.commit()
+        rows = get_scope_settings(db, "workspace", str(workspace["id"]))
+    finally:
+        db.close()
+    assert rows == {}
 
 
 def test_apply_standard_removes_fast_rows(workspace):
@@ -288,8 +315,10 @@ def test_state_fast_workspace_omits_optional_phases(client, workspace, project):
     resp = client.get(_ws_url(project, "state"))
     data = resp.json
     assert data["workflow_mode"] == "fast"
-    for phase_id in ("1.3", "1.4", "4.0", "5.1", "5.2"):
+    for phase_id in ("1.3", "1.4", "4.0"):
         assert phase_id not in data["enabled_phases"]
+    for phase_id in ("5.1", "5.2"):
+        assert phase_id in data["enabled_phases"]
 
 
 # ── workspace list GET exposure ────────────────────────────────────────────────

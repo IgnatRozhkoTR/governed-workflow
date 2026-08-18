@@ -142,7 +142,7 @@ This is the fast-mode review gate — the user's only checkpoint before delivery
 
 If the user asks for a review, spawn the `integration-reviewer` agent and relay its findings verbatim — the user decides what, if anything, needs fixing before approving.
 
-- **Approve** → workflow completes (fast mode skips reflection, `5.1`/`5.2`)
+- **Approve** → `5.1` (reflection)
 - **Reject** → back to `4.1` with the user's comments
 
 Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat. Auto-approved when `yolo_mode` is on.
