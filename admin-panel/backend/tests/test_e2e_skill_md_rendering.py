@@ -28,11 +28,10 @@ SKILL_OUTPUT_REL = ".claude/skills/governed-workflow/SKILL.md"
 @pytest.fixture
 def project_with_template(tmp_path, clean_db, git_repo):
     """Use the install flow to place SKILL.md.template into ``git_repo`` and register a project."""
-    _fill_missing_repo_defaults(Path(git_repo))
-
     project_id = "e2e-skill-project"
     db = get_db()
     try:
+        _fill_missing_repo_defaults(db, Path(git_repo))
         db.execute(
             "INSERT INTO projects (id, name, path, registered) VALUES (?, ?, ?, ?)",
             (project_id, "E2E Skill Project", git_repo, datetime.now().isoformat()),

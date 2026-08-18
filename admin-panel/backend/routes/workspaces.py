@@ -20,6 +20,8 @@ from core.paths import (
     DEFAULT_GIT_HOOKS_DIR,
     DEFAULT_HOOKS_DIR,
     DEFAULT_MCP_TEMPLATE,
+    DEFAULT_MODULES_DIR,
+    DEFAULT_MODULES_LOCAL_DIR,
     DEFAULT_REPO_CLAUDE_MD,
     DEFAULT_RULES_DIR,
     DEFAULT_SKILLS_DIR,
@@ -31,6 +33,7 @@ from services import comment_service, lsp_service, proposal_service, review_pipe
 from services import review_mode_service
 from services import workflow_mode_service
 from services.configurator_service import ConfiguratorChain
+from services.modules_discovery import resolve_enabled_module_overrides
 
 bp = Blueprint("workspaces", __name__)
 logger = logging.getLogger(__name__)
@@ -347,7 +350,10 @@ def _restore_project_files(project_path):
 _MD_SEPARATOR = "\n\n---\n\n# Governed Workflow Defaults\n\n"
 
 # Repo-default asset directories that are merged into each workspace.
-# Each tuple is (source_dir, destination_subpath_inside_workspace).
+# Each tuple is (source_dir, destination_subpath_inside_workspace). The
+# destination subpath's final component (e.g. "agents", "hooks") doubles as
+# the module override subpath: a module ships its overrides mirroring this
+# same layout under override/<subpath>/.
 _REPO_DEFAULT_ASSET_DIRS = [
     (DEFAULT_AGENTS_DIR, Path(".claude") / "agents"),
     (DEFAULT_HOOKS_DIR, Path(".claude") / "hooks"),
@@ -355,6 +361,29 @@ _REPO_DEFAULT_ASSET_DIRS = [
     (DEFAULT_DEFAULTS_DIR, Path(".claude") / "defaults"),
     (DEFAULT_SKILLS_DIR, Path(".claude") / "skills"),
 ]
+
+_MODULE_OVERRIDE_ROOTS = [DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR]
+
+
+def _composed_repo_default_sources(db) -> list[tuple[dict[str, Path], Path]]:
+    """Compose each ``_REPO_DEFAULT_ASSET_DIRS`` entry with enabled-module overrides.
+
+    For every ``(src_dir, dst_rel)`` pair, builds ``{relative_path: source_path}``
+    from the repo-default files under *src_dir*, then overlays it with enabled
+    modules' ``override/<dst_rel.name>/`` files (later-enabled module wins —
+    see :func:`resolve_enabled_module_overrides`). Returns a list of
+    ``(composed_map, dst_rel)`` pairs, one per asset dir, in declared order.
+    """
+    composed = []
+    for src_dir, dst_rel in _REPO_DEFAULT_ASSET_DIRS:
+        asset_map: dict[str, Path] = {}
+        if src_dir.exists():
+            for src_file in src_dir.rglob("*"):
+                if src_file.is_file():
+                    asset_map[str(src_file.relative_to(src_dir))] = src_file
+        asset_map.update(resolve_enabled_module_overrides(db, dst_rel.name, _MODULE_OVERRIDE_ROOTS))
+        composed.append((asset_map, dst_rel))
+    return composed
 
 
 def _concatenate_md(repo_default: Path, project_file: Path, workspace_target: Path):
@@ -382,16 +411,16 @@ def _concatenate_md(repo_default: Path, project_file: Path, workspace_target: Pa
     workspace_target.write_text(content)
 
 
-def _fill_missing_repo_defaults(target_root: Path):
-    """Copy each missing file from repo default asset dirs into target_root. Never overwrites."""
-    for src_dir, dst_rel in _REPO_DEFAULT_ASSET_DIRS:
-        if not src_dir.exists():
-            continue
+def _fill_missing_repo_defaults(db, target_root: Path):
+    """Copy each missing file from the composed default+override asset maps into target_root.
+
+    Precedence for what counts as a "default" here is repo defaults overlaid
+    by enabled modules' overrides (see :func:`_composed_repo_default_sources`).
+    Existing destination files are never overwritten.
+    """
+    for asset_map, dst_rel in _composed_repo_default_sources(db):
         dst_dir = target_root / dst_rel
-        for src_file in src_dir.rglob("*"):
-            if not src_file.is_file():
-                continue
-            rel = src_file.relative_to(src_dir)
+        for rel, src_file in asset_map.items():
             dst_file = dst_dir / rel
             if dst_file.exists():
                 continue
@@ -399,12 +428,14 @@ def _fill_missing_repo_defaults(target_root: Path):
             shutil.copy2(src_file, dst_file)
 
 
-def _merge_project_assets(project_path: str, workspace_path: Path):
+def _merge_project_assets(db, project_path: str, workspace_path: Path):
     """Populate workspace .claude/ via a two-pass merge.
 
-    Pass 1 — repo defaults: for each file under the repo default asset dirs,
-    copy it to the equivalent workspace destination ONLY when the destination
-    is missing.  Existing destination files are never overwritten.
+    Pass 1 — composed defaults: for each file in the composed default+override
+    asset maps (repo defaults overlaid by enabled modules' overrides — see
+    :func:`_composed_repo_default_sources`), copy it to the equivalent workspace
+    destination ONLY when the destination is missing. Existing destination
+    files are never overwritten.
 
     Pass 2 — project-local overrides: if the project has its own .claude/,
     walk it and write its files over the workspace copies so the project
@@ -414,8 +445,8 @@ def _merge_project_assets(project_path: str, workspace_path: Path):
     """
     project = Path(project_path)
 
-    # Pass 1: fill missing files from repo defaults
-    _fill_missing_repo_defaults(workspace_path)
+    # Pass 1: fill missing files from the composed default+override maps
+    _fill_missing_repo_defaults(db, workspace_path)
 
     # Pass 2: project-local content overwrites workspace copies (project wins).
     # Prune the worktrees storage root BEFORE descending — it holds a full
@@ -580,7 +611,7 @@ def _setup_checkout_workspace(project_path, branch, source_ref):
     return project_path, None
 
 
-def _install_worktree_configs(project_path, wt_path):
+def _install_worktree_configs(db, project_path, wt_path):
     """Populate the worktree with a merged .claude/ from repo defaults and project."""
     wt_path = Path(wt_path)
     dst_claude = wt_path / ".claude"
@@ -589,8 +620,8 @@ def _install_worktree_configs(project_path, wt_path):
     # Legacy cleanup: move git-rules.md from its old home inside rules/ to .claude/ root
     migrate_legacy_git_rules(project_path)
 
-    # a) Merge repo defaults + project-local content into .claude/
-    _merge_project_assets(project_path, wt_path)
+    # a) Merge repo defaults (+ enabled-module overrides) + project-local content into .claude/
+    _merge_project_assets(db, project_path, wt_path)
 
     # b) Re-establish rules/ and git-config.json as symlinks back to project root
     for rel in _SYMLINK_TO_PROJECT:
@@ -632,13 +663,14 @@ def _install_worktree_configs(project_path, wt_path):
     _install_git_hooks(dst_claude, str(wt_path))
 
 
-def _install_checkout_configs(project_path):
+def _install_checkout_configs(db, project_path):
     """Apply workspace config for checkout (non-worktree) mode.
 
     The project directory IS the user's permanent root, so this mode is
     conservative: it backs everything up first, then fills in only missing
-    pieces from repo defaults without overwriting existing files.
-    CLAUDE.md is left alone if it already exists.
+    pieces from the composed repo default + enabled-module-override maps,
+    without overwriting existing files. CLAUDE.md is left alone if it already
+    exists.
     """
     _backup_project_files(project_path)
 
@@ -647,8 +679,9 @@ def _install_checkout_configs(project_path):
 
     project = Path(project_path)
 
-    # Fill missing repo-default files — never overwrite existing project files
-    _fill_missing_repo_defaults(project)
+    # Fill missing files from the composed default+override maps — never
+    # overwrite existing project files
+    _fill_missing_repo_defaults(db, project)
 
     # Merge governed hooks into settings.json (union, never overwrite)
     settings_path = project / ".claude" / "settings.json"
@@ -892,12 +925,12 @@ def create_workspace(project_id):
             working_dir, err = _setup_worktree_workspace(project_path, branch, sanitized, source_ref)
             if err:
                 return err
-            _install_worktree_configs(project_path, working_dir)
+            _install_worktree_configs(db, project_path, working_dir)
         else:
             working_dir, err = _setup_checkout_workspace(project_path, branch, source_ref)
             if err:
                 return err
-            _install_checkout_configs(project_path)
+            _install_checkout_configs(db, project_path)
 
         body, workspace_id = _register_workspace(
             db, project_id, branch, sanitized, working_dir, source, locale,

@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -446,8 +447,13 @@ _WORKSPACES = _import_workspaces_module()
 
 
 def _call_install_worktree_configs(project_path, wt_path):
-    """Call the internal bootstrap function."""
-    _WORKSPACES._install_worktree_configs(project_path, wt_path)
+    """Call the internal bootstrap function with a fresh db connection."""
+    from core.db import get_db
+    db = get_db()
+    try:
+        _WORKSPACES._install_worktree_configs(db, project_path, wt_path)
+    finally:
+        db.close()
 
 
 class TestMergeLayer:
@@ -511,6 +517,157 @@ class TestMergeLayer:
         assert dst_rules.is_symlink()
         src_rules = Path(project_with_assets) / ".claude" / "rules"
         assert dst_rules.resolve() == src_rules.resolve()
+
+
+class TestMergeLayerModuleOverrides:
+    """Ordering guarantee: repo default < enabled-module override < project-local."""
+
+    @staticmethod
+    def _make_override_module(root: Path, module_id: str, subpath: str, filename: str, content: str) -> Path:
+        mod_dir = root / module_id
+        mod_dir.mkdir(parents=True)
+        (mod_dir / "SKILL.md").write_text(f"---\nname: {module_id}\n---\n")
+        override_dir = mod_dir / "override" / subpath
+        override_dir.mkdir(parents=True)
+        (override_dir / filename).write_text(content)
+        return mod_dir
+
+    @staticmethod
+    def _enable_module(db, module_id: str, enabled_at: str = "2024-01-01T00:00:00") -> None:
+        db.execute(
+            "INSERT INTO modules_enabled (module_id, enabled_at) VALUES (?, ?)",
+            (module_id, enabled_at),
+        )
+        db.commit()
+
+    def test_module_override_fills_gap_left_by_defaults_and_project(self, project_with_assets, tmp_path):
+        """A module override supplies a file neither the repo defaults nor the
+        project provide, landing in the worktree via the fill-missing pass."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(modules_root, "mod-a", "hooks", "module-hook.md", "# From module override")
+
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        db = get_db()
+        try:
+            self._enable_module(db, "mod-a")
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._install_worktree_configs(db, project_with_assets, wt)
+        finally:
+            db.close()
+
+        assert (wt / ".claude" / "hooks" / "module-hook.md").read_text() == "# From module override"
+        # Existing project-local precedence is unaffected by the module toggle.
+        assert (wt / ".claude" / "agents" / "custom.md").read_text() == "# Custom Project Agent"
+
+    def test_module_override_wins_over_repo_default_on_collision(self, project_with_assets, tmp_path):
+        """An override for an existing repo-default agent filename wins over the default."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(
+            modules_root, "mod-a", "agents", "middle-backend-engineer.md",
+            "# Module override of a real default agent",
+        )
+
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        db = get_db()
+        try:
+            self._enable_module(db, "mod-a")
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._install_worktree_configs(db, project_with_assets, wt)
+        finally:
+            db.close()
+
+        assert (wt / ".claude" / "agents" / "middle-backend-engineer.md").read_text() == (
+            "# Module override of a real default agent"
+        )
+
+    def test_project_local_file_wins_over_colliding_module_override(self, project_with_assets, tmp_path):
+        """Project always wins: project-local agents/custom.md beats a module override
+        shipped for the exact same relative path."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(
+            modules_root, "mod-a", "agents", "custom.md", "# From module override, should lose",
+        )
+
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        db = get_db()
+        try:
+            self._enable_module(db, "mod-a")
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._install_worktree_configs(db, project_with_assets, wt)
+        finally:
+            db.close()
+
+        assert (wt / ".claude" / "agents" / "custom.md").read_text() == "# Custom Project Agent"
+
+    def test_disabled_module_override_not_applied(self, project_with_assets, tmp_path):
+        """A module directory that exists on disk but is not enabled contributes nothing."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(modules_root, "mod-a", "hooks", "module-hook.md", "# Should not appear")
+
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        db = get_db()
+        try:
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._install_worktree_configs(db, project_with_assets, wt)
+        finally:
+            db.close()
+
+        assert not (wt / ".claude" / "hooks" / "module-hook.md").exists()
+
+    def test_checkout_fill_missing_uses_module_override_when_destination_missing(self, tmp_path):
+        """_fill_missing_repo_defaults (checkout mode's fill pass) picks up a module
+        override file for a destination that does not already exist."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(modules_root, "mod-a", "rules", "custom-rule.md", "# Module rule override")
+
+        target = tmp_path / "target"
+        target.mkdir()
+
+        db = get_db()
+        try:
+            self._enable_module(db, "mod-a")
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._fill_missing_repo_defaults(db, target)
+        finally:
+            db.close()
+
+        assert (target / ".claude" / "rules" / "custom-rule.md").read_text() == "# Module rule override"
+
+    def test_checkout_fill_missing_never_overwrites_existing_destination_file(self, tmp_path):
+        """Fill-missing semantics hold even when a module ships an override for an
+        already-populated destination: checkout mode never overwrites."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(modules_root, "mod-a", "rules", "custom-rule.md", "# Module rule override")
+
+        target = tmp_path / "target"
+        (target / ".claude" / "rules").mkdir(parents=True)
+        (target / ".claude" / "rules" / "custom-rule.md").write_text("# Pre-existing file")
+
+        db = get_db()
+        try:
+            self._enable_module(db, "mod-a")
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._fill_missing_repo_defaults(db, target)
+        finally:
+            db.close()
+
+        assert (target / ".claude" / "rules" / "custom-rule.md").read_text() == "# Pre-existing file"
 
 
 class TestWriteWorkspaceSettingsUnion:
