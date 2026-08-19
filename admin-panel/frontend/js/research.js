@@ -208,6 +208,7 @@ function _renderMarkdownPreview(lines) {
   if (typeof hljs !== 'undefined') {
     rendered.querySelectorAll('pre code').forEach(function(block) { hljs.highlightElement(block); });
   }
+  renderMermaidBlocks(rendered);
   return rendered;
 }
 

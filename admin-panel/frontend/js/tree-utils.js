@@ -91,3 +91,36 @@ function renderTreeNode(node, container, depth, options) {
     }
   });
 }
+
+// ═══════════════════════════════════════════════
+//  MERMAID FENCE RENDERING (shared across md previews)
+// ═══════════════════════════════════════════════
+
+var _mermaidBlockCounter = 0;
+
+// Replaces ```mermaid fences (rendered by marked as <pre><code class="language-mermaid">)
+// with rendered SVG diagrams. Must run after markdown HTML has been sanitized and
+// inserted into the DOM; reads only textContent, never re-injects raw HTML.
+async function renderMermaidBlocks(containerEl) {
+  if (!containerEl || typeof mermaid === 'undefined') return;
+
+  var codeBlocks = containerEl.querySelectorAll('pre > code.language-mermaid');
+  for (var i = 0; i < codeBlocks.length; i++) {
+    var codeEl = codeBlocks[i];
+    var preEl = codeEl.parentElement;
+    var definition = codeEl.textContent;
+    var renderId = 'mdMermaid_' + (++_mermaidBlockCounter);
+
+    try {
+      var result = await mermaid.render(renderId, definition);
+      var wrapper = document.createElement('div');
+      wrapper.className = 'md-mermaid';
+      wrapper.innerHTML = result.svg;
+      preEl.replaceWith(wrapper);
+    } catch (e) {
+      console.error('Mermaid block render failed:', e);
+      var orphan = document.getElementById('d' + renderId);
+      if (orphan) orphan.remove();
+    }
+  }
+}

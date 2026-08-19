@@ -271,6 +271,7 @@ function renderExplorerContent(path, lines, lineNumber) {
     if (typeof hljs !== 'undefined') {
       contentEl.querySelectorAll('pre code').forEach(function(block) { hljs.highlightElement(block); });
     }
+    renderMermaidBlocks(mdBody);
   } else {
     disposeEditor();
 
