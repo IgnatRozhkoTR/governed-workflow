@@ -18,6 +18,10 @@ Use your normal file tools (Write/Edit), no special MCP tool. Write into:
 
 Start the file with a `# ` H1 — it becomes the report's title in the admin panel UI.
 
+## Diagrams
+
+If a small Mermaid diagram would genuinely make a report clearer — a short flowchart for a multi-step process, a sequence diagram for a PR's cross-service call flow — include one. It renders automatically in the admin panel's scratchpad view. Don't reach for this by default or add one to every report; skip it when the report is simple enough that prose alone is clear.
+
 ## Multi-repo workspaces
 
 - A report about one specific attached repo (e.g. "explain the PR you just opened in `service-a`") goes into that repo's own `.claude/scratchpad/`.
