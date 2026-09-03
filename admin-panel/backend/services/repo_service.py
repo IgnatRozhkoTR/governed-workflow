@@ -184,6 +184,31 @@ def resolve_git_rules(db, project, repo_row) -> str:
     return ""
 
 
+def _install_worktree_merge_layer(db, project, repo_row, worktree_path: Path) -> None:
+    """Give an attached repo's worktree the same merge layer as the composite root.
+
+    Applies the project-wide CLAUDE.md/rules/hooks merge (the same one
+    ``_install_worktree_configs`` gives the multi-repo composite directory)
+    to this individual repo's own worktree, then overwrites its
+    ``.claude/git-rules.md`` with this specific repo's resolved rules text
+    (project default, or this repo's ``git_rules_override`` when set) since
+    that may differ from the project's raw default file the generic merge
+    symlinks in.
+
+    Imported lazily to avoid a circular import: routes.workspaces already
+    imports this module at load time.
+    """
+    from routes.workspaces import _install_worktree_configs
+
+    _install_worktree_configs(db, project["path"], str(worktree_path), install_git_hooks=True)
+
+    rules_path = git_rules_path(str(worktree_path))
+    if rules_path.exists() or rules_path.is_symlink():
+        rules_path.unlink()
+    rules_path.parent.mkdir(parents=True, exist_ok=True)
+    rules_path.write_text(resolve_git_rules(db, project, repo_row))
+
+
 def attach_repo(db, ws, project, repo_row) -> dict:
     """Attach a registered repo to a multi-repo workspace: worktree + branch + DB row.
 
@@ -256,6 +281,19 @@ def attach_repo(db, ws, project, repo_row) -> dict:
             "worktree_add_failed",
             f"git worktree add failed for repo '{repo_row['rel_path']}': {stderr}",
         )
+
+    try:
+        _install_worktree_merge_layer(db, project, repo_row, worktree_path)
+    except Exception as exc:
+        run_git(str(repo_abs), "worktree", "remove", str(worktree_path), "--force")
+        if not base_sync_service.branch_checked_out_anywhere(str(repo_abs), branch):
+            run_git(str(repo_abs), "branch", "-D", branch)
+        if isinstance(exc, RepoServiceError):
+            raise
+        raise RepoServiceError(
+            "config_merge_failed",
+            f"Failed to install worktree config for repo '{repo_row['rel_path']}': {exc}",
+        ) from exc
 
     now = datetime.now().isoformat()
     db.execute(

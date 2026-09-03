@@ -191,6 +191,132 @@ def test_reattach_after_archive_reuses_existing_branch(client, multi_project):
     assert worktree2.is_dir()
 
 
+# ─── ATTACH MERGE LAYER ─────────────────────────────────────────────────────
+
+
+def test_attach_repo_worktree_gets_concatenated_claude_md(client, multi_project):
+    (Path(multi_project["path"]) / "CLAUDE.md").write_text("PROJECT_WIDE_CLAUDE_MD_MARKER")
+
+    _create_multi_workspace(client, multi_project, branch="feature/attach-claude-md")
+    repo_id = multi_project["repos"]["service-b"]["id"]
+
+    r = client.post(
+        f"/api/ws/{multi_project['id']}/feature/attach-claude-md/repos/attach",
+        json={"repo_id": repo_id},
+    )
+    assert r.status_code == 200, r.json
+
+    worktree = Path(r.json["attached"]["worktree_path"])
+    claude_md = worktree / "CLAUDE.md"
+    assert claude_md.is_file()
+    assert not claude_md.is_symlink()
+    content = claude_md.read_text()
+    assert "PROJECT_WIDE_CLAUDE_MD_MARKER" in content
+    assert "Governed Workflow Defaults" in content
+
+
+def test_attach_repo_worktree_rules_resolve_to_project_default_without_override(client, multi_project):
+    project_rules = Path(multi_project["path"]) / ".claude" / "git-rules.md"
+    project_rules.parent.mkdir(parents=True, exist_ok=True)
+    project_rules.write_text("PROJECT_DEFAULT_GIT_RULES")
+
+    _create_multi_workspace(client, multi_project, branch="feature/attach-rules-default")
+    repo_id = multi_project["repos"]["service-b"]["id"]
+
+    r = client.post(
+        f"/api/ws/{multi_project['id']}/feature/attach-rules-default/repos/attach",
+        json={"repo_id": repo_id},
+    )
+    assert r.status_code == 200, r.json
+
+    worktree = Path(r.json["attached"]["worktree_path"])
+    rules_file = worktree / ".claude" / "git-rules.md"
+    assert rules_file.is_file()
+    assert rules_file.read_text() == "PROJECT_DEFAULT_GIT_RULES"
+
+
+def test_attach_repo_worktree_rules_use_per_repo_override(client, multi_project):
+    from core.db import get_db
+    from services import repo_service
+
+    project_rules = Path(multi_project["path"]) / ".claude" / "git-rules.md"
+    project_rules.parent.mkdir(parents=True, exist_ok=True)
+    project_rules.write_text("PROJECT_DEFAULT_GIT_RULES")
+
+    repo_a_id = multi_project["repos"]["service-a"]["id"]
+    repo_b_id = multi_project["repos"]["service-b"]["id"]
+
+    db = get_db()
+    try:
+        repo_service.update_repo(
+            db, multi_project["id"], repo_a_id, git_rules_override="SERVICE_A_SPECIFIC_RULES"
+        )
+    finally:
+        db.close()
+
+    _create_multi_workspace(
+        client, multi_project, branch="feature/attach-rules-override",
+        repos=[repo_a_id, repo_b_id],
+    )
+
+    a_rules = (
+        Path(multi_project["path"]) / ".claude" / "worktrees" / "feature-attach-rules-override"
+        / "service-a" / ".claude" / "git-rules.md"
+    )
+    b_rules = (
+        Path(multi_project["path"]) / ".claude" / "worktrees" / "feature-attach-rules-override"
+        / "service-b" / ".claude" / "git-rules.md"
+    )
+    assert a_rules.read_text() == "SERVICE_A_SPECIFIC_RULES"
+    assert b_rules.read_text() == "PROJECT_DEFAULT_GIT_RULES"
+    assert not a_rules.is_symlink()
+    assert not b_rules.is_symlink()
+
+
+def test_attach_repo_installs_git_hooks(client, multi_project):
+    _create_multi_workspace(client, multi_project, branch="feature/attach-hooks")
+    repo_id = multi_project["repos"]["service-b"]["id"]
+
+    r = client.post(
+        f"/api/ws/{multi_project['id']}/feature/attach-hooks/repos/attach",
+        json={"repo_id": repo_id},
+    )
+    assert r.status_code == 200, r.json
+
+    worktree = Path(r.json["attached"]["worktree_path"])
+    hooks_dir = worktree / ".claude" / "git-hooks"
+    assert (hooks_dir / "pre-commit").is_file()
+    assert (hooks_dir / "pre-push").is_file()
+
+    result = subprocess.run(
+        ["git", "config", "--worktree", "core.hooksPath"],
+        cwd=str(worktree), capture_output=True, text=True, env=GIT_ENV,
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip() == str(hooks_dir)
+
+
+def test_attach_two_repos_same_request_does_not_error_or_duplicate_write(client, multi_project):
+    (Path(multi_project["path"]) / "CLAUDE.md").write_text("SHARED_PROJECT_CLAUDE_MD")
+    repo_a_id = multi_project["repos"]["service-a"]["id"]
+    repo_b_id = multi_project["repos"]["service-b"]["id"]
+
+    r = _create_multi_workspace(
+        client, multi_project, branch="feature/attach-two-repos", repos=[repo_a_id, repo_b_id]
+    )
+    assert r.status_code == 201, r.json
+    assert all("error" not in entry for entry in r.json["attached_repos"])
+
+    composite = Path(r.json["working_dir"])
+    for rel_path in ("service-a", "service-b"):
+        claude_md = composite / rel_path / "CLAUDE.md"
+        assert claude_md.is_file()
+        assert "SHARED_PROJECT_CLAUDE_MD" in claude_md.read_text()
+
+    project_claude_md = Path(multi_project["path"]) / "CLAUDE.md"
+    assert project_claude_md.read_text() == "SHARED_PROJECT_CLAUDE_MD"
+
+
 # ─── ARCHIVE ───────────────────────────────────────────────────────────────
 
 
