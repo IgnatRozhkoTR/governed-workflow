@@ -580,6 +580,9 @@ async function _loadDiff(mode, commitSha) {
     DIFF_DATA = AppState.diff;
     if (e && e.payload && e.payload.error === 'base_ref_not_found') {
       showToast(t('diff.baseNotFound'));
+    } else if (e && e.payload && (e.payload.error === 'repo_required' || e.payload.error === 'repo_not_found') && !state.diffRepo) {
+      // No repo attached/selected yet (e.g. a multi-repo workspace with nothing attached):
+      // the empty picker already communicates this, so avoid spamming a toast on every load.
     } else {
       showToast(t('diff.loadFailed'));
     }
@@ -596,13 +599,13 @@ async function loadDiffRepos() {
 
     var validPaths = repos.map(function(repo) { return repo.path; });
     if (validPaths.indexOf(state.diffRepo) === -1) {
-      state.diffRepo = '.';
+      state.diffRepo = validPaths.length > 0 ? validPaths[0] : '';
       localStorage.removeItem('diff_repo');
     }
     setFilterSelectOptions('diffRepoSelect', options, state.diffRepo);
   } catch (e) {
     console.warn('Failed to load repos:', e.message);
-    state.diffRepo = '.';
+    state.diffRepo = '';
     var existingWidget = _filterSelects['diffRepoSelect'];
     if (!existingWidget || existingWidget.options.length === 0) {
       setFilterSelectOptions('diffRepoSelect', [{ value: '.', label: t('diff.repository') }], '.');

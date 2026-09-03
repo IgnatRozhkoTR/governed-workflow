@@ -323,6 +323,7 @@
   "diff.diffAgainst": "Сравнить с",
   "diff.baseDefault": "База по умолчанию",
   "diff.baseNotFound": "Базовая ветка не найдена в этом репозитории",
+  "diff.repoRequired": "Выберите репозиторий, чтобы посмотреть его дифф",
   "diff.loadFailed": "Не удалось загрузить дифф",
   "diff.noMatches": "Нет совпадений",
   "explorer.projectFiles": "Файлы проекта",

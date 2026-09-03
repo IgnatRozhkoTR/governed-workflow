@@ -965,3 +965,87 @@ def test_repo_param_traversal_outside_project_path_still_rejected(client, nested
         r = client.get(f"/api/ws/test-project/feature/test/{endpoint}?repo=../something")
         assert r.status_code == 400, endpoint
         assert r.json["error"] == "invalid_repo", endpoint
+
+
+# ---------------------------------------------------------------------------
+# multi-repo project: get_repos / diff / history / branches scoping
+# ---------------------------------------------------------------------------
+
+def _create_multi_workspace(client, project, branch, **extra):
+    payload = {"branch": branch, "worktree": True}
+    payload.update(extra)
+    return client.post(f"/api/projects/{project['id']}/workspaces", json=payload)
+
+
+def test_get_repos_multi_project_returns_only_attached_repos_no_root_entry(client, multi_project):
+    repo_a_id = multi_project["repos"]["service-a"]["id"]
+    branch = "feature/repos-multi"
+    r = _create_multi_workspace(client, multi_project, branch, repos=[repo_a_id])
+    assert r.status_code == 201, r.json
+
+    r_repos = client.get(f"/api/ws/{multi_project['id']}/{branch}/repos")
+    assert r_repos.status_code == 200
+    repos = r_repos.json["repos"]
+    assert repos == [{"path": "service-a", "name": "service-a"}]
+
+
+def test_get_repos_multi_project_no_attached_repos_returns_empty_list(client, multi_project):
+    branch = "feature/repos-none"
+    r = _create_multi_workspace(client, multi_project, branch)
+    assert r.status_code == 201, r.json
+
+    r_repos = client.get(f"/api/ws/{multi_project['id']}/{branch}/repos")
+    assert r_repos.status_code == 200
+    assert r_repos.json["repos"] == []
+
+
+def test_get_repos_single_project_unchanged(client, workspace):
+    r = client.get("/api/ws/test-project/feature/test/repos")
+    assert r.status_code == 200
+    assert r.json["repos"][0]["path"] == "."
+
+
+def test_diff_history_branches_multi_project_resolve_attached_repo_worktree(client, multi_project):
+    repo_a_id = multi_project["repos"]["service-a"]["id"]
+    repo_b_id = multi_project["repos"]["service-b"]["id"]
+    branch = "feature/scoped-multi"
+    r = _create_multi_workspace(client, multi_project, branch, repos=[repo_a_id, repo_b_id])
+    assert r.status_code == 201, r.json
+
+    worktree_b = Path(r.json["attached_repos"][1]["worktree_path"])
+    assert worktree_b.name == "service-b"
+    (worktree_b / "uncommitted.py").write_text("x = 1\n")
+
+    r_diff = client.get(f"/api/ws/{multi_project['id']}/{branch}/diff?mode=uncommitted&repo=service-b")
+    assert r_diff.status_code == 200, r_diff.json
+    diff_paths = [f["path"] for f in r_diff.json["files"]]
+    assert "uncommitted.py" in diff_paths
+
+    r_history = client.get(f"/api/ws/{multi_project['id']}/{branch}/history?repo=service-b")
+    assert r_history.status_code == 200, r_history.json
+
+    r_branches = client.get(f"/api/ws/{multi_project['id']}/{branch}/branches?repo=service-b")
+    assert r_branches.status_code == 200, r_branches.json
+
+
+def test_diff_history_branches_multi_project_missing_repo_param_returns_repo_required(client, multi_project):
+    branch = "feature/scoped-multi-required"
+    r = _create_multi_workspace(client, multi_project, branch)
+    assert r.status_code == 201, r.json
+
+    for endpoint in REPO_SCOPED_ENDPOINTS:
+        resp = client.get(f"/api/ws/{multi_project['id']}/{branch}/{endpoint}")
+        assert resp.status_code == 400, endpoint
+        assert resp.json["error"] == "repo_required", endpoint
+
+
+def test_diff_history_branches_multi_project_unattached_repo_returns_repo_not_found(client, multi_project):
+    branch = "feature/scoped-multi-unattached"
+    repo_a_id = multi_project["repos"]["service-a"]["id"]
+    r = _create_multi_workspace(client, multi_project, branch, repos=[repo_a_id])
+    assert r.status_code == 201, r.json
+
+    for endpoint in REPO_SCOPED_ENDPOINTS:
+        resp = client.get(f"/api/ws/{multi_project['id']}/{branch}/{endpoint}?repo=service-c")
+        assert resp.status_code == 400, endpoint
+        assert resp.json["error"] == "repo_not_found", endpoint

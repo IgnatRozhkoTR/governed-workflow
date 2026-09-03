@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request
 from core.decorators import with_workspace
 from core.helpers import run_git, DEFAULT_SOURCE_BRANCH
 from core.i18n import t
+from services import repo_service
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,28 @@ def _has_git_marker(path: Path) -> bool:
     return git_entry.is_dir() or git_entry.is_file()
 
 
-def _resolve_repo_dir(working_dir: str, project_path: str, repo_param: str) -> tuple[str | None, str | None]:
+def _resolve_multi_repo_dir(db, workspace_id: int, repo_param: str) -> tuple[str | None, str | None]:
+    """Resolve a repo param to its attached worktree_path for a multi-repo workspace.
+
+    There is no workspace-root repo in multi-repo mode, so an empty/"." param
+    is a required-parameter error rather than falling back to any directory.
+    """
+    if not repo_param or repo_param == ".":
+        return None, "repo_required"
+
+    attached = repo_service.list_attached(db, workspace_id)
+    match = next((row for row in attached if row["rel_path"] == repo_param), None)
+    if match is None:
+        return None, "repo_not_found"
+
+    worktree_path = Path(match["worktree_path"])
+    if not worktree_path.is_dir():
+        return None, "repo_not_found"
+
+    return str(worktree_path), None
+
+
+def _resolve_single_repo_dir(working_dir: str, project_path: str, repo_param: str) -> tuple[str | None, str | None]:
     """Resolve an optional inner-repository subpath to an absolute directory.
 
     "." (or omitted) means the workspace working_dir itself. Any other value is
@@ -52,6 +74,19 @@ def _resolve_repo_dir(working_dir: str, project_path: str, repo_param: str) -> t
         return None, "repo_not_found"
 
     return str(candidate), None
+
+
+def _resolve_repo_dir(db, ws, project, repo_param: str) -> tuple[str | None, str | None]:
+    """Resolve an optional inner-repository subpath to an absolute directory.
+
+    Branches on the project's type: multi-repo projects only ever resolve
+    against their attached workspace_repos/worktree_path rows, never against
+    the shared project-root checkout; single-repo projects keep the legacy
+    project-path subdirectory scan.
+    """
+    if project["project_type"] == "multi":
+        return _resolve_multi_repo_dir(db, ws["id"], repo_param)
+    return _resolve_single_repo_dir(ws["working_dir"], project["path"], repo_param)
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/file", methods=["GET"])
@@ -222,7 +257,18 @@ def list_files(db, ws, project):
 @bp.route("/api/ws/<project_id>/<path:branch>/repos", methods=["GET"])
 @with_workspace
 def get_repos(db, ws, project):
-    """List the workspace root plus any immediate subdirectories of the project path that are git repositories."""
+    """List the repositories available for diffing in this workspace.
+
+    Multi-repo projects only ever expose their attached repos (no workspace-root
+    entry, since the composite workspace directory is not itself a git repo).
+    Single-repo projects keep the legacy workspace root plus any immediate
+    subdirectory of the project path that is a git repository.
+    """
+    if project["project_type"] == "multi":
+        attached = repo_service.list_attached(db, ws["id"])
+        repos = [{"path": row["rel_path"], "name": row["name"] or row["rel_path"]} for row in attached]
+        return jsonify({"repos": repos})
+
     root = Path(project["path"])
 
     repos = [{"path": ".", "name": Path(project["path"]).name}]
@@ -315,7 +361,7 @@ def _try_history_refs(working_dir, source_branch, log_format):
 @with_workspace
 def get_history(db, ws, project):
     repo = request.args.get("repo", "").strip()
-    working_dir, err = _resolve_repo_dir(ws["working_dir"], project["path"], repo)
+    working_dir, err = _resolve_repo_dir(db, ws, project, repo)
     if err:
         return jsonify({"error": err}), 400
 
@@ -337,7 +383,7 @@ def get_history(db, ws, project):
 @with_workspace
 def get_branches(db, ws, project):
     repo = request.args.get("repo", "").strip()
-    working_dir, err = _resolve_repo_dir(ws["working_dir"], project["path"], repo)
+    working_dir, err = _resolve_repo_dir(db, ws, project, repo)
     if err:
         return jsonify({"error": err}), 400
 
@@ -476,7 +522,7 @@ def get_diff(db, ws, project):
         }), 400
 
     repo = request.args.get("repo", "").strip()
-    working_dir, err = _resolve_repo_dir(working_dir, project["path"], repo)
+    working_dir, err = _resolve_repo_dir(db, ws, project, repo)
     if err:
         return jsonify({"error": err}), 400
 
