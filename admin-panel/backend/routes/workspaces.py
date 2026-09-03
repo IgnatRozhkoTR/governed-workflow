@@ -631,6 +631,40 @@ def _setup_checkout_workspace(project_path, branch, source_ref):
     return project_path, None
 
 
+def _ensure_scratchpad_dir(git_dir, fs_path):
+    """Create .claude/scratchpad/ and register it in this checkout's local exclude file.
+
+    The exclude file (not the user's tracked .gitignore) is used so scratchpad
+    reports never show up as untracked/dirty in either a worktree or a plain
+    checkout. ``git_dir`` is where git commands run (the worktree or checkout
+    root); ``run_git`` resolves ``info/exclude`` relative to it via git
+    plumbing so this works for both a linked worktree and a plain checkout
+    without hardcoding ``.git`` layout assumptions.
+    """
+    fs_path = Path(fs_path)
+    scratchpad_dir = fs_path / ".claude" / "scratchpad"
+    scratchpad_dir.mkdir(parents=True, exist_ok=True)
+
+    ok, out, _ = run_git(git_dir, "rev-parse", "--git-path", "info/exclude")
+    if not ok:
+        return
+
+    exclude_path = Path(out.strip())
+    if not exclude_path.is_absolute():
+        exclude_path = Path(git_dir) / exclude_path
+
+    exclude_line = ".claude/scratchpad/"
+    existing_lines = exclude_path.read_text().splitlines() if exclude_path.exists() else []
+    if exclude_line in existing_lines:
+        return
+
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    with exclude_path.open("a") as f:
+        if existing_lines and not existing_lines[-1] == "":
+            f.write("\n")
+        f.write(exclude_line + "\n")
+
+
 def _install_worktree_configs(db, project_path, wt_path, install_git_hooks=True):
     """Populate the worktree with a merged .claude/ from repo defaults and project.
 
@@ -641,6 +675,8 @@ def _install_worktree_configs(db, project_path, wt_path, install_git_hooks=True)
     wt_path = Path(wt_path)
     dst_claude = wt_path / ".claude"
     src_claude = Path(project_path) / ".claude"
+
+    _ensure_scratchpad_dir(str(wt_path), wt_path)
 
     # Legacy cleanup: move git-rules.md from its old home inside rules/ to .claude/ root
     migrate_legacy_git_rules(project_path)
@@ -699,6 +735,8 @@ def _install_checkout_configs(db, project_path):
     exists.
     """
     _backup_project_files(project_path)
+
+    _ensure_scratchpad_dir(project_path, project_path)
 
     # Legacy cleanup: move git-rules.md from its old home inside rules/ to .claude/ root
     migrate_legacy_git_rules(project_path)

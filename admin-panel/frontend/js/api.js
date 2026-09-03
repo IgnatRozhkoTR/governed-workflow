@@ -402,6 +402,27 @@ function apiGetRepos(projectId, branch) {
   return apiGet(url);
 }
 
+function _scratchpadsUrl(projectId, branch, suffix, repo, extraParams) {
+  var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/scratchpads' + suffix;
+  var params = [];
+  if (repo && repo !== '.') params.push('repo=' + encodeURIComponent(repo));
+  if (extraParams) params = params.concat(extraParams);
+  if (params.length) url += '?' + params.join('&');
+  return url;
+}
+
+function apiGetScratchpads(projectId, branch, repo) {
+  return apiGet(_scratchpadsUrl(projectId, branch, '', repo));
+}
+
+function apiGetScratchpadContent(projectId, branch, name, repo) {
+  return apiGet(_scratchpadsUrl(projectId, branch, '/content', repo, ['name=' + encodeURIComponent(name)]));
+}
+
+function apiSaveScratchpadContent(projectId, branch, name, content, repo) {
+  return apiPut(_scratchpadsUrl(projectId, branch, '/content', repo, ['name=' + encodeURIComponent(name)]), { content: content });
+}
+
 function apiHistoryRename(projectId, branch, sha, message) {
   var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/history/rename';
   return apiPost(url, { sha: sha, message: message });

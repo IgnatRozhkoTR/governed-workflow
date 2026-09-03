@@ -48,7 +48,7 @@ async function switchTab(tabId) {
 
   var splitMain = document.getElementById('splitMain');
   if (splitMain) {
-    if (tabId === 'files' || tabId === 'changes' || tabId === 'terminal') {
+    if (tabId === 'files' || tabId === 'changes' || tabId === 'terminal' || tabId === 'scratchpads') {
       splitMain.classList.add('no-padding');
     } else {
       splitMain.classList.remove('no-padding');
@@ -135,6 +135,8 @@ function _activateTabHooks(tabId) {
       _explorerLoaded = true;
       loadExplorerFiles();
     }
+  } else if (tabId === 'scratchpads') {
+    if (typeof loadScratchpads === 'function') loadScratchpads();
   } else if (tabId === 'terminal') {
     if (typeof onTerminalTabActivated === 'function') onTerminalTabActivated();
   }
@@ -180,7 +182,7 @@ function applyStoredTabForContext(ctx) {
 
   var splitMain = document.getElementById('splitMain');
   if (splitMain) {
-    splitMain.classList.toggle('no-padding', tabId === 'files' || tabId === 'changes' || tabId === 'terminal');
+    splitMain.classList.toggle('no-padding', tabId === 'files' || tabId === 'changes' || tabId === 'terminal' || tabId === 'scratchpads');
   }
 
   return tabId;
@@ -215,7 +217,7 @@ function applyStoredTabForContext(ctx) {
     if (mainEl && tabId === 'terminal') mainEl.classList.add('terminal-active');
 
     var splitMain = document.getElementById('splitMain');
-    if (splitMain && (tabId === 'files' || tabId === 'changes' || tabId === 'terminal')) {
+    if (splitMain && (tabId === 'files' || tabId === 'changes' || tabId === 'terminal' || tabId === 'scratchpads')) {
       splitMain.classList.add('no-padding');
     }
   } else {

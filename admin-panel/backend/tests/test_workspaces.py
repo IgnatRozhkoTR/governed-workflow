@@ -42,6 +42,28 @@ def test_create_workspace(client, project):
     assert r.json["branch"] == "feature/new-ws"
 
 
+def test_create_workspace_creates_scratchpad_dir_and_registers_exclude(client, project):
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/scratchpad-setup", "source": "develop", "worktree": True},
+    )
+    assert r.status_code == 201, r.json
+
+    working_dir = Path(r.json["working_dir"])
+    scratchpad_dir = working_dir / ".claude" / "scratchpad"
+    assert scratchpad_dir.is_dir()
+
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-path", "info/exclude"],
+        cwd=str(working_dir), check=True, capture_output=True, text=True,
+    )
+    exclude_path = Path(result.stdout.strip())
+    if not exclude_path.is_absolute():
+        exclude_path = working_dir / exclude_path
+    assert exclude_path.exists()
+    assert ".claude/scratchpad/" in exclude_path.read_text().splitlines()
+
+
 def test_create_workspace_no_worktree(client, project):
     _git(project["path"], "checkout", "-b", "other-branch")
     _git(project["path"], "checkout", "develop")

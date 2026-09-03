@@ -1,0 +1,46 @@
+/* ═══════════════════════════════════════════════
+   SCRATCHPADS TAB
+   ═══════════════════════════════════════════════ */
+
+.sp-section-header {
+  padding: 8px 14px 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.sp-file-item {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sp-file-title {
+  color: var(--text-secondary);
+}
+
+.sp-file-item.active .sp-file-title {
+  color: var(--text-primary);
+}
+
+.sp-file-meta {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+.sp-empty-section {
+  padding: 6px 14px 14px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.sp-source-editor {
+  width: 100%;
+  height: calc(100% - 40px);
+  border: none;
+  border-radius: 0;
+  resize: none;
+}

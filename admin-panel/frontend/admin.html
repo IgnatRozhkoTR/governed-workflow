@@ -81,6 +81,7 @@
 <link rel="stylesheet" href="css/phase-settings.css?v=1">
 <link rel="stylesheet" href="css/proposals.css?v=1">
 <link rel="stylesheet" href="css/settings.css?v=5">
+<link rel="stylesheet" href="css/scratchpads.css?v=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -160,6 +161,9 @@
   </button>
   <button class="sidebar-btn" data-tab="changes" title="Code Changes" data-i18n-title="sidebar.changes">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+  </button>
+  <button class="sidebar-btn" data-tab="scratchpads" title="Scratchpads" data-i18n-title="sidebar.scratchpads">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v18"/><path d="M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/><path d="M13 8h4"/><path d="M13 12h4"/></svg>
   </button>
   <button class="sidebar-btn" data-tab="dashboard" title="Settings" data-i18n-title="tabs.settings">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -837,6 +841,27 @@
     </div>
   </div>
 
+  <!-- ─── SCRATCHPADS ─── -->
+  <div class="tab-panel" id="panel-scratchpads">
+    <div class="card" style="overflow: hidden;">
+      <div class="diff-controls">
+        <span class="badge badge-info" id="scratchpadsFileCount">0 files</span>
+      </div>
+      <div class="diff-layout">
+        <div class="diff-file-list" id="scratchpadsList">
+          <div class="diff-file-list-header">
+            <span data-i18n="scratchpads.title">Scratchpads</span>
+            <span style="font-family: var(--font-mono);" id="scratchpadsCount">0</span>
+          </div>
+        </div>
+        <div class="diff-resize-handle" id="scratchpadsResizeHandle"></div>
+        <div class="diff-content" id="scratchpadsContent">
+          <div class="diff-placeholder" data-i18n="scratchpads.selectFile">Select a scratchpad to view it</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ─── REVIEW ─── -->
   <div class="tab-panel" id="panel-review">
     <div class="card">
@@ -964,6 +989,7 @@
 <script src="js/file-explorer.js?v=11"></script>
 <script src="js/git-config.js?v=11"></script>
 <script src="js/git-cockpit.js?v=1"></script>
+<script src="js/scratchpads.js?v=1"></script>
 <script src="js/rules.js?v=2"></script>
 <script src="js/claude-config.js?v=12"></script>
 <script src="js/network-mode.js?v=12"></script>

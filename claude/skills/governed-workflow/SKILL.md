@@ -604,3 +604,7 @@ Some phases require a progress entry before they will let you advance. Use `work
 Each phase section above states its own requirement — this document deliberately does not tabulate transitions, because which phase follows which is decided server-side from the enabled phase set.
 
 Progress is used for phase gate validation, session recovery after compaction, and retrospective review.
+
+## Human-Facing Reports
+
+When you owe the human a report or explanation that is not itself part of the diff/PR (e.g. "explain this PR", "summarize this job"), see the `scratchpad` skill — write it as a plain markdown file, not a chat-only summary.
