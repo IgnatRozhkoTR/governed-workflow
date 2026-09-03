@@ -607,4 +607,4 @@ Progress is used for phase gate validation, session recovery after compaction, a
 
 ## Human-Facing Reports
 
-When you owe the human a report or explanation that is not itself part of the diff/PR (e.g. "explain this PR", "summarize this job"), see the `scratchpad` skill — write it as a plain markdown file, not a chat-only summary.
+Any report, explanation, analysis, or decision rationale meant to persist or be shared beyond the chat transcript — not just PR/job summaries — belongs in a plain markdown file, not a chat-only reply; see the `scratchpad` skill for where and how.
