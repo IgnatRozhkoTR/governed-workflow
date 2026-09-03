@@ -26,7 +26,7 @@ def iter_module_dirs(roots: list[Path], required_file: str = "SKILL.md") -> list
     return [by_id[k] for k in sorted(by_id.keys())]
 
 
-def _enabled_module_ids_in_order(db: sqlite3.Connection) -> list[str]:
+def enabled_module_ids(db: sqlite3.Connection) -> list[str]:
     """Return enabled module ids ordered by ``enabled_at`` then ``module_id`` (ascending).
 
     This is the deterministic precedence order for override application: a
@@ -48,7 +48,7 @@ def resolve_enabled_module_overrides(
     *roots* (so a ``modules-local`` copy shadows the tracked one), then scanned
     recursively for files under ``override/<subpath>/``. Modules are applied in
     ascending ``(enabled_at, module_id)`` order — see
-    :func:`_enabled_module_ids_in_order` — so a later-enabled module's file wins
+    :func:`enabled_module_ids` — so a later-enabled module's file wins
     on a relative-path collision with an earlier one.
 
     A module with no ``override/<subpath>/`` directory, or one not present under
@@ -56,7 +56,7 @@ def resolve_enabled_module_overrides(
     """
     module_dirs_by_id = {entry.name: entry for entry in iter_module_dirs(roots)}
     composed: dict[str, Path] = {}
-    for module_id in _enabled_module_ids_in_order(db):
+    for module_id in enabled_module_ids(db):
         module_dir = module_dirs_by_id.get(module_id)
         if module_dir is None:
             continue
