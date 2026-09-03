@@ -400,7 +400,7 @@ _TEMPLATE_GATE_STEPS = frozenset({3})
 
 _TEMPLATE_SHORT_DESCRIPTIONS = {
     0: "Engineers implement sub-phase tasks (in-scope edits)",
-    1: "Validators run; backend routes to fixes or review",
+    1: "Validators run; the backend routes onward from the result",
     2: "Engineers address validation or review failures",
     3: "User reviews the diff and approves the commit message",
     4: "Engineer commits the staged changes",
@@ -433,7 +433,7 @@ If the user requests additional work or new requirements emerge, use `workspace_
 
 Call `workspace_advance` when both implementation and tests are complete.
 
-**Advance 3.N.0 → 3.N.1** requires: at least 1 file changed per `must`-scope entry.""",
+**Advancing from 3.N.0** requires: at least 1 file changed per `must`-scope entry.""",
 
     1: """\
 ## 3.N.1 Validation
@@ -443,28 +443,28 @@ Call `workspace_advance` when both implementation and tests are complete.
 Deploy validator sub-agents (`middle-code-validator` / `senior-code-validator`) for compilation check + code quality review. Each validator returns its PASS/FAIL findings directly to you as its response — there is no tool to submit them. Verification profiles assigned to the workspace (configured via `workspace_assign_verification_profile`) run automatically server-side **at the advance gate**.
 
 Call `workspace_advance`. The verification run executes during the advance and the phase machine routes off its result:
-- Verification failed → the advance lands you in `3.N.2` (Fixes) — it does NOT block. Fix the failures there, then advance back here to re-validate.
-- Verification passed, or no profiles are assigned → `3.N.3` (Code Review)""",
+- Verification failed → the advance lands you in the fix sub-phase — it does NOT block. Fix the failures there, then advance back here to re-validate.
+- Verification passed, or no profiles are assigned → the backend routes you onward to the next enabled sub-phase""",
 
     2: """\
 ## 3.N.2 Fixes
 
 **Actors**: Engineer sub-agents | **Code edits: ON (in sub-phase scope)**
 
-You arrive here from a failed verification run at `3.N.1` (or a code-review rejection at `3.N.3`). Call `workspace_get_verification_results` to see exactly which steps failed, and `workspace_get_comments` for any user feedback. Deploy engineer sub-agents to fix the issues — edits are allowed here. Call `workspace_advance` when done to return to `3.N.1` and re-validate. The loop is `3.N.1 → (fail) 3.N.2 → 3.N.1 → (pass) 3.N.3`.""",
+You arrive here from a failed verification run (or a code-review rejection). Call `workspace_get_verification_results` to see exactly which steps failed, and `workspace_get_comments` for any user feedback. Deploy engineer sub-agents to fix the issues — edits are allowed here. Call `workspace_advance` when done to re-validate; the backend loops you back through verification until it passes.""",
 
     3: """\
 ## 3.N.3 Code Review (USER GATE)
 
 User reviews the diff in the admin panel.
 
-- **Approve** (+ optional commit message) → `3.N.4`
-- **Reject** → back to `3.N.2` with comments
+- **Approve** (+ optional commit message) → the backend advances you to the next enabled sub-phase
+- **Reject** → the backend moves you back into the fix sub-phase with comments
 
 Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
-**After rejection**: the backend sets the phase to `3.N.2`. You are now in the fix phase — code edits are ON. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to confirm you're at `3.N.2`
+**After rejection**: the backend picks the phase you land in — code edits are ON there. Do NOT call `workspace_advance` immediately. Instead:
+1. Call `workspace_get_state` to see which phase you are now in
 2. Call `workspace_get_comments` to read the rejection feedback
 3. Deploy engineer sub-agents to address the feedback
 4. Call `workspace_advance` only after fixes are complete""",
@@ -478,7 +478,7 @@ Commit all changes. Use the commit message from `workspace_get_state` (`context.
 
 Call `workspace_advance(commit_hash="{hash}")`.
 
-**Advance 3.N.4 → next** requires: valid commit hash + progress entry `"3.N"`. Backend routes to `3.(N+1).0` or `4.0` if last sub-phase.""",
+**Advancing from 3.N.4** requires: valid commit hash + progress entry `"3.N"`. The backend routes you to the next execution sub-phase, or onward past execution when this was the last one.""",
 }
 
 
@@ -505,7 +505,7 @@ SendMessage(
 
 Call `workspace_advance` when both implementation and tests are complete.
 
-**Advance 3.N.0 → 3.N.1** requires: at least 1 file changed per `must`-scope entry."""
+**Advancing from 3.N.0** requires: at least 1 file changed per `must`-scope entry."""
 
 
 _IMPLEMENTATION_FAST_DESCRIPTION = """\
@@ -531,9 +531,9 @@ SendMessage(
 
 If the user requests additional work or new requirements emerge, use `workspace_extend_plan` to add a new sub-phase rather than rewriting the entire plan. This preserves existing sub-phases and their progress.
 
-Call `workspace_advance` when both implementation and tests are complete. Fast mode has no verification (3.N.1), fixes (3.N.2), or commit-approval gate (3.N.3) — advancing here goes straight to commit.
+Call `workspace_advance` when both implementation and tests are complete. Fast mode has no verification, fix, or commit-approval sub-phases — advancing here goes straight to commit.
 
-**Advance 3.N.0 → 3.N.4** requires: at least 1 file changed per `must`-scope entry."""
+**Advancing from 3.N.0** requires: at least 1 file changed per `must`-scope entry."""
 
 
 _IMPLEMENTATION_FAST_SIMPLE_DESCRIPTION = """\
@@ -557,9 +557,9 @@ SendMessage(
 )
 ```
 
-Call `workspace_advance` when both implementation and tests are complete. Fast mode has no verification (3.N.1), fixes (3.N.2), or commit-approval gate (3.N.3) — advancing here goes straight to commit.
+Call `workspace_advance` when both implementation and tests are complete. Fast mode has no verification, fix, or commit-approval sub-phases — advancing here goes straight to commit.
 
-**Advance 3.N.0 → 3.N.4** requires: at least 1 file changed per `must`-scope entry."""
+**Advancing from 3.N.0** requires: at least 1 file changed per `must`-scope entry."""
 
 
 _COMMIT_FAST_DESCRIPTION = """\
@@ -571,7 +571,7 @@ Commit all changes. Use the commit message from `workspace_get_state` (`context.
 
 Call `workspace_advance(commit_hash="{hash}")`.
 
-**Advance 3.N.4 → next** requires: valid commit hash + progress entry `"3.N"`. Backend routes to `3.(N+1).0` or `4.1` if last sub-phase — fast mode has no 4.0 review pipeline."""
+**Advancing from 3.N.4** requires: valid commit hash + progress entry `"3.N"`. The backend routes you to the next execution sub-phase, or onward past execution when this was the last one — fast mode has no blind-review pipeline."""
 
 
 class _ExecutionTemplatePhase(Phase):

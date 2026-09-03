@@ -8,6 +8,8 @@ backfills the Stop hook into pre-existing worktree settings files.
 
 import json
 import logging
+import re
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -425,6 +427,147 @@ def test_disabled_phase_is_absent_from_rendered_skill(db, project_row, project_r
     assert "## 1.1 Research" not in body
     # Sanity: an unrelated phase is still present.
     assert "## 1.0 Assessment" in body
+
+
+_PHASE_MAP_HEADER = "| Phase | Name | What happens | Edits | Commits | Push | Gate |"
+_MAP_ROW_RE = re.compile(r"^\|\s*`([^`]+)`\s*\|")
+_BODY_HEADING_RE = re.compile(r"^##\s+(?:Phase\s+)?(\d+(?:\.[\dNx]+)*)\b", re.MULTILINE)
+_PHASE_REF_RE = re.compile(r"(?<![\w.])(\d+\.(?:\d+|[Nx])(?:\.(?:\d+|[Nx]))?)(?![\w.])")
+_EXECUTION_REF_RE = re.compile(r"^3\.(?:\d+|[Nx])(?:\.(\d+|[Nx]))?$")
+
+_TOGGLE_CASES = {
+    # The four render variants of the untouched default phase set.
+    "default": None,
+    # Phase sets observed on real projects, where scope toggles dropped the
+    # research, impact-analysis, validation and post-review-fix phases.
+    "research-and-review-off": ["0", "1.0", "2.0", "3.x.0", "3.x.4", "4.2", "5.1", "5.2", "6"],
+    # An arbitrary mid-sequence drop that no workflow mode would ever produce.
+    "mid-sequence-drop": ["0", "1.0", "1.3", "1.4", "3.x.0", "3.x.1", "3.x.3", "3.x.4", "4.0", "4.2", "5.1", "6"],
+    # Drops each phase that another phase's own summary or prose used to name.
+    "referenced-phases-off": ["0", "1.1", "1.2", "2.0", "3.x.1", "3.x.2", "3.x.4", "4.1", "5.2", "6"],
+}
+
+
+def _canonical_phase_ref(ref: str) -> str:
+    """Fold a rendered phase reference onto the id the resolver uses.
+
+    Body sections label execution phases ``3.N.K`` and the Phase Map labels
+    them ``3.x.K``; concrete plan items (``3.1.0``) belong to the same family.
+    All three collapse to ``3.x.K``, and a bare sub-phase id (``3.1``) to
+    ``3.x``.
+    """
+    match = _EXECUTION_REF_RE.match(ref)
+    if not match:
+        return ref
+    step = match.group(1)
+    return "3.x" if step is None else f"3.x.{step}"
+
+
+def _phase_map_ids(rendered: str) -> set:
+    """Phase ids that have a row in the rendered Phase Map table."""
+    lines = rendered.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(_PHASE_MAP_HEADER))
+    ids = set()
+    for line in lines[start + 2:]:
+        if not line.startswith("|"):
+            break
+        match = _MAP_ROW_RE.match(line)
+        if match:
+            ids.add(_canonical_phase_ref(match.group(1)))
+    return ids
+
+
+def _body_section_ids(rendered: str) -> set:
+    """Phase ids that have a body section heading in the rendered skill."""
+    return {_canonical_phase_ref(pid) for pid in _BODY_HEADING_RE.findall(rendered)}
+
+
+def _referenced_phase_ids(rendered: str) -> set:
+    """Every dotted phase id mentioned anywhere in the rendered skill."""
+    return {_canonical_phase_ref(ref) for ref in _PHASE_REF_RE.findall(rendered)}
+
+
+def _renderable_phase_ids(phase_ids: list) -> set:
+    """The enabled set, plus the bare execution-family id its members imply."""
+    allowed = set(phase_ids)
+    if any(pid.startswith("3.x.") for pid in phase_ids):
+        allowed.add("3.x")
+    return allowed
+
+
+def _default_phase_ids() -> list:
+    """Resolve the clean-default phase set with no scope overrides applied."""
+    from services import phase_resolver
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        "CREATE TABLE phase_settings "
+        "(scope_type TEXT, scope_id TEXT, phase_id TEXT, enabled INTEGER)"
+    )
+    try:
+        return phase_resolver.resolve_for_project(conn, None, include_templated=True)
+    finally:
+        conn.close()
+
+
+def _render_case(case: str, workflow_mode: str, simple_planning: bool):
+    phase_ids = _TOGGLE_CASES[case] or _default_phase_ids()
+    template = SkillConfigurator.DEFAULT_TEMPLATE_PATH.read_text()
+    rendered = SkillConfigurator.render(
+        template, phase_ids, simple_planning=simple_planning, workflow_mode=workflow_mode
+    )
+    return phase_ids, rendered
+
+
+@pytest.mark.parametrize("case", sorted(_TOGGLE_CASES))
+@pytest.mark.parametrize("workflow_mode", ["standard", "fast"])
+@pytest.mark.parametrize("simple_planning", [False, True])
+def test_rendered_skill_never_references_a_disabled_phase(case, workflow_mode, simple_planning):
+    """No phase id outside the enabled set survives anywhere in the output.
+
+    Phases are toggled per device/project/workspace scope, which is an axis
+    the template's mode conditionals cannot see. Any hardcoded successor or
+    transition reference therefore goes stale the moment a project turns that
+    phase off, and mis-instructs the orchestrator at runtime. The document
+    declares which phases exist and leaves routing to the backend, so every
+    phase id it mentions must be one of its own enabled phases.
+    """
+    phase_ids, rendered = _render_case(case, workflow_mode, simple_planning)
+
+    dangling = _referenced_phase_ids(rendered) - _renderable_phase_ids(phase_ids)
+
+    assert not dangling, f"rendered skill references disabled phases: {sorted(dangling)}"
+
+
+@pytest.mark.parametrize("case", sorted(_TOGGLE_CASES))
+@pytest.mark.parametrize("workflow_mode", ["standard", "fast"])
+@pytest.mark.parametrize("simple_planning", [False, True])
+def test_phase_map_and_body_sections_cover_the_same_phases(case, workflow_mode, simple_planning):
+    """Every phase with a body section has a Phase Map row and vice versa.
+
+    The table and the body are built by two separate skip predicates
+    (``short_description`` vs ``description_for_skill``). If they ever
+    disagree, a phase is documented in one view and invisible in the other.
+    """
+    phase_ids, rendered = _render_case(case, workflow_mode, simple_planning)
+
+    assert _phase_map_ids(rendered) == _body_section_ids(rendered)
+    assert _phase_map_ids(rendered) == set(phase_ids)
+
+
+def test_progress_documentation_states_no_phase_transitions():
+    """The progress section names no successor phase.
+
+    It used to tabulate rows like ``| 1.0 -> 1.1 | "1.0" |``, which named a
+    phase that any project could switch off. Each phase section now carries
+    its own progress requirement instead.
+    """
+    _, rendered = _render_case("default", "standard", False)
+
+    section = rendered.split("## Progress Documentation", 1)[1]
+    assert "→" not in section
+    assert not _PHASE_REF_RE.findall(section)
 
 
 def test_declarative_module_phase_appears_in_rendered_skill(

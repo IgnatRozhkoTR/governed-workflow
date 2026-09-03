@@ -37,7 +37,7 @@ Some or all of these stages may be skipped depending on the workspace's review m
 
 If the pipeline failed mid-run, the reason is exposed only via `workspace_review_pipeline_summary` (`failed_files_errors`, `integration_errors`, top-level `error`) — never as a discussion. Inspect those fields and decide whether to re-trigger or proceed.
 
-**Advance 4.0 → 4.1** requires: progress entry for phase `"4.0"`."""
+**Advancing from 4.0** requires: progress entry for phase `"4.0"`."""
 
     def progress_key(self, ws):
         return "4.0"
@@ -79,7 +79,7 @@ When complete:
 1. Call `workspace_update_progress` for phase `"4"`
 2. Call `workspace_advance`
 
-**Advance 4.1 → 4.2** requires: progress entry `"4"` + all review items resolved by user."""
+**Advancing from 4.1** requires: progress entry `"4"` + all review items resolved by user."""
 
     def _fast_description(self) -> str:
         return """\
@@ -87,9 +87,9 @@ When complete:
 
 **Actors**: Engineer sub-agents | **Code edits: ON (merged scope), Commits: ON**
 
-Active scope = union of all sub-phase scopes. Fast mode has no blind-review pipeline (4.0) — you land here either as a pass-through right after the `3.N.4` commit, or after the user rejects at `4.2` with comments.
+Active scope = union of all sub-phase scopes. Fast mode has no blind-review pipeline — you land here either as a pass-through right after the execution commit, or after the user rejects at the final approval gate with comments.
 
-1. Call `workspace_get_comments` to check for open user-review issues from a `4.2` rejection.
+1. Call `workspace_get_comments` to check for open user-review issues from a final-approval rejection.
 2. If there are open issues, address them with engineer sub-agents.
 3. If there are none (first pass after commit), there is nothing to fix.
 
@@ -97,7 +97,7 @@ When complete:
 1. Call `workspace_update_progress` for phase `"4"`
 2. Call `workspace_advance`
 
-**Advance 4.1 → 4.2** requires: progress entry `"4"`."""
+**Advancing from 4.1** requires: progress entry `"4"`."""
 
     def progress_key(self, ws):
         return "4"
@@ -126,13 +126,13 @@ class FinalApprovalPhase(Phase):
         return """\
 ## 4.2 Final Approval (USER GATE)
 
-- **Approve** → `5.1`
-- **Reject** → back to `4.1`
+- **Approve** → the backend advances you to the next enabled phase
+- **Reject** → the backend moves you back into the fix phase
 
 Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
-**After rejection**: the backend sets the phase to `4.1`. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to confirm you're at `4.1`
+**After rejection**: the backend picks the phase you land in. Do NOT call `workspace_advance` immediately. Instead:
+1. Call `workspace_get_state` to see which phase you are now in
 2. Call `workspace_get_comments` to read the rejection feedback
 3. Address the feedback — fix code, update resolutions
 4. Call `workspace_advance` only after fixes are complete"""
@@ -145,13 +145,13 @@ This is the fast-mode review gate — the user's only checkpoint before delivery
 
 If the user asks for a review, spawn the `integration-reviewer` agent and relay its findings verbatim — the user decides what, if anything, needs fixing before approving.
 
-- **Approve** → `5.1` (reflection)
-- **Reject** → back to `4.1` with the user's comments
+- **Approve** → the backend advances you to the next enabled phase
+- **Reject** → the backend moves you back into the fix phase with the user's comments
 
 Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat. Auto-approved when `yolo_mode` is on.
 
-**After rejection**: the backend sets the phase to `4.1`. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to confirm you're at `4.1`
+**After rejection**: the backend picks the phase you land in. Do NOT call `workspace_advance` immediately. Instead:
+1. Call `workspace_get_state` to see which phase you are now in
 2. Call `workspace_get_comments` to read the rejection feedback
 3. Address the feedback — fix code
 4. Call `workspace_advance` only after fixes are complete"""
@@ -183,10 +183,10 @@ class ReflectionPhase(Phase):
    - `memory_write` / `memory_delete` — you cannot edit files yourself (Edit/Write are disallowed at this phase). Spawn a `junior-backend-engineer` sub-agent to write/delete the markdown file under `~/.claude/projects/<encoded-project-path>/memory/` and update the `MEMORY.md` index if it exists. Encode the project path by replacing `/` and `.` with `-` (e.g. `/Users/me/Projects/foo` → `-Users-me-Projects-foo`); hand the sub-agent the proposal payload as the source of truth.
    - `rule_new` / `rule_update` — apply directly via the `mcp__governed-workflow__rule_create` / `mcp__governed-workflow__rule_update` MCP tools (no sub-agent needed).
    - On success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=...)`; on tool failure, call with `status="failed"`; on conscious skip, call with `status="rejected"`.
-5. Leave proposals with `implementation_kind="manual"` alone — phase 5.2 picks them up.
-6. **Advance.** `workspace_advance` routes automatically: if any `manual` proposals remain in `status="proposed"`, you land in **5.2 Manual implementation**; otherwise you land in **6 Done**.
+5. Leave proposals with `implementation_kind="manual"` alone — the manual implementation phase picks them up.
+6. **Advance.** `workspace_advance` routes automatically: if any `manual` proposals remain in `status="proposed"` you land in manual implementation, otherwise the backend takes you onward to delivery.
 
-Auto proposals are applied here without a further human gate — phase 4.2 was the final user approval. The user can inspect the outcomes afterward via `mcp__governed-workflow__workspace_list_proposals` or directly in the DB."""
+Auto proposals are applied here without a further human gate — the final approval gate has already passed. The user can inspect the outcomes afterward via `mcp__governed-workflow__workspace_list_proposals` or directly in the DB."""
 
     def validate(self, ws, body, project_path):
         return True, {}
@@ -200,7 +200,7 @@ Auto proposals are applied here without a further human gate — phase 4.2 was t
 class ManualImplementationPhase(Phase):
     id = "5.2"
     name = "Manual implementation"
-    short_description = "Implement the manual proposals queued by 5.1"
+    short_description = "Implement the manual proposals queued by the reflector"
 
     def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
         return """\
@@ -217,7 +217,7 @@ class ManualImplementationPhase(Phase):
      - `agent_new` / `agent_update` / `skill_new` / `skill_update` — spawn `middle-backend-engineer` (or `junior-backend-engineer` if trivial) with a prompt that describes the new/updated agent or skill, including the proposal's payload as the source of truth.
      - `workflow_improvement` — typically requires a multi-file change; spawn `senior-backend-engineer`.
    - On the sub-agent's success, call `mcp__governed-workflow__workspace_resolve_proposal(proposal_id, status="executed", result_json=<one-line summary>)`; on failure, call with `status="failed", result_json=<error summary>`; on conscious skip, call with `status="rejected"`.
-3. **Advance to 6 Done** when the queue is drained.
+3. **Advance** when the queue is drained.
 
 Manual proposals must be implementable purely via `.claude/` workspace metadata (agents, skills, rules, memory) and the `rule_*` MCP tools — file edits outside `.claude/` are blocked at 5.2 by phase permissions, so any proposal that needs repo-code changes must become a new ticket instead."""
 

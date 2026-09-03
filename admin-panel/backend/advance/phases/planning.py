@@ -68,9 +68,9 @@ When the plan is agreed:
 
 **Editing the plan later**: do not resubmit the whole plan to change one part of it. Use `workspace_update_subphase` to patch `3.1`'s name, tasks or scope (sets plan status to 'pending' — the user must re-approve), and `workspace_set_plan_diagrams` / `workspace_set_plan_description` for documentation edits (these keep the approval intact). Fast mode stays at one sub-phase, so `workspace_extend_plan` and `workspace_delete_subphase` do not apply.
 
-**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel (auto-approved when `yolo_mode` is on). `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0`.
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel (auto-approved when `yolo_mode` is on). `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item.
 
-**Advance 2.0 → 3.1.0** requires: a single execution sub-phase `3.1` with a non-empty `scope.must`, plan_status='approved', and progress entry `"2"`."""
+**Advancing from 2.0** requires: a single execution sub-phase `3.1` with a non-empty `scope.must`, plan_status='approved', and progress entry `"2"`."""
 
     def _simple_description(self) -> str:
         return """\
@@ -110,9 +110,9 @@ When the plan is agreed:
 
 **Editing the plan later**: to reword the plan's summary, call `workspace_set_plan_description` instead of resubmitting the whole plan — it keeps the user's approval intact.
 
-**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0`.
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item.
 
-**Advance 2.0 → 3.1.0** requires: a single execution sub-phase `3.1` with a non-empty `scope.must`, plan_status='approved', and progress entry `"2"`."""
+**Advancing from 2.0** requires: a single execution sub-phase `3.1` with a non-empty `scope.must`, plan_status='approved', and progress entry `"2"`."""
 
     def _full_description(self) -> str:
         return """\
@@ -166,9 +166,9 @@ When plan is agreed:
 
 The structural tools (`extend_plan`, `update_subphase`, `delete_subphase`) set the plan status to 'pending' — the user must re-approve, and until they do the agent cannot edit files. The documentation tools (`set_plan_diagrams`, `set_plan_description`) deliberately leave the approval intact, so they are safe to call mid-execution. Reserve `workspace_set_plan` for the initial plan and for genuine full rewrites.
 
-**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. Approving the plan also approves its scope and accepts all proposed acceptance criteria — it is the single approval. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly to `3.1.0` (the first execution item) — there is no separate 2.1 gate phase. If the user rejects, the plan status goes back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan`, then call `workspace_advance` again.
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. Approving the plan also approves its scope and accepts all proposed acceptance criteria — it is the single approval. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item — there is no separate gate phase between planning and execution. If the user rejects, the plan status goes back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan`, then call `workspace_advance` again.
 
-**Advance 2.0 → 3.1.0** requires: valid plan with ≥1 execution sub-phase (each with a non-empty `scope.must`), plan_status='approved', ≥1 acceptance criterion, no proposed criteria, and progress entry `"2"`."""
+**Advancing from 2.0** requires: valid plan with ≥1 execution sub-phase (each with a non-empty `scope.must`), plan_status='approved', ≥1 acceptance criterion, no proposed criteria, and progress entry `"2"`."""
 
     def progress_key(self, ws):
         return "2"

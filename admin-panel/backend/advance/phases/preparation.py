@@ -75,7 +75,7 @@ When assessment is complete:
 1. Call `workspace_update_progress` for phase `"1.0"` with a non-empty summary
 2. Call `workspace_advance`
 
-**Advance 1.0 → 1.1** requires: progress entry `"1.0"` with a non-empty summary AND at least one open research discussion (`type='research'`)."""
+**Advancing from 1.0** requires: progress entry `"1.0"` with a non-empty summary AND at least one open research discussion (`type='research'`)."""
 
     def progress_key(self, ws):
         return "1.0"
@@ -131,11 +131,11 @@ Deploy parallel researcher sub-agents — one per investigation topic identified
   - `file` — specific file in the commit (optional)
   - `description` — mandatory context explaining what the diff proves
 
-Every unresolved research discussion (raised in 1.0) MUST be linked to at least one research entry before advancing.
+Every unresolved research discussion (raised during assessment) MUST be linked to at least one research entry before advancing.
 
 Call `workspace_advance(no_further_research_needed=true)` when all researchers complete.
 
-**Advance 1.1 → 1.2** requires: `no_further_research_needed=true`, every open research discussion has linked research, at least 1 research entry, all entries valid."""
+**Advancing from 1.1** requires: `no_further_research_needed=true`, every open research discussion has linked research, at least 1 research entry, all entries valid."""
 
     def validate(self, ws, body, project_path):
         locale = ws["locale"]
@@ -257,7 +257,7 @@ When all research is proven (prover confirms):
 1. Call `workspace_update_progress` for phase `"1"`
 2. Call `workspace_advance`
 
-**Advance 1.2 → 1.3** requires: all research entries proven (none rejected, none unproven) + progress entry `"1"`."""
+**Advancing from 1.2** requires: all research entries proven (none rejected, none unproven) + progress entry `"1"`."""
 
     def _fast_description(self) -> str:
         return """\
@@ -283,7 +283,7 @@ When all research is proven (prover confirms):
 1. Call `workspace_update_progress` for phase `"1"`
 2. Call `workspace_advance`
 
-**Advance 1.2 → 2.0** requires: all research entries proven (none rejected, none unproven) + progress entry `"1"`. Fast mode skips impact analysis (1.3) and the preparation review gate (1.4) — advancing here goes directly to planning."""
+**Advancing from 1.2** requires: all research entries proven (none rejected, none unproven) + progress entry `"1"`. Fast mode skips impact analysis and the preparation review gate — advancing here goes directly to planning."""
 
     def progress_key(self, ws):
         return "1"
@@ -348,7 +348,7 @@ When complete:
 1. Call `workspace_update_progress` for phase `"1.3"`
 2. Call `workspace_advance`
 
-**Advance 1.3 → 1.4** requires: progress entry `"1.3"`. (Impact analysis should be populated — user will reject at 1.4 if it isn't.)"""
+**Advancing from 1.3** requires: progress entry `"1.3"`. (Impact analysis should be populated — the user will reject at the preparation review gate if it isn't.)"""
 
     def progress_key(self, ws):
         return "1.3"
@@ -374,16 +374,16 @@ class PreparationReviewPhase(Phase):
 
 The user reviews the full preparation package in the Pre-planning tab: assessment summary, research findings, and impact analysis.
 
-- **Approve** → advances to `2.0`
-- **Reject** → back to `1.1` with comments
+- **Approve** → the backend advances you to the next enabled phase
+- **Reject** → the backend moves you back into the preparation phases with comments
 
 Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
-**After rejection**: the backend sets the phase to `1.1`. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to confirm you're at `1.1`
+**After rejection**: the backend picks the phase you land in. Do NOT call `workspace_advance` immediately. Instead:
+1. Call `workspace_get_state` to see which phase you are now in
 2. Call `workspace_get_comments` to read the rejection feedback
 3. Deploy more researcher sub-agents (and update impact analysis later) to address the feedback
-4. Re-run Phase 1.2 and 1.3 before returning to the gate"""
+4. Re-run every preparation phase you were returned to before advancing back to the gate"""
 
     def progress_key(self, ws):
         return "1.3"
