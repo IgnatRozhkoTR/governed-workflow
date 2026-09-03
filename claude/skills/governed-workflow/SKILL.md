@@ -607,4 +607,4 @@ Progress is used for phase gate validation, session recovery after compaction, a
 
 ## Human-Facing Reports
 
-Any report, explanation, analysis, or decision rationale meant to persist or be shared beyond the chat transcript — not just PR/job summaries — belongs in a plain markdown file, not a chat-only reply; see the `scratchpad` skill for where and how.
+When the orchestrator owes the human user a report or explanation (findings, a summary, decision rationale) that should persist beyond the chat transcript, put it in a plain markdown file, not a chat-only reply; see the `scratchpad` skill for where and how.
