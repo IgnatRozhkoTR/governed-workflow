@@ -263,10 +263,20 @@ function renderExplorerContent(path, lines, lineNumber) {
     var mdBody = document.createElement('div');
     mdBody.className = 'explorer-file-body md-preview';
     mdBody.innerHTML = tmp.innerHTML;
+    mdBody.tabIndex = -1;
+    mdBody.addEventListener('keydown', function(e) {
+      var isCopyShortcut = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'c' || e.key === 'C');
+      if (!isCopyShortcut || window.getSelection().toString() !== '') return;
+      e.preventDefault();
+      safeCopyToClipboard(lines.join('\n')).then(function() {
+        flashButton(copyBtn, t('actions.copied'));
+      });
+    });
 
     contentEl.innerHTML = '';
     contentEl.appendChild(header);
     contentEl.appendChild(mdBody);
+    mdBody.focus({ preventScroll: true });
 
     if (typeof hljs !== 'undefined') {
       contentEl.querySelectorAll('pre code').forEach(function(block) { hljs.highlightElement(block); });

@@ -514,6 +514,10 @@ td.d2h-code-side-linenumber:hover {
   color: var(--text-primary);
 }
 
+.md-preview:focus {
+  outline: none;
+}
+
 .md-preview h1, .md-preview h2, .md-preview h3 {
   margin-top: 16px;
   margin-bottom: 8px;

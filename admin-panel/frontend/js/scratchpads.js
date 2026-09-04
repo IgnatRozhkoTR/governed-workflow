@@ -166,6 +166,18 @@ function renderScratchpadContent() {
   toggle.appendChild(prevBtn);
   header.appendChild(toggle);
 
+  var copyBtn = document.createElement('button');
+  copyBtn.className = 'btn btn-sm';
+  copyBtn.textContent = t('buttons.copy');
+  copyBtn.onclick = function() {
+    var textarea = document.querySelector('#scratchpadsContent .sp-source-editor');
+    var text = (textarea && textarea.value !== spState.content) ? textarea.value : spState.content;
+    safeCopyToClipboard(text).then(function() {
+      flashButton(copyBtn, t('actions.copied'));
+    });
+  };
+  header.appendChild(copyBtn);
+
   if (spState.mode === 'source') {
     var saveBtn = document.createElement('button');
     saveBtn.className = 'btn btn-sm';
@@ -199,7 +211,17 @@ function renderScratchpadContent() {
     var mdBody = document.createElement('div');
     mdBody.className = 'explorer-file-body md-preview';
     mdBody.innerHTML = tmp.innerHTML;
+    mdBody.tabIndex = -1;
+    mdBody.addEventListener('keydown', function(e) {
+      var isCopyShortcut = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'c' || e.key === 'C');
+      if (!isCopyShortcut || window.getSelection().toString() !== '') return;
+      e.preventDefault();
+      safeCopyToClipboard(spState.content).then(function() {
+        flashButton(copyBtn, t('actions.copied'));
+      });
+    });
     contentEl.appendChild(mdBody);
+    mdBody.focus({ preventScroll: true });
 
     if (typeof hljs !== 'undefined') {
       contentEl.querySelectorAll('pre code').forEach(function(block) { hljs.highlightElement(block); });
