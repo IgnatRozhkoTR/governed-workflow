@@ -65,11 +65,17 @@ def workspace_get_state(ws, project, db, locale) -> dict:
         No parameters. Workspace is auto-detected from the working directory.
 
     Returns:
-        Dict with keys: phase, status, review_mode, scope, phase_sequence,
-        context, discussions, plan_summary, progress_summary,
+        Dict with keys: phase, status, workflow_mode, review_mode, scope,
+        phase_sequence, context, discussions, plan_summary, progress_summary,
         research_summary, unresolved_comments_count, review_issues_summary,
         criteria_summary, previous_sessions_count, locale, branch,
         working_dir, _detail_tools.
+
+        `phase_sequence` is already filtered to the phases enabled for this
+        workspace. When `workflow_mode` is `fast`, the optional research and
+        review phases (1.3, 1.4, 4.0 and the 3.N.1/3.N.2/3.N.3 execution
+        sub-phases) are intentionally absent, and `review_mode` is inert
+        because the 4.0 review pipeline never runs.
 
     Errors:
         not_found  — no workspace matched the current working directory.
@@ -141,6 +147,7 @@ def workspace_get_state(ws, project, db, locale) -> dict:
     result = {
         "phase": ws["phase"],
         "status": ws["status"],
+        "workflow_mode": ws_field(ws, "workflow_mode", "standard"),
         "review_mode": ws_field(ws, "review_mode", "files_integration"),
         "scope": scope,
         "phase_sequence": phase_sequence,
