@@ -49,9 +49,7 @@ async function initApp() {
     const stateData = response.data;
 
     LOCK_DATA.branch = ctx.branch;
-    LOCK_DATA.session_id = stateData.session_id || null;
-    LOCK_DATA.working_dir = stateData.working_dir || null;
-    LOCK_DATA.sessions = stateData.sessions || [];
+    applyLockSessionFields(stateData);
 
     applyStateData(stateData);
 

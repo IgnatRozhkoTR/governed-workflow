@@ -8,6 +8,14 @@ document.addEventListener('workspace-reset', function() {
   _explorerLoaded = false;
 });
 
+function applyLockSessionFields(stateData) {
+  LOCK_DATA.session_id = stateData.session_id || null;
+  LOCK_DATA.working_dir = stateData.working_dir || null;
+  LOCK_DATA.sessions = stateData.sessions || [];
+  LOCK_DATA.source_branch = stateData.source_branch || null;
+  LOCK_DATA.project_type = stateData.project_type || null;
+}
+
 async function refreshTabData() {
   if (_initialLoad) return;
   var ctx = getWorkspaceContext();
@@ -16,11 +24,7 @@ async function refreshTabData() {
     var response = await apiGetState(ctx.projectId, ctx.branch);
     var stateData = response.data;
     applyStateData(stateData);
-    LOCK_DATA.session_id = stateData.session_id || null;
-    LOCK_DATA.working_dir = stateData.working_dir || null;
-    LOCK_DATA.sessions = stateData.sessions || [];
-    LOCK_DATA.source_branch = stateData.source_branch || null;
-    LOCK_DATA.project_type = stateData.project_type || null;
+    applyLockSessionFields(stateData);
     EventBus.emit('state:refreshed', stateData);
   } catch(e) { console.warn('Refresh state failed:', e.message); }
   try {

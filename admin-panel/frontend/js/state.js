@@ -173,6 +173,8 @@ function resetAppState() {
   LOCK_DATA.session_id = null;
   LOCK_DATA.working_dir = null;
   LOCK_DATA.sessions = [];
+  LOCK_DATA.source_branch = null;
+  LOCK_DATA.project_type = null;
   LOCK_DATA.locale = null;
   LOCK_DATA.yolo_mode = false;
   LOCK_DATA.workflow_mode = "standard";
