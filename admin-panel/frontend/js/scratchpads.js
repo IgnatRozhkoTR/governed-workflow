@@ -138,6 +138,36 @@ async function selectScratchpad(repo, name) {
   }
 }
 
+function currentScratchpadText() {
+  var textarea = document.querySelector('#scratchpadsContent .sp-source-editor');
+  return (textarea && textarea.value !== spState.content) ? textarea.value : spState.content;
+}
+
+function scratchpadDownloadFilename() {
+  var fallback = spState.selectedName;
+  var sections = spState.sections || [];
+  var title = null;
+  for (var i = 0; i < sections.length; i++) {
+    var section = sections[i];
+    if (section.repo !== spState.selectedRepo) continue;
+    var files = section.files || [];
+    for (var j = 0; j < files.length; j++) {
+      if (files[j].name === spState.selectedName) {
+        title = files[j].title;
+        break;
+      }
+    }
+    if (title !== null) break;
+  }
+
+  if (!title || !title.trim()) return fallback;
+
+  var sanitized = title.replace(/[\/\\:*?"<>|\x00-\x1f]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!sanitized) return fallback;
+
+  return /\.md$/i.test(sanitized) ? sanitized : sanitized + '.md';
+}
+
 function renderScratchpadContent() {
   var contentEl = document.getElementById('scratchpadsContent');
   if (!contentEl || !spState.selectedName) return;
@@ -170,13 +200,31 @@ function renderScratchpadContent() {
   copyBtn.className = 'btn btn-sm';
   copyBtn.textContent = t('buttons.copy');
   copyBtn.onclick = function() {
-    var textarea = document.querySelector('#scratchpadsContent .sp-source-editor');
-    var text = (textarea && textarea.value !== spState.content) ? textarea.value : spState.content;
+    var text = currentScratchpadText();
     safeCopyToClipboard(text).then(function() {
       flashButton(copyBtn, t('actions.copied'));
     });
   };
   header.appendChild(copyBtn);
+
+  var downloadBtn = document.createElement('button');
+  downloadBtn.className = 'btn btn-sm';
+  downloadBtn.textContent = t('buttons.download');
+  downloadBtn.onclick = function() {
+    var text = currentScratchpadText();
+    var blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = scratchpadDownloadFilename();
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function() {
+      URL.revokeObjectURL(url);
+    }, 0);
+  };
+  header.appendChild(downloadBtn);
 
   if (spState.mode === 'source') {
     var saveBtn = document.createElement('button');

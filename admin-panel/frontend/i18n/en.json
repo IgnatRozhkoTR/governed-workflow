@@ -41,6 +41,7 @@
   "buttons.delete": "Delete",
   "buttons.copy": "Copy",
   "buttons.copied": "Copied!",
+  "buttons.download": "Download",
   "buttons.reply": "Reply",
   "buttons.resolve": "resolve",
   "buttons.unresolve": "Unresolve",
