@@ -11,7 +11,9 @@ DEFAULT_RULE_NAMES = frozenset({
     "java-conventions",
     "research-principles",
     "test-standards",
+    "token-efficiency",
     "validation-pipeline",
+    "workflow-hardening",
 })
 
 _NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9\-_]{0,62}$")
