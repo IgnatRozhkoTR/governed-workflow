@@ -1,6 +1,6 @@
 # agents
 
-20 agent definitions — the orchestrator plus 19 sub-agent roles it works with. Each file is a Markdown spec that Claude Code loads as an agent.
+23 agent definitions — the orchestrator plus 22 sub-agent roles it works with. Each file is a Markdown spec that Claude Code loads as an agent.
 
 ## Frontmatter Fields
 
