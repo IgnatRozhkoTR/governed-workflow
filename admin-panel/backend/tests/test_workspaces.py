@@ -478,6 +478,16 @@ def _call_install_worktree_configs(project_path, wt_path):
         db.close()
 
 
+def _call_install_checkout_configs(project_path):
+    """Call the checkout-mode bootstrap function with a fresh db connection."""
+    from core.db import get_db
+    db = get_db()
+    try:
+        _WORKSPACES._install_checkout_configs(db, project_path)
+    finally:
+        db.close()
+
+
 class TestMergeLayer:
     """Integration tests for the _merge_project_assets merge logic."""
 
@@ -816,6 +826,82 @@ class TestWriteWorkspaceSettingsUnion:
         assert "PostToolUse" in data["hooks"]
         assert "SessionStart" in data["hooks"]
         assert data["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+
+
+class TestWriteWorkspaceLocalSettings:
+    """Tests for the settings.local.json merge written at workspace setup."""
+
+    def test_local_settings_created_when_missing(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.local.json"
+
+        _WORKSPACES._write_workspace_local_settings(settings)
+
+        data = json.loads(settings.read_text())
+        assert data == {"agent": "orchestrator", "autoCompactWindow": 250000}
+
+    def test_local_settings_merged_preserving_other_keys(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.local.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text(json.dumps({"permissions": {"allow": ["Bash(ls)"]}, "agent": "other"}))
+
+        _WORKSPACES._write_workspace_local_settings(settings)
+
+        data = json.loads(settings.read_text())
+        assert data["permissions"] == {"allow": ["Bash(ls)"]}
+        assert data["agent"] == "orchestrator"
+        assert data["autoCompactWindow"] == 250000
+
+    def test_local_settings_reset_when_json_invalid(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.local.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text("{not valid json,,}")
+
+        _WORKSPACES._write_workspace_local_settings(settings)
+
+        data = json.loads(settings.read_text())
+        assert data == {"agent": "orchestrator", "autoCompactWindow": 250000}
+
+    def test_worktree_setup_writes_real_local_settings_file(self, project_with_assets, tmp_path):
+        wt = tmp_path / "wt"
+        wt.mkdir()
+
+        _call_install_worktree_configs(project_with_assets, wt)
+
+        local = wt / ".claude" / "settings.local.json"
+        assert local.is_file() and not local.is_symlink()
+        data = json.loads(local.read_text())
+        assert data["agent"] == "orchestrator"
+        assert data["autoCompactWindow"] == 250000
+        assert not (Path(project_with_assets) / ".claude" / "settings.local.json").exists()
+
+    def test_worktree_setup_preserves_project_local_settings_keys(self, project_with_assets, tmp_path):
+        project_local = Path(project_with_assets) / ".claude" / "settings.local.json"
+        project_local.write_text(json.dumps({"permissions": {"allow": ["Bash(ls)"]}}))
+        wt = tmp_path / "wt"
+        wt.mkdir()
+
+        _call_install_worktree_configs(project_with_assets, wt)
+
+        data = json.loads((wt / ".claude" / "settings.local.json").read_text())
+        assert data["permissions"] == {"allow": ["Bash(ls)"]}
+        assert data["agent"] == "orchestrator"
+        assert json.loads(project_local.read_text()) == {"permissions": {"allow": ["Bash(ls)"]}}
+
+    def test_checkout_setup_merges_local_settings_and_restores_on_teardown(self, project_with_assets):
+        project_local = Path(project_with_assets) / ".claude" / "settings.local.json"
+        project_local.write_text(json.dumps({"permissions": {"allow": ["Bash(ls)"]}}))
+
+        _call_install_checkout_configs(project_with_assets)
+
+        data = json.loads(project_local.read_text())
+        assert data["permissions"] == {"allow": ["Bash(ls)"]}
+        assert data["agent"] == "orchestrator"
+        assert data["autoCompactWindow"] == 250000
+
+        _WORKSPACES._restore_project_files(project_with_assets)
+
+        assert json.loads(project_local.read_text()) == {"permissions": {"allow": ["Bash(ls)"]}}
+        assert not project_local.with_name("settings.local.json.pre-workspace").exists()
 
 
 class TestEnsureWorkspaceMcp:

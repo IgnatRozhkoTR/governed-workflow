@@ -227,9 +227,11 @@ _WORKSPACE_HOOKS = {
 # agent-teams feature, which is gated behind this env flag.
 _WORKSPACE_ENV = {"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"}
 
+_WORKSPACE_LOCAL_SETTINGS = {"agent": "orchestrator", "autoCompactWindow": 250000}
+
 _MCP_SERVER_PATH = str(Path(__file__).resolve().parent.parent / "mcp_server.py")
 
-_BACKUP_FILES = [".claude/settings.json", ".mcp.json", "CLAUDE.md"]
+_BACKUP_FILES = [".claude/settings.json", ".claude/settings.local.json", ".mcp.json", "CLAUDE.md"]
 
 _BACKUP_DIRS = [".claude/agents", ".claude/hooks"]
 
@@ -307,6 +309,19 @@ def _write_workspace_settings(settings_path):
     env.update(_WORKSPACE_ENV)
     existing["env"] = env
 
+    settings_path.write_text(json.dumps(existing, indent=2))
+
+
+def _write_workspace_local_settings(settings_path):
+    """Merge the governed local keys into settings.local.json at settings_path, preserving other keys."""
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    existing = {}
+    if settings_path.exists():
+        try:
+            existing = json.loads(settings_path.read_text())
+        except (json.JSONDecodeError, ValueError, OSError):
+            pass
+    existing.update(_WORKSPACE_LOCAL_SETTINGS)
     settings_path.write_text(json.dumps(existing, indent=2))
 
 
@@ -696,8 +711,9 @@ def _install_worktree_configs(db, project_path, wt_path, install_git_hooks=True)
                     dst.unlink()
             dst.symlink_to(src)
 
-    # c) Merge governed hooks into workspace settings.json
+    # c) Merge governed hooks into workspace settings.json and local keys into settings.local.json
     _write_workspace_settings(dst_claude / "settings.json")
+    _write_workspace_local_settings(dst_claude / "settings.local.json")
 
     # d) Write CLAUDE.md as a real concatenated file in the worktree
     _concatenate_md(DEFAULT_REPO_CLAUDE_MD, Path(project_path) / "CLAUDE.md", wt_path / "CLAUDE.md")
@@ -751,6 +767,7 @@ def _install_checkout_configs(db, project_path):
     settings_path = project / ".claude" / "settings.json"
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     _write_workspace_settings(settings_path)
+    _write_workspace_local_settings(settings_path.parent / "settings.local.json")
 
     # CLAUDE.md: copy repo default only when the project has none
     target = project / "CLAUDE.md"
