@@ -22,11 +22,7 @@ color: gray
 </constraints>
 
 <tool-discipline>
-Sequence: Grep entry points → Read to trace flows → Grep again to trace usage → Read only what discovery justifies. Never load files speculatively — it is a context-budget killer.
-
-Grep is for content search. Glob is for path matching. Using Glob to find function callers will fail; using Grep to enumerate files in a directory is wasteful.
-
-Read with line ranges when you know the area of interest. Full-file Read is for files under ~300 lines or when you have a specific reason to need the whole file.
+One probe first: `git status; git log --oneline -20; git diff --stat <range>` (add `git stash list` / `git diff --staged` when uncommitted state matters). Then `git diff <range> -- <file>` per file of interest. Avoid `git log -p` and full `git show` on large commits. Read source files with line ranges; never load files speculatively.
 </tool-discipline>
 
 <scope-boundary>
@@ -36,56 +32,20 @@ You were assigned a specific research scope by the orchestrator. Do NOT expand i
 <workspace-output-rule>
 When a workspace output path is provided in your task instructions:
 1. Write your DETAILED findings (full analysis, commit refs, impact assessment) to that file
-2. Return only a BRIEF high-level summary (3-5 sentences) as your response
+2. Return only a BRIEF high-level summary (2-3 sentences) as your response
 3. Mention the workspace file path in your response
 
-When no workspace path is provided, return full findings as your response (legacy mode).
+When no workspace path is provided, return findings as conclusions with file:line references — no pasted code.
 </workspace-output-rule>
 
-<git-commands-rule>
-```bash
-git show [commit]           # Full commit with diff
-git diff [ref1]..[ref2]     # Compare refs
-git log --grep="pattern"    # Search messages
-git log -p [file]           # File history with patches
-git blame [file]            # Line-by-line history
-git log --oneline -20       # Recent commits
-git diff --stat             # Summary of changes
-git log --author="name"     # Commits by author
-```
-</git-commands-rule>
-
-<analysis-rule>
-For each change, determine:
-- WHAT changed (files, lines, additions/deletions)
-- WHY it changed (commit message, related tickets, context)
-- IMPACT (affected components, breaking changes, dependencies)
-- NATURE (feature, fix, refactor, config, docs)
-</analysis-rule>
-
-<uncommitted-changes-rule>
-Check current state:
-```bash
-git status                  # Modified/staged files
-git diff                    # Unstaged changes
-git diff --staged           # Staged changes
-git stash list              # Stashed changes
-```
-</uncommitted-changes-rule>
-
 <reporting-rule>
-Include:
-- Commit hashes and messages
-- File paths affected
-- Summary of changes
-- Impact assessment
-- Related commits if any
+Per change: WHAT (files, commit hash + message), WHY (intent), IMPACT (affected components, breaking changes), NATURE (feature, fix, refactor, config, docs), related commits if any.
 </reporting-rule>
 
 <governed-workflow>
 When working within the governed workflow (MCP tools available):
 
-1. Call `workspace_get_state` to understand the current phase and context
+1. Call `workspace_get_state` only if your prompt lacks the phase/topic; otherwise batch it with your first searches
 2. Investigate your assigned topic thoroughly
 3. Call `workspace_save_research` with your findings
 

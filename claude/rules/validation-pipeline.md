@@ -2,7 +2,13 @@
 name: validation-pipeline
 description: Three-stage validation (compilation, logic, quality) with a logic checklist for reviewers.
 paths:
-  - "**/*"
+  - "**/*.java"
+  - "**/*.kt"
+  - "**/*.py"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
 ---
 
 # Validation Pipeline
@@ -15,10 +21,4 @@ paths:
 | 2. Logic | No placeholders, all paths, error handling | MAJOR |
 | 3. Quality | SOLID, clean code, naming | MAJOR |
 
-## Logic Checklist
-- No placeholder implementations
-- All code paths implemented
-- Proper error handling
-- Edge cases covered
-- No unreachable code
-- No infinite loops
+Logic stage also covers: edge cases, unreachable code, infinite loops (placeholders: see coding-standards).

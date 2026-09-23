@@ -46,7 +46,7 @@ Each sub-phase has `id`, `name`, `tasks`, and `scope`. Sub-phases map to executi
 
 **Remember the cost of splitting**: a sub-phase is a full cycle that ends in the user manually reviewing and approving a diff. Two sub-phases means the user stops twice — every split you propose is spending the user's attention, not just yours.
 
-**Compile-coupling check — required before finalising any multi-sub-phase split**: verify each sub-phase leaves the tree compiling on its own. Check module dependency direction in the build files. If anything in sub-phase N only compiles once sub-phase N+1 exists, the boundary is wrong and the task must move to the sub-phase where it actually compiles. (On a real ticket this caught a properties file assigned to the data-layer sub-phase that in fact lived in the UI module.)
+**Compile-coupling check — required before finalising any multi-sub-phase split**: verify each sub-phase leaves the tree compiling on its own. Check module dependency direction in the build files. If anything in sub-phase N only compiles once sub-phase N+1 exists, the boundary is wrong and the task must move to the sub-phase where it actually compiles.
 
 **Two more anti-patterns:**
 - If a unit is merely LARGE, split it into more TASKS inside one sub-phase, not into more sub-phases — task-level splitting gives review granularity at zero gate cost, and is almost always the right move.
@@ -153,11 +153,11 @@ Call `workspace_get_criteria()` for the full criteria list. The user may have de
 
 ### Proposing additional criteria
 
-Call `workspace_propose_criteria` for any gaps. Supported types:
+Call `workspace_propose_criteria` for any gaps (types: `unit_test`, `integration_test`, `bdd_scenario`, `custom`).
 
 #### Feasibility check — confirm before proposing, not after
 
-Before proposing any test criterion, confirm a test of that KIND already exists in this repo — not merely that the naming convention matches. Grep for an existing test of the same layer (view, controller, repository, scheduled job, migration). A real ticket proposed criteria targeting Vaadin view classes in a repo where every test under a `view` package actually targeted an extracted pure helper — zero real view tests existed, so the criteria were unsatisfiable as written and the implementer would have had to fake them or fail the gate.
+Before proposing any test criterion, confirm a test of that KIND already exists in this repo — not merely that the naming convention matches. Grep for an existing test of the same layer (view, controller, repository, scheduled job, migration); a package named `view` may contain only tests of extracted helpers, which makes view-level criteria unsatisfiable.
 
 If no test of that kind exists, exactly one of three things is true, and you must pick one explicitly:
 
@@ -167,26 +167,13 @@ If no test of that kind exists, exactly one of three things is true, and you mus
 
 **Making a layer testable does not mean extracting a new class.** When logic must move to become testable, prefer moving it into an EXISTING collaborator that is already covered by tests over creating a new class. Create a new type only when the logic is complex enough to deserve its own name. "It needs a unit test" is not by itself a reason for a new class — check first whether an existing service, and its existing test class, can host it.
 
-**Shape assertions adversarially.** Prefer the assertion that fails on the specific bug you are guarding against, not the one that merely exercises the feature. If a criterion would pass on the broken version of the code, it is not a criterion — it is decoration.
+**Shape assertions adversarially.** Prefer the assertion that fails on the specific bug you are guarding against, not the one that merely exercises the feature (e.g. assert the constructed URL string, not upload success). If a criterion would pass on the broken version of the code, it is not a criterion.
 
-- *Public image URL*: assert on the CONSTRUCTED URL STRING, not on upload success. An upload-success test passes while the feature is broken, because the file uploads fine and only the derived URL is malformed.
-- *Styled dropdown value*: assert the CLOSED/SELECTED field is styled, not the open dropdown list. In the failure mode being guarded against, the open dropdown looks right and only the closed value loses styling — so the obvious check passes on broken code.
-
-**For `unit_test` or `integration_test`:**
-
-Create **one criterion per test class** — group all test methods for the same file into a single call. Do NOT create a separate criterion for each test method.
-
-```
-workspace_propose_criteria(
-  type="unit_test",
-  description="UserService creation and validation logic",
-  details_json='{"file": "src/test/java/com/example/UserServiceTest.java", "test_names": ["createUser_shouldReturnUser_whenValid", "createUser_shouldThrow_whenEmailTaken"]}'
-)
-```
+The `details_json` shape per type (`file` + `test_names`, `file` + `scenario_names`, `instruction`) and its JSON-string encoding are in the `workspace_propose_criteria` tool description. Rules the tool does not state:
 
 **Mandatory rules for `unit_test` and `integration_test` criteria:**
 
-1. **`details_json` MUST contain both `file` and `test_names`** — these are the fields the validator checks. Putting file paths or test names in the `description` field does nothing; the validator ignores `description` for automated checks.
+1. **`file` and `test_names` go in `details_json`** — the validator ignores `description` for automated checks.
 
 2. **`file`** — full path to the test class, relative to project root. Use the project's actual directory structure (check existing tests with Glob/Grep to confirm the path convention).
 
@@ -202,26 +189,6 @@ workspace_propose_criteria(
 
 5. **`description`** is a human-readable summary shown in the admin panel. Keep it short — the technical details belong in `details_json`.
 
-**For `bdd_scenario`:**
-```
-workspace_propose_criteria(
-  type="bdd_scenario",
-  description="User registration end-to-end flow",
-  details_json='{"file": "features/user-registration.feature", "scenario_names": ["User registers with valid data", "User sees error for duplicate email"]}'
-)
-```
-
-**For `custom`:**
-```
-workspace_propose_criteria(
-  type="custom",
-  description="Liquibase changelog applies cleanly",
-  details_json='{"instruction": "Run liquibase update and verify no errors on a clean database"}'
-)
-```
-
-**IMPORTANT**: The `details_json` parameter must be a JSON-encoded STRING, not a dict object. Always use `json.dumps()` or construct the string manually.
-
 ### Gate rule
 
 All acceptance criteria must be accepted (or deleted) before the plan can advance to user review. Criteria with status `proposed` or `rejected` will block advancement. To remove one you no longer want, call `workspace_delete_criteria(criterion_id)` — this is only allowed while the criterion is not yet accepted; once plan approval accepts all proposed criteria, deletion is refused, so clean up unwanted criteria before the plan is approved.
@@ -230,7 +197,7 @@ All acceptance criteria must be accepted (or deleted) before the plan can advanc
 
 ## Collaboration with Plan-Advisor
 
-The plan-advisor is a persistent teammate, not a sub-agent. It was spawned in Phase 0 and must be resumed via `SendMessage(to: "plan-advisor", ...)`, never re-spawned.
+Message the plan-advisor via `SendMessage(to: "plan-advisor", ...)`. Re-spawn it only on session recovery (see the governed-workflow skill). Present the outline without implementation assumptions so the advisor forms independent judgment.
 
 ### Scope decisions are not only in the ticket
 
@@ -238,7 +205,7 @@ Ticket text is not the only source of scope. Decisions the user makes during pre
 
 ### Step 1 — Resume and present
 
-Resume the plan-advisor with a **structured brief that enumerates every deliverable** — a free-form "review this" prompt is measurably weaker. On a real plan, a free-form pass caught 5 issues but also asserted a confidently wrong fact; the structured brief below, run against the same plan, caught 8 ticket requirements (including an entire feature's worth of audit-log events) that no task in the plan owned.
+Message the plan-advisor with a **structured brief that enumerates every deliverable** — a free-form "review this" prompt is measurably weaker.
 
 ```
 SendMessage(
@@ -257,8 +224,6 @@ SendMessage(
            7. SETTLED — the following are final, do not relitigate: {list, e.g. sub-phase count, chosen architecture, decisions made during preparation review with their rationale}."
 )
 ```
-
-Marking settled decisions explicitly worked in practice: the advisor accepted the sub-phase count as final and spent its effort on task contents instead of re-arguing structure.
 
 ### Step 2 — Review and discuss
 
@@ -279,28 +244,12 @@ Review the expansion. Send numbered remarks on specific tasks if needed. The pla
 ### Step 5 — Finalize
 
 Execute in order:
-1. `workspace_set_plan` — full plan JSON with execution items, each carrying its own `scope` (must/may). Resets plan approval status to pending. If you are only correcting one sub-phase, its diagrams, or its description after this point, use `workspace_update_subphase`, `workspace_set_plan_diagrams`, or `workspace_set_plan_description` instead of resubmitting the whole plan.
+1. `workspace_set_plan` — full plan JSON with execution items, each carrying its own `scope` (must/may). Resets plan approval status to pending. For later corrections use the granular tools above.
 2. `workspace_update_progress` for phase `"2"` with a summary of the plan.
-3. `workspace_advance` — this enters the user review wait at 2.0. The workspace stays at 2.0 while the user reviews and approves the plan in the admin panel. Approving the plan also approves scope and cascades all proposed acceptance criteria to accepted. Once approved, the backend advances directly to 3.1.0.
+3. `workspace_advance` — refused until the user approves the plan in the admin panel (see Plan approval wait below). Approving the plan also approves scope and accepts all proposed criteria; advancing then moves directly to 3.1.0.
 
 **Advance 2.0 -> 3.1.0** requires: valid plan with at least 1 execution sub-phase + progress entry `"2"` + >=1 acceptance criterion with no pending/rejected criteria + plan approved by user in the admin panel. There is no separate 2.1 gate phase and no separate scope approval — one plan approval covers everything.
 
+**Plan approval wait**: after submitting the plan, tell the user it awaits approval and end the turn — do not poll. When the user messages or a scheduled check fires, check `workspace_get_state` once; if `plan_status='approved'`, call `workspace_advance`.
+
 ---
-
-## Anti-patterns
-
-| Do NOT | Instead |
-|--------|---------|
-| Stuff technical details into task titles | Titles are for humans — keep them business-level |
-| Create a sub-phase per file | Sub-phases are for logical chunks — layers, modules, concerns |
-| Inflate the plan with unnecessary sub-phases | Fewer sub-phases is better; one is fine for simple tasks |
-| Split along a build-order dependency chain (entity → repository → service → view) | That's one feature arriving in dependency order, not several reviewable units — split into tasks within one sub-phase instead |
-| Propose a test criterion for a layer with no test of that kind in the repo | Confirm feasibility first — proceed and say so, add a plan task to make it testable, or use a `custom` criterion |
-| Skip acceptance criteria | They are validated programmatically — missing criteria means gaps slip through |
-| Combine "implement + write tests" in one task | Always separate — different agents, different perspectives |
-| Use `proposed` or `rejected` criteria status at advance time | All criteria must be `accepted` or deleted before advancing |
-| Brief the plan-advisor with implementation assumptions | Present the outline, let the advisor form independent judgment |
-| Pass `details_json` as a dict object | It must be a JSON-encoded string |
-| Put file paths or test names in `description` instead of `details_json` | `description` is for humans; `details_json.file` and `details_json.test_names` are what the validator reads |
-| Create one criterion per test method | Group all methods for the same test class into one criterion with the `test_names` array |
-| Invent test names without reading existing tests first | Read actual test files of the same kind before proposing; names are a literal substring check and cannot be changed after plan approval |

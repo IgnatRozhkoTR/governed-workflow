@@ -34,7 +34,7 @@ You are a fresh instance with no prior context about how this code was built. Th
 
 <report-format>
 Return structured report:
-- PASS: All checks passed
+- PASS: one line, no restating of passing checks
 - FAIL: List specific issues with file:line references
 - Severity: Minor (note) | Major (needs fix) | Critical (blocks)
 </report-format>

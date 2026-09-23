@@ -68,7 +68,7 @@ When the plan is agreed:
 
 **Editing the plan later**: do not resubmit the whole plan to change one part of it. Use `workspace_update_subphase` to patch `3.1`'s name, tasks or scope (sets plan status to 'pending' — the user must re-approve), and `workspace_set_plan_diagrams` / `workspace_set_plan_description` for documentation edits (these keep the approval intact). Fast mode stays at one sub-phase, so `workspace_extend_plan` and `workspace_delete_subphase` do not apply.
 
-**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel (auto-approved when `yolo_mode` is on). `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item.
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel (auto-approved when `yolo_mode` is on). `workspace_advance` is refused until then — after submitting the plan, tell the user it awaits approval and end the turn; do not poll. When the user messages or a scheduled check fires, check `workspace_get_state` once and advance if `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item.
 
 **Advancing from 2.0** requires: a single execution sub-phase `3.1` with a non-empty `scope.must`, plan_status='approved', and progress entry `"2"`."""
 
@@ -110,7 +110,7 @@ When the plan is agreed:
 
 **Editing the plan later**: to reword the plan's summary, call `workspace_set_plan_description` instead of resubmitting the whole plan — it keeps the user's approval intact.
 
-**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item.
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. `workspace_advance` is refused until then — after submitting the plan, tell the user it awaits approval and end the turn; do not poll. When the user messages or a scheduled check fires, check `workspace_get_state` once and advance if `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item.
 
 **Advancing from 2.0** requires: a single execution sub-phase `3.1` with a non-empty `scope.must`, plan_status='approved', and progress entry `"2"`."""
 
@@ -120,36 +120,7 @@ When the plan is agreed:
 
 **Actors**: Orchestrator + plan-advisor
 
-Message the plan-advisor teammate to collaborate on the execution plan:
-
-```
-SendMessage(
-  to: "plan-advisor",
-  content: "We are in the planning phase. Review the research findings and impact analysis
-            via workspace_get_state. Help me design the execution plan. Consider whether this
-            task needs multiple sub-phases or a single one. Each sub-phase needs: id (3.1,
-            3.2, ...), name, scope (must/may globs), and tasks."
-)
-```
-
-**Sub-phase count guidance**: Multiple sub-phases are NOT required. Use them only when the task naturally splits into independent, separately reviewable chunks — different layers, modules, or concerns that benefit from isolated review. For simple or atomic tasks, use a single sub-phase (just `3.1`). The purpose of sub-phases is to make the user's review manageable, not to inflate the plan. When in doubt, fewer sub-phases is better.
-
-**Task grouping (parallel execution)**: Tasks within a sub-phase that don't conflict MUST be assigned the same `group` field so they execute in parallel. Only use sequential (different groups or no group) when tasks have real dependencies — e.g., test engineer waits for engineer to finish. The diagram renders grouped tasks as fork/join. Example:
-```json
-{
-  "tasks": [
-    {"title": "Add UserService", "agent": "middle-backend-engineer", "group": "impl"},
-    {"title": "Add OrderService", "agent": "middle-backend-engineer", "group": "impl"},
-    {"title": "Write UserService tests", "agent": "middle-backend-test-engineer", "group": "test"},
-    {"title": "Write OrderService tests", "agent": "middle-backend-test-engineer", "group": "test"}
-  ]
-}
-```
-Here `impl` tasks run in parallel, then `test` tasks run in parallel after. Without groups, all 4 would run sequentially — wasteful when they don't conflict.
-
-**Scope (must vs may)**: Scope is part of the plan — each execution item carries its own `scope: {must, may}`. The distinction matters:
-- **must**: Broad areas where absence of changes means the task is incomplete. These are ticket-level requirements obvious *before* planning — e.g., if the ticket says "add BDD scenarios", the BDD module is must-scope. Keep this list short.
-- **may**: Specific files and packages identified *during* planning. Most paths from the execution plan belong here. These are permitted but not required — the plan proposes them, but the user decides if they're all necessary.
+Follow `/planning`: plan structure, sub-phase split rules, task grouping, must/may scope, the structured plan-advisor brief, acceptance-criteria rules, and the granular plan-editing tools.
 
 When plan is agreed:
 1. Call `workspace_set_plan` with the full plan JSON — each execution item must include its `scope` (must/may)
@@ -157,16 +128,9 @@ When plan is agreed:
 3. Call `workspace_update_progress` for phase `"2"`
 4. Call `workspace_advance`
 
-**Editing the plan later**: NEVER resubmit the whole plan with `workspace_set_plan` to change one part of it — use the granular tool that matches what actually changed:
-- `workspace_extend_plan` — append a new sub-phase (auto-assigned ID, with its own scope) without touching existing ones. Use when the user requests additional changes within the same ticket, or new work warrants a new sub-phase.
-- `workspace_update_subphase` — patch one existing sub-phase's name, tasks and/or scope in place. Fields you omit stay as they are; IDs are never renumbered.
-- `workspace_delete_subphase` — remove one sub-phase and renumber the rest so IDs stay sequential. Refused for the last remaining sub-phase.
-- `workspace_set_plan_diagrams` — replace (default) or append the `systemDiagram` entries.
-- `workspace_set_plan_description` — replace the plan's top-level description.
+**Editing the plan later**: never resubmit the whole plan to change one part of it. Use `workspace_extend_plan` to append a sub-phase, and the other granular tools listed in `/planning` for in-place edits.
 
-The structural tools (`extend_plan`, `update_subphase`, `delete_subphase`) set the plan status to 'pending' — the user must re-approve, and until they do the agent cannot edit files. The documentation tools (`set_plan_diagrams`, `set_plan_description`) deliberately leave the approval intact, so they are safe to call mid-execution. Reserve `workspace_set_plan` for the initial plan and for genuine full rewrites.
-
-**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. Approving the plan also approves its scope and accepts all proposed acceptance criteria — it is the single approval. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item — there is no separate gate phase between planning and execution. If the user rejects, the plan status goes back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan`, then call `workspace_advance` again.
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. Approving the plan also approves its scope and accepts all proposed acceptance criteria — it is the single approval. `workspace_advance` is refused until then — after submitting the plan, tell the user it awaits approval and end the turn; do not poll. When the user messages or a scheduled check fires, check `workspace_get_state` once and advance if `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item — there is no separate gate phase between planning and execution. If the user rejects, the plan status goes back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan`, then call `workspace_advance` again.
 
 **Advancing from 2.0** requires: valid plan with ≥1 execution sub-phase (each with a non-empty `scope.must`), plan_status='approved', ≥1 acceptance criterion, no proposed criteria, and progress entry `"2"`."""
 

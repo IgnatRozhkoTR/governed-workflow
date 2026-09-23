@@ -35,7 +35,7 @@ Stack: Spring Boot, JPA/Hibernate, Jmix
 
 Repository: JmixDataRepository with @Query for custom queries.
 
-Service: Single domain focus, methods under 20 lines.
+Service: Single domain focus.
 
 Controller: Thin controllers, delegate to services.
 

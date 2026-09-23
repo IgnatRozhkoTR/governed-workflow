@@ -461,13 +461,9 @@ User reviews the diff in the admin panel.
 - **Approve** (+ optional commit message) → the backend advances you to the next enabled sub-phase
 - **Reject** → the backend moves you back into the fix sub-phase with comments
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+**Waiting**: do not poll — see User Gates — Waiting below.
 
-**After rejection**: the backend picks the phase you land in — code edits are ON there. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to see which phase you are now in
-2. Call `workspace_get_comments` to read the rejection feedback
-3. Deploy engineer sub-agents to address the feedback
-4. Call `workspace_advance` only after fixes are complete""",
+**After rejection**: you land in a phase with code edits ON. Follow User Gate Rejection below — deploy engineer sub-agents to address the feedback, then advance.""",
 
     4: """\
 ## 3.N.4 Commit

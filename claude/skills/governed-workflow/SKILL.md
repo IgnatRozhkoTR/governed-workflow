@@ -7,30 +7,13 @@ description: Orchestrates a governed multi-phase implementation workflow — ass
 
 Multi-phase implementation workflow with backend-enforced transitions. Every phase advance is validated server-side — the orchestrator cannot self-certify readiness.
 
-**Start every session by calling `workspace_get_state`.** The `phase` field tells you where you are. The `previous_sessions_count` field tells you whether this is a fresh start or a continuation.
+Phase detail lives in two companion skills: `/plan-preparation` (assessment through preparation review) and `/planning` (planning). Load the matching one on entering those phases.
 
 ---
 
 ## Agent Roles: All Agents Are Resumable Sub-agents
 
-All agents — including plan-advisor — are resumable sub-agents. Spawn with `Agent(name: "...", ...)` and continue via `SendMessage(to: "name", ...)`.
-
-```
-Agent(
-  name: "plan-advisor",
-  subagent_type: "plan-advisor",
-  run_in_background: true,
-  prompt: "..."
-)
-```
-
-```
-Agent(
-  name: "researcher-auth",
-  subagent_type: "code-researcher",
-  prompt: "..."
-)
-```
+All agents — including plan-advisor — are resumable sub-agents. Spawn with `Agent(name: "...", subagent_type: "...", prompt: "...")` and continue via `SendMessage(to: "name", ...)`.
 
 Agents execute their task and return. The orchestrator continues them for follow-up via `SendMessage(to: "<name>")`.
 
@@ -169,16 +152,7 @@ Agent(
 
 If the plan-advisor is not yet spawned (skipped Phase 0 or session recovery), spawn it first (see Phase 0 steps).
 
-Message the plan-advisor teammate:
-
-```
-SendMessage(
-  to: "plan-advisor",
-  content: "Begin assessment. Read workspace_get_state for context (ticket, working_dir, context notes).
-            Identify affected areas of the codebase. Raise research questions via
-            workspace_post_discussion (type='research'). Report findings in a structured summary."
-)
-```
+Message the plan-advisor with the structured assessment brief from `/plan-preparation`.
 
 When assessment is complete:
 1. Call `workspace_update_progress` for phase `"1.0"` with a non-empty summary
@@ -192,26 +166,7 @@ When assessment is complete:
 
 **Actors**: Researcher sub-agents (parallel, one-shot)
 
-Deploy parallel researcher sub-agents — one per investigation topic identified in assessment. Each sub-agent:
-- Investigates its topic
-- Calls `workspace_save_research` with findings + typed proofs
-- Each finding must include a `proof` with a `type` field. The proof format depends on the researcher type:
-
-**type: "code"** (code-researcher, senior-code-researcher)
-  - `file` — path relative to workspace root
-  - `line_start`, `line_end` — PRECISE proof range. Try to stay under 20-30 lines, no hard limit.
-  - `snippet_start`, `snippet_end` — 15-line max window WITHIN the proof range for the quick-reference quote
-  - Do NOT include snippet text — the server reads the actual file to render quotes
-
-**type: "web"** (web-researcher)
-  - `url` — source URL (required)
-  - `title` — page/article title
-  - `quote` — verbatim text from the source (required — server cannot fetch web pages)
-
-**type: "diff"** (diff-researcher)
-  - `commit` — commit hash (required)
-  - `file` — specific file in the commit (optional)
-  - `description` — mandatory context explaining what the diff proves
+Deploy parallel researcher sub-agents — one per investigation topic identified in assessment (researcher choice: see `/plan-preparation`). Each calls `workspace_save_research` with findings and typed proofs; the proof formats are defined in the researcher agents.
 
 Every unresolved research discussion (raised during assessment) MUST be linked to at least one research entry before advancing.
 
@@ -235,7 +190,7 @@ Agent(
 )
 ```
 
-The prover ONLY verifies — it does NOT research. It calls `workspace_prove_research` for each entry DIRECTLY — the orchestrator does NOT need to call it. Wait for the prover to finish, then check results.
+The prover ONLY verifies — it does NOT research. It calls `workspace_prove_research` for each entry DIRECTLY — the orchestrator does NOT need to call it. Its return is the completion notice — ask it for a short proven/rejected list rather than re-reading every entry.
 
 If any research is rejected: re-deploy the original researcher sub-agents for those topics (to fix their proofs), then re-deploy the prover.
 
@@ -251,16 +206,7 @@ When all research is proven (prover confirms):
 
 **Actors**: Orchestrator + plan-advisor
 
-Before planning, document the cross-cutting effects of this change. Message the plan-advisor:
-
-```
-SendMessage(
-  to: "plan-advisor",
-  content: "We are in Phase 1.3 (Impact Analysis). Using the proven research, help me
-            produce a structured impact analysis covering: affected flows, API changes,
-            data flow, dependencies, ticket gaps, outstanding questions."
-)
-```
+Before planning, document the cross-cutting effects of this change, following `/plan-preparation` (advisor brief, six-field structure, research loop).
 
 Save the result via `workspace_set_impact_analysis` with the six fields. The Pre-planning tab renders it alongside the research summaries so the user can review everything before the preparation gate.
 
@@ -279,13 +225,9 @@ The user reviews the full preparation package in the Pre-planning tab: assessmen
 - **Approve** → the backend advances you to the next enabled phase
 - **Reject** → the backend moves you back into the preparation phases with comments
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+**Waiting**: do not poll — see User Gates — Waiting below.
 
-**After rejection**: the backend picks the phase you land in. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to see which phase you are now in
-2. Call `workspace_get_comments` to read the rejection feedback
-3. Deploy more researcher sub-agents (and update impact analysis later) to address the feedback
-4. Re-run every preparation phase you were returned to before advancing back to the gate
+**After rejection**: follow User Gate Rejection below. Here the work is: deploy more researcher sub-agents (and update impact analysis later) to address the feedback, and re-run every preparation phase you were returned to before advancing back to the gate.
 
 ---
 
@@ -293,36 +235,7 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
 **Actors**: Orchestrator + plan-advisor
 
-Message the plan-advisor teammate to collaborate on the execution plan:
-
-```
-SendMessage(
-  to: "plan-advisor",
-  content: "We are in the planning phase. Review the research findings and impact analysis
-            via workspace_get_state. Help me design the execution plan. Consider whether this
-            task needs multiple sub-phases or a single one. Each sub-phase needs: id (3.1,
-            3.2, ...), name, scope (must/may globs), and tasks."
-)
-```
-
-**Sub-phase count guidance**: Multiple sub-phases are NOT required. Use them only when the task naturally splits into independent, separately reviewable chunks — different layers, modules, or concerns that benefit from isolated review. For simple or atomic tasks, use a single sub-phase (just `3.1`). The purpose of sub-phases is to make the user's review manageable, not to inflate the plan. When in doubt, fewer sub-phases is better.
-
-**Task grouping (parallel execution)**: Tasks within a sub-phase that don't conflict MUST be assigned the same `group` field so they execute in parallel. Only use sequential (different groups or no group) when tasks have real dependencies — e.g., test engineer waits for engineer to finish. The diagram renders grouped tasks as fork/join. Example:
-```json
-{
-  "tasks": [
-    {"title": "Add UserService", "agent": "middle-backend-engineer", "group": "impl"},
-    {"title": "Add OrderService", "agent": "middle-backend-engineer", "group": "impl"},
-    {"title": "Write UserService tests", "agent": "middle-backend-test-engineer", "group": "test"},
-    {"title": "Write OrderService tests", "agent": "middle-backend-test-engineer", "group": "test"}
-  ]
-}
-```
-Here `impl` tasks run in parallel, then `test` tasks run in parallel after. Without groups, all 4 would run sequentially — wasteful when they don't conflict.
-
-**Scope (must vs may)**: Scope is part of the plan — each execution item carries its own `scope: {must, may}`. The distinction matters:
-- **must**: Broad areas where absence of changes means the task is incomplete. These are ticket-level requirements obvious *before* planning — e.g., if the ticket says "add BDD scenarios", the BDD module is must-scope. Keep this list short.
-- **may**: Specific files and packages identified *during* planning. Most paths from the execution plan belong here. These are permitted but not required — the plan proposes them, but the user decides if they're all necessary.
+Follow `/planning`: plan structure, sub-phase split rules, task grouping, must/may scope, the structured plan-advisor brief, acceptance-criteria rules, and the granular plan-editing tools.
 
 When plan is agreed:
 1. Call `workspace_set_plan` with the full plan JSON — each execution item must include its `scope` (must/may)
@@ -330,16 +243,9 @@ When plan is agreed:
 3. Call `workspace_update_progress` for phase `"2"`
 4. Call `workspace_advance`
 
-**Editing the plan later**: NEVER resubmit the whole plan with `workspace_set_plan` to change one part of it — use the granular tool that matches what actually changed:
-- `workspace_extend_plan` — append a new sub-phase (auto-assigned ID, with its own scope) without touching existing ones. Use when the user requests additional changes within the same ticket, or new work warrants a new sub-phase.
-- `workspace_update_subphase` — patch one existing sub-phase's name, tasks and/or scope in place. Fields you omit stay as they are; IDs are never renumbered.
-- `workspace_delete_subphase` — remove one sub-phase and renumber the rest so IDs stay sequential. Refused for the last remaining sub-phase.
-- `workspace_set_plan_diagrams` — replace (default) or append the `systemDiagram` entries.
-- `workspace_set_plan_description` — replace the plan's top-level description.
+**Editing the plan later**: never resubmit the whole plan to change one part of it. Use `workspace_extend_plan` to append a sub-phase, and the other granular tools listed in `/planning` for in-place edits.
 
-The structural tools (`extend_plan`, `update_subphase`, `delete_subphase`) set the plan status to 'pending' — the user must re-approve, and until they do the agent cannot edit files. The documentation tools (`set_plan_diagrams`, `set_plan_description`) deliberately leave the approval intact, so they are safe to call mid-execution. Reserve `workspace_set_plan` for the initial plan and for genuine full rewrites.
-
-**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. Approving the plan also approves its scope and accepts all proposed acceptance criteria — it is the single approval. `workspace_advance` stays blocked until `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item — there is no separate gate phase between planning and execution. If the user rejects, the plan status goes back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan`, then call `workspace_advance` again.
+**User review (happens while the workspace sits at 2.0)**: The user reviews and approves the plan in the admin panel. Approving the plan also approves its scope and accepts all proposed acceptance criteria — it is the single approval. `workspace_advance` is refused until then — after submitting the plan, tell the user it awaits approval and end the turn; do not poll. When the user messages or a scheduled check fires, check `workspace_get_state` once and advance if `plan_status='approved'`. On approval, advancing from 2.0 moves the workspace directly into the first execution item — there is no separate gate phase between planning and execution. If the user rejects, the plan status goes back to pending/rejected; revise the plan with plan-advisor and resubmit via `workspace_set_plan`, then call `workspace_advance` again.
 
 **Advancing from 2.0** requires: valid plan with ≥1 execution sub-phase (each with a non-empty `scope.must`), plan_status='approved', ≥1 acceptance criterion, no proposed criteria, and progress entry `"2"`.
 
@@ -400,13 +306,9 @@ User reviews the diff in the admin panel.
 - **Approve** (+ optional commit message) → the backend advances you to the next enabled sub-phase
 - **Reject** → the backend moves you back into the fix sub-phase with comments
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+**Waiting**: do not poll — see User Gates — Waiting below.
 
-**After rejection**: the backend picks the phase you land in — code edits are ON there. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to see which phase you are now in
-2. Call `workspace_get_comments` to read the rejection feedback
-3. Deploy engineer sub-agents to address the feedback
-4. Call `workspace_advance` only after fixes are complete
+**After rejection**: you land in a phase with code edits ON. Follow User Gate Rejection below — deploy engineer sub-agents to address the feedback, then advance.
 
 ---
 
@@ -438,11 +340,11 @@ Some or all of these stages may be skipped depending on the workspace's review m
 
 ### What you do at 4.0
 
-1. Watch the **Review Pipeline** card on the workspace page in the admin panel, or poll `GET /api/workspaces/<id>/review-pipeline-status`. States: `queued` → `filtering` → `file_stage` → `integration_stage` → `adjudication_stage` → `done` (or `failed`) — only the stages the review mode enabled actually run.
-2. When state is `done` or `failed`:
+1. The pipeline runs in the background. Call `workspace_review_pipeline_summary` once; if `is_complete` is not yet true, tell the user the review is running and end the turn — do not poll. Check it again once when the user messages or a scheduled check fires.
+2. When `is_complete=true`:
    - Call `workspace_get_review_issues` to see the findings.
    - Call `workspace_update_progress(phase="4.0", summary="Pipeline complete. N findings.")`.
-   - Before calling `workspace_advance`, call `workspace_review_pipeline_summary` (or `GET /api/workspaces/<id>/review-pipeline/summary`). Confirm `is_complete=true` and `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: re-trigger via the Run Review button (workspace page) or `POST /api/workspaces/<id>/review-pipeline/start`, OR proceed with the partial result if the failures are recoverable.
+   - Check `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: ask the user to re-trigger via the Run Review button on the workspace page, OR proceed with the partial result if the failures are recoverable. Never call the admin HTTP API directly.
    - Call `workspace_advance` to move to 4.1.
 
 If the pipeline failed mid-run, the reason is exposed only via `workspace_review_pipeline_summary` (`failed_files_errors`, `integration_errors`, top-level `error`) — never as a discussion. Inspect those fields and decide whether to re-trigger or proceed.
@@ -478,13 +380,9 @@ When complete:
 - **Approve** → the backend advances you to the next enabled phase
 - **Reject** → the backend moves you back into the fix phase
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+**Waiting**: do not poll — see User Gates — Waiting below.
 
-**After rejection**: the backend picks the phase you land in. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to see which phase you are now in
-2. Call `workspace_get_comments` to read the rejection feedback
-3. Address the feedback — fix code, update resolutions
-4. Call `workspace_advance` only after fixes are complete
+**After rejection**: follow User Gate Rejection below — address the feedback (fix code, update resolutions), then advance.
 
 ---
 
@@ -496,7 +394,7 @@ Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
 
 1. Call `mcp__governed-workflow__workspace_get_reflection_context` — returns `{scope, branch_diff, review_findings, transcript}` for the ticket.
 2. Spawn the `reflector` sub-agent via the `Agent` tool with `subagent_type="reflector"`. Hand it the context as the prompt verbatim — the agent will submit zero or more proposals via `mcp__governed-workflow__workspace_submit_proposal`.
-3. Call `mcp__governed-workflow__workspace_list_proposals` to retrieve what the reflector submitted in this run.
+3. The reflector's report lists each submitted proposal as `id — implementation_kind — type — title`. If it lists no `auto` proposals, skip to step 5. Otherwise call `mcp__governed-workflow__workspace_list_proposals(implementation_kind="auto", status="proposed")` once to get their payloads.
 4. For each proposal with `implementation_kind="auto"`, apply it now:
    - `memory_write` / `memory_delete` — you cannot edit files yourself (Edit/Write are disallowed at this phase). Spawn a `junior-backend-engineer` sub-agent to write/delete the markdown file under `~/.claude/projects/<encoded-project-path>/memory/` and update the `MEMORY.md` index if it exists. Encode the project path by replacing `/` and `.` with `-` (e.g. `/Users/me/Projects/foo` → `-Users-me-Projects-foo`); hand the sub-agent the proposal payload as the source of truth.
    - `rule_new` / `rule_update` — apply directly via the `mcp__governed-workflow__rule_create` / `mcp__governed-workflow__rule_update` MCP tools (no sub-agent needed).
@@ -541,14 +439,11 @@ The orchestrator only needs to understand the workflow-shaping tools below. The 
 
 | Tool | Why it needs explanation |
 |------|--------------------------|
-| `workspace_get_state` | Single source of truth for `phase`, `scope`, `plan`, `context`, `previous_sessions_count`, `progress_summary`. Call at session start and after every gate event. |
+| `workspace_get_state` | Single source of truth for `phase`, `scope`, `plan`, `context`, `previous_sessions_count`, `progress_summary`. Call once at session start and once when a user gate may have changed state. After `workspace_advance`, use the `phase` it returns instead of re-fetching. |
 | `workspace_advance` | Drives the phase machine. The backend picks the next phase from server-side rules. Required arguments vary by phase — consult the per-phase blocks below for what to pass at each advance. |
 | `workspace_set_plan` | Writes or replaces the execution plan. Each execution item carries a `scope` field (must/may) — there is no separate scope call. Planning-phase only; switches `plan_status` back to `pending`. |
 | `workspace_extend_plan` | Appends a sub-phase to an already-approved plan. Each new item carries its own `scope`. Use instead of `workspace_set_plan` when execution surfaces new work — avoids invalidating prior sub-phases. |
-| `workspace_update_subphase` | Patches ONE execution item in place (name/tasks/scope) without resubmitting the whole plan. Prefer this over `workspace_set_plan` for a single-item fix. Resets `plan_status` to `pending`. |
-| `workspace_delete_subphase` | Removes one execution item; remaining items are renumbered to stay sequential. Cannot delete the last remaining sub-phase. Resets `plan_status` to `pending`. |
-| `workspace_set_plan_diagrams` | Replaces or appends the plan's `systemDiagram` list. Does NOT reset plan approval. |
-| `workspace_set_plan_description` | Replaces the plan's `description`. Does NOT reset plan approval. |
+| `workspace_update_subphase` / `workspace_delete_subphase` / `workspace_set_plan_diagrams` / `workspace_set_plan_description` | Granular plan edits — see `/planning` for which ones reset plan approval. |
 | `workspace_propose_criteria` | Records acceptance criteria the user reviews at the plan approval gate. Valid in the planning phase only; required before advancing past it. |
 | `workspace_delete_criteria` | Deletes a proposed acceptance criterion. Allowed only while it is not yet accepted — plan approval accepts all proposed criteria, after which deletion is refused. |
 | `workspace_post_discussion` | Raises an architectural or research question the user resolves in the admin panel. Required by some advance guards (e.g. an open research discussion before leaving assessment). |
@@ -563,13 +458,17 @@ Full tool roster is granted via this agent's frontmatter; consult tool descripti
 
 ---
 
+## User Gates — Waiting
+
+When `workspace_advance` returns 202 (awaiting approval), tell the user the gate is waiting and end the turn — do not poll. Re-check `workspace_get_state` once when the user messages or a scheduled check fires.
+
 ## User Gate Rejection — Critical Rule
 
 **When a user gate rejects, the backend moves you to the fix/rework phase. You MUST fix before advancing.**
 
 The destination is chosen server-side from the enabled phase set — this document does not name it, because it depends on which phases this project has turned on.
 
-**NEVER call `workspace_advance` immediately after detecting a rejection.** Always: (1) read `workspace_get_state` to learn which phase you are now in, (2) read `workspace_get_comments` for feedback, (3) do the work, (4) then advance.
+**NEVER call `workspace_advance` immediately after detecting a rejection.** Always: (1) read the phase you are now in from the `workspace_get_state` result that showed the rejection, (2) read `workspace_get_comments` for feedback, (3) do the work, (4) then advance.
 
 ---
 
@@ -589,7 +488,7 @@ The `ReviewGuard` only blocks at user gate phases — it does NOT block during i
 | Code | Meaning |
 |------|---------|
 | 200 | Advanced |
-| 202 | User gate — poll and wait |
+| 202 | User gate — tell the user and end the turn (see User Gates — Waiting) |
 | 422 | Validation failed — read error, fix, retry |
 | 409 | Already at gate or phase changed |
 

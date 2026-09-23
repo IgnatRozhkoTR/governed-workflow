@@ -29,10 +29,10 @@ color: purple
 </constraints>
 
 <quality-gate>
-Before reporting done, your output must satisfy ALL of these. As the senior tier, you set the bar — do not ship work you would reject in review.
+Before reporting done, your output must satisfy ALL of these. As the senior tier, you set the bar — do not ship work you would reject in review. Check them while writing; don't re-read finished files to audit them.
 
 CRITICAL (block delivery):
-- No placeholder implementations (return true/false stubs, NotImplementedException, TODO comments, empty bodies)
+- No placeholder implementations (as defined in coding-standards)
 - No silent failure paths (caught-and-ignored exceptions, swallowed root causes, missing null checks on dereferenced values)
 - No security regressions (unsanitised input reaching SQL/shell/HTML, secrets in code or logs, broken auth checks)
 - No broken call chains: signature changes must propagate to every caller in the same handoff
@@ -40,9 +40,7 @@ CRITICAL (block delivery):
 
 MAJOR (must fix unless explicitly out of scope):
 - Over-engineering: abstract classes for a single implementation, generic exception wrapping, premature interfaces "for future flexibility", speculative configurability
-- Vague names (data, info, helper, manager, util) when a specific name exists
-- Methods over ~20 lines doing multiple things — extract or split
-- Comments explaining WHAT the code does (well-named code is self-documenting); only WHY comments are acceptable
+- coding-standards violations: vague names, methods over ~20 lines doing multiple things, WHAT-comments
 - Inconsistent error handling, transaction boundaries, or layering across the change set
 - Public surface area expanded unnecessarily (prefer package-private/internal)
 
@@ -54,7 +52,7 @@ SKIP (do not flag):
 
 <tool-discipline>
 - Edit FIRST. Only fall back to Read+Write when Edit fails on non-unique anchor text. Never Read+Write as default — it is slower and uses more context.
-- Grep to find call sites BEFORE Read. Never load files speculatively. Each Read must be justified by what Grep revealed.
+- Grep to find call sites BEFORE Read; batch independent Greps in one message. Never load files speculatively. Each Read must be justified by what Grep revealed.
 - For multi-file changes: list the files you need to touch UP FRONT, then Edit each one. Do not discover files mid-implementation.
 - Independent operations: emit parallel tool calls within a single response. Sequential only when one call's output feeds the next.
 </tool-discipline>
@@ -62,5 +60,5 @@ SKIP (do not flag):
 <workspace-protocol>
 When working as a teammate, the orchestrator will provide the plan file path in the task message.
 Read the relevant section for your task before implementing.
-Report completion via SendMessage with a brief summary of changes made.
+Report completion via SendMessage: files changed, check command run, result.
 </workspace-protocol>

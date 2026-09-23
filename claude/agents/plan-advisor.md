@@ -34,7 +34,7 @@ When reviewing the orchestrator's high-level plan:
    - Dependencies: does this task depend on another that runs in the same group?
    - Gaps: does the research reveal something this task doesn't address?
    - Task titles: human-readable summary? Technical details in description, not title?
-3. Send your review as a numbered list. Per task: verdict (OK or CONCERN) with reasoning for concerns. Then list any cross-cutting issues (group ordering, missing tasks, overall gaps). Any claim of the form "there is no X in this codebase" (e.g. no precedent, no existing call sites) must state the exact grep/glob pattern you ran and the paths covered — unverified absence claims are the single most common failure mode in this workflow.
+3. Send your review as a numbered list of CONCERNs only (task + reasoning), ending with "N other tasks OK". Then list any cross-cutting issues (group ordering, missing tasks, overall gaps).
 4. Orchestrator responds to each concern — accept/adjust or reject with reason.
 5. Discuss until consensus on each point. Be critical but constructive.
 6. After consensus: expand the plan with technical details. The orchestrator calls `workspace_set_plan` to set the finalized plan via MCP. Each execution item in the plan must include a `scope` field (must/may) — scope is embedded in the plan, not set separately.
@@ -57,8 +57,5 @@ When working within the governed workflow (MCP tools available):
 
 The orchestrator coordinates through `workspace_get_state` and `workspace_advance` MCP tools. You receive tasks from the orchestrator, execute them, and report results back.
 
-When expanding the plan:
-1. Call workspace_list_research, then workspace_get_research for relevant entries, to read proven research directly
-2. Update the plan with technical details — after consensus, the orchestrator calls `workspace_set_plan` to persist it via MCP. Each execution item must include a `scope` field (must/may); scope is part of the plan, not a separate call.
-3. If a research entry is missing or unavailable, note it and work with available information
+When expanding the plan (see <plan-review> steps 1 and 6), if a research entry is missing or unavailable, note it and work with available information.
 </governed-workflow>

@@ -55,43 +55,20 @@ Brief each agent like a smart colleague who just walked in cold:
 
 When work is independent, spawn agents in parallel by including multiple Agent tool calls in one message.
 
-# Memory system
+Relay a sub-agent's conclusions, not its output. Work a sub-agent already verified is not re-verified by another agent unless a phase requires it.
 
-You have a persistent file-based memory at `~/.claude/projects/<project>/memory/`. Build it up over time so future sessions have a complete picture of who the user is, what behaviors to repeat or avoid, and the context behind the work.
+# Memory
 
-Four types of memory:
-- **user** — role, goals, responsibilities, knowledge. Tailors how you collaborate with this specific person.
-- **feedback** — guidance the user has given about how to approach work. Save both corrections AND validated approaches. Always include the **why** so you can judge edge cases later.
-- **project** — ongoing work, goals, initiatives, incidents not derivable from code or git history. Save with absolute dates.
-- **reference** — pointers to external systems (Linear projects, Slack channels, dashboards, etc.).
+Memory writes happen only through reflector proposals in phase 5.1. Before relying on a memory that names a file, function, or flag, verify it still exists.
 
-Save format: write each memory to its own file with frontmatter (`name`, `description`, `metadata.type`), then index it in `MEMORY.md` as one line: `- [Title](file.md) — one-line hook`. Keep `MEMORY.md` under 200 lines.
+# System reminders
 
-Do NOT save:
-- Code patterns, conventions, file paths, architecture (derivable from current code).
-- Git history, recent changes, who-changed-what (use `git log` / `git blame`).
-- Ephemeral task state, current conversation context, in-progress work.
-- Anything already in `CLAUDE.md`.
-
-Before recommending from memory: if the memory names a file/function/flag, verify it still exists. Memory describes what was true when written, not necessarily now.
-
-# Hook & system-reminder awareness
-
-This workspace has several hooks installed:
-
-- **`block-orchestrator-writes`** (PreToolUse on Edit/Write/MultiEdit/NotebookEdit/Bash): rejects orchestrator file edits, including Bash commands that write files. This is intentional defense-in-depth — Bash could otherwise bypass tool-level restrictions.
-- **`user-prompt-submit.sh`** (UserPromptSubmit): injects a brief reminder of the orchestrator role on each turn. Acknowledge by acting in role.
-- **`session-start.py`** (SessionStart): surfaces the current phase and research index at session start and on resume.
-
-System reminders are signals from the harness, not direct messages from the user. They bear no direct relation to the surrounding user message — treat them accordingly.
+System reminders and hook output are harness signals, not messages from the user.
 
 # Phase awareness
 
-Always consult `workspace_get_state` early in a session and after any phase-relevant action to know:
-- Current phase ID and status
-- Active scope (`must` / `may` file path patterns)
-- Plan summary
-- Open discussions, review issues, unresolved comments
-- Previous sessions count
+Call `workspace_get_state` once at session start (phase, scope, plan, open discussions, review issues, comments, previous sessions count). After `workspace_advance`, use the `phase` it returns instead of re-fetching. Re-fetch only when a user gate may have changed state.
+
+User gates: when `workspace_advance` returns 202, tell the user the gate is waiting and end the turn. Do not poll. Re-check `workspace_get_state` once when the user messages or a scheduled check fires.
 
 Refer to the `/governed-workflow` skill for phase-specific playbooks. Each phase has its own gate semantics — preparation review at 1.4, plan approval in the panel during 2.0 (scope is embedded in the plan; one approval covers both), code review at 3.N.3, final approval at 4.2.

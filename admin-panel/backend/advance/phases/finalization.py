@@ -28,11 +28,11 @@ Some or all of these stages may be skipped depending on the workspace's review m
 
 ### What you do at 4.0
 
-1. Watch the **Review Pipeline** card on the workspace page in the admin panel, or poll `GET /api/workspaces/<id>/review-pipeline-status`. States: `queued` → `filtering` → `file_stage` → `integration_stage` → `adjudication_stage` → `done` (or `failed`) — only the stages the review mode enabled actually run.
-2. When state is `done` or `failed`:
+1. The pipeline runs in the background. Call `workspace_review_pipeline_summary` once; if `is_complete` is not yet true, tell the user the review is running and end the turn — do not poll. Check it again once when the user messages or a scheduled check fires.
+2. When `is_complete=true`:
    - Call `workspace_get_review_issues` to see the findings.
    - Call `workspace_update_progress(phase="4.0", summary="Pipeline complete. N findings.")`.
-   - Before calling `workspace_advance`, call `workspace_review_pipeline_summary` (or `GET /api/workspaces/<id>/review-pipeline/summary`). Confirm `is_complete=true` and `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: re-trigger via the Run Review button (workspace page) or `POST /api/workspaces/<id>/review-pipeline/start`, OR proceed with the partial result if the failures are recoverable.
+   - Check `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: ask the user to re-trigger via the Run Review button on the workspace page, OR proceed with the partial result if the failures are recoverable. Never call the admin HTTP API directly.
    - Call `workspace_advance` to move to 4.1.
 
 If the pipeline failed mid-run, the reason is exposed only via `workspace_review_pipeline_summary` (`failed_files_errors`, `integration_errors`, top-level `error`) — never as a discussion. Inspect those fields and decide whether to re-trigger or proceed.
@@ -129,13 +129,9 @@ class FinalApprovalPhase(Phase):
 - **Approve** → the backend advances you to the next enabled phase
 - **Reject** → the backend moves you back into the fix phase
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+**Waiting**: do not poll — see User Gates — Waiting below.
 
-**After rejection**: the backend picks the phase you land in. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to see which phase you are now in
-2. Call `workspace_get_comments` to read the rejection feedback
-3. Address the feedback — fix code, update resolutions
-4. Call `workspace_advance` only after fixes are complete"""
+**After rejection**: follow User Gate Rejection below — address the feedback (fix code, update resolutions), then advance."""
 
     def _fast_description(self) -> str:
         return """\
@@ -148,13 +144,9 @@ If the user asks for a review, spawn the `integration-reviewer` agent and relay 
 - **Approve** → the backend advances you to the next enabled phase
 - **Reject** → the backend moves you back into the fix phase with the user's comments
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat. Auto-approved when `yolo_mode` is on.
+**Waiting**: do not poll — see User Gates — Waiting below. Auto-approved when `yolo_mode` is on.
 
-**After rejection**: the backend picks the phase you land in. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to see which phase you are now in
-2. Call `workspace_get_comments` to read the rejection feedback
-3. Address the feedback — fix code
-4. Call `workspace_advance` only after fixes are complete"""
+**After rejection**: follow User Gate Rejection below — address the feedback (fix code), then advance."""
 
     def validate(self, ws, body, project_path):
         return True, {}
@@ -178,7 +170,7 @@ class ReflectionPhase(Phase):
 
 1. Call `mcp__governed-workflow__workspace_get_reflection_context` — returns `{scope, branch_diff, review_findings, transcript}` for the ticket.
 2. Spawn the `reflector` sub-agent via the `Agent` tool with `subagent_type="reflector"`. Hand it the context as the prompt verbatim — the agent will submit zero or more proposals via `mcp__governed-workflow__workspace_submit_proposal`.
-3. Call `mcp__governed-workflow__workspace_list_proposals` to retrieve what the reflector submitted in this run.
+3. The reflector's report lists each submitted proposal as `id — implementation_kind — type — title`. If it lists no `auto` proposals, skip to step 5. Otherwise call `mcp__governed-workflow__workspace_list_proposals(implementation_kind="auto", status="proposed")` once to get their payloads.
 4. For each proposal with `implementation_kind="auto"`, apply it now:
    - `memory_write` / `memory_delete` — you cannot edit files yourself (Edit/Write are disallowed at this phase). Spawn a `junior-backend-engineer` sub-agent to write/delete the markdown file under `~/.claude/projects/<encoded-project-path>/memory/` and update the `MEMORY.md` index if it exists. Encode the project path by replacing `/` and `.` with `-` (e.g. `/Users/me/Projects/foo` → `-Users-me-Projects-foo`); hand the sub-agent the proposal payload as the source of truth.
    - `rule_new` / `rule_update` — apply directly via the `mcp__governed-workflow__rule_create` / `mcp__governed-workflow__rule_update` MCP tools (no sub-agent needed).

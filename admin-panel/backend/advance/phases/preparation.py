@@ -60,16 +60,7 @@ class AssessmentPhase(Phase):
 
 If the plan-advisor is not yet spawned (skipped Phase 0 or session recovery), spawn it first (see Phase 0 steps).
 
-Message the plan-advisor teammate:
-
-```
-SendMessage(
-  to: "plan-advisor",
-  content: "Begin assessment. Read workspace_get_state for context (ticket, working_dir, context notes).
-            Identify affected areas of the codebase. Raise research questions via
-            workspace_post_discussion (type='research'). Report findings in a structured summary."
-)
-```
+Message the plan-advisor with the structured assessment brief from `/plan-preparation`.
 
 When assessment is complete:
 1. Call `workspace_update_progress` for phase `"1.0"` with a non-empty summary
@@ -110,26 +101,7 @@ class ResearchPhase(Phase):
 
 **Actors**: Researcher sub-agents (parallel, one-shot)
 
-Deploy parallel researcher sub-agents — one per investigation topic identified in assessment. Each sub-agent:
-- Investigates its topic
-- Calls `workspace_save_research` with findings + typed proofs
-- Each finding must include a `proof` with a `type` field. The proof format depends on the researcher type:
-
-**type: "code"** (code-researcher, senior-code-researcher)
-  - `file` — path relative to workspace root
-  - `line_start`, `line_end` — PRECISE proof range. Try to stay under 20-30 lines, no hard limit.
-  - `snippet_start`, `snippet_end` — 15-line max window WITHIN the proof range for the quick-reference quote
-  - Do NOT include snippet text — the server reads the actual file to render quotes
-
-**type: "web"** (web-researcher)
-  - `url` — source URL (required)
-  - `title` — page/article title
-  - `quote` — verbatim text from the source (required — server cannot fetch web pages)
-
-**type: "diff"** (diff-researcher)
-  - `commit` — commit hash (required)
-  - `file` — specific file in the commit (optional)
-  - `description` — mandatory context explaining what the diff proves
+Deploy parallel researcher sub-agents — one per investigation topic identified in assessment (researcher choice: see `/plan-preparation`). Each calls `workspace_save_research` with findings and typed proofs; the proof formats are defined in the researcher agents.
 
 Every unresolved research discussion (raised during assessment) MUST be linked to at least one research entry before advancing.
 
@@ -249,7 +221,7 @@ Agent(
 )
 ```
 
-The prover ONLY verifies — it does NOT research. It calls `workspace_prove_research` for each entry DIRECTLY — the orchestrator does NOT need to call it. Wait for the prover to finish, then check results.
+The prover ONLY verifies — it does NOT research. It calls `workspace_prove_research` for each entry DIRECTLY — the orchestrator does NOT need to call it. Its return is the completion notice — ask it for a short proven/rejected list rather than re-reading every entry.
 
 If any research is rejected: re-deploy the original researcher sub-agents for those topics (to fix their proofs), then re-deploy the prover.
 
@@ -275,7 +247,7 @@ Agent(
 )
 ```
 
-The prover ONLY verifies — it does NOT research. It calls `workspace_prove_research` for each entry DIRECTLY — the orchestrator does NOT need to call it. Wait for the prover to finish, then check results.
+The prover ONLY verifies — it does NOT research. It calls `workspace_prove_research` for each entry DIRECTLY — the orchestrator does NOT need to call it. Its return is the completion notice — ask it for a short proven/rejected list rather than re-reading every entry.
 
 If any research is rejected: re-deploy the original researcher sub-agents for those topics (to fix their proofs), then re-deploy the prover.
 
@@ -331,16 +303,7 @@ class ImpactAnalysisPhase(Phase):
 
 **Actors**: Orchestrator + plan-advisor
 
-Before planning, document the cross-cutting effects of this change. Message the plan-advisor:
-
-```
-SendMessage(
-  to: "plan-advisor",
-  content: "We are in Phase 1.3 (Impact Analysis). Using the proven research, help me
-            produce a structured impact analysis covering: affected flows, API changes,
-            data flow, dependencies, ticket gaps, outstanding questions."
-)
-```
+Before planning, document the cross-cutting effects of this change, following `/plan-preparation` (advisor brief, six-field structure, research loop).
 
 Save the result via `workspace_set_impact_analysis` with the six fields. The Pre-planning tab renders it alongside the research summaries so the user can review everything before the preparation gate.
 
@@ -377,13 +340,9 @@ The user reviews the full preparation package in the Pre-planning tab: assessmen
 - **Approve** → the backend advances you to the next enabled phase
 - **Reject** → the backend moves you back into the preparation phases with comments
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+**Waiting**: do not poll — see User Gates — Waiting below.
 
-**After rejection**: the backend picks the phase you land in. Do NOT call `workspace_advance` immediately. Instead:
-1. Call `workspace_get_state` to see which phase you are now in
-2. Call `workspace_get_comments` to read the rejection feedback
-3. Deploy more researcher sub-agents (and update impact analysis later) to address the feedback
-4. Re-run every preparation phase you were returned to before advancing back to the gate"""
+**After rejection**: follow User Gate Rejection below. Here the work is: deploy more researcher sub-agents (and update impact analysis later) to address the feedback, and re-run every preparation phase you were returned to before advancing back to the gate."""
 
     def progress_key(self, ws):
         return "1.3"
