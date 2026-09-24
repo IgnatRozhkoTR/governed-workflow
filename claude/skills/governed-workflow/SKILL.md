@@ -11,23 +11,21 @@ Phase detail lives in two companion skills: `/plan-preparation` (assessment thro
 
 ---
 
-## Agent Roles: All Agents Are Resumable Sub-agents
+## Agent Roles: Only Plan-Advisor Is a Resumable Sub-agent
 
-All agents — including plan-advisor — are resumable sub-agents. Spawn with `Agent(name: "...", subagent_type: "...", prompt: "...")` and continue via `SendMessage(to: "name", ...)`.
+Spawning `Agent(name: "...")` makes an in-process teammate whose tools are intersected with the orchestrator's own allowlist — it loses its MCP tools. Only **plan-advisor** is spawned with `name` (as a resumable teammate) and continued via `SendMessage(to: "plan-advisor", ...)`. Every other agent is spawned WITHOUT `name` — `Agent(subagent_type: "...", prompt: "...")` — as a one-shot sub-agent that keeps its full tool list; it executes its task and returns.
 
-Agents execute their task and return. The orchestrator continues them for follow-up via `SendMessage(to: "<name>")`.
-
-**Plan-advisor** is spawned once in Phase 0 with `run_in_background: true` and continued throughout the session via `SendMessage(to: "plan-advisor", ...)`. All other agents are spawned per-task and may be continued if needed.
+**Plan-advisor** is spawned once in Phase 0 with `run_in_background: true` and continued throughout the session via `SendMessage(to: "plan-advisor", ...)`. Every other agent is spawned fresh (without `name`) for each round of work — re-deploy it rather than messaging a previous instance.
 
 ### Spawn rules per role
 
 | Role | When |
 |------|------|
-| **plan-advisor** | Spawned once at init (background), then messaged for assessment, impact analysis, planning, and each implementation sub-phase |
-| senior-backend-engineer | Complex implementation sub-phases, including the fix cycles that follow them. Continue via SendMessage. Production code ONLY — never tests. |
-| senior-backend-test-engineer | Complex test scenarios spanning write + fix cycles. Continue via SendMessage. Tests ONLY — always deployed AFTER engineer completes. |
-| senior-code-validator | Continue via SendMessage when re-validation after fixes is expected |
-| senior-code-researcher | Deep research spanning multiple rounds. Continue via SendMessage. |
+| **plan-advisor** | Spawned once at init (background, with `name`), then messaged for assessment, impact analysis, planning, and each implementation sub-phase |
+| senior-backend-engineer | Complex implementation sub-phases, including the fix cycles that follow them. Re-spawn for each round. Production code ONLY — never tests. |
+| senior-backend-test-engineer | Complex test scenarios spanning write + fix cycles. Re-spawn for each round. Tests ONLY — always deployed AFTER engineer completes. |
+| senior-code-validator | Re-spawn when re-validation after fixes is needed |
+| senior-code-researcher | Deep research spanning multiple rounds. Re-spawn per round. |
 | code-researcher | Research phase (parallel, one per topic). Variants: diff-researcher, web-researcher, ui-researcher depending on where the answer lives. |
 | research-prover | Research proving phase |
 | middle-backend-engineer | Implementation (stage 1), fixes, commit, and the post-review fix phase. Production code ONLY — never tests. |

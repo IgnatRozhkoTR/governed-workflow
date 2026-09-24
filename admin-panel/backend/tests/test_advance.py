@@ -159,6 +159,14 @@ def test_research_blocked_no_entries(workspace, project):
     assert code == 422
 
 
+def test_research_blocked_no_entries_even_with_confirmation(workspace, project):
+    set_phase(workspace["id"], "1.1")
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"], body={"no_further_research_needed": True})
+    assert code == 422
+    assert result["status"] == "blocked"
+
+
 def test_research_passes(workspace, project):
     set_phase(workspace["id"], "1.1")
     disc_id = add_discussion(workspace["id"], type="research")
@@ -917,3 +925,22 @@ def test_advance_skips_disabled_commit_approval_gate(workspace, project):
         assert result["phase"] == "3.1.4"
     finally:
         _clean_phase_settings()
+
+
+def test_research_blocked_no_entries_even_under_yolo_mode(workspace, project):
+    """yolo_mode skips Phase.validate() for every phase, but the zero-research
+    invariant is enforced in transition_phase() itself, so it survives yolo."""
+    set_phase(workspace["id"], "1.1", yolo_mode=1)
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 422
+    assert "error" in result
+
+
+def test_research_passes_under_yolo_mode_with_entries(workspace, project):
+    set_phase(workspace["id"], "1.1", yolo_mode=1)
+    add_research(workspace["id"])
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 200
+    assert result["phase"] == "1.2"

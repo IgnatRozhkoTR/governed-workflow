@@ -790,6 +790,18 @@ class TestWriteWorkspaceSettingsUnion:
         ]
         assert len(block_entries) == 1
 
+    def test_writeWorkspaceSettings_shouldIncludeBlockNamedAgentHook_whenCreatingFreshSettings(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.json"
+        _WORKSPACES._write_workspace_settings(settings)
+        data = json.loads(settings.read_text())
+        pre_tool_use = data["hooks"]["PreToolUse"]
+        block_entries = [
+            e for e in pre_tool_use
+            if any("block-named-agent-spawn.py" in h.get("command", "") for h in e.get("hooks", []))
+        ]
+        assert len(block_entries) >= 1
+        assert block_entries[0]["matcher"] == "Agent"
+
     def test_write_workspace_settings_enables_agent_teams(self, tmp_path):
         settings = tmp_path / ".claude" / "settings.json"
 
@@ -1070,6 +1082,53 @@ class TestHookScriptRepoResolution:
         assert proc.returncode == 0
         output = json.loads(proc.stdout)
         assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_block_named_agent_allows_unnamed_spawn(self):
+        """Any subagent_type is fine as long as no `name` is passed."""
+        proc = self._run_hook("block-named-agent-spawn.py", {
+            "tool_name": "Agent",
+            "tool_input": {"subagent_type": "middle-backend-engineer", "prompt": "do X"},
+        })
+        assert proc.returncode == 0
+        assert proc.stdout.strip() == b""
+
+    def test_block_named_agent_allows_named_plan_advisor(self):
+        """plan-advisor is the one role allowed to be spawned with `name`."""
+        proc = self._run_hook("block-named-agent-spawn.py", {
+            "tool_name": "Agent",
+            "tool_input": {"name": "plan-advisor", "subagent_type": "plan-advisor", "prompt": "assess"},
+        })
+        assert proc.returncode == 0
+        assert proc.stdout.strip() == b""
+
+    def test_block_named_agent_denies_named_non_plan_advisor(self):
+        """Naming any other role would spawn it as a teammate limited to the orchestrator's tools."""
+        proc = self._run_hook("block-named-agent-spawn.py", {
+            "tool_name": "Agent",
+            "tool_input": {"name": "researcher-1", "subagent_type": "code-researcher", "prompt": "investigate"},
+        })
+        assert proc.returncode == 0
+        output = json.loads(proc.stdout)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "code-researcher" in output["hookSpecificOutput"]["permissionDecisionReason"]
+
+    def test_block_named_agent_denies_named_general_purpose(self):
+        """A named spawn with no subagent_type (general-purpose) is still denied."""
+        proc = self._run_hook("block-named-agent-spawn.py", {
+            "tool_name": "Agent",
+            "tool_input": {"name": "helper", "prompt": "do X"},
+        })
+        assert proc.returncode == 0
+        output = json.loads(proc.stdout)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_block_named_agent_ignores_non_agent_tools(self):
+        proc = self._run_hook("block-named-agent-spawn.py", {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "/tmp/x.py"},
+        })
+        assert proc.returncode == 0
+        assert proc.stdout.strip() == b""
 
 
 def test_get_command_config_returns_env_vars(client, workspace, project):
