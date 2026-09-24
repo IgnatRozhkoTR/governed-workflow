@@ -1,35 +1,19 @@
 ---
 name: scratchpad
-description: Write human-facing reports and explanations (e.g. "explain this PR", "summarize this job") as markdown files, separate from the actual code changes.
+description: Write human-facing reports and explanations (e.g. "explain this PR", "summarize this job") via the scratchpad MCP tools, separate from the actual code changes.
 user_invocable: false
 ---
 
 # Scratchpad Skill
 
-When you produce a report, explanation, or summary meant for the human to read separately from the code changes themselves — not something that becomes part of the diff/PR — write it as a markdown file rather than only answering in chat.
+When you produce a report, explanation, or summary meant for the human to read separately from the code changes themselves — not something that becomes part of the diff/PR — create it as a scratchpad, not a chat-only answer.
 
-## Where to write
+## How to write
 
-Use your normal file tools (Write/Edit), no special MCP tool. Write into:
+Use the `scratchpad_create` / `scratchpad_replace` / `scratchpad_patch` / `scratchpad_delete` MCP tools — never Write/Edit, and never a file in `/tmp` or a sub-agent spawned just to write one.
 
-```
-.claude/scratchpad/<descriptive-kebab-name>.md
-```
+Start `content` with a `# Title` H1 — it becomes the report's title in the admin panel's Scratchpads tab.
 
-Start the file with a `# ` H1 — it becomes the report's title in the admin panel UI.
+Pass `repo` to scope a report to one attached repo in a multi-repo workspace (e.g. "explain the PR you just opened in `service-a`"); omit it for a report spanning the whole job/workspace.
 
-## Diagrams
-
-If a small Mermaid diagram would genuinely make a report clearer — a short flowchart for a multi-step process, a sequence diagram for a PR's cross-service call flow — include one. It renders automatically in the admin panel's scratchpad view. Don't reach for this by default or add one to every report; skip it when the report is simple enough that prose alone is clear.
-
-## Multi-repo workspaces
-
-- A report about one specific attached repo (e.g. "explain the PR you just opened in `service-a`") goes into that repo's own `.claude/scratchpad/`.
-- A report spanning the whole job/workspace (e.g. "summarize everything this job did") goes into the workspace root's own `.claude/scratchpad/` — the composite directory's, not any individual attached repo's.
-
-## Examples
-
-- "Explain every PR you just created" → one `pr-explainer.md` per repo that has a PR, written into that repo's `.claude/scratchpad/`.
-- "Summarize this job's outcome" → `job-summary.md` in the workspace root's `.claude/scratchpad/`.
-
-This is a lightweight convention, not a workflow — no approval gate, no MCP tool, just a fixed, predictable place for human-facing writeups.
+Include a small Mermaid diagram only if it genuinely clarifies a multi-step process or cross-service flow — skip it for simple reports.

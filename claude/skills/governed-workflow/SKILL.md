@@ -506,4 +506,4 @@ Progress is used for phase gate validation, session recovery after compaction, a
 
 ## Human-Facing Reports
 
-When the orchestrator owes the human user a report or explanation (findings, a summary, decision rationale) that should persist beyond the chat transcript, put it in a plain markdown file, not a chat-only reply; see the `scratchpad` skill for where and how.
+When the orchestrator owes the human user a report or explanation (findings, a summary, decision rationale) that should persist beyond the chat transcript, create it as a scratchpad via the scratchpad MCP tools, not a chat-only reply; see the `scratchpad` skill.

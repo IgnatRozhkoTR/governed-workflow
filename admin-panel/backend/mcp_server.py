@@ -70,6 +70,12 @@ from mcp_tools.repos import (
     workspace_attach_repo,
     workspace_save_pr,
 )
+from mcp_tools.scratchpad import (
+    scratchpad_create,
+    scratchpad_replace,
+    scratchpad_patch,
+    scratchpad_delete,
+)
 
 _SIMPLE_MODE_HIDDEN_TOOLS = (
     "workspace_propose_criteria",
