@@ -124,3 +124,30 @@ async function renderMermaidBlocks(containerEl) {
     }
   }
 }
+
+// Adds a hover-revealed copy button to every fenced code block except mermaid
+// diagrams. Copies the code element's textContent, so highlighting markup is never included.
+function addCodeCopyButtons(containerEl) {
+  if (!containerEl) return;
+  containerEl.querySelectorAll('pre > code:not(.language-mermaid)').forEach(function(codeEl) {
+    var preEl = codeEl.parentElement;
+    if (preEl.querySelector('.code-copy-btn')) return;
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'code-copy-btn';
+    button.textContent = t('buttons.copy');
+    button.title = t('buttons.copy');
+    button.setAttribute('aria-label', t('buttons.copy'));
+    button.onclick = function() {
+      safeCopyToClipboard(codeEl.textContent).then(function() {
+        button.classList.add('copied');
+        button.textContent = t('buttons.copied');
+        setTimeout(function() {
+          button.classList.remove('copied');
+          button.textContent = t('buttons.copy');
+        }, 1500);
+      });
+    };
+    preEl.appendChild(button);
+  });
+}

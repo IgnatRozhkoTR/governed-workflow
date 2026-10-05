@@ -44,3 +44,39 @@
   border-radius: 0;
   resize: none;
 }
+
+.md-preview pre {
+  position: relative;
+}
+
+.code-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition), color var(--transition);
+}
+
+.md-preview pre:hover .code-copy-btn,
+.code-copy-btn:focus-visible {
+  opacity: 1;
+}
+
+.code-copy-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.code-copy-btn.copied {
+  opacity: 1;
+  color: var(--success);
+  border-color: var(--success);
+}

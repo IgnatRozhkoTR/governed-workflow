@@ -274,6 +274,7 @@ function renderScratchpadContent() {
     if (typeof hljs !== 'undefined') {
       contentEl.querySelectorAll('pre code').forEach(function(block) { hljs.highlightElement(block); });
     }
+    addCodeCopyButtons(mdBody);
     renderMermaidBlocks(mdBody);
   } else {
     var textarea = document.createElement('textarea');
