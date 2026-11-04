@@ -20,6 +20,9 @@ body {
   margin: 0;
 }
 
+/* Fira Code ligatures merge "</" into a single slash-like glyph, so typed text no longer reads verbatim. */
+input, textarea, [contenteditable] { font-variant-ligatures: none; }
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }

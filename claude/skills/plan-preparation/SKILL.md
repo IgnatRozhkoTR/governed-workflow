@@ -11,9 +11,9 @@ Phases 1.0 through 1.4: take a ticket from raw requirements to a fully researche
 
 ## Phase 1.0: Assessment
 
-**Actor**: plan-advisor **teammate** (resumed, NOT a new sub-agent)
+**Actor**: plan-advisor (messaged via `SendMessage(to: "plan-advisor")`, NOT a new sub-agent)
 
-If you don't have `plan_advisor_id` yet (skipped Phase 0 or session recovery), spawn the teammate first (see Phase 0 in the governed-workflow skill), then resume it.
+If the plan-advisor is not running (skipped Phase 0 or session recovery), spawn it first (see Phase 0 in the governed-workflow skill).
 
 ### Goal
 
@@ -96,39 +96,17 @@ Use `senior-code-researcher` when the topic is complex (deep call chains, framew
 
 ### Summary requirement
 
-Every researcher MUST provide a `summary` parameter when calling `workspace_save_research`. This is a 2-3 sentence human-readable overview of the overall findings — what was found, what it means for the ticket, and any surprises. The summary appears in research lists and the admin panel without requiring the full findings to be loaded.
-
-Example of a good summary:
-> "The TradeService uses Spring's @Transactional with REQUIRES_NEW propagation in 3 of its 14 public methods. This means audit logging within those methods would commit independently of the business transaction — if the trade fails and rolls back, the audit log entry would persist. The remaining 11 methods use default propagation and would roll back audit entries together with the business transaction."
-
-Example of a bad summary:
-> "Investigated TradeService transactions. Found several methods with different propagation settings."
+Every researcher MUST pass a 2-3 sentence `summary` to `workspace_save_research`: what was found, what it means for the ticket, any surprises. Specific facts, not "investigated X, found several things".
 
 ### Discussion linking
 
 If a research question originated from a discussion (posted via `workspace_post_discussion` in phase 1.0), pass the `discussion_id` to `workspace_save_research`. This links the research findings to the discussion that raised the question, and is required for advancing past the research phase — all unresolved research discussions must have linked findings.
 
-### Proof format per type
-
-**type: "code"** (code-researcher, senior-code-researcher)
-- `file` — path relative to workspace root
-- `line_start`, `line_end` — precise proof range (aim for under 20-30 lines)
-- `snippet_start`, `snippet_end` — 15-line max window within the proof range for the quick-reference quote
-- Do NOT include snippet text — the server reads the actual file to render quotes
-
-**type: "web"** (web-researcher)
-- `url` — source URL (required)
-- `title` — page/article title
-- `quote` — verbatim text from the source (required — server cannot fetch web pages)
-
-**type: "diff"** (diff-researcher)
-- `commit` — commit hash (required)
-- `file` — specific file in the commit (optional)
-- `description` — mandatory context explaining what the diff proves
+Proof formats (`code` / `web` / `diff`) are defined in the researcher agents — do not repeat them in briefs.
 
 ### When all researchers complete
 
-Call `workspace_advance`.
+Call `workspace_advance(no_further_research_needed=true)`.
 
 **Advance 1.1 -> 1.2** requires: `no_further_research_needed=true`, every open research discussion having linked research, at least 1 research entry saved, all entries valid.
 
@@ -152,27 +130,18 @@ Agent(
 )
 ```
 
-The prover calls `workspace_prove_research` for each entry directly — the orchestrator does NOT need to relay these calls. Wait for the prover to finish, then check results.
+The prover calls `workspace_prove_research` for each entry directly — the orchestrator does NOT need to relay these calls. Its return is the completion notice: ask it for a short proven/rejected list by entry, and do not re-read every research entry yourself.
 
 ### Rejection loop
 
-If any research is rejected:
+For each rejected entry:
 
-1. Re-deploy the original researcher sub-agents for those specific topics (to fix their proofs or re-investigate).
-2. Re-deploy the prover to verify the corrected entries.
-3. Repeat until all research is proven.
+1. Decide whether the topic is still relevant.
+2. If relevant: re-deploy the original researcher to fix the proofs or re-investigate, then re-deploy the prover. Repeat until proven.
+3. If stale or no longer needed: `workspace_delete_research(id)` (the user can also delete it in the Research tab).
+4. After 2 failed re-proof attempts for the same topic, treat it as stale: post a discussion via `workspace_post_discussion` noting the gap and ask the user whether to delete it or provide more context.
 
-Do not advance with rejected research. The loop must converge — if a researcher cannot produce verifiable findings for a topic after 2 attempts, post a discussion via `workspace_post_discussion` noting the gap and move on.
-
-### Handling rejected research
-
-When the prover rejects a research entry:
-1. First assess: is the research topic still relevant, or has it become stale/unnecessary?
-2. If still relevant: re-deploy the researcher to fix the proofs, then re-prove.
-3. If stale or no longer needed: call `workspace_delete_research(id)` to remove the entry, or the user can delete it via the admin panel (Research tab → delete button). All entries must be proven or deleted before advancing past 1.2.
-4. Rejected entries block advancement — do not advance with any rejected research remaining.
-
-After 2 failed re-proof attempts for the same topic, treat it as stale and ask the user whether to delete it or provide additional context.
+Rejected entries block advancement — all entries must be proven or deleted before advancing past 1.2.
 
 ### When all research is proven
 
@@ -205,25 +174,14 @@ SendMessage(
 
 ### Required analysis structure
 
-Produce a structured analysis covering all six areas:
+Cover all six areas (these are the `workspace_set_impact_analysis` fields). Be specific — "the /api/trades POST response now includes an `auditId` field (string, always present)", not "API changes".
 
-**1. Affected user flows**
-Which user interactions change? Think in terms of what users do, not what code runs. Examples: "The trade creation flow now requires an additional confirmation step", "The report export no longer includes archived trades".
-
-**2. API contract changes**
-What changes in request/response formats? New required fields? Removed fields? Changed types? New endpoints? Removed endpoints? Changed authentication requirements? Be specific — "the /api/trades POST response now includes an `auditId` field (string, always present)" is useful. "API changes" is not.
-
-**3. Data flow changes**
-Where do key parameters come from and how does data move through the system? Trace the origin and destination of new or changed data. Example: "The audit trail ID is generated by AuditLogService.logAction(), stored in the audit_log table, and returned to the caller in the response. It is NOT passed by the client — it is server-generated."
-
-**4. External dependencies**
-Does this require actions outside the codebase? Database migrations not managed by the project, infrastructure changes, Kubernetes config updates, coordination with other teams, third-party API changes.
-
-**5. Ticket gaps found**
-Ambiguities and underspecified requirements discovered during research. Each gap should state: what is ambiguous, what the options are, and which option you recommend (with reasoning from research).
-
-**6. Remaining open questions**
-Things that need user input because they cannot be resolved from code, web, or git research. These become discussion points for the user at phase 1.4.
+- `affected_flows` — user interactions that change, in terms of what users do, not what code runs.
+- `api_changes` — request/response format changes, new/removed endpoints, auth changes.
+- `data_flow_changes` — origin and destination of new or changed data (e.g. server-generated vs client-supplied).
+- `external_dependencies` — actions outside the codebase: unmanaged DB migrations, infrastructure, other teams, third-party APIs.
+- `ticket_gaps` — each ambiguity with the options and your recommended option (with reasoning from research).
+- `open_questions` — questions that need user input because code, web, or git research cannot resolve them; raised at 1.4.
 
 ### Loop logic
 
@@ -239,15 +197,7 @@ Questions that cannot be resolved from code, web, or git research are left as op
 
 ### When analysis is complete
 
-1. Call `workspace_set_impact_analysis` with the six structured fields:
-   - `affected_flows`: Which user flows change
-   - `api_changes`: Endpoint changes and contract changes
-   - `data_flow_changes`: Parameter sources and data movement
-   - `external_dependencies`: DB migrations, infrastructure, coordination
-   - `ticket_gaps`: Ambiguities discovered
-   - `open_questions`: Questions for the user
-
-   Within each field, put each distinct item on its own line or as a markdown bullet (`- item`) so the panel renders a readable list rather than a run-on paragraph.
+1. Call `workspace_set_impact_analysis` with the six fields above. Within each field, put each distinct item on its own line or as a markdown bullet (`- item`) so the panel renders a readable list rather than a run-on paragraph.
 
    This data is displayed in the Pre-planning tab for user review at phase 1.4.
 
@@ -286,12 +236,7 @@ Discussions that were resolved during research, with brief resolution summaries.
 
 ### Waiting for approval
 
-Call `workspace_advance` to enter the user gate. Then:
-
-1. Poll `workspace_get_state` once per minute
-2. Phase advanced (user approved) -> proceed to phase 2.0 (Planning)
-3. After 10 polls -> ask the user in chat
-4. User chat message -> re-check state
+Call `workspace_advance` to enter the user gate. When it returns 202, tell the user the gate is waiting and end the turn — do not poll. Re-check `workspace_get_state` once when the user messages or a scheduled check fires; if the phase advanced, proceed to phase 2.0 (Planning).
 
 ### On rejection
 

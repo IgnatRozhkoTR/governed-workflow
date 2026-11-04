@@ -4,16 +4,20 @@ Fast mode drops the optional research/review sub-phases for a single
 workspace by writing workspace-scope ``phase_settings`` disable rows, which the
 phase resolver and advance engine already honor. Standard mode clears those
 rows so the workspace falls back to the inherited device/project phase set.
+Fast mode still includes the reflection phases (5.1/5.2).
 """
 from services import phase_settings
 from services.configurator_service import ConfiguratorChain
 
-FAST_DISABLED_PHASE_IDS: tuple = ("1.3", "1.4", "3.x.1", "3.x.3", "4.0", "5.1", "5.2")
+FAST_DISABLED_PHASE_IDS: tuple = ("1.3", "1.4", "3.x.1", "3.x.3", "4.0")
 VALID_MODES = ("standard", "fast")
 
 # 3.x.2 (fix-review) is written implicitly by set_scope_settings whenever 3.x.1
 # is disabled, so reverting to standard must clear it alongside the explicit set.
-_FAST_ROW_PHASE_IDS: tuple = FAST_DISABLED_PHASE_IDS + ("3.x.2",)
+# 5.1/5.2 are legacy disable rows from before fast mode included reflection;
+# clearing them on revert keeps older fast workspaces from being stuck with
+# stale disable rows even though fast mode no longer writes them.
+_FAST_ROW_PHASE_IDS: tuple = FAST_DISABLED_PHASE_IDS + ("3.x.2", "5.1", "5.2")
 
 
 def _validate_mode(mode: str) -> None:

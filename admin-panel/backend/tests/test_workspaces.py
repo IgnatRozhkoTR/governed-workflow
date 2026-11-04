@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -39,6 +40,28 @@ def test_create_workspace(client, project):
     )
     assert r.status_code == 201
     assert r.json["branch"] == "feature/new-ws"
+
+
+def test_create_workspace_creates_scratchpad_dir_and_registers_exclude(client, project):
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/scratchpad-setup", "source": "develop", "worktree": True},
+    )
+    assert r.status_code == 201, r.json
+
+    working_dir = Path(r.json["working_dir"])
+    scratchpad_dir = working_dir / ".claude" / "scratchpad"
+    assert scratchpad_dir.is_dir()
+
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-path", "info/exclude"],
+        cwd=str(working_dir), check=True, capture_output=True, text=True,
+    )
+    exclude_path = Path(result.stdout.strip())
+    if not exclude_path.is_absolute():
+        exclude_path = working_dir / exclude_path
+    assert exclude_path.exists()
+    assert ".claude/scratchpad/" in exclude_path.read_text().splitlines()
 
 
 def test_create_workspace_no_worktree(client, project):
@@ -220,6 +243,182 @@ def test_create_workspace_friendly_error_when_worktree_path_exists(
     assert r.json["details"] == "fatal: '/some/path' already exists"
 
 
+# ─── BASE BRANCH SYNC TESTS ───────────────────────────────────────────────────
+
+from testing_utils import GIT_ENV
+
+
+@pytest.fixture
+def project_with_origin(project, tmp_path):
+    """Point the project's local repo at a real origin remote for base-sync tests."""
+    origin_path = tmp_path / "origin.git"
+    _git(project["path"], "init", "--bare", str(origin_path))
+    _git(project["path"], "remote", "add", "origin", str(origin_path))
+    _git(project["path"], "push", "origin", "develop:develop")
+    return project
+
+
+def _head_sha(repo_path):
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=str(repo_path), capture_output=True, text=True, env=GIT_ENV
+    ).stdout.strip()
+
+
+def test_create_workspace_base_sync_fast_forwards_stale_local_branch(client, project_with_origin):
+    project = project_with_origin
+    project_path = project["path"]
+
+    _git(project_path, "checkout", "-b", "main")
+    old_sha = _head_sha(project_path)
+    (Path(project_path) / "advance.txt").write_text("advance main")
+    _git(project_path, "add", "advance.txt")
+    _git(project_path, "commit", "-m", "advance main")
+    new_sha = _head_sha(project_path)
+    _git(project_path, "push", "origin", "main:main")
+    _git(project_path, "reset", "--hard", old_sha)
+    _git(project_path, "checkout", "develop")
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/from-main", "source": "main", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    base_sync = r.json["base_sync"]
+    assert base_sync["attempted"] is True
+    assert base_sync["updated"] is True
+    assert base_sync["reason"] == f"updated-from {old_sha[:7]} to {new_sha[:7]}"
+    assert base_sync["before"] == old_sha[:7]
+    assert base_sync["after"] == new_sha[:7]
+
+    local_main = subprocess.run(
+        ["git", "rev-parse", "refs/heads/main"], cwd=project_path, capture_output=True, text=True, env=GIT_ENV
+    ).stdout.strip()
+    assert local_main == new_sha
+
+
+def test_create_workspace_base_sync_skips_when_base_checked_out(client, project_with_origin):
+    project = project_with_origin
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/from-develop", "source": "develop", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    assert r.json["base_sync"] == {
+        "attempted": False,
+        "updated": False,
+        "reason": "skipped-checked-out",
+    }
+
+
+def test_create_workspace_base_sync_reports_not_fast_forward_when_diverged(client, project_with_origin, tmp_path):
+    project = project_with_origin
+    project_path = project["path"]
+
+    _git(project_path, "checkout", "-b", "main")
+    base_sha = _head_sha(project_path)
+    _git(project_path, "push", "origin", "main:main")
+
+    clone_dir = tmp_path / "clone"
+    subprocess.run(
+        ["git", "clone", str(Path(project_path).parent / "origin.git"), str(clone_dir)],
+        check=True, capture_output=True, env=GIT_ENV,
+    )
+    _git(clone_dir, "checkout", "main")
+    (clone_dir / "origin_change.txt").write_text("origin advances")
+    _git(clone_dir, "add", "origin_change.txt")
+    _git(clone_dir, "commit", "-m", "advance origin main")
+    _git(clone_dir, "push", "origin", "main")
+
+    (Path(project_path) / "local_change.txt").write_text("local diverges")
+    _git(project_path, "add", "local_change.txt")
+    _git(project_path, "commit", "-m", "diverge local main")
+    diverged_sha = _head_sha(project_path)
+    _git(project_path, "checkout", "develop")
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/from-diverged-main", "source": "main", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    base_sync = r.json["base_sync"]
+    assert base_sync["attempted"] is True
+    assert base_sync["updated"] is False
+    assert base_sync["reason"] == "not-fast-forward"
+
+    local_main = subprocess.run(
+        ["git", "rev-parse", "refs/heads/main"], cwd=project_path, capture_output=True, text=True, env=GIT_ENV
+    ).stdout.strip()
+    assert local_main == diverged_sha
+
+
+def test_create_workspace_base_sync_reports_no_local_branch(client, project_with_origin):
+    project = project_with_origin
+    project_path = project["path"]
+
+    _git(project_path, "checkout", "-b", "release")
+    _git(project_path, "push", "origin", "release:release")
+    _git(project_path, "checkout", "develop")
+    _git(project_path, "branch", "-D", "release")
+
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/from-release", "source": "release", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    assert r.json["base_sync"] == {
+        "attempted": False,
+        "updated": False,
+        "reason": "no-local-branch",
+    }
+
+
+def test_create_workspace_base_sync_not_attempted_without_remote(client, project):
+    r = client.post(
+        f"/api/projects/{project['id']}/workspaces",
+        json={"branch": "feature/no-remote", "source": "develop", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    assert r.json["base_sync"] == {
+        "attempted": False,
+        "updated": False,
+        "reason": "not-remote-based",
+    }
+
+
+def test_create_workspace_base_sync_failure_does_not_block_creation(client, project_with_origin, monkeypatch):
+    from core.db import get_db
+    from routes import workspaces as workspaces_module
+
+    def boom(project_path, base):
+        raise RuntimeError("simulated git failure")
+
+    monkeypatch.setattr(workspaces_module, "_sync_local_base_branch", boom)
+
+    r = client.post(
+        f"/api/projects/{project_with_origin['id']}/workspaces",
+        json={"branch": "feature/sync-boom", "source": "develop", "worktree": True},
+    )
+
+    assert r.status_code == 201, r.json
+    assert r.json["base_sync"] == {"attempted": False, "updated": False, "reason": "sync-error"}
+
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT id FROM workspaces WHERE project_id = ? AND branch = ?",
+            (project_with_origin["id"], "feature/sync-boom"),
+        ).fetchone()
+    finally:
+        db.close()
+    assert row is not None
+
+
 # ─── 3.2 MERGE LAYER TESTS ────────────────────────────────────────────────────
 
 REPO_ROOT = Path(__file__).resolve().parents[3]  # worktrees/Restructuring
@@ -270,8 +469,23 @@ _WORKSPACES = _import_workspaces_module()
 
 
 def _call_install_worktree_configs(project_path, wt_path):
-    """Call the internal bootstrap function."""
-    _WORKSPACES._install_worktree_configs(project_path, wt_path)
+    """Call the internal bootstrap function with a fresh db connection."""
+    from core.db import get_db
+    db = get_db()
+    try:
+        _WORKSPACES._install_worktree_configs(db, project_path, wt_path)
+    finally:
+        db.close()
+
+
+def _call_install_checkout_configs(project_path):
+    """Call the checkout-mode bootstrap function with a fresh db connection."""
+    from core.db import get_db
+    db = get_db()
+    try:
+        _WORKSPACES._install_checkout_configs(db, project_path)
+    finally:
+        db.close()
 
 
 class TestMergeLayer:
@@ -335,6 +549,157 @@ class TestMergeLayer:
         assert dst_rules.is_symlink()
         src_rules = Path(project_with_assets) / ".claude" / "rules"
         assert dst_rules.resolve() == src_rules.resolve()
+
+
+class TestMergeLayerModuleOverrides:
+    """Ordering guarantee: repo default < enabled-module override < project-local."""
+
+    @staticmethod
+    def _make_override_module(root: Path, module_id: str, subpath: str, filename: str, content: str) -> Path:
+        mod_dir = root / module_id
+        mod_dir.mkdir(parents=True)
+        (mod_dir / "SKILL.md").write_text(f"---\nname: {module_id}\n---\n")
+        override_dir = mod_dir / "override" / subpath
+        override_dir.mkdir(parents=True)
+        (override_dir / filename).write_text(content)
+        return mod_dir
+
+    @staticmethod
+    def _enable_module(db, module_id: str, enabled_at: str = "2024-01-01T00:00:00") -> None:
+        db.execute(
+            "INSERT INTO modules_enabled (module_id, enabled_at) VALUES (?, ?)",
+            (module_id, enabled_at),
+        )
+        db.commit()
+
+    def test_module_override_fills_gap_left_by_defaults_and_project(self, project_with_assets, tmp_path):
+        """A module override supplies a file neither the repo defaults nor the
+        project provide, landing in the worktree via the fill-missing pass."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(modules_root, "mod-a", "hooks", "module-hook.md", "# From module override")
+
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        db = get_db()
+        try:
+            self._enable_module(db, "mod-a")
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._install_worktree_configs(db, project_with_assets, wt)
+        finally:
+            db.close()
+
+        assert (wt / ".claude" / "hooks" / "module-hook.md").read_text() == "# From module override"
+        # Existing project-local precedence is unaffected by the module toggle.
+        assert (wt / ".claude" / "agents" / "custom.md").read_text() == "# Custom Project Agent"
+
+    def test_module_override_wins_over_repo_default_on_collision(self, project_with_assets, tmp_path):
+        """An override for an existing repo-default agent filename wins over the default."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(
+            modules_root, "mod-a", "agents", "middle-backend-engineer.md",
+            "# Module override of a real default agent",
+        )
+
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        db = get_db()
+        try:
+            self._enable_module(db, "mod-a")
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._install_worktree_configs(db, project_with_assets, wt)
+        finally:
+            db.close()
+
+        assert (wt / ".claude" / "agents" / "middle-backend-engineer.md").read_text() == (
+            "# Module override of a real default agent"
+        )
+
+    def test_project_local_file_wins_over_colliding_module_override(self, project_with_assets, tmp_path):
+        """Project always wins: project-local agents/custom.md beats a module override
+        shipped for the exact same relative path."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(
+            modules_root, "mod-a", "agents", "custom.md", "# From module override, should lose",
+        )
+
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        db = get_db()
+        try:
+            self._enable_module(db, "mod-a")
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._install_worktree_configs(db, project_with_assets, wt)
+        finally:
+            db.close()
+
+        assert (wt / ".claude" / "agents" / "custom.md").read_text() == "# Custom Project Agent"
+
+    def test_disabled_module_override_not_applied(self, project_with_assets, tmp_path):
+        """A module directory that exists on disk but is not enabled contributes nothing."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(modules_root, "mod-a", "hooks", "module-hook.md", "# Should not appear")
+
+        wt = tmp_path / "wt"
+        wt.mkdir()
+        db = get_db()
+        try:
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._install_worktree_configs(db, project_with_assets, wt)
+        finally:
+            db.close()
+
+        assert not (wt / ".claude" / "hooks" / "module-hook.md").exists()
+
+    def test_checkout_fill_missing_uses_module_override_when_destination_missing(self, tmp_path):
+        """_fill_missing_repo_defaults (checkout mode's fill pass) picks up a module
+        override file for a destination that does not already exist."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(modules_root, "mod-a", "rules", "custom-rule.md", "# Module rule override")
+
+        target = tmp_path / "target"
+        target.mkdir()
+
+        db = get_db()
+        try:
+            self._enable_module(db, "mod-a")
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._fill_missing_repo_defaults(db, target)
+        finally:
+            db.close()
+
+        assert (target / ".claude" / "rules" / "custom-rule.md").read_text() == "# Module rule override"
+
+    def test_checkout_fill_missing_never_overwrites_existing_destination_file(self, tmp_path):
+        """Fill-missing semantics hold even when a module ships an override for an
+        already-populated destination: checkout mode never overwrites."""
+        from core.db import get_db
+
+        modules_root = tmp_path / "modules"
+        self._make_override_module(modules_root, "mod-a", "rules", "custom-rule.md", "# Module rule override")
+
+        target = tmp_path / "target"
+        (target / ".claude" / "rules").mkdir(parents=True)
+        (target / ".claude" / "rules" / "custom-rule.md").write_text("# Pre-existing file")
+
+        db = get_db()
+        try:
+            self._enable_module(db, "mod-a")
+            with patch.object(_WORKSPACES, "_MODULE_OVERRIDE_ROOTS", [modules_root]):
+                _WORKSPACES._fill_missing_repo_defaults(db, target)
+        finally:
+            db.close()
+
+        assert (target / ".claude" / "rules" / "custom-rule.md").read_text() == "# Pre-existing file"
 
 
 class TestWriteWorkspaceSettingsUnion:
@@ -425,6 +790,18 @@ class TestWriteWorkspaceSettingsUnion:
         ]
         assert len(block_entries) == 1
 
+    def test_writeWorkspaceSettings_shouldIncludeBlockNamedAgentHook_whenCreatingFreshSettings(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.json"
+        _WORKSPACES._write_workspace_settings(settings)
+        data = json.loads(settings.read_text())
+        pre_tool_use = data["hooks"]["PreToolUse"]
+        block_entries = [
+            e for e in pre_tool_use
+            if any("block-named-agent-spawn.py" in h.get("command", "") for h in e.get("hooks", []))
+        ]
+        assert len(block_entries) >= 1
+        assert block_entries[0]["matcher"] == "Agent"
+
     def test_write_workspace_settings_enables_agent_teams(self, tmp_path):
         settings = tmp_path / ".claude" / "settings.json"
 
@@ -461,6 +838,82 @@ class TestWriteWorkspaceSettingsUnion:
         assert "PostToolUse" in data["hooks"]
         assert "SessionStart" in data["hooks"]
         assert data["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+
+
+class TestWriteWorkspaceLocalSettings:
+    """Tests for the settings.local.json merge written at workspace setup."""
+
+    def test_local_settings_created_when_missing(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.local.json"
+
+        _WORKSPACES._write_workspace_local_settings(settings)
+
+        data = json.loads(settings.read_text())
+        assert data == {"agent": "orchestrator", "autoCompactWindow": 250000}
+
+    def test_local_settings_merged_preserving_other_keys(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.local.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text(json.dumps({"permissions": {"allow": ["Bash(ls)"]}, "agent": "other"}))
+
+        _WORKSPACES._write_workspace_local_settings(settings)
+
+        data = json.loads(settings.read_text())
+        assert data["permissions"] == {"allow": ["Bash(ls)"]}
+        assert data["agent"] == "orchestrator"
+        assert data["autoCompactWindow"] == 250000
+
+    def test_local_settings_reset_when_json_invalid(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.local.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text("{not valid json,,}")
+
+        _WORKSPACES._write_workspace_local_settings(settings)
+
+        data = json.loads(settings.read_text())
+        assert data == {"agent": "orchestrator", "autoCompactWindow": 250000}
+
+    def test_worktree_setup_writes_real_local_settings_file(self, project_with_assets, tmp_path):
+        wt = tmp_path / "wt"
+        wt.mkdir()
+
+        _call_install_worktree_configs(project_with_assets, wt)
+
+        local = wt / ".claude" / "settings.local.json"
+        assert local.is_file() and not local.is_symlink()
+        data = json.loads(local.read_text())
+        assert data["agent"] == "orchestrator"
+        assert data["autoCompactWindow"] == 250000
+        assert not (Path(project_with_assets) / ".claude" / "settings.local.json").exists()
+
+    def test_worktree_setup_preserves_project_local_settings_keys(self, project_with_assets, tmp_path):
+        project_local = Path(project_with_assets) / ".claude" / "settings.local.json"
+        project_local.write_text(json.dumps({"permissions": {"allow": ["Bash(ls)"]}}))
+        wt = tmp_path / "wt"
+        wt.mkdir()
+
+        _call_install_worktree_configs(project_with_assets, wt)
+
+        data = json.loads((wt / ".claude" / "settings.local.json").read_text())
+        assert data["permissions"] == {"allow": ["Bash(ls)"]}
+        assert data["agent"] == "orchestrator"
+        assert json.loads(project_local.read_text()) == {"permissions": {"allow": ["Bash(ls)"]}}
+
+    def test_checkout_setup_merges_local_settings_and_restores_on_teardown(self, project_with_assets):
+        project_local = Path(project_with_assets) / ".claude" / "settings.local.json"
+        project_local.write_text(json.dumps({"permissions": {"allow": ["Bash(ls)"]}}))
+
+        _call_install_checkout_configs(project_with_assets)
+
+        data = json.loads(project_local.read_text())
+        assert data["permissions"] == {"allow": ["Bash(ls)"]}
+        assert data["agent"] == "orchestrator"
+        assert data["autoCompactWindow"] == 250000
+
+        _WORKSPACES._restore_project_files(project_with_assets)
+
+        assert json.loads(project_local.read_text()) == {"permissions": {"allow": ["Bash(ls)"]}}
+        assert not project_local.with_name("settings.local.json.pre-workspace").exists()
 
 
 class TestEnsureWorkspaceMcp:
@@ -629,6 +1082,53 @@ class TestHookScriptRepoResolution:
         assert proc.returncode == 0
         output = json.loads(proc.stdout)
         assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_block_named_agent_allows_unnamed_spawn(self):
+        """Any subagent_type is fine as long as no `name` is passed."""
+        proc = self._run_hook("block-named-agent-spawn.py", {
+            "tool_name": "Agent",
+            "tool_input": {"subagent_type": "middle-backend-engineer", "prompt": "do X"},
+        })
+        assert proc.returncode == 0
+        assert proc.stdout.strip() == b""
+
+    def test_block_named_agent_allows_named_plan_advisor(self):
+        """plan-advisor is the one role allowed to be spawned with `name`."""
+        proc = self._run_hook("block-named-agent-spawn.py", {
+            "tool_name": "Agent",
+            "tool_input": {"name": "plan-advisor", "subagent_type": "plan-advisor", "prompt": "assess"},
+        })
+        assert proc.returncode == 0
+        assert proc.stdout.strip() == b""
+
+    def test_block_named_agent_denies_named_non_plan_advisor(self):
+        """Naming any other role would spawn it as a teammate limited to the orchestrator's tools."""
+        proc = self._run_hook("block-named-agent-spawn.py", {
+            "tool_name": "Agent",
+            "tool_input": {"name": "researcher-1", "subagent_type": "code-researcher", "prompt": "investigate"},
+        })
+        assert proc.returncode == 0
+        output = json.loads(proc.stdout)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "code-researcher" in output["hookSpecificOutput"]["permissionDecisionReason"]
+
+    def test_block_named_agent_denies_named_general_purpose(self):
+        """A named spawn with no subagent_type (general-purpose) is still denied."""
+        proc = self._run_hook("block-named-agent-spawn.py", {
+            "tool_name": "Agent",
+            "tool_input": {"name": "helper", "prompt": "do X"},
+        })
+        assert proc.returncode == 0
+        output = json.loads(proc.stdout)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_block_named_agent_ignores_non_agent_tools(self):
+        proc = self._run_hook("block-named-agent-spawn.py", {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "/tmp/x.py"},
+        })
+        assert proc.returncode == 0
+        assert proc.stdout.strip() == b""
 
 
 def test_get_command_config_returns_env_vars(client, workspace, project):

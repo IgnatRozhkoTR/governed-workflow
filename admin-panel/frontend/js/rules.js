@@ -31,7 +31,7 @@ function renderRules() {
     var nameSafe = escapeHtml(r.name);
     var descSafe = escapeHtml(r.description || '');
     var pathsHtml = (r.paths || []).map(function(p) {
-      return '<code style="padding: 1px 6px; background: var(--bg-tertiary); border-radius: 3px; margin-right: 4px;">' + escapeHtml(p) + '</code>';
+      return '<code class="rules-item-path-chip">' + escapeHtml(p) + '</code>';
     }).join('');
 
     var errorHtml = '';

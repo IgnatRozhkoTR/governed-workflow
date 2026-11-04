@@ -63,6 +63,17 @@ def hook_command(name: str, interpreter: str = "python3") -> str:
     return f"{interpreter} {DEFAULT_HOOKS_DIR / name}"
 
 
+def tools_dir() -> Path:
+    """Return the tools directory, honoring the GOVERNED_WORKFLOW_TOOLS_DIR override.
+
+    app.py exports GOVERNED_WORKFLOW_TOOLS_DIR at startup (defaulting to
+    DEFAULT_TOOLS_DIR), so downloaded build tools and LSP launchers referenced
+    from verification profile commands resolve consistently whether the
+    override is set explicitly (e.g. in tests) or left to the app.py default.
+    """
+    return Path(os.environ.get("GOVERNED_WORKFLOW_TOOLS_DIR") or DEFAULT_TOOLS_DIR)
+
+
 def admin_token_setup_command() -> str:
     """Return the absolute ``auth-token`` CLI command for the current install.
 

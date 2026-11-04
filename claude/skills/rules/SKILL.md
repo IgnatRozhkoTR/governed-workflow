@@ -32,13 +32,15 @@ Three frontmatter fields, all required:
 
 ## Default vs user rules
 
-Five rule names are reserved defaults shipped with the admin panel:
+Seven rule names are reserved defaults shipped with the admin panel:
 
 - `coding-standards`
 - `java-conventions`
 - `research-principles`
 - `test-standards`
+- `token-efficiency`
 - `validation-pipeline`
+- `workflow-hardening`
 
 Defaults are **immutable** through the MCP tools and the admin panel — they cannot be overwritten, updated, or deleted. Any other rule is a user rule, fully editable. User rules are git-ignored by default (`claude/rules/.gitignore` handles the exceptions for the defaults).
 

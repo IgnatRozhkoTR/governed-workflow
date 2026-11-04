@@ -20,6 +20,14 @@ def test_get_workspace_state(client, workspace):
     assert "progress" in data
 
 
+def test_get_workspace_state_includes_source_branch_and_project_type(client, workspace):
+    response = client.get(_ws_url(workspace, "state"))
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["source_branch"] == "develop"
+    assert data["project_type"] == "single"
+
+
 def test_get_workspace_state_returns_etag(client, workspace):
     """State endpoint returns a stable ETag header for the JSON payload."""
     response = client.get(_ws_url(workspace, "state"))
@@ -268,4 +276,31 @@ def test_state_payload_has_no_scope_status(client, workspace):
     assert "scope_status" not in state
     assert "scope" in state
 
+
+def test_mcp_get_state_exposes_standard_workflow_mode(workspace, monkeypatch):
+    monkeypatch.chdir(workspace["working_dir"])
+    from mcp_server import workspace_get_state
+    result = workspace_get_state()
+    assert result["workflow_mode"] == "standard"
+
+
+def test_mcp_get_state_exposes_fast_workflow_mode_and_omits_optional_phases(workspace, monkeypatch):
+    from core.db import get_db
+    from services.workflow_mode_service import apply_mode_phase_settings
+
+    db = get_db()
+    try:
+        apply_mode_phase_settings(db, workspace["id"], "fast")
+        db.execute("UPDATE workspaces SET workflow_mode = 'fast' WHERE id = ?", (workspace["id"],))
+        db.commit()
+    finally:
+        db.close()
+
+    monkeypatch.chdir(workspace["working_dir"])
+    from mcp_server import workspace_get_state
+    result = workspace_get_state()
+
+    assert result["workflow_mode"] == "fast"
+    for phase_id in ("1.3", "1.4", "4.0"):
+        assert phase_id not in result["phase_sequence"]
 

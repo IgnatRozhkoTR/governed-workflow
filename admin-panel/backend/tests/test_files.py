@@ -1,6 +1,9 @@
 """Tests for file read and diff routes."""
 import os
+from datetime import datetime
 from pathlib import Path
+
+import pytest
 
 from testing_utils import _git
 
@@ -871,3 +874,178 @@ def test_diff_base_ignored_for_commit_mode(client, workspace):
     assert r.json["mode"] == "commit"
     paths = [f["path"] for f in r.json["files"]]
     assert "committed.py" in paths
+
+
+# ---------------------------------------------------------------------------
+# repo= resolution when working_dir is a worktree subdirectory of the project
+# (mirrors <project>/.claude/worktrees/<branch> in production)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def nested_workspace(clean_db):
+    """Project whose path is a parent repo, with the workspace working_dir a
+    genuine git-worktree subdirectory of the project path, matching the real
+    <project>/.claude/worktrees/<branch> layout."""
+    import tempfile
+    from core.db import get_db
+
+    tmp_root = Path(tempfile.mkdtemp())
+    project_root = tmp_root / "project"
+    project_root.mkdir()
+    _git(project_root, "init")
+    _git(project_root, "config", "user.name", "Test")
+    _git(project_root, "config", "user.email", "test@test.com")
+    _git(project_root, "checkout", "-b", "develop")
+    (project_root / ".gitignore").write_text("")
+    _git(project_root, "add", ".")
+    _git(project_root, "commit", "-m", "Initial commit")
+
+    worktree_dir = project_root / ".claude" / "worktrees" / "feature-test"
+    worktree_dir.parent.mkdir(parents=True)
+    _git(project_root, "worktree", "add", "-b", "feature/test", str(worktree_dir), "develop")
+
+    db = get_db()
+    registered = datetime.now().isoformat()
+    db.execute(
+        "INSERT INTO projects (id, name, path, registered) VALUES (?, ?, ?, ?)",
+        ("test-project", "Test Project", str(project_root), registered),
+    )
+    now = datetime.now().isoformat()
+    cursor = db.execute(
+        "INSERT INTO workspaces (project_id, branch, sanitized_branch, working_dir, "
+        "created, status, phase, plan_json, source_branch) "
+        "VALUES (?, ?, ?, ?, ?, 'active', '0', ?, ?)",
+        ("test-project", "feature/test", "feature-test", str(worktree_dir),
+         now, '{"description":"","systemDiagram":"","execution":[]}', "develop"),
+    )
+    ws_id = cursor.lastrowid
+    db.commit()
+    db.close()
+
+    return {
+        "project_path": str(project_root),
+        "working_dir": str(worktree_dir),
+        "ws_id": ws_id,
+    }
+
+
+def test_get_repos_lists_inner_repo_under_project_not_under_worktree(client, nested_workspace):
+    inner = Path(nested_workspace["project_path"]) / "inner_repo"
+    inner.mkdir()
+    _git(inner, "init")
+
+    r = client.get("/api/ws/test-project/feature/test/repos")
+
+    assert r.status_code == 200
+    paths = [repo["path"] for repo in r.json["repos"]]
+    assert paths[0] == "."
+    assert "inner_repo" in paths
+    assert not (Path(nested_workspace["working_dir"]) / "inner_repo").exists()
+
+
+def test_repo_param_resolves_inner_repo_under_project_for_diff_and_branches(client, nested_workspace):
+    inner = _init_inner_repo(nested_workspace["project_path"], "inner_repo")
+    (inner / "inner_uncommitted.py").write_text("inner = 1\n")
+    _git(inner, "branch", "inner-feature")
+
+    r_diff = client.get("/api/ws/test-project/feature/test/diff?mode=uncommitted&repo=inner_repo")
+    assert r_diff.status_code == 200
+    diff_paths = [f["path"] for f in r_diff.json["files"]]
+    assert "inner_uncommitted.py" in diff_paths
+
+    r_branches = client.get("/api/ws/test-project/feature/test/branches?repo=inner_repo")
+    assert r_branches.status_code == 200
+    branch_names = [b["name"] for b in r_branches.json["branches"]]
+    assert "inner-main" in branch_names
+    assert "inner-feature" in branch_names
+
+
+def test_repo_param_traversal_outside_project_path_still_rejected(client, nested_workspace):
+    for endpoint in REPO_SCOPED_ENDPOINTS:
+        r = client.get(f"/api/ws/test-project/feature/test/{endpoint}?repo=../something")
+        assert r.status_code == 400, endpoint
+        assert r.json["error"] == "invalid_repo", endpoint
+
+
+# ---------------------------------------------------------------------------
+# multi-repo project: get_repos / diff / history / branches scoping
+# ---------------------------------------------------------------------------
+
+def _create_multi_workspace(client, project, branch, **extra):
+    payload = {"branch": branch, "worktree": True}
+    payload.update(extra)
+    return client.post(f"/api/projects/{project['id']}/workspaces", json=payload)
+
+
+def test_get_repos_multi_project_returns_only_attached_repos_no_root_entry(client, multi_project):
+    repo_a_id = multi_project["repos"]["service-a"]["id"]
+    branch = "feature/repos-multi"
+    r = _create_multi_workspace(client, multi_project, branch, repos=[repo_a_id])
+    assert r.status_code == 201, r.json
+
+    r_repos = client.get(f"/api/ws/{multi_project['id']}/{branch}/repos")
+    assert r_repos.status_code == 200
+    repos = r_repos.json["repos"]
+    assert repos == [{"path": "service-a", "name": "service-a"}]
+
+
+def test_get_repos_multi_project_no_attached_repos_returns_empty_list(client, multi_project):
+    branch = "feature/repos-none"
+    r = _create_multi_workspace(client, multi_project, branch)
+    assert r.status_code == 201, r.json
+
+    r_repos = client.get(f"/api/ws/{multi_project['id']}/{branch}/repos")
+    assert r_repos.status_code == 200
+    assert r_repos.json["repos"] == []
+
+
+def test_get_repos_single_project_unchanged(client, workspace):
+    r = client.get("/api/ws/test-project/feature/test/repos")
+    assert r.status_code == 200
+    assert r.json["repos"][0]["path"] == "."
+
+
+def test_diff_history_branches_multi_project_resolve_attached_repo_worktree(client, multi_project):
+    repo_a_id = multi_project["repos"]["service-a"]["id"]
+    repo_b_id = multi_project["repos"]["service-b"]["id"]
+    branch = "feature/scoped-multi"
+    r = _create_multi_workspace(client, multi_project, branch, repos=[repo_a_id, repo_b_id])
+    assert r.status_code == 201, r.json
+
+    worktree_b = Path(r.json["attached_repos"][1]["worktree_path"])
+    assert worktree_b.name == "service-b"
+    (worktree_b / "uncommitted.py").write_text("x = 1\n")
+
+    r_diff = client.get(f"/api/ws/{multi_project['id']}/{branch}/diff?mode=uncommitted&repo=service-b")
+    assert r_diff.status_code == 200, r_diff.json
+    diff_paths = [f["path"] for f in r_diff.json["files"]]
+    assert "uncommitted.py" in diff_paths
+
+    r_history = client.get(f"/api/ws/{multi_project['id']}/{branch}/history?repo=service-b")
+    assert r_history.status_code == 200, r_history.json
+
+    r_branches = client.get(f"/api/ws/{multi_project['id']}/{branch}/branches?repo=service-b")
+    assert r_branches.status_code == 200, r_branches.json
+
+
+def test_diff_history_branches_multi_project_missing_repo_param_returns_repo_required(client, multi_project):
+    branch = "feature/scoped-multi-required"
+    r = _create_multi_workspace(client, multi_project, branch)
+    assert r.status_code == 201, r.json
+
+    for endpoint in REPO_SCOPED_ENDPOINTS:
+        resp = client.get(f"/api/ws/{multi_project['id']}/{branch}/{endpoint}")
+        assert resp.status_code == 400, endpoint
+        assert resp.json["error"] == "repo_required", endpoint
+
+
+def test_diff_history_branches_multi_project_unattached_repo_returns_repo_not_found(client, multi_project):
+    branch = "feature/scoped-multi-unattached"
+    repo_a_id = multi_project["repos"]["service-a"]["id"]
+    r = _create_multi_workspace(client, multi_project, branch, repos=[repo_a_id])
+    assert r.status_code == 201, r.json
+
+    for endpoint in REPO_SCOPED_ENDPOINTS:
+        resp = client.get(f"/api/ws/{multi_project['id']}/{branch}/{endpoint}?repo=service-c")
+        assert resp.status_code == 400, endpoint
+        assert resp.json["error"] == "repo_not_found", endpoint

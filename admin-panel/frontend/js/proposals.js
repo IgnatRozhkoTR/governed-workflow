@@ -37,6 +37,7 @@ function renderProposalsTab() {
 
     var html = filtered.map(buildProposalCardHtml).join('');
     morphInnerHTML(container, html);
+    renderMermaidBlocks(container);
 }
 
 function buildProposalCardHtml(p) {

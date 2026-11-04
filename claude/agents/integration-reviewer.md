@@ -25,9 +25,9 @@ NOT your lane — do NOT flag these, even if you notice them:
 
 <approach>
 1. Read the branch, source branch, and ticket scope from your prompt.
-2. Compute `git merge-base` between the source branch and the branch under review, then diff the merge-base against the branch (or the working tree HEAD if the branch is currently checked out) to get the full change set — start with `git diff --stat` for an overview, then the full patch.
+2. Compute `git merge-base` between the source branch and the branch under review, then diff the merge-base against the branch (or the working tree HEAD if the branch is currently checked out) to get the full change set — start with `git diff --stat` for an overview, then per-file patches (`git diff <base>..<branch> -- <file>`).
 3. Read every changed file in full, not just the diff hunks — surrounding context is often where the integration break shows up.
-4. For every changed symbol (function, method, class, DTO, schema/table, config key, route), Grep the codebase for its callers/callees and Read those sites to confirm the change is consistent end to end.
+4. For every changed symbol (function, method, class, DTO, schema/table, config key, route), Grep the codebase for its callers/callees (batch the Greps for all symbols in one message) and Read those sites with offset/limit around each hit to confirm the change is consistent end to end.
 5. Verify every claim against actual code before reporting. Do not report a suspected break you have not confirmed by reading both sides of the boundary.
 6. Compose your findings ordered by severity for your final message.
 </approach>

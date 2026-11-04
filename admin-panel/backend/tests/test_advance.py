@@ -1,4 +1,6 @@
 """Tests for advance endpoints (approve/reject) and perform_advance advancers."""
+import pytest
+
 import advance.orchestrator as orchestrator
 
 from testing_utils import set_phase, add_progress, add_research, add_discussion, add_review_issue, add_criterion, add_comment, make_plan_json
@@ -157,6 +159,14 @@ def test_research_blocked_no_entries(workspace, project):
     ws = _get_ws_row(workspace["id"])
     result, code = perform_advance(ws, project["path"])
     assert code == 422
+
+
+def test_research_blocked_no_entries_even_with_confirmation(workspace, project):
+    set_phase(workspace["id"], "1.1")
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"], body={"no_further_research_needed": True})
+    assert code == 422
+    assert result["status"] == "blocked"
 
 
 def test_research_passes(workspace, project):
@@ -936,34 +946,33 @@ def _proposal_row(proposal_id):
         db.close()
 
 
-def test_advance_to_done_rejects_leftover_proposal_from_5_1(workspace, project):
-    """Advancing 5.1 → 6 with a leftover auto proposal marks it rejected as completed."""
+@pytest.mark.parametrize("phase,kind", [("5.1", "auto"), ("5.2", "manual")])
+def test_advance_to_done_leaves_leftover_proposal_open(workspace, project, phase, kind):
+    set_phase(workspace["id"], phase)
+    proposal_id = _insert_open_proposal(workspace["id"], project["id"], implementation_kind=kind)
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 200
+    assert result["phase"] == "6"
+
+    row = _proposal_row(proposal_id)
+    assert row["status"] == "proposed"
+    assert row["reason"] is None
+
+
+def test_leftover_proposal_can_be_resolved_after_workspace_done(client, workspace, project):
     set_phase(workspace["id"], "5.1")
-    proposal_id = _insert_open_proposal(workspace["id"], project["id"], implementation_kind="auto")
+    proposal_id = _insert_open_proposal(workspace["id"], project["id"])
+    perform_advance(_get_ws_row(workspace["id"]), project["path"])
 
-    ws = _get_ws_row(workspace["id"])
-    result, code = perform_advance(ws, project["path"])
-    assert code == 200
-    assert result["phase"] == "6"
+    response = client.put(
+        f"/api/ws/test-project/feature/test/proposals/{proposal_id}/resolve",
+        json={"status": "rejected"},
+    )
 
-    row = _proposal_row(proposal_id)
-    assert row["status"] == "rejected"
-    assert row["reason"] == "Workspace completed"
-
-
-def test_advance_to_done_rejects_leftover_proposal_from_5_2(workspace, project):
-    """Advancing 5.2 → 6 with a leftover manual proposal marks it rejected as completed."""
-    set_phase(workspace["id"], "5.2")
-    proposal_id = _insert_open_proposal(workspace["id"], project["id"], implementation_kind="manual")
-
-    ws = _get_ws_row(workspace["id"])
-    result, code = perform_advance(ws, project["path"])
-    assert code == 200
-    assert result["phase"] == "6"
-
-    row = _proposal_row(proposal_id)
-    assert row["status"] == "rejected"
-    assert row["reason"] == "Workspace completed"
+    assert response.status_code == 200
+    assert _proposal_row(proposal_id)["status"] == "rejected"
 
 
 # ── Disabled 3.x.3 skips commit-approval gate ─────────────────────────────────
@@ -983,3 +992,22 @@ def test_advance_skips_disabled_commit_approval_gate(workspace, project):
         assert result["phase"] == "3.1.4"
     finally:
         _clean_phase_settings()
+
+
+def test_research_blocked_no_entries_even_under_yolo_mode(workspace, project):
+    """yolo_mode skips Phase.validate() for every phase, but the zero-research
+    invariant is enforced in transition_phase() itself, so it survives yolo."""
+    set_phase(workspace["id"], "1.1", yolo_mode=1)
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 422
+    assert "error" in result
+
+
+def test_research_passes_under_yolo_mode_with_entries(workspace, project):
+    set_phase(workspace["id"], "1.1", yolo_mode=1)
+    add_research(workspace["id"])
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+    assert code == 200
+    assert result["phase"] == "1.2"

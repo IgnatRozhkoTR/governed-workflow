@@ -161,6 +161,28 @@ def _check_review_file_count(ws) -> None:
         )
 
 
+def _check_research_entries_exist(db, ws) -> None:
+    """Raise AdvanceBusinessRuleError when leaving 1.1 with zero research entries.
+
+    ResearchPhase.validate() already blocks this in the normal path, but
+    yolo_mode skips validate() entirely for every phase. This check runs
+    unconditionally (mirrors _check_review_file_count) so the research
+    requirement survives yolo_mode. It only fires when the workspace is
+    actually sitting at 1.1 — workspaces where 1.1 is disabled via phase
+    settings never transition through it, so they are unaffected.
+    """
+    count = db.execute(
+        "SELECT COUNT(*) as cnt FROM research_entries WHERE workspace_id = ?",
+        (ws["id"],)
+    ).fetchone()["cnt"]
+    if count == 0:
+        raise AdvanceBusinessRuleError(
+            "Cannot advance from 1.1 (Research): the workspace has zero saved "
+            "research entries. Deploy researcher sub-agents and save findings "
+            "via workspace_save_research before advancing."
+        )
+
+
 def _maybe_write_advance_action(db, ws, new_phase: str) -> None:
     """Write pending-advance-action file when crossing a boundary_key boundary.
 
@@ -229,7 +251,13 @@ def transition_phase(db, ws, new_phase, commit_hash=None):
     validated against a concrete base.
     """
     if new_phase == "4.0":
-        _check_review_file_count(ws)
+        from services import review_mode_service
+
+        if "files" in review_mode_service.strategies_for(ws):
+            _check_review_file_count(ws)
+
+    if ws["phase"] == "1.1":
+        _check_research_entries_exist(db, ws)
 
     rows = db.execute(
         "UPDATE workspaces SET phase = ? WHERE id = ? AND phase = ?",
@@ -264,10 +292,23 @@ def _start_review_pipeline(ws) -> None:
     """Spawn the background headless review pipeline.
 
     Disabled when ``GOVERNED_WORKFLOW_DISABLE_REVIEW_PIPELINE`` is truthy
-    (used by tests that do not want to fork a real Claude subprocess).
-    Failures here never block the phase transition.
+    (used by tests that do not want to fork a real Claude subprocess). Also
+    skipped entirely when the workspace's review mode enables no strategies
+    (``manual`` mode) — user gates only, no automatic reviewers. Failures
+    here never block the phase transition.
     """
     if os.environ.get("GOVERNED_WORKFLOW_DISABLE_REVIEW_PIPELINE"):
+        return
+
+    from services import review_mode_service
+
+    strategies = review_mode_service.strategies_for(ws)
+    if not strategies:
+        logger.info(
+            "review mode for workspace %s enables no strategies (manual); "
+            "skipping automatic review pipeline",
+            ws["id"],
+        )
         return
 
     working_dir = ws_field(ws, "working_dir")
@@ -281,6 +322,7 @@ def _start_review_pipeline(ws) -> None:
             workspace_id=ws["id"],
             project_path=Path(working_dir),
             base_branch=ws_field(ws, "source_branch") or "main",
+            strategies=strategies,
         )
     except Exception:
         logger.exception(
@@ -453,10 +495,6 @@ def perform_advance(ws, project_path, body=None):
             return {"error": str(exc), "status": "blocked"}, 422
         if post_commit is None:
             return {"error": t("advance.error.phaseAlreadyChanged", locale)}, 409
-
-        if new_phase == "6":
-            from services.proposal_service import reject_open_proposals
-            reject_open_proposals(db, ws["id"], reason="Workspace completed")
 
         db.commit()
         for callback in post_commit:

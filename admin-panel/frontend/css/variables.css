@@ -45,6 +45,8 @@
   --diff-del-bg: rgba(60, 34, 34, 0.55);
   --diff-add-text: #e8e6e1;
   --diff-del-text: #e8e6e1;
+  --diff-add-word-bg: rgba(46, 160, 67, 0.4);
+  --diff-del-word-bg: rgba(248, 81, 73, 0.4);
   --bg: #0f1117;
   --bg-secondary: #1e2130;
   --bg-tertiary: #262a3d;
@@ -85,6 +87,8 @@
   --diff-del-bg: rgba(245, 210, 210, 0.6);
   --diff-add-text: #1a1a18;
   --diff-del-text: #1a1a18;
+  --diff-add-word-bg: rgba(140, 210, 140, 0.75);
+  --diff-del-word-bg: rgba(235, 150, 150, 0.75);
   --bg: #f5f0e8;
   --bg-secondary: #fff;
   --bg-tertiary: #f0ebe0;

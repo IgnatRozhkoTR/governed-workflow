@@ -121,11 +121,12 @@ def stub_pipeline(monkeypatch):
     """
     calls = []
 
-    def stub(workspace_id, project_path, base_branch="main"):
+    def stub(workspace_id, project_path, base_branch="main", strategies=None):
         calls.append({
             "workspace_id": workspace_id,
             "project_path": str(project_path),
             "base_branch": base_branch,
+            "strategies": strategies,
         })
         return stub.return_value
 
@@ -152,6 +153,8 @@ class TestStartReviewPipeline:
         assert call["workspace_id"] == workspace["id"]
         # Default base branch comes from workspaces.source_branch (set to 'develop' by fixture).
         assert call["base_branch"] == "develop"
+        # Default review_mode is 'files_integration' — strategies resolved from the workspace.
+        assert call["strategies"] == frozenset({"files", "integration"})
 
     def test_refuses_when_wrong_phase(self, client, workspace, stub_pipeline):
         # Default workspace fixture is at phase 0; no force given.

@@ -8,6 +8,8 @@ backfills the Stop hook into pre-existing worktree settings files.
 
 import json
 import logging
+import re
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -153,6 +155,104 @@ def test_engine_template_lacking_placeholder_logs_warning_and_writes_nothing(
 
     assert not (root / SKILL_OUTPUT_REL).exists()
     assert any("placeholder" in r.getMessage() for r in caplog.records)
+
+
+# ── SkillConfigurator: module override template ────────────────────────────────
+
+
+def _make_module_with_skill_template_override(root: Path, module_id: str, template_content: str) -> Path:
+    mod_dir = root / module_id
+    mod_dir.mkdir(parents=True)
+    (mod_dir / "SKILL.md").write_text(f"---\nname: {module_id}\n---\n")
+    override_dir = mod_dir / "override" / "skills" / "governed-workflow"
+    override_dir.mkdir(parents=True)
+    (override_dir / "SKILL.md.template").write_text(template_content)
+    return mod_dir
+
+
+def test_enabled_module_template_override_used_when_present(
+    db, project_row, project_root, tmp_path, default_template, caplog
+):
+    modules_root = tmp_path / "modules"
+    override_template = (
+        "---\nname: governed-workflow\ndescription: x\n---\n\n"
+        "# Module Override Heading\n\nPreamble.\n\n{{PHASES}}\n\nFooter.\n"
+    )
+    _make_module_with_skill_template_override(modules_root, "mod-a", override_template)
+    db.execute(
+        "INSERT INTO modules_enabled (module_id, enabled_at) VALUES (?, ?)",
+        ("mod-a", "2024-01-01T00:00:00"),
+    )
+    db.commit()
+
+    with patch("services.configurator_service._MODULE_OVERRIDE_ROOTS", [modules_root]), \
+         caplog.at_level(logging.DEBUG, logger="services.configurator_service"):
+        SkillConfigurator().configure(db, project_row, project_root)
+
+    body = (project_root / SKILL_OUTPUT_REL).read_text()
+    assert "# Module Override Heading" in body
+    assert any("module override template" in r.getMessage() for r in caplog.records)
+
+
+def test_disabled_module_template_override_reverts_to_engine_default(
+    db, project_row, project_root, tmp_path, default_template
+):
+    """Disabling the module and re-rendering falls back to the engine default template."""
+    modules_root = tmp_path / "modules"
+    override_template = (
+        "---\nname: governed-workflow\ndescription: x\n---\n\n"
+        "# Module Override Heading\n\nPreamble.\n\n{{PHASES}}\n\nFooter.\n"
+    )
+    _make_module_with_skill_template_override(modules_root, "mod-a", override_template)
+    db.execute(
+        "INSERT INTO modules_enabled (module_id, enabled_at) VALUES (?, ?)",
+        ("mod-a", "2024-01-01T00:00:00"),
+    )
+    db.commit()
+
+    with patch("services.configurator_service._MODULE_OVERRIDE_ROOTS", [modules_root]):
+        SkillConfigurator().configure(db, project_row, project_root)
+    assert "# Module Override Heading" in (project_root / SKILL_OUTPUT_REL).read_text()
+
+    db.execute("DELETE FROM modules_enabled WHERE module_id = ?", ("mod-a",))
+    db.commit()
+
+    with patch("services.configurator_service._MODULE_OVERRIDE_ROOTS", [modules_root]):
+        SkillConfigurator().configure(db, project_row, project_root)
+
+    body = (project_root / SKILL_OUTPUT_REL).read_text()
+    assert "# Module Override Heading" not in body
+    assert "Preamble." in body and "Footer." in body
+
+
+def test_last_enabled_module_template_override_wins_on_collision(
+    db, project_row, project_root, tmp_path, default_template
+):
+    modules_root = tmp_path / "modules"
+    first_template = (
+        "---\nname: governed-workflow\ndescription: x\n---\n\n# From First Module\n\n{{PHASES}}\n"
+    )
+    second_template = (
+        "---\nname: governed-workflow\ndescription: x\n---\n\n# From Second Module\n\n{{PHASES}}\n"
+    )
+    _make_module_with_skill_template_override(modules_root, "mod-first", first_template)
+    _make_module_with_skill_template_override(modules_root, "mod-second", second_template)
+    db.execute(
+        "INSERT INTO modules_enabled (module_id, enabled_at) VALUES (?, ?)",
+        ("mod-first", "2024-01-01T00:00:00"),
+    )
+    db.execute(
+        "INSERT INTO modules_enabled (module_id, enabled_at) VALUES (?, ?)",
+        ("mod-second", "2024-01-02T00:00:00"),
+    )
+    db.commit()
+
+    with patch("services.configurator_service._MODULE_OVERRIDE_ROOTS", [modules_root]):
+        SkillConfigurator().configure(db, project_row, project_root)
+
+    body = (project_root / SKILL_OUTPUT_REL).read_text()
+    assert "# From Second Module" in body
+    assert "# From First Module" not in body
 
 
 def test_missing_project_path_skips_root_but_still_renders_worktrees(
@@ -329,6 +429,147 @@ def test_disabled_phase_is_absent_from_rendered_skill(db, project_row, project_r
     assert "## 1.0 Assessment" in body
 
 
+_PHASE_MAP_HEADER = "| Phase | Name | What happens | Edits | Commits | Push | Gate |"
+_MAP_ROW_RE = re.compile(r"^\|\s*`([^`]+)`\s*\|")
+_BODY_HEADING_RE = re.compile(r"^##\s+(?:Phase\s+)?(\d+(?:\.[\dNx]+)*)\b", re.MULTILINE)
+_PHASE_REF_RE = re.compile(r"(?<![\w.])(\d+\.(?:\d+|[Nx])(?:\.(?:\d+|[Nx]))?)(?![\w.])")
+_EXECUTION_REF_RE = re.compile(r"^3\.(?:\d+|[Nx])(?:\.(\d+|[Nx]))?$")
+
+_TOGGLE_CASES = {
+    # The four render variants of the untouched default phase set.
+    "default": None,
+    # Phase sets observed on real projects, where scope toggles dropped the
+    # research, impact-analysis, validation and post-review-fix phases.
+    "research-and-review-off": ["0", "1.0", "2.0", "3.x.0", "3.x.4", "4.2", "5.1", "5.2", "6"],
+    # An arbitrary mid-sequence drop that no workflow mode would ever produce.
+    "mid-sequence-drop": ["0", "1.0", "1.3", "1.4", "3.x.0", "3.x.1", "3.x.3", "3.x.4", "4.0", "4.2", "5.1", "6"],
+    # Drops each phase that another phase's own summary or prose used to name.
+    "referenced-phases-off": ["0", "1.1", "1.2", "2.0", "3.x.1", "3.x.2", "3.x.4", "4.1", "5.2", "6"],
+}
+
+
+def _canonical_phase_ref(ref: str) -> str:
+    """Fold a rendered phase reference onto the id the resolver uses.
+
+    Body sections label execution phases ``3.N.K`` and the Phase Map labels
+    them ``3.x.K``; concrete plan items (``3.1.0``) belong to the same family.
+    All three collapse to ``3.x.K``, and a bare sub-phase id (``3.1``) to
+    ``3.x``.
+    """
+    match = _EXECUTION_REF_RE.match(ref)
+    if not match:
+        return ref
+    step = match.group(1)
+    return "3.x" if step is None else f"3.x.{step}"
+
+
+def _phase_map_ids(rendered: str) -> set:
+    """Phase ids that have a row in the rendered Phase Map table."""
+    lines = rendered.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(_PHASE_MAP_HEADER))
+    ids = set()
+    for line in lines[start + 2:]:
+        if not line.startswith("|"):
+            break
+        match = _MAP_ROW_RE.match(line)
+        if match:
+            ids.add(_canonical_phase_ref(match.group(1)))
+    return ids
+
+
+def _body_section_ids(rendered: str) -> set:
+    """Phase ids that have a body section heading in the rendered skill."""
+    return {_canonical_phase_ref(pid) for pid in _BODY_HEADING_RE.findall(rendered)}
+
+
+def _referenced_phase_ids(rendered: str) -> set:
+    """Every dotted phase id mentioned anywhere in the rendered skill."""
+    return {_canonical_phase_ref(ref) for ref in _PHASE_REF_RE.findall(rendered)}
+
+
+def _renderable_phase_ids(phase_ids: list) -> set:
+    """The enabled set, plus the bare execution-family id its members imply."""
+    allowed = set(phase_ids)
+    if any(pid.startswith("3.x.") for pid in phase_ids):
+        allowed.add("3.x")
+    return allowed
+
+
+def _default_phase_ids() -> list:
+    """Resolve the clean-default phase set with no scope overrides applied."""
+    from services import phase_resolver
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        "CREATE TABLE phase_settings "
+        "(scope_type TEXT, scope_id TEXT, phase_id TEXT, enabled INTEGER)"
+    )
+    try:
+        return phase_resolver.resolve_for_project(conn, None, include_templated=True)
+    finally:
+        conn.close()
+
+
+def _render_case(case: str, workflow_mode: str, simple_planning: bool):
+    phase_ids = _TOGGLE_CASES[case] or _default_phase_ids()
+    template = SkillConfigurator.DEFAULT_TEMPLATE_PATH.read_text()
+    rendered = SkillConfigurator.render(
+        template, phase_ids, simple_planning=simple_planning, workflow_mode=workflow_mode
+    )
+    return phase_ids, rendered
+
+
+@pytest.mark.parametrize("case", sorted(_TOGGLE_CASES))
+@pytest.mark.parametrize("workflow_mode", ["standard", "fast"])
+@pytest.mark.parametrize("simple_planning", [False, True])
+def test_rendered_skill_never_references_a_disabled_phase(case, workflow_mode, simple_planning):
+    """No phase id outside the enabled set survives anywhere in the output.
+
+    Phases are toggled per device/project/workspace scope, which is an axis
+    the template's mode conditionals cannot see. Any hardcoded successor or
+    transition reference therefore goes stale the moment a project turns that
+    phase off, and mis-instructs the orchestrator at runtime. The document
+    declares which phases exist and leaves routing to the backend, so every
+    phase id it mentions must be one of its own enabled phases.
+    """
+    phase_ids, rendered = _render_case(case, workflow_mode, simple_planning)
+
+    dangling = _referenced_phase_ids(rendered) - _renderable_phase_ids(phase_ids)
+
+    assert not dangling, f"rendered skill references disabled phases: {sorted(dangling)}"
+
+
+@pytest.mark.parametrize("case", sorted(_TOGGLE_CASES))
+@pytest.mark.parametrize("workflow_mode", ["standard", "fast"])
+@pytest.mark.parametrize("simple_planning", [False, True])
+def test_phase_map_and_body_sections_cover_the_same_phases(case, workflow_mode, simple_planning):
+    """Every phase with a body section has a Phase Map row and vice versa.
+
+    The table and the body are built by two separate skip predicates
+    (``short_description`` vs ``description_for_skill``). If they ever
+    disagree, a phase is documented in one view and invisible in the other.
+    """
+    phase_ids, rendered = _render_case(case, workflow_mode, simple_planning)
+
+    assert _phase_map_ids(rendered) == _body_section_ids(rendered)
+    assert _phase_map_ids(rendered) == set(phase_ids)
+
+
+def test_progress_documentation_states_no_phase_transitions():
+    """The progress section names no successor phase.
+
+    It used to tabulate rows like ``| 1.0 -> 1.1 | "1.0" |``, which named a
+    phase that any project could switch off. Each phase section now carries
+    its own progress requirement instead.
+    """
+    _, rendered = _render_case("default", "standard", False)
+
+    section = rendered.split("## Progress Documentation", 1)[1]
+    assert "→" not in section
+    assert not _PHASE_REF_RE.findall(section)
+
+
 def test_declarative_module_phase_appears_in_rendered_skill(
     db, project_row, tmp_path, default_template_with_map
 ):
@@ -474,6 +715,160 @@ def test_agent_files_configurator_is_idempotent(
         "correctness-reviewer.md",
         "file-reviewer.md",
     ]
+
+
+# ── AgentFilesConfigurator: module overrides + project-local precedence ────────
+
+
+def _enable_module(db, module_id: str, enabled_at: str) -> None:
+    db.execute(
+        "INSERT INTO modules_enabled (module_id, enabled_at) VALUES (?, ?)",
+        (module_id, enabled_at),
+    )
+    db.commit()
+
+
+def _make_module_with_agent_override(root: Path, module_id: str, filename: str, content: str) -> Path:
+    mod_dir = root / module_id
+    mod_dir.mkdir(parents=True)
+    (mod_dir / "SKILL.md").write_text(f"---\nname: {module_id}\n---\n")
+    override_dir = mod_dir / "override" / "agents"
+    override_dir.mkdir(parents=True)
+    (override_dir / filename).write_text(content)
+    return mod_dir
+
+
+def test_agent_files_configurator_applies_enabled_module_override(
+    db, project_row, agent_source, tmp_path
+):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    modules_root = tmp_path / "modules"
+    _make_module_with_agent_override(modules_root, "mod-a", "file-reviewer.md", "# Overridden by mod-a")
+    _enable_module(db, "mod-a", "2024-01-01T00:00:00")
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", agent_source), \
+         patch("services.configurator_service._MODULE_OVERRIDE_ROOTS", [modules_root]):
+        AgentFilesConfigurator().configure(db, project_row, tmp_path / "irrelevant")
+
+    agents_dir = wt / ".claude" / "agents"
+    assert (agents_dir / "file-reviewer.md").read_text() == "# Overridden by mod-a"
+    assert "architecture-reviewer" in (agents_dir / "architecture-reviewer.md").read_text()
+
+
+def test_agent_files_configurator_project_local_file_survives_rerender(
+    db, project_row, agent_source, tmp_path
+):
+    """A project-local agents file overlays defaults and survives repeated re-renders.
+
+    Regression guard: previously the configurator only ever mirrored the repo
+    default set, so a project-local customization was clobbered on every run.
+    """
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    project_root = tmp_path / "proj"
+    project_agents_dir = project_root / ".claude" / "agents"
+    project_agents_dir.mkdir(parents=True)
+    (project_agents_dir / "custom.md").write_text("# Project custom agent")
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", agent_source):
+        AgentFilesConfigurator().configure(db, project_row, project_root)
+        AgentFilesConfigurator().configure(db, project_row, project_root)
+
+    agents_dir = wt / ".claude" / "agents"
+    assert (agents_dir / "custom.md").read_text() == "# Project custom agent"
+    assert (agents_dir / "file-reviewer.md").exists()
+
+
+def test_agent_files_configurator_project_local_wins_over_module_override(
+    db, project_row, agent_source, tmp_path
+):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    modules_root = tmp_path / "modules"
+    _make_module_with_agent_override(modules_root, "mod-a", "file-reviewer.md", "# From module override")
+    _enable_module(db, "mod-a", "2024-01-01T00:00:00")
+
+    project_root = tmp_path / "proj"
+    project_agents_dir = project_root / ".claude" / "agents"
+    project_agents_dir.mkdir(parents=True)
+    (project_agents_dir / "file-reviewer.md").write_text("# Project always wins")
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", agent_source), \
+         patch("services.configurator_service._MODULE_OVERRIDE_ROOTS", [modules_root]):
+        AgentFilesConfigurator().configure(db, project_row, project_root)
+
+    agents_dir = wt / ".claude" / "agents"
+    assert (agents_dir / "file-reviewer.md").read_text() == "# Project always wins"
+
+
+def test_agent_files_configurator_override_removed_after_module_disabled(
+    db, project_row, agent_source, tmp_path
+):
+    """Disabling a module and re-rendering restores the repo-default agent file."""
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    modules_root = tmp_path / "modules"
+    _make_module_with_agent_override(modules_root, "mod-a", "file-reviewer.md", "# Overridden by mod-a")
+    _enable_module(db, "mod-a", "2024-01-01T00:00:00")
+    project_root = tmp_path / "proj"
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", agent_source), \
+         patch("services.configurator_service._MODULE_OVERRIDE_ROOTS", [modules_root]):
+        AgentFilesConfigurator().configure(db, project_row, project_root)
+
+    agents_dir = wt / ".claude" / "agents"
+    assert (agents_dir / "file-reviewer.md").read_text() == "# Overridden by mod-a"
+
+    db.execute("DELETE FROM modules_enabled WHERE module_id = ?", ("mod-a",))
+    db.commit()
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", agent_source), \
+         patch("services.configurator_service._MODULE_OVERRIDE_ROOTS", [modules_root]):
+        AgentFilesConfigurator().configure(db, project_row, project_root)
+
+    assert (agents_dir / "file-reviewer.md").read_text() == "---\nname: file-reviewer\n---\nbody\n"
+
+
+def test_agent_files_configurator_stale_deletion_preserves_override_and_project_files(
+    db, project_row, agent_source, tmp_path
+):
+    """Only files absent from the full composed set (defaults + overrides + project)
+    are treated as stale; override-sourced and project-sourced files are kept."""
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _insert_worktree(db, project_row, "feature/x", wt, status="active")
+
+    modules_root = tmp_path / "modules"
+    _make_module_with_agent_override(modules_root, "mod-a", "module-only-agent.md", "# Module-only agent")
+    _enable_module(db, "mod-a", "2024-01-01T00:00:00")
+
+    project_root = tmp_path / "proj"
+    project_agents_dir = project_root / ".claude" / "agents"
+    project_agents_dir.mkdir(parents=True)
+    (project_agents_dir / "project-only-agent.md").write_text("# Project-only agent")
+
+    stale_dir = wt / ".claude" / "agents"
+    stale_dir.mkdir(parents=True)
+    (stale_dir / "retired-agent.md").write_text("old\n")
+
+    with patch("services.configurator_service.DEFAULT_AGENTS_DIR", agent_source), \
+         patch("services.configurator_service._MODULE_OVERRIDE_ROOTS", [modules_root]):
+        AgentFilesConfigurator().configure(db, project_row, project_root)
+
+    agents_dir = wt / ".claude" / "agents"
+    assert not (agents_dir / "retired-agent.md").exists()
+    assert (agents_dir / "module-only-agent.md").exists()
+    assert (agents_dir / "project-only-agent.md").exists()
+    assert (agents_dir / "file-reviewer.md").exists()
 
 
 # ── StopHookConfigurator ───────────────────────────────────────────────────────

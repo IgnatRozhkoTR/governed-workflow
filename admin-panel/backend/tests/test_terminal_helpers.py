@@ -1,17 +1,24 @@
 """Unit tests for terminal helper functions."""
+import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 SERVER_DIR = str(Path(__file__).resolve().parent.parent)
 if SERVER_DIR not in sys.path:
     sys.path.insert(0, SERVER_DIR)
 
+import core.terminal as terminal_module
 from core.terminal import (
     _strip_ansi,
     _is_claude_ready,
     build_claude_command,
+    copy_image_to_host_clipboard,
+    create_session,
     mark_new_session,
     parse_env_vars,
+    send_paste_keystroke,
+    send_prompt,
     write_launch_env_file,
 )
 
@@ -161,3 +168,201 @@ def test_build_claude_command_sources_launch_env():
     command = build_claude_command(ws)
 
     assert "if [ -f .claude/state/launch-env ]; then . .claude/state/launch-env; fi;" in command
+
+
+def test_copy_image_to_host_clipboard_returns_false_on_unsupported_platform(monkeypatch):
+    monkeypatch.setattr(terminal_module.sys, "platform", "win32")
+    monkeypatch.setattr(
+        terminal_module.subprocess, "run",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not be called")),
+    )
+
+    assert copy_image_to_host_clipboard("/tmp/image.png") is False
+
+
+def test_copy_image_to_host_clipboard_returns_false_on_linux(monkeypatch):
+    monkeypatch.setattr(terminal_module.sys, "platform", "linux")
+    monkeypatch.setattr(
+        terminal_module.subprocess, "run",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not be called")),
+    )
+
+    assert copy_image_to_host_clipboard("/tmp/image.png") is False
+
+
+def test_copy_image_to_host_clipboard_macos_success_invokes_osascript(monkeypatch):
+    monkeypatch.setattr(terminal_module.sys, "platform", "darwin")
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", fake_run)
+
+    assert copy_image_to_host_clipboard("/tmp/image.png") is True
+    assert len(calls) == 1
+    assert calls[0][0] == "osascript"
+    assert "/tmp/image.png" in calls[0][2]
+    assert "«class PNGf»" in calls[0][2]
+
+
+def test_copy_image_to_host_clipboard_macos_nonzero_returncode_returns_false(monkeypatch):
+    monkeypatch.setattr(terminal_module.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        terminal_module.subprocess, "run",
+        lambda *a, **k: SimpleNamespace(returncode=1),
+    )
+
+    assert copy_image_to_host_clipboard("/tmp/image.png") is False
+
+
+def test_copy_image_to_host_clipboard_macos_timeout_returns_false(monkeypatch):
+    monkeypatch.setattr(terminal_module.sys, "platform", "darwin")
+
+    def raising_run(*a, **k):
+        raise subprocess.TimeoutExpired(cmd=["osascript"], timeout=10)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", raising_run)
+
+    assert copy_image_to_host_clipboard("/tmp/image.png") is False
+
+
+def test_copy_image_to_host_clipboard_macos_refuses_path_with_double_quote(monkeypatch):
+    monkeypatch.setattr(terminal_module.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        terminal_module.subprocess, "run",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not be called")),
+    )
+
+    assert copy_image_to_host_clipboard('/tmp/weird "quoted" dir/image.png') is False
+
+
+def test_copy_image_to_host_clipboard_macos_refuses_path_with_backslash(monkeypatch):
+    monkeypatch.setattr(terminal_module.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        terminal_module.subprocess, "run",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not be called")),
+    )
+
+    assert copy_image_to_host_clipboard("/tmp/weird\\dir/image.png") is False
+
+
+def test_send_paste_keystroke_returns_false_when_session_missing(monkeypatch):
+    monkeypatch.setattr(
+        terminal_module.subprocess, "run",
+        lambda cmd, **k: SimpleNamespace(returncode=1),
+    )
+
+    assert send_paste_keystroke("ws-missing") is False
+
+
+def test_send_paste_keystroke_sends_ctrl_v_when_session_exists(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[:2] == ["tmux", "has-session"]:
+            return SimpleNamespace(returncode=0)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", fake_run)
+
+    assert send_paste_keystroke("ws-exists") is True
+    send_keys_calls = [c for c in calls if c[:2] == ["tmux", "send-keys"]]
+    assert len(send_keys_calls) == 1
+    assert "C-v" in send_keys_calls[0]
+
+
+def test_send_prompt_uses_named_buffer_for_load_and_paste(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", fake_run)
+
+    assert send_prompt("ws-exists", "hello\nworld") is True
+
+    load_calls = [c for c in calls if c[:2] == ["tmux", "load-buffer"]]
+    paste_calls = [c for c in calls if c[:2] == ["tmux", "paste-buffer"]]
+    assert len(load_calls) == 1
+    assert len(paste_calls) == 1
+
+    load_cmd = load_calls[0]
+    assert load_cmd[2] == "-b"
+    buf_name = load_cmd[3]
+    assert buf_name.startswith("gw-prompt-")
+
+    paste_cmd = paste_calls[0]
+    assert "-d" in paste_cmd
+    assert "-b" in paste_cmd
+    assert paste_cmd[paste_cmd.index("-b") + 1] == buf_name
+    assert "-t" in paste_cmd
+    assert paste_cmd[paste_cmd.index("-t") + 1] == "ws-exists"
+
+
+def test_send_prompt_uses_distinct_buffer_names_across_calls(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", fake_run)
+
+    send_prompt("ws-exists", "first")
+    send_prompt("ws-exists", "second")
+
+    load_calls = [c for c in calls if c[:2] == ["tmux", "load-buffer"]]
+    buffer_names = [c[3] for c in load_calls]
+    assert len(buffer_names) == 2
+    assert buffer_names[0] != buffer_names[1]
+
+
+def test_send_prompt_deletes_buffer_on_failure(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[:2] == ["tmux", "paste-buffer"]:
+            raise subprocess.CalledProcessError(1, cmd)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", fake_run)
+
+    assert send_prompt("ws-exists", "hello") is False
+
+    delete_calls = [c for c in calls if c[:2] == ["tmux", "delete-buffer"]]
+    assert len(delete_calls) == 1
+    assert "-b" in delete_calls[0]
+
+    load_cmd = next(c for c in calls if c[:2] == ["tmux", "load-buffer"])
+    buf_name = load_cmd[3]
+    assert delete_calls[0][delete_calls[0].index("-b") + 1] == buf_name
+
+
+def test_send_prompt_returns_false_when_session_missing(monkeypatch):
+    monkeypatch.setattr(
+        terminal_module.subprocess, "run",
+        lambda cmd, **k: SimpleNamespace(returncode=1),
+    )
+
+    assert send_prompt("ws-missing", "hello") is False
+
+
+def test_create_session_unbinds_middle_click_paste(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(terminal_module.subprocess, "run", fake_run)
+
+    create_session("ws-new", "/tmp/some-workspace")
+
+    unbind_calls = [c for c in calls if c[:2] == ["tmux", "unbind-key"]]
+    assert len(unbind_calls) == 1
+    assert unbind_calls[0] == ["tmux", "unbind-key", "-T", "root", "MouseDown2Pane"]

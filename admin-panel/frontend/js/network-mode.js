@@ -2,12 +2,8 @@
 //  NETWORK MODE
 // ═══════════════════════════════════════════════
 
-function _networkModeHeader() {
-  return '<div class="card-header" style="cursor: pointer;" ' +
-         'onclick="this.closest(\'.card\').classList.toggle(\'collapsed\')">' +
-         '<span class="card-title">' + escapeHtml(t('networkMode.title')) + '</span>' +
-         '<span class="card-collapse-chevron">&#9660;</span>' +
-         '</div>';
+function _networkModeSubsectionTitle() {
+  return '<div class="settings-subsection-title">' + escapeHtml(t('networkMode.title')) + '</div>';
 }
 
 async function renderNetworkMode() {
@@ -18,9 +14,9 @@ async function renderNetworkMode() {
   try {
     info = await apiGetNetworkMode();
   } catch (e) {
-    host.innerHTML = _networkModeHeader() +
-      '<div class="card-body"><div style="color: var(--text-muted); font-size: 0.82rem;">' +
-      escapeHtml(t('networkMode.unavailable')) + '</div></div>';
+    host.innerHTML = _networkModeSubsectionTitle() +
+      '<div style="color: var(--text-muted); font-size: 0.82rem;">' +
+      escapeHtml(t('networkMode.unavailable')) + '</div>';
     return;
   }
 
@@ -33,20 +29,18 @@ async function renderNetworkMode() {
       }).join(', ')
     : '<em>' + escapeHtml(t('networkMode.noLan')) + '</em>';
 
-  host.innerHTML = _networkModeHeader() +
-    '<div class="card-body">' +
-      '<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">' +
-        '<input type="checkbox" id="networkModeToggle"' + (enabled ? ' checked' : '') + '>' +
-        '<span style="font-size: 0.85rem;">' + escapeHtml(t('networkMode.allowAccess')) + '</span>' +
-      '</label>' +
-      '<p style="margin: 10px 0 0; color: var(--text-muted); font-size: 0.78rem;">' +
-        escapeHtml(t('networkMode.explain')) +
-      '</p>' +
-      (enabled
-        ? '<p style="margin: 10px 0 0; color: var(--text-muted); font-size: 0.78rem;">' +
-          escapeHtml(t('networkMode.reach')) + ' ' + lanList + '</p>'
-        : '') +
-    '</div>';
+  host.innerHTML = _networkModeSubsectionTitle() +
+    '<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">' +
+      '<input type="checkbox" id="networkModeToggle"' + (enabled ? ' checked' : '') + '>' +
+      '<span style="font-size: 0.85rem;">' + escapeHtml(t('networkMode.allowAccess')) + '</span>' +
+    '</label>' +
+    '<p style="margin: 10px 0 0; color: var(--text-muted); font-size: 0.78rem;">' +
+      escapeHtml(t('networkMode.explain')) +
+    '</p>' +
+    (enabled
+      ? '<p style="margin: 10px 0 0; color: var(--text-muted); font-size: 0.78rem;">' +
+        escapeHtml(t('networkMode.reach')) + ' ' + lanList + '</p>'
+      : '');
 
   var toggle = document.getElementById('networkModeToggle');
   if (toggle) toggle.addEventListener('change', onNetworkModeToggleChange);

@@ -168,4 +168,4 @@ if __name__ == "__main__":
     print(f"  Bind host: {bind_host}")
     if not token_configured:
         print(f"  [!] No admin token configured. Run `{admin_token_setup_command()}` to generate one.")
-    app.run(host=bind_host, port=5111, debug=False)
+    app.run(host=bind_host, port=5111, debug=False, threaded=True)

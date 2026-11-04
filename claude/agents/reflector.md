@@ -37,4 +37,4 @@ You have just finished a ticket. The prompt you are given embeds the ticket scop
 
 ## Workflow
 
-Read the prompt sections in order, use Read/Grep/Bash to corroborate as needed. For each proposal, call the MCP tool directly with the structured payload. Submit each proposal individually. Stop when done. End with a single sentence stating how many proposals were submitted and of which types.
+Read the prompt sections in order, use Read/Grep/Bash to corroborate as needed. For each proposal, call the MCP tool directly with the structured payload. Submit each proposal individually. Stop when done. End with one line per submitted proposal — `id — implementation_kind — type — title` (the id is returned by `workspace_submit_proposal`) — or "No proposals submitted."

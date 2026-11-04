@@ -4,7 +4,7 @@ Claude Code slash-command skills. Each subfolder is one skill, invoked as `/<fol
 
 ## Current Skills
 
-`governed-workflow`, `plan-preparation`, `planning`, `setup`, `rules`, `telegram-multi-session`, `commit-push-mr`, `local-review`, `chrome-troubleshooter`.
+`governed-workflow`, `plan-preparation`, `planning`, `setup`, `rules`, `module-installation`, `telegram-multi-session`, `commit-push-mr`, `local-review`, `chrome-troubleshooter`.
 
 ## Structure
 

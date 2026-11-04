@@ -71,6 +71,7 @@
 .lsp-server-status.stopped { background: rgba(148, 163, 184, 0.15); color: var(--text-muted); }
 .lsp-server-status.error { background: rgba(248, 113, 113, 0.15); color: #f87171; }
 .lsp-server-status.starting { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+.lsp-server-status.stopping { background: rgba(96, 165, 250, 0.15); color: #60a5fa; }
 
 .lsp-dropdown-actions {
   display: flex;
@@ -102,10 +103,23 @@
 .lsp-btn.start { border-color: #4ade80; color: #4ade80; }
 .lsp-btn.stop { border-color: #f87171; color: #f87171; }
 
+.lsp-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .lsp-dropdown-error {
   font-size: 11px;
   color: #f87171;
   padding: 4px 8px;
+}
+
+.lsp-dropdown-error-sticky {
+  font-weight: 500;
+  border-top: 1px dashed rgba(248, 113, 113, 0.3);
+  margin-top: 2px;
+  padding-top: 4px;
 }
 
 /* LSP section in verification profile cards */
@@ -149,7 +163,7 @@
 }
 
 /* LSP Shortcut config rows */
-.setup-shortcut-row, .lsp-shortcut-row {
+.lsp-shortcut-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -157,16 +171,12 @@
   padding: 4px 0;
 }
 
-.setup-shortcut-row {
-  padding: 4px 18px;
-}
-
-.setup-shortcut-row label, .lsp-shortcut-row label {
+.lsp-shortcut-row label {
   font-size: 12px;
   min-width: 140px;
 }
 
-.setup-shortcut-row input, .lsp-shortcut-row input {
+.lsp-shortcut-row input {
   font-size: 12px;
   font-family: monospace;
   padding: 4px 8px;
@@ -183,9 +193,4 @@
   color: var(--text-muted);
   margin-top: 8px;
   line-height: 1.5;
-}
-
-/* Setup wizard needs its own padding since there's no card-body wrapper */
-#setup-shortcuts .shortcut-hint {
-  padding: 0 18px 12px;
 }

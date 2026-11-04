@@ -115,6 +115,7 @@ function renderPPImpactAnalysis() {
   }
 
   morphInnerHTML(container, parts.join(''));
+  renderMermaidBlocks(container);
 }
 
 // ═══════════════════════════════════════════════

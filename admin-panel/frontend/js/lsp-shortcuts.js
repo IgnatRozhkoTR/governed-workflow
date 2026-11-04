@@ -240,46 +240,7 @@ function saveLspShortcutsFromConfig() {
   });
 
   if (typeof showToast === 'function') {
-    showToast('LSP shortcuts saved');
+    showToast(t('settings.lspShortcutsSaved'));
   }
-}
-
-// --- Setup wizard rendering ---
-
-function renderSetupShortcutsSection() {
-  var shortcuts = getLspShortcuts();
-  var actions = Object.keys(LSP_SHORTCUT_LABELS);
-
-  var html = '';
-  for (var i = 0; i < actions.length; i++) {
-    var action = actions[i];
-    var label = LSP_SHORTCUT_LABELS[action];
-    var value = shortcuts[action] || '';
-    html += '<div class="setup-shortcut-row">'
-      + '<label>' + label + '</label>'
-      + '<input type="text" id="shortcut-' + action + '" value="' + escapeAttr(value) + '" placeholder="e.g., Cmd+B">'
-      + '</div>';
-  }
-
-  html += '<div class="shortcut-hint">'
-    + 'Available modifiers: Cmd (\u2318), Alt/Option (\u2325), Shift (\u21E7), Ctrl<br>'
-    + 'Keys: A-Z, F1-F12, Enter, Escape, Tab, Space, arrows<br>'
-    + 'Example: Cmd+B, Cmd+Alt+B, Shift+F12'
-    + '</div>';
-
-  return html;
-}
-
-function collectSetupShortcuts() {
-  var shortcuts = {};
-  var actions = Object.keys(LSP_SHORTCUT_LABELS);
-
-  for (var i = 0; i < actions.length; i++) {
-    var action = actions[i];
-    var input = document.getElementById('shortcut-' + action);
-    shortcuts[action] = input ? input.value.trim() : LSP_DEFAULT_SHORTCUTS[action];
-  }
-
-  return shortcuts;
 }
 

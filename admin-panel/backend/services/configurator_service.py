@@ -12,9 +12,18 @@ import sqlite3
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from core.paths import DEFAULT_AGENTS_DIR, DEFAULT_SKILLS_DIR, hook_command
+from core.paths import (
+    DEFAULT_AGENTS_DIR,
+    DEFAULT_MODULES_DIR,
+    DEFAULT_MODULES_LOCAL_DIR,
+    DEFAULT_SKILLS_DIR,
+    hook_command,
+)
+from services.modules_discovery import resolve_enabled_module_overrides
 
 log = logging.getLogger(__name__)
+
+_MODULE_OVERRIDE_ROOTS = [DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR]
 
 
 def _on_off(flag: bool) -> str:
@@ -103,12 +112,13 @@ class SkillConfigurator(Configurator):
     TEMPLATE_REL_PATH = ".claude/skills/governed-workflow/SKILL.md.template"
     OUTPUT_REL_PATH = ".claude/skills/governed-workflow/SKILL.md"
     DEFAULT_TEMPLATE_PATH = DEFAULT_SKILLS_DIR / "governed-workflow" / "SKILL.md.template"
+    TEMPLATE_OVERRIDE_REL_PATH = "governed-workflow/SKILL.md.template"
     PLACEHOLDER_PHASES = "{{PHASES}}"
     PLACEHOLDER_PHASE_MAP = "{{PHASE_MAP}}"
 
     def configure(self, db: sqlite3.Connection, project_id: int, project_path: Path) -> list[dict]:
         project_path = Path(project_path)
-        template, skip = self._load_engine_template()
+        template, skip = self._load_engine_template(db)
         if template is None:
             return [skip]
 
@@ -122,7 +132,7 @@ class SkillConfigurator(Configurator):
     def configure_workspace(
         self, db: sqlite3.Connection, project: sqlite3.Row, ws: sqlite3.Row
     ) -> list[dict]:
-        template, skip = self._load_engine_template()
+        template, skip = self._load_engine_template(db)
         if template is None:
             return [skip]
         if not ws["working_dir"]:
@@ -130,19 +140,30 @@ class SkillConfigurator(Configurator):
         simple_planning = self._fetch_simple_planning(db, project["id"])
         return [self._render_workspace(db, template, simple_planning, ws)]
 
-    def _load_engine_template(self) -> tuple[str | None, dict | None]:
-        """Read and validate the engine template. Returns (template, None) or (None, skip)."""
-        if not self.DEFAULT_TEMPLATE_PATH.exists():
+    def _resolve_template_path(self, db: sqlite3.Connection) -> Path:
+        """Pick the SKILL.md.template source: last-enabled module override, else the engine default."""
+        overrides = resolve_enabled_module_overrides(db, "skills", _MODULE_OVERRIDE_ROOTS)
+        override_path = overrides.get(self.TEMPLATE_OVERRIDE_REL_PATH)
+        if override_path is not None:
+            log.debug("SkillConfigurator: using module override template %s", override_path)
+            return override_path
+        log.debug("SkillConfigurator: using engine default template %s", self.DEFAULT_TEMPLATE_PATH)
+        return self.DEFAULT_TEMPLATE_PATH
+
+    def _load_engine_template(self, db: sqlite3.Connection) -> tuple[str | None, dict | None]:
+        """Read and validate the resolved template. Returns (template, None) or (None, skip)."""
+        template_path = self._resolve_template_path(db)
+        if not template_path.exists():
             log.warning(
                 "SkillConfigurator: engine template missing at %s, skipping",
-                self.DEFAULT_TEMPLATE_PATH,
+                template_path,
             )
             return None, _skipped("SKILL.md", "template missing")
-        template = self.DEFAULT_TEMPLATE_PATH.read_text()
+        template = template_path.read_text()
         if self.PLACEHOLDER_PHASES not in template:
             log.warning(
                 "SkillConfigurator: template at %s lacks %s placeholder, skipping",
-                self.DEFAULT_TEMPLATE_PATH,
+                template_path,
                 self.PLACEHOLDER_PHASES,
             )
             return None, _skipped("SKILL.md", "template missing placeholder")
@@ -315,59 +336,82 @@ class SkillConfigurator(Configurator):
 
 
 class AgentFilesConfigurator(Configurator):
-    """Mirrors ``claude/agents/*.md`` from the governed-workflow install into every
-    active worktree's ``.claude/agents/`` directory.
+    """Mirrors the composed agent set into every active worktree's ``.claude/agents/``.
 
-    Existing worktrees stay in lock-step with the canonical agent set. On each run
-    every ``*.md`` from the source directory is copied (overwriting if present), and
-    any ``*.md`` in the worktree's ``.claude/agents/`` that is no longer present in
-    the source is removed — otherwise a renamed/retired agent (e.g. the collapsed
-    ``logic-reviewer`` / ``security-reviewer``) would linger and continue to be
-    advertised by Claude Code.
+    The composed set layers three sources, each overwriting the last on a
+    filename collision: ``claude/agents/*.md`` from the governed-workflow
+    install, then enabled modules' ``override/agents/`` files (later-enabled
+    module wins), then the project's own ``.claude/agents/*.md`` (project
+    always wins). This lets a project-local agent customization survive a
+    re-render, and lets disabling a module revert its override on the next
+    render, while still keeping every worktree in lock-step otherwise.
 
-    The source directory is :data:`core.paths.DEFAULT_AGENTS_DIR`. If it does not
-    exist (uninstalled / partial install), the configurator skips silently.
+    On each run every file in the composed set is copied (overwriting if
+    present), and any ``*.md`` under the worktree's ``.claude/agents/`` that is
+    not in the composed set is removed — otherwise a renamed/retired agent
+    (e.g. the collapsed ``logic-reviewer`` / ``security-reviewer``) would
+    linger and continue to be advertised by Claude Code.
+
+    If the composed set is empty (no defaults, no overrides, no project-local
+    agents), the configurator skips silently.
 
     This configurator deliberately covers active worktrees only — the project
     root is never an execution workspace, so its ``.claude/agents/`` does not
-    need the canonical agent set.
+    need the canonical agent set rendered into it (it is only ever read from,
+    as the project-local layer of the composed set).
     """
 
     OUTPUT_REL_DIR = Path(".claude") / "agents"
 
     def configure(self, db: sqlite3.Connection, project_id: int, project_path: Path) -> list[dict]:
-        source_dir = DEFAULT_AGENTS_DIR
-        if not source_dir.exists() or not source_dir.is_dir():
-            log.warning(
-                "AgentFilesConfigurator: source %s missing, skipping",
-                source_dir,
-            )
-            return [_skipped("agents", "source directory missing")]
+        project_path = Path(project_path)
+        default_agents, empty_reason = self._default_agent_sources()
 
-        source_agents = sorted(p for p in source_dir.glob("*.md") if p.is_file())
-        if not source_agents:
-            log.warning(
-                "AgentFilesConfigurator: no *.md files in %s, skipping",
-                source_dir,
+        composed: dict[str, Path] = dict(default_agents)
+        composed.update(resolve_enabled_module_overrides(db, "agents", _MODULE_OVERRIDE_ROOTS))
+        project_agents_dir = project_path / self.OUTPUT_REL_DIR
+        if project_agents_dir.is_dir():
+            composed.update(
+                {p.name: p for p in sorted(project_agents_dir.glob("*.md")) if p.is_file()}
             )
-            return [_skipped("agents", "no agent files in source")]
+
+        if not composed:
+            log.warning("AgentFilesConfigurator: %s, skipping", empty_reason)
+            return [_skipped("agents", empty_reason)]
 
         results = []
         for working_dir in _active_worktree_paths(db, project_id):
             target_dir = Path(working_dir) / self.OUTPUT_REL_DIR
-            self._sync_directory(source_agents, target_dir)
+            self._sync_directory(composed, target_dir)
             results.append(_rendered(str(target_dir)))
         return results
 
-    def _sync_directory(self, source_agents: list[Path], target_dir: Path) -> None:
+    def _default_agent_sources(self) -> tuple[dict[str, Path], str | None]:
+        """Return ({filename: path}, reason) for ``DEFAULT_AGENTS_DIR``.
+
+        ``reason`` is ``None`` when at least one file was found — the only case
+        that guarantees the composed set is non-empty regardless of overrides
+        or project-local agents — otherwise it explains why this layer was
+        empty, for use as the skip reason when the whole composed set is empty.
+        """
+        if not DEFAULT_AGENTS_DIR.exists() or not DEFAULT_AGENTS_DIR.is_dir():
+            return {}, "source directory missing"
+        files = {p.name: p for p in sorted(DEFAULT_AGENTS_DIR.glob("*.md")) if p.is_file()}
+        if not files:
+            return {}, "no agent files in source"
+        return files, None
+
+    def _sync_directory(self, composed: dict[str, Path], target_dir: Path) -> None:
         target_dir.mkdir(parents=True, exist_ok=True)
-        source_names = {p.name for p in source_agents}
+        composed_names = set(composed.keys())
 
-        for src in source_agents:
-            _atomic_copy2(src, target_dir / src.name)
+        for rel_name, src in composed.items():
+            dst = target_dir / rel_name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            _atomic_copy2(src, dst)
 
-        for existing in target_dir.glob("*.md"):
-            if existing.name not in source_names:
+        for existing in target_dir.rglob("*.md"):
+            if str(existing.relative_to(target_dir)) not in composed_names:
                 try:
                     existing.unlink()
                     log.info("AgentFilesConfigurator: removed stale %s", existing)
@@ -378,7 +422,7 @@ class AgentFilesConfigurator(Configurator):
 
         log.info(
             "AgentFilesConfigurator: synced %d agent files into %s",
-            len(source_agents), target_dir,
+            len(composed), target_dir,
         )
 
 

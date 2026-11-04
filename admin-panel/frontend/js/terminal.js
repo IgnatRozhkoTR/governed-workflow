@@ -5,6 +5,41 @@ var term = null;
 var fitAddon = null;
 var terminalWs = null;
 var terminalConnected = false;
+var _lastPastedImageKey = '';
+var _lastPastedImageAt = 0;
+var PASTED_IMAGE_DEDUPE_WINDOW_MS = 10000;
+var _lastTerminalEnterAt = 0;
+var POST_ENTER_PASTE_SUPPRESS_MS = 500;
+var _IS_MAC = /Mac/.test(navigator.platform || navigator.userAgent || '');
+var _terminalInstanceCounter = 0;
+var _typedBurstTimestamps = [];
+var _typedBurstActive = false;
+var _typedBurstQuietTimer = null;
+var RAPID_BURST_WINDOW_MS = 400;
+var RAPID_BURST_THRESHOLD = 40;
+var RAPID_BURST_QUIET_MS = 1000;
+
+// Tracks single-character onData events in a rolling window so simulated/automated
+// keystroke floods (which never fire a real 'paste' event) still surface in the logs.
+function _trackRapidTypedBurst() {
+  var now = Date.now();
+  _typedBurstTimestamps.push(now);
+  if (_typedBurstTimestamps.length > 60) {
+    _typedBurstTimestamps.shift();
+  }
+  while (_typedBurstTimestamps.length && now - _typedBurstTimestamps[0] > RAPID_BURST_WINDOW_MS) {
+    _typedBurstTimestamps.shift();
+  }
+  if (_typedBurstTimestamps.length > RAPID_BURST_THRESHOLD && !_typedBurstActive) {
+    _typedBurstActive = true;
+    console.debug('[paste-guard] rapid typed burst: ' + _typedBurstTimestamps.length + ' chars in ' + RAPID_BURST_WINDOW_MS + 'ms');
+  }
+  if (_typedBurstQuietTimer) clearTimeout(_typedBurstQuietTimer);
+  _typedBurstQuietTimer = setTimeout(function() {
+    _typedBurstActive = false;
+    _typedBurstTimestamps.length = 0;
+  }, RAPID_BURST_QUIET_MS);
+}
 
 function _uploadPastedImage(file, ws) {
   var ctx = (typeof getWorkspaceContext === 'function') ? getWorkspaceContext() : null;
@@ -18,9 +53,17 @@ function _uploadPastedImage(file, ws) {
   fetch(url, { method: 'POST', headers: headers, body: form })
     .then(function(r) { return r.json().then(function(d){ return { ok: r.ok, body: d }; }); })
     .then(function(res) {
-      if (res.ok && res.body && res.body.path && ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(res.body.path);
-        if (typeof showToast === 'function') showToast(t('terminal.imagePasted') || 'Image attached');
+      if (res.ok && res.body && res.body.path) {
+        var mode = res.body.mode;
+        if (mode === 'clipboard') {
+          if (typeof showToast === 'function') showToast(t('terminal.imagePasted') || 'Image attached');
+        } else if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send('@' + res.body.path);
+          if (typeof showToast === 'function') showToast(t('terminal.imagePasted') || 'Image attached');
+        } else {
+          var msg = 'Image paste failed';
+          if (typeof showToast === 'function') showToast(msg);
+        }
       } else {
         var msg = (res.body && res.body.error) ? res.body.error : 'Image paste failed';
         if (typeof showToast === 'function') showToast(msg);
@@ -35,13 +78,23 @@ function _getActiveTerminalKind() {
   return typeof ACTIVE_TERMINAL_KIND === 'string' && ACTIVE_TERMINAL_KIND ? ACTIVE_TERMINAL_KIND : 'claude';
 }
 
-function _buildTerminalWsUrl(projectId, branch) {
+function _terminalWsOrigin() {
   var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  var base = protocol + '//' + window.location.host + '/ws/terminal/' +
+  return protocol + '//' + window.location.host;
+}
+
+function _buildTerminalWsUrl(projectId, branch) {
+  var base = _terminalWsOrigin() + '/ws/terminal/' +
              encodeURIComponent(projectId) + '/' + encodeURIComponent(branch);
   var kind = _getActiveTerminalKind();
   var withKind = kind && kind !== 'claude' ? base + '/' + encodeURIComponent(kind) : base;
   return _appendTokenToWsUrl(withKind);
+}
+
+function _buildSessionTerminalWsUrl(sessionName) {
+  return _appendTokenToWsUrl(
+    _terminalWsOrigin() + '/ws/terminal-session/' + encodeURIComponent(sessionName)
+  );
 }
 
 var TERMINAL_THEMES = {
@@ -102,6 +155,23 @@ function _createTerminal(containerId, wsRef) {
   var container = document.getElementById(containerId);
   if (!container) return null;
 
+  // The container element (e.g. 'terminalContainer', 'splitTerminalContainer') is a
+  // static node in admin.html that survives a workspace-reset — only the Terminal
+  // object gets disposed and nulled. Terminal.dispose() tears down xterm's own
+  // internal renderer DOM but never touches listeners this function attached
+  // directly to the container, so a reconnect that calls _createTerminal again on
+  // the same container would otherwise stack a second 'paste'/'wheel' listener
+  // pair. Remove any prior listeners and stale DOM before wiring up fresh ones.
+  if (container._pasteGuardPasteHandler) {
+    container.removeEventListener('paste', container._pasteGuardPasteHandler, true);
+    container._pasteGuardPasteHandler = null;
+  }
+  if (container._pasteGuardWheelHandler) {
+    container.removeEventListener('wheel', container._pasteGuardWheelHandler);
+    container._pasteGuardWheelHandler = null;
+  }
+  container.innerHTML = '';
+
   var terminal = new Terminal({
     cursorBlink: true,
     fontSize: 13,
@@ -109,7 +179,7 @@ function _createTerminal(containerId, wsRef) {
     theme: getTerminalTheme(),
     allowProposedApi: true,
     scrollback: 5000,
-    copyOnSelect: true
+    copyOnSelect: false
   });
 
   var addon = new FitAddon.FitAddon();
@@ -123,6 +193,9 @@ function _createTerminal(containerId, wsRef) {
 
   terminal.attachCustomKeyEventHandler(function(e) {
     if (e.type !== 'keydown') return true;
+    if (e.key === 'Enter') {
+      _lastTerminalEnterAt = Date.now();
+    }
     var isMacCopy = e.metaKey && !e.ctrlKey && e.key === 'c';
     var isCtrlShiftCopy = e.ctrlKey && e.shiftKey && e.key === 'C';
     if ((isMacCopy || isCtrlShiftCopy) && terminal.hasSelection()) {
@@ -132,6 +205,17 @@ function _createTerminal(containerId, wsRef) {
       }
       return false;
     }
+    // On Windows/Linux, plain Ctrl+V is the paste shortcut. xterm maps it to a
+    // control character and cancels the keydown, which suppresses the browser's
+    // native paste event. Returning false here makes xterm bail out before it
+    // cancels the event, so the browser's default paste proceeds normally.
+    // On macOS, Ctrl+V is left alone since paste is Cmd+V there and Ctrl+V is
+    // the terminal's "quoted insert" shortcut.
+    var isPlainCtrlV = e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey &&
+      (e.keyCode === 86 || (typeof e.key === 'string' && e.key.toLowerCase() === 'v'));
+    if (!_IS_MAC && isPlainCtrlV) {
+      return false;
+    }
     return true;
   });
 
@@ -139,8 +223,10 @@ function _createTerminal(containerId, wsRef) {
     terminal.parser.registerOscHandler(52, function(data) {
       var parts = data.split(';');
       if (parts.length >= 2) {
+        var payload = parts[parts.length - 1];
+        if (payload === '?') { return true; }
         try {
-          var decoded = atob(parts[parts.length - 1]);
+          var decoded = atob(payload);
           if (typeof safeCopyToClipboard === 'function') {
             safeCopyToClipboard(decoded);
           }
@@ -150,14 +236,30 @@ function _createTerminal(containerId, wsRef) {
     });
   }
 
-  container.addEventListener('wheel', function(e) {
+  var wheelHandler = function(e) {
     e.stopPropagation();
-  }, { passive: true });
+  };
+  container.addEventListener('wheel', wheelHandler, { passive: true });
+  container._pasteGuardWheelHandler = wheelHandler;
 
-  container.addEventListener('paste', function(e) {
+  var pasteHandler = function(e) {
     var ws = wsRef();
     var cd = e.clipboardData || window.clipboardData;
-    if (!cd) { e.preventDefault(); return; }
+    if (!cd) { return; }
+
+    var pastedText = cd.getData ? cd.getData('text') : '';
+    if (pastedText && pastedText.length > 0) {
+      var delta = Date.now() - _lastTerminalEnterAt;
+      var suppressed = delta < POST_ENTER_PASTE_SUPPRESS_MS;
+      if (suppressed) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[paste-guard] text paste ' + pastedText.length + ' chars, ' + delta + 'ms after last Enter — SUPPRESSED');
+      } else {
+        console.debug('[paste-guard] text paste ' + pastedText.length + ' chars, ' + delta + 'ms after last Enter — allowed');
+      }
+      return;
+    }
 
     var items = cd.items ? Array.prototype.slice.call(cd.items) : [];
     var imageItem = null;
@@ -169,21 +271,46 @@ function _createTerminal(containerId, wsRef) {
     }
 
     if (imageItem) {
-      e.preventDefault();
       var file = imageItem.getAsFile();
-      if (file) _uploadPastedImage(file, ws);
+      if (!file) { return; }
+
+      var imageKey = file.size + ':' + file.type + ':' + (file.lastModified || 0) + ':' + (file.name || '');
+      var now = Date.now();
+      if (imageKey === _lastPastedImageKey && (now - _lastPastedImageAt) < PASTED_IMAGE_DEDUPE_WINDOW_MS) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+      _lastPastedImageKey = imageKey;
+      _lastPastedImageAt = now;
+      _uploadPastedImage(file, ws);
       return;
     }
+  };
+  container.addEventListener('paste', pasteHandler, true);
+  container._pasteGuardPasteHandler = pasteHandler;
 
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      var text = cd.getData('text');
-      if (text) ws.send(text);
-    }
-    e.preventDefault();
-  });
+  _terminalInstanceCounter += 1;
+  console.log('[paste-guard] terminal created for #' + containerId + ' (instance ' + _terminalInstanceCounter + ')');
+  console.log('[paste-guard] armed, window=' + POST_ENTER_PASTE_SUPPRESS_MS + 'ms');
 
   terminal.onData(function(data) {
     var ws = wsRef();
+    if (data === '\r') {
+      _lastTerminalEnterAt = Date.now();
+    }
+    // SGR mouse-tracking (\x1b[<) and legacy mouse (\x1b[M) sequences fire on every
+    // mouse move and would otherwise dominate the chunk log — exclude them entirely.
+    var isMouseTracking = data.indexOf('\x1b[<') === 0 || data.indexOf('\x1b[M') === 0;
+    if (!isMouseTracking) {
+      if (data.length > 8) {
+        var bracketed = data.indexOf('\x1b[200~') !== -1;
+        console.debug('[paste-guard] onData chunk ' + data.length + ' chars' + (bracketed ? ' (bracketed)' : '') + ', ' + (Date.now() - _lastTerminalEnterAt) + 'ms after last Enter');
+      } else if (data.length === 1) {
+        _trackRapidTypedBurst();
+      }
+    }
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(data);
     }
@@ -250,8 +377,8 @@ function initTerminal() {
   fitAddon = result.fitAddon;
 
   window.addEventListener('resize', function() {
-    if (fitAddon && document.getElementById('panel-terminal').classList.contains('active')) {
-      fitAddon.fit();
+    if (document.getElementById('panel-terminal').classList.contains('active')) {
+      _fitAndPushSize(_activeTerminalTarget());
     }
     if (splitFitAddon && document.getElementById('splitContainer') &&
         document.getElementById('splitContainer').classList.contains('split-active')) {
@@ -266,6 +393,7 @@ function connectTerminal() {
   if (!term) {
     initTerminal();
   }
+  showWorkspaceTerminalView();
 
   var ctx = getWorkspaceContext();
   if (!ctx) {
@@ -366,29 +494,64 @@ function updateTerminalTheme() {
   if (splitTerm) {
     splitTerm.options.theme = getTerminalTheme();
   }
+  Object.keys(_sessionTabs).forEach(function(name) {
+    var tab = _sessionTabs[name];
+    if (tab.terminal) tab.terminal.options.theme = getTerminalTheme();
+  });
 }
 
 function onTerminalTabActivated() {
   if (!term) {
     initTerminal();
   }
-  if (fitAddon) {
-    setTimeout(function() { fitAddon.fit(); if (term) term.focus(); }, 50);
-  }
+  _fitActiveTerminalSoon(true);
   startSessionListPolling();
+  _refreshWorkspaceSessionName();
 }
 
 // ═══════════════════════════════════════════════
 //  SESSION LIST
 // ═══════════════════════════════════════════════
 var _sessionListInterval = null;
+var _sessionListSignature = null;
+var _sessionListErrorShown = false;
+var _workspaceSessionName = null;
+var _lastSessionListPayload = [];
+
+// Learns the exact tmux session name the workspace terminal is backed by, so the
+// by-name chip for that same session can be suppressed instead of showing the
+// workspace's own terminal twice in the toolbar.
+function _refreshWorkspaceSessionName() {
+  var ctx = (typeof getWorkspaceContext === 'function') ? getWorkspaceContext() : null;
+  if (!ctx) return;
+
+  var url = '/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) +
+             '/terminal/status?kind=' + encodeURIComponent(_getActiveTerminalKind());
+
+  apiGet(url)
+    .then(function(data) {
+      _workspaceSessionName = (data && data.session) ? data.session : null;
+      renderSessionList(_lastSessionListPayload);
+    })
+    .catch(function(e) {
+      console.warn('[chips] workspace session name lookup failed', e);
+    });
+}
 
 function loadTerminalSessions() {
   apiGet('/api/terminal/sessions')
     .then(function(sessions) {
+      // Only a successful listing is authoritative — a failed poll must not tear
+      // down terminals for sessions that are still alive.
+      try {
+        _closeVanishedSessionTabs(sessions);
+      } catch (e) {
+        console.error('[chips] closing vanished session tabs failed', e);
+      }
       renderSessionList(sessions);
     })
-    .catch(function() {
+    .catch(function(e) {
+      console.warn('[chips] session poll failed', e);
       renderSessionList([]);
     });
 }
@@ -397,29 +560,140 @@ function renderSessionList(sessions) {
   var container = document.getElementById('terminalSessionList');
   if (!container) return;
 
-  if (!sessions.length) {
-    container.innerHTML = '<span style="color: var(--text-muted); font-size: 0.75rem;">' + t('terminal.noSessions') + '</span>';
-    return;
+  try {
+    if (!Array.isArray(sessions)) {
+      console.warn('[chips] unexpected payload', sessions);
+      sessions = [];
+    }
+    _lastSessionListPayload = sessions;
+
+    var signature = _sessionChipSignature(sessions);
+
+    // The signature is a claim about what the container currently holds, so it is
+    // recorded only once the rebuild has actually produced those chips, and it is
+    // distrusted whenever the container is empty. Recording it up front would make
+    // a single interrupted rebuild permanent: every later poll carries the same
+    // signature, skips the rebuild and leaves the toolbar blank for good.
+    if (signature !== _sessionListSignature || !container.firstChild) {
+      _rebuildSessionChips(container, sessions);
+      _sessionListSignature = signature;
+    }
+
+    _updateSessionChipStates();
+  } catch (e) {
+    console.error('[chips] render failed', e);
+    _sessionListSignature = null;
+    if (!_sessionListErrorShown) {
+      _sessionListErrorShown = true;
+      if (typeof showToast === 'function') showToast(t('terminal.sessionListError'));
+    }
+  }
+}
+
+function _sessionChipSignature(sessions) {
+  return I18N_LOCALE + '\u0002' + (_workspaceSessionName || '') + '\u0002' + sessions.map(function(s) {
+    return s.name + '\u0001' + (s.attached ? '1' : '0') + '\u0001' + (s.command || '');
+  }).join('\u0002');
+}
+
+// Chips are built as DOM nodes rather than markup so tmux-supplied session names
+// never have to survive a round trip through HTML/attribute escaping.
+function _rebuildSessionChips(container, sessions) {
+  var frag = document.createDocumentFragment();
+  frag.appendChild(_buildWorkspaceChip());
+
+  // The workspace terminal chip already represents this session, so listing it
+  // again by name would open a second tmux client attached to the same session.
+  var otherSessions = sessions.filter(function(session) {
+    return session.name !== _workspaceSessionName;
+  });
+
+  if (!otherSessions.length) {
+    var empty = document.createElement('span');
+    empty.className = 'session-list-empty';
+    empty.textContent = t('terminal.noSessions');
+    frag.appendChild(empty);
+  } else {
+    otherSessions.forEach(function(session) {
+      frag.appendChild(_buildSessionChip(session));
+    });
   }
 
-  var html = '';
-  sessions.forEach(function(s) {
-    var statusClass = s.attached ? 'session-attached' : 'session-detached';
-    var statusText = s.attached ? t('terminal.attached') : t('terminal.detached');
-    html += '<div class="session-item" title="' + escapeHtml(s.command || s.name) + '">' +
-      '<span class="session-status-dot ' + statusClass + '"></span>' +
-      '<span class="session-name">' + escapeHtml(s.name) + '</span>' +
-      '<span class="session-status-label">' + statusText + '</span>' +
-      '<button class="session-kill-btn" onclick="killSessionByName(\'' + escapeAttr(s.name) + '\')" title="' + t('terminal.killSession') + '">&times;</button>' +
-      '</div>';
+  container.textContent = '';
+  container.appendChild(frag);
+}
+
+function _buildWorkspaceChip() {
+  var chip = document.createElement('div');
+  chip.className = 'session-item';
+  chip.title = _workspaceSessionName
+    ? t('terminal.workspaceSession') + ' (' + _workspaceSessionName + ')'
+    : t('terminal.workspaceSession');
+
+  var label = document.createElement('span');
+  label.className = 'session-name';
+  label.textContent = t('terminal.workspaceSession');
+  chip.appendChild(label);
+
+  chip.addEventListener('click', showWorkspaceTerminalView);
+  return chip;
+}
+
+function _buildSessionChip(session) {
+  var chip = document.createElement('div');
+  chip.className = 'session-item';
+  chip.dataset.session = session.name;
+  chip.title = session.command || session.name;
+
+  var dot = document.createElement('span');
+  dot.className = 'session-status-dot ' + (session.attached ? 'session-attached' : 'session-detached');
+  chip.appendChild(dot);
+
+  var name = document.createElement('span');
+  name.className = 'session-name';
+  name.textContent = session.name;
+  chip.appendChild(name);
+
+  var status = document.createElement('span');
+  status.className = 'session-status-label';
+  status.textContent = session.attached ? t('terminal.attached') : t('terminal.detached');
+  chip.appendChild(status);
+
+  var killBtn = document.createElement('button');
+  killBtn.className = 'session-kill-btn';
+  killBtn.title = t('terminal.killSession');
+  killBtn.innerHTML = '&times;';
+  killBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    killSessionByName(session.name);
   });
-  container.innerHTML = html;
+  chip.appendChild(killBtn);
+
+  chip.addEventListener('click', function() { openSessionTab(session.name); });
+  return chip;
+}
+
+function _updateSessionChipStates() {
+  var container = document.getElementById('terminalSessionList');
+  if (!container) return;
+  container.querySelectorAll('.session-item').forEach(function(chip) {
+    var name = chip.dataset.session || null;
+    var tab = name ? _sessionTabs[name] : null;
+    chip.classList.toggle('active', name === _activeSessionTabName);
+    chip.classList.toggle('open', !!(tab && tab.ws && tab.ws.readyState === WebSocket.OPEN));
+  });
 }
 
 function killSessionByName(name) {
   apiPost('/api/terminal/sessions/' + encodeURIComponent(name) + '/kill', {})
-    .then(function() { loadTerminalSessions(); })
-    .catch(function() {});
+    .then(function() {
+      closeSessionTab(name);
+      loadTerminalSessions();
+    })
+    .catch(function(e) {
+      if (typeof showToast === 'function') showToast(t('terminal.killFailed') + ': ' + e.message);
+      loadTerminalSessions();
+    });
 }
 
 function startSessionListPolling() {
@@ -433,6 +707,153 @@ function stopSessionListPolling() {
     clearInterval(_sessionListInterval);
     _sessionListInterval = null;
   }
+}
+
+// ═══════════════════════════════════════════════
+//  SESSION TERMINAL TABS
+// ═══════════════════════════════════════════════
+var _sessionTabs = {};
+var _activeSessionTabName = null;
+var _sessionViewCounter = 0;
+
+function openSessionTab(name) {
+  var tab = _sessionTabs[name] || _createSessionTabView(name);
+  if (!tab) return;
+
+  _showTerminalView(name);
+
+  if (!tab.terminal) {
+    var created = _createTerminal(tab.viewId, function() { return tab.ws; });
+    if (!created) {
+      closeSessionTab(name);
+      return;
+    }
+    tab.terminal = created.terminal;
+    tab.fitAddon = created.fitAddon;
+  }
+
+  if (!tab.ws || tab.ws.readyState > WebSocket.OPEN) {
+    _connectSessionTab(tab);
+  }
+
+  _fitActiveTerminalSoon(true);
+}
+
+function _createSessionTabView(name) {
+  var container = document.getElementById('terminalContainer');
+  if (!container) return null;
+
+  _sessionViewCounter += 1;
+  var view = document.createElement('div');
+  view.className = 'terminal-view';
+  view.id = 'sessionTerminalView' + _sessionViewCounter;
+  container.appendChild(view);
+
+  var tab = { name: name, viewId: view.id, viewEl: view, terminal: null, fitAddon: null, ws: null };
+  _sessionTabs[name] = tab;
+  return tab;
+}
+
+function _connectSessionTab(tab) {
+  tab.ws = _connectTerminal(tab.terminal, tab.fitAddon, _buildSessionTerminalWsUrl(tab.name), {
+    focusOnOpen: _activeSessionTabName === tab.name,
+    onConnected: _updateSessionChipStates,
+    onDisconnected: function() {
+      if (tab.terminal) tab.terminal.writeln('\r\n\x1b[33m' + t('terminal.sessionClosed') + '\x1b[0m');
+      _updateSessionChipStates();
+    },
+    onError: function() {
+      if (tab.terminal) tab.terminal.writeln('\r\n\x1b[31m' + t('terminal.sessionError') + '\x1b[0m');
+      _updateSessionChipStates();
+    }
+  });
+}
+
+function closeSessionTab(name) {
+  var tab = _sessionTabs[name];
+  if (!tab) return;
+
+  if (tab.ws) {
+    tab.ws.onopen = null;
+    tab.ws.onmessage = null;
+    tab.ws.onclose = null;
+    tab.ws.onerror = null;
+    tab.ws.close();
+    tab.ws = null;
+  }
+  if (tab.terminal) {
+    tab.terminal.dispose();
+    tab.terminal = null;
+  }
+  if (tab.viewEl && tab.viewEl.parentNode) {
+    tab.viewEl.parentNode.removeChild(tab.viewEl);
+  }
+  delete _sessionTabs[name];
+
+  if (_activeSessionTabName === name) {
+    showWorkspaceTerminalView();
+  }
+}
+
+function closeAllSessionTabs() {
+  Object.keys(_sessionTabs).forEach(closeSessionTab);
+}
+
+function _closeVanishedSessionTabs(sessions) {
+  if (!Array.isArray(sessions)) {
+    console.warn('[chips] unexpected payload', sessions);
+    sessions = [];
+  }
+  var alive = {};
+  sessions.forEach(function(s) { alive[s.name] = true; });
+  Object.keys(_sessionTabs).forEach(function(name) {
+    if (!alive[name]) closeSessionTab(name);
+  });
+}
+
+function showWorkspaceTerminalView() {
+  _showTerminalView(null);
+  _fitActiveTerminalSoon(true);
+}
+
+function _showTerminalView(name) {
+  _activeSessionTabName = name;
+
+  var container = document.getElementById('terminalContainer');
+  if (container) container.classList.toggle('session-view-active', !!name);
+
+  Object.keys(_sessionTabs).forEach(function(key) {
+    _sessionTabs[key].viewEl.classList.toggle('active', key === name);
+  });
+
+  _updateSessionChipStates();
+}
+
+function _activeTerminalTarget() {
+  var tab = _activeSessionTabName ? _sessionTabs[_activeSessionTabName] : null;
+  if (tab) return tab;
+  return { terminal: term, fitAddon: fitAddon, ws: terminalWs };
+}
+
+// A hidden xterm cannot measure itself, so every reveal must re-fit and tell the
+// backend pty about the dimensions it ended up with.
+function _fitAndPushSize(target) {
+  if (!target || !target.fitAddon) return;
+  target.fitAddon.fit();
+  var dims = target.fitAddon.proposeDimensions();
+  if (!dims || !dims.cols || !dims.rows) return;
+  var ws = target.ws;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ resize: [dims.cols, dims.rows] }));
+  }
+}
+
+function _fitActiveTerminalSoon(shouldFocus) {
+  setTimeout(function() {
+    var target = _activeTerminalTarget();
+    _fitAndPushSize(target);
+    if (shouldFocus && target.terminal) target.terminal.focus();
+  }, 50);
 }
 
 // ═══════════════════════════════════════════════
@@ -588,6 +1009,9 @@ function updateSplitTerminalStatus(status) {
 
 document.addEventListener('workspace-reset', function() {
   if (typeof disconnectTerminal === 'function') disconnectTerminal();
+  closeAllSessionTabs();
+  _sessionListSignature = null;
+  _workspaceSessionName = null;
   if (typeof disconnectSplitTerminal === 'function') disconnectSplitTerminal();
   if (term) { term.clear(); term.dispose(); term = null; fitAddon = null; }
   if (typeof splitTerm !== 'undefined' && splitTerm) { splitTerm.clear(); splitTerm.dispose(); splitTerm = null; splitFitAddon = null; }

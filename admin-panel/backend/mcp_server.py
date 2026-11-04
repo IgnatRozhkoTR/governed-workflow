@@ -4,6 +4,7 @@ All tool implementations live in mcp_tools/.
 Importing mcp_tools triggers @mcp.tool registration for all tools.
 """
 from advance.phases import register_module_phases_from_disk
+from services.module_mcp_loader import register_module_mcp_tools
 from mcp_tools import mcp, _detect_workspace
 from mcp_tools.state import workspace_get_state
 from mcp_tools.advance import workspace_advance
@@ -65,6 +66,16 @@ from mcp_tools.proposals import (
     workspace_list_proposals,
     workspace_resolve_proposal,
 )
+from mcp_tools.repos import (
+    workspace_attach_repo,
+    workspace_save_pr,
+)
+from mcp_tools.scratchpad import (
+    scratchpad_create,
+    scratchpad_replace,
+    scratchpad_patch,
+    scratchpad_delete,
+)
 
 _SIMPLE_MODE_HIDDEN_TOOLS = (
     "workspace_propose_criteria",
@@ -109,5 +120,6 @@ def _deregister_simple_mode_tools() -> None:
 
 if __name__ == "__main__":
     register_module_phases_from_disk()
+    register_module_mcp_tools(mcp)
     _deregister_simple_mode_tools()
     mcp.run(transport="stdio")

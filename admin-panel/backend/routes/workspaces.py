@@ -1,6 +1,7 @@
 """Workspace and branch management routes."""
 import json
 import logging
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +20,8 @@ from core.paths import (
     DEFAULT_GIT_HOOKS_DIR,
     DEFAULT_HOOKS_DIR,
     DEFAULT_MCP_TEMPLATE,
+    DEFAULT_MODULES_DIR,
+    DEFAULT_MODULES_LOCAL_DIR,
     DEFAULT_REPO_CLAUDE_MD,
     DEFAULT_RULES_DIR,
     DEFAULT_SKILLS_DIR,
@@ -26,9 +29,13 @@ from core.paths import (
 )
 from core.terminal import session_name
 from services.git_rules_service import migrate_legacy_git_rules
-from services import comment_service, proposal_service, review_pipeline_service
+from services import base_sync_service
+from services import comment_service, lsp_service, proposal_service, review_pipeline_service
+from services import pr_service, repo_service
+from services import review_mode_service
 from services import workflow_mode_service
 from services.configurator_service import ConfiguratorChain
+from services.modules_discovery import resolve_enabled_module_overrides
 
 bp = Blueprint("workspaces", __name__)
 logger = logging.getLogger(__name__)
@@ -161,6 +168,7 @@ _SESSION_START_CMD = hook_command("session-start.py")
 _USER_PROMPT_SUBMIT_CMD = hook_command("user-prompt-submit.sh", interpreter="bash")
 _PRE_TOOL_HOOK_CMD = hook_command("pre-tool-hook.py")
 _BLOCK_ORCHESTRATOR_CMD = hook_command("block-orchestrator-writes.py")
+_BLOCK_NAMED_AGENT_CMD = hook_command("block-named-agent-spawn.py")
 _STOP_ADVANCE_ACTION_CMD = hook_command("stop-advance-action.py")
 
 BLOCK_ORCHESTRATOR_MATCHER = "Edit|MultiEdit|Write|NotebookEdit|Bash"
@@ -203,6 +211,13 @@ _WORKSPACE_HOOKS = {
                     "type": "command",
                     "command": _PRE_TOOL_HOOK_CMD,
                 }]
+            },
+            {
+                "matcher": "Agent",
+                "hooks": [{
+                    "type": "command",
+                    "command": _BLOCK_NAMED_AGENT_CMD,
+                }]
             }
         ],
         "Stop": [
@@ -220,9 +235,11 @@ _WORKSPACE_HOOKS = {
 # agent-teams feature, which is gated behind this env flag.
 _WORKSPACE_ENV = {"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"}
 
+_WORKSPACE_LOCAL_SETTINGS = {"agent": "orchestrator", "autoCompactWindow": 250000}
+
 _MCP_SERVER_PATH = str(Path(__file__).resolve().parent.parent / "mcp_server.py")
 
-_BACKUP_FILES = [".claude/settings.json", ".mcp.json", "CLAUDE.md"]
+_BACKUP_FILES = [".claude/settings.json", ".claude/settings.local.json", ".mcp.json", "CLAUDE.md"]
 
 _BACKUP_DIRS = [".claude/agents", ".claude/hooks"]
 
@@ -303,6 +320,19 @@ def _write_workspace_settings(settings_path):
     settings_path.write_text(json.dumps(existing, indent=2))
 
 
+def _write_workspace_local_settings(settings_path):
+    """Merge the governed local keys into settings.local.json at settings_path, preserving other keys."""
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    existing = {}
+    if settings_path.exists():
+        try:
+            existing = json.loads(settings_path.read_text())
+        except (json.JSONDecodeError, ValueError, OSError):
+            pass
+    existing.update(_WORKSPACE_LOCAL_SETTINGS)
+    settings_path.write_text(json.dumps(existing, indent=2))
+
+
 def _backup_project_files(project_path):
     """Back up project files and directories before workspace modifications (non-worktree mode).
 
@@ -345,7 +375,10 @@ def _restore_project_files(project_path):
 _MD_SEPARATOR = "\n\n---\n\n# Governed Workflow Defaults\n\n"
 
 # Repo-default asset directories that are merged into each workspace.
-# Each tuple is (source_dir, destination_subpath_inside_workspace).
+# Each tuple is (source_dir, destination_subpath_inside_workspace). The
+# destination subpath's final component (e.g. "agents", "hooks") doubles as
+# the module override subpath: a module ships its overrides mirroring this
+# same layout under override/<subpath>/.
 _REPO_DEFAULT_ASSET_DIRS = [
     (DEFAULT_AGENTS_DIR, Path(".claude") / "agents"),
     (DEFAULT_HOOKS_DIR, Path(".claude") / "hooks"),
@@ -353,6 +386,29 @@ _REPO_DEFAULT_ASSET_DIRS = [
     (DEFAULT_DEFAULTS_DIR, Path(".claude") / "defaults"),
     (DEFAULT_SKILLS_DIR, Path(".claude") / "skills"),
 ]
+
+_MODULE_OVERRIDE_ROOTS = [DEFAULT_MODULES_DIR, DEFAULT_MODULES_LOCAL_DIR]
+
+
+def _composed_repo_default_sources(db) -> list[tuple[dict[str, Path], Path]]:
+    """Compose each ``_REPO_DEFAULT_ASSET_DIRS`` entry with enabled-module overrides.
+
+    For every ``(src_dir, dst_rel)`` pair, builds ``{relative_path: source_path}``
+    from the repo-default files under *src_dir*, then overlays it with enabled
+    modules' ``override/<dst_rel.name>/`` files (later-enabled module wins —
+    see :func:`resolve_enabled_module_overrides`). Returns a list of
+    ``(composed_map, dst_rel)`` pairs, one per asset dir, in declared order.
+    """
+    composed = []
+    for src_dir, dst_rel in _REPO_DEFAULT_ASSET_DIRS:
+        asset_map: dict[str, Path] = {}
+        if src_dir.exists():
+            for src_file in src_dir.rglob("*"):
+                if src_file.is_file():
+                    asset_map[str(src_file.relative_to(src_dir))] = src_file
+        asset_map.update(resolve_enabled_module_overrides(db, dst_rel.name, _MODULE_OVERRIDE_ROOTS))
+        composed.append((asset_map, dst_rel))
+    return composed
 
 
 def _concatenate_md(repo_default: Path, project_file: Path, workspace_target: Path):
@@ -380,16 +436,16 @@ def _concatenate_md(repo_default: Path, project_file: Path, workspace_target: Pa
     workspace_target.write_text(content)
 
 
-def _fill_missing_repo_defaults(target_root: Path):
-    """Copy each missing file from repo default asset dirs into target_root. Never overwrites."""
-    for src_dir, dst_rel in _REPO_DEFAULT_ASSET_DIRS:
-        if not src_dir.exists():
-            continue
+def _fill_missing_repo_defaults(db, target_root: Path):
+    """Copy each missing file from the composed default+override asset maps into target_root.
+
+    Precedence for what counts as a "default" here is repo defaults overlaid
+    by enabled modules' overrides (see :func:`_composed_repo_default_sources`).
+    Existing destination files are never overwritten.
+    """
+    for asset_map, dst_rel in _composed_repo_default_sources(db):
         dst_dir = target_root / dst_rel
-        for src_file in src_dir.rglob("*"):
-            if not src_file.is_file():
-                continue
-            rel = src_file.relative_to(src_dir)
+        for rel, src_file in asset_map.items():
             dst_file = dst_dir / rel
             if dst_file.exists():
                 continue
@@ -397,12 +453,14 @@ def _fill_missing_repo_defaults(target_root: Path):
             shutil.copy2(src_file, dst_file)
 
 
-def _merge_project_assets(project_path: str, workspace_path: Path):
+def _merge_project_assets(db, project_path: str, workspace_path: Path):
     """Populate workspace .claude/ via a two-pass merge.
 
-    Pass 1 — repo defaults: for each file under the repo default asset dirs,
-    copy it to the equivalent workspace destination ONLY when the destination
-    is missing.  Existing destination files are never overwritten.
+    Pass 1 — composed defaults: for each file in the composed default+override
+    asset maps (repo defaults overlaid by enabled modules' overrides — see
+    :func:`_composed_repo_default_sources`), copy it to the equivalent workspace
+    destination ONLY when the destination is missing. Existing destination
+    files are never overwritten.
 
     Pass 2 — project-local overrides: if the project has its own .claude/,
     walk it and write its files over the workspace copies so the project
@@ -412,8 +470,8 @@ def _merge_project_assets(project_path: str, workspace_path: Path):
     """
     project = Path(project_path)
 
-    # Pass 1: fill missing files from repo defaults
-    _fill_missing_repo_defaults(workspace_path)
+    # Pass 1: fill missing files from the composed default+override maps
+    _fill_missing_repo_defaults(db, workspace_path)
 
     # Pass 2: project-local content overwrites workspace copies (project wins).
     # Prune the worktrees storage root BEFORE descending — it holds a full
@@ -483,7 +541,7 @@ def list_workspaces(project_id):
 
         rows = db.execute(
             "SELECT id, sanitized_branch, branch, session_id, working_dir, phase, status, "
-            "created, workflow_mode "
+            "created, workflow_mode, review_mode "
             "FROM workspaces WHERE project_id = ? ORDER BY created",
             (project_id,)
         ).fetchall()
@@ -515,6 +573,7 @@ def list_workspaces(project_id):
                 "status": row["status"],
                 "created": row["created"],
                 "workflow_mode": row["workflow_mode"],
+                "review_mode": row["review_mode"],
                 "sessions": sessions_by_ws.get(row["id"], []),
             })
 
@@ -560,6 +619,24 @@ def _setup_worktree_workspace(project_path, branch, sanitized, source_ref):
     return str(wt_path), None
 
 
+def _setup_multi_workspace(project_path, sanitized):
+    """Create the composite worktree directory for a multi-repo workspace.
+
+    Unlike the single-repo worktree, this is a plain directory (no repo is
+    attached yet), so there is no git worktree cleanup to perform — a
+    non-empty leftover is treated as a conflict rather than recovered from.
+
+    Returns (working_dir, error_response) where error_response is None on success.
+    """
+    composite_path = Path(project_path) / ".claude" / "worktrees" / sanitized
+    if composite_path.exists() and any(composite_path.iterdir()):
+        error_msg = t("api.error.worktreeTargetPathExists", path=str(composite_path))
+        return None, (jsonify({"error": error_msg}), 409)
+
+    composite_path.mkdir(parents=True, exist_ok=True)
+    return str(composite_path), None
+
+
 def _setup_checkout_workspace(project_path, branch, source_ref):
     """Checkout (or create) a branch in the main repo for non-worktree mode.
 
@@ -577,17 +654,58 @@ def _setup_checkout_workspace(project_path, branch, source_ref):
     return project_path, None
 
 
-def _install_worktree_configs(project_path, wt_path):
-    """Populate the worktree with a merged .claude/ from repo defaults and project."""
+def _ensure_scratchpad_dir(git_dir, fs_path):
+    """Create .claude/scratchpad/ and register it in this checkout's local exclude file.
+
+    The exclude file (not the user's tracked .gitignore) is used so scratchpad
+    reports never show up as untracked/dirty in either a worktree or a plain
+    checkout. ``git_dir`` is where git commands run (the worktree or checkout
+    root); ``run_git`` resolves ``info/exclude`` relative to it via git
+    plumbing so this works for both a linked worktree and a plain checkout
+    without hardcoding ``.git`` layout assumptions.
+    """
+    fs_path = Path(fs_path)
+    scratchpad_dir = fs_path / ".claude" / "scratchpad"
+    scratchpad_dir.mkdir(parents=True, exist_ok=True)
+
+    ok, out, _ = run_git(git_dir, "rev-parse", "--git-path", "info/exclude")
+    if not ok:
+        return
+
+    exclude_path = Path(out.strip())
+    if not exclude_path.is_absolute():
+        exclude_path = Path(git_dir) / exclude_path
+
+    exclude_line = ".claude/scratchpad/"
+    existing_lines = exclude_path.read_text().splitlines() if exclude_path.exists() else []
+    if exclude_line in existing_lines:
+        return
+
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    with exclude_path.open("a") as f:
+        if existing_lines and not existing_lines[-1] == "":
+            f.write("\n")
+        f.write(exclude_line + "\n")
+
+
+def _install_worktree_configs(db, project_path, wt_path, install_git_hooks=True):
+    """Populate the worktree with a merged .claude/ from repo defaults and project.
+
+    ``install_git_hooks`` is False for a freshly created multi-repo composite
+    directory, which is a plain directory (not a git worktree) until repos are
+    attached — there is nothing for ``git config --worktree`` to target yet.
+    """
     wt_path = Path(wt_path)
     dst_claude = wt_path / ".claude"
     src_claude = Path(project_path) / ".claude"
 
+    _ensure_scratchpad_dir(str(wt_path), wt_path)
+
     # Legacy cleanup: move git-rules.md from its old home inside rules/ to .claude/ root
     migrate_legacy_git_rules(project_path)
 
-    # a) Merge repo defaults + project-local content into .claude/
-    _merge_project_assets(project_path, wt_path)
+    # a) Merge repo defaults (+ enabled-module overrides) + project-local content into .claude/
+    _merge_project_assets(db, project_path, wt_path)
 
     # b) Re-establish rules/ and git-config.json as symlinks back to project root
     for rel in _SYMLINK_TO_PROJECT:
@@ -601,8 +719,9 @@ def _install_worktree_configs(project_path, wt_path):
                     dst.unlink()
             dst.symlink_to(src)
 
-    # c) Merge governed hooks into workspace settings.json
+    # c) Merge governed hooks into workspace settings.json and local keys into settings.local.json
     _write_workspace_settings(dst_claude / "settings.json")
+    _write_workspace_local_settings(dst_claude / "settings.local.json")
 
     # d) Write CLAUDE.md as a real concatenated file in the worktree
     _concatenate_md(DEFAULT_REPO_CLAUDE_MD, Path(project_path) / "CLAUDE.md", wt_path / "CLAUDE.md")
@@ -626,31 +745,37 @@ def _install_worktree_configs(project_path, wt_path):
         dst_funnel.symlink_to(src_funnel)
 
     # g) Install phase-gated git hooks into the worktree
-    _install_git_hooks(dst_claude, str(wt_path))
+    if install_git_hooks:
+        _install_git_hooks(dst_claude, str(wt_path))
 
 
-def _install_checkout_configs(project_path):
+def _install_checkout_configs(db, project_path):
     """Apply workspace config for checkout (non-worktree) mode.
 
     The project directory IS the user's permanent root, so this mode is
     conservative: it backs everything up first, then fills in only missing
-    pieces from repo defaults without overwriting existing files.
-    CLAUDE.md is left alone if it already exists.
+    pieces from the composed repo default + enabled-module-override maps,
+    without overwriting existing files. CLAUDE.md is left alone if it already
+    exists.
     """
     _backup_project_files(project_path)
+
+    _ensure_scratchpad_dir(project_path, project_path)
 
     # Legacy cleanup: move git-rules.md from its old home inside rules/ to .claude/ root
     migrate_legacy_git_rules(project_path)
 
     project = Path(project_path)
 
-    # Fill missing repo-default files — never overwrite existing project files
-    _fill_missing_repo_defaults(project)
+    # Fill missing files from the composed default+override maps — never
+    # overwrite existing project files
+    _fill_missing_repo_defaults(db, project)
 
     # Merge governed hooks into settings.json (union, never overwrite)
     settings_path = project / ".claude" / "settings.json"
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     _write_workspace_settings(settings_path)
+    _write_workspace_local_settings(settings_path.parent / "settings.local.json")
 
     # CLAUDE.md: copy repo default only when the project has none
     target = project / "CLAUDE.md"
@@ -691,9 +816,31 @@ def _install_git_hooks(dst_claude, working_dir):
         run_git(working_dir, "config", "--worktree", "core.hooksPath", str(hooks_dir))
 
 
+def _branch_checked_out_anywhere(project_path, branch):
+    return base_sync_service.branch_checked_out_anywhere(project_path, branch)
+
+
+def _sync_local_base_branch(project_path, base):
+    return base_sync_service.sync_local_base_branch(project_path, base)
+
+
+def _resolve_base_sync(project_path, source, source_from_origin):
+    """Report whether the local `source` branch was fast-forwarded.
+
+    Wrapped so a failure here can never block or fail workspace creation.
+    """
+    if not source_from_origin:
+        return {"attempted": False, "updated": False, "reason": "not-remote-based"}
+    try:
+        return _sync_local_base_branch(project_path, source)
+    except Exception:
+        logger.exception("Failed to sync local base branch %r after workspace creation", source)
+        return {"attempted": False, "updated": False, "reason": "sync-error"}
+
+
 def _register_workspace(
     db, project_id, branch, sanitized, working_dir, source, locale, project_path,
-    workflow_mode,
+    workflow_mode, review_mode,
 ):
     """Insert workspace into DB and return the (response-body dict, workspace id)."""
     ws_path = workspace_dir(project_path, branch)
@@ -703,10 +850,12 @@ def _register_workspace(
 
     cursor = db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, session_id, "
-        "working_dir, created, status, phase, plan_json, source_branch, locale, workflow_mode) "
-        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?)",
+        "working_dir, created, status, phase, plan_json, source_branch, locale, workflow_mode, "
+        "review_mode) "
+        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?, ?)",
         (project_id, branch, sanitized, str(working_dir), created,
-         '{"description":"","systemDiagram":"","execution":[]}', source, locale, workflow_mode)
+         '{"description":"","systemDiagram":"","execution":[]}', source, locale, workflow_mode,
+         review_mode)
     )
     workspace_id = cursor.lastrowid
     db.commit()
@@ -722,6 +871,50 @@ def _register_workspace(
     }, workspace_id
 
 
+def _prewarm_lsp_servers(db, project_id, working_dir):
+    """Best-effort kick off every LSP-enabled profile assigned to *project_id*.
+
+    Reuses the same async start machinery and per-instance locks as the
+    normal LSP start route, so a background pre-warm followed by a user
+    clicking "start" is a clean no-op. Never raises: indexing/Gradle sync
+    happening early is a nice-to-have, not something creation should fail on.
+    """
+    if os.environ.get("GOVERNED_WORKFLOW_DISABLE_LSP_PREWARM"):
+        return {"started": [], "skipped_reason": "disabled_by_env"}
+
+    try:
+        results = lsp_service.start_all_lsp_servers_async(db, project_id, working_dir)
+        db.commit()
+    except Exception:
+        logger.exception("LSP pre-warm failed for project=%s", project_id)
+        return {"started": [], "skipped_reason": "prewarm_failed"}
+
+    if not results:
+        return {"started": [], "skipped_reason": "no_lsp_enabled_profiles"}
+
+    started = [r["profile_name"] for r in results if "error" not in r]
+    return {"started": started, "skipped_reason": None}
+
+
+def _attach_requested_repos(db, ws, project, repo_ids):
+    """Attach each requested repo id, collecting a per-repo result or error.
+
+    Never raises: a failed attach must not roll back the workspace that was
+    just created, so each failure becomes an error entry alongside successes.
+    """
+    results = []
+    for repo_id in repo_ids:
+        repo_row = repo_service.get_repo(db, project["id"], repo_id)
+        if repo_row is None:
+            results.append({"repo_id": repo_id, "error": t("api.error.repoNotFound")})
+            continue
+        try:
+            results.append(repo_service.attach_repo(db, ws, project, repo_row))
+        except repo_service.RepoServiceError as exc:
+            results.append({"repo_id": repo_id, "rel_path": repo_row["rel_path"], "error": str(exc)})
+    return results
+
+
 @bp.route("/api/projects/<project_id>/workspaces", methods=["POST"])
 def create_workspace(project_id):
     with get_db_ctx() as db:
@@ -734,9 +927,14 @@ def create_workspace(project_id):
         source = body.get("source", DEFAULT_SOURCE_BRANCH).strip()
         use_worktree = body.get("worktree", True)
         locale = body.get("locale", "en").strip()
+        requested_repo_ids = body.get("repos") or []
 
         if not branch:
             return jsonify({"error": t("api.error.branchNameRequired")}), 400
+
+        project_type = project["project_type"]
+        if project_type == "multi" and not use_worktree:
+            return jsonify({"error": t("api.error.multiRequiresWorktree")}), 400
 
         requested_mode = body.get("workflow_mode")
         if isinstance(requested_mode, str):
@@ -746,25 +944,38 @@ def create_workspace(project_id):
         except ValueError:
             return jsonify({"error": t("api.error.invalidWorkflowMode")}), 400
 
+        requested_review_mode = body.get("review_mode")
+        if isinstance(requested_review_mode, str):
+            requested_review_mode = requested_review_mode.strip()
+        try:
+            review_mode = review_mode_service.resolve_default_review_mode(
+                project, requested_review_mode
+            )
+        except ValueError:
+            return jsonify({"error": t("api.error.invalidReviewMode")}), 400
+
         project_path = project["path"]
         sanitized = sanitize_branch(branch)
 
-        ok, _, _ = run_git(project_path, "rev-parse", "--is-inside-work-tree")
-        if not ok:
-            run_git(project_path, "init")
-            run_git(project_path, "commit", "--allow-empty", "-m", "Initial commit")
-
-        has_remote, remotes, _ = run_git(project_path, "remote")
-        if has_remote and remotes.strip():
-            run_git(project_path, "fetch", "origin")
-
-        source_ref = f"origin/{source}"
-        ok, _, _ = run_git(project_path, "rev-parse", "--verify", source_ref)
-        if not ok:
-            ok, _, _ = run_git(project_path, "rev-parse", "--verify", source)
+        source_from_origin = False
+        if project_type != "multi":
+            ok, _, _ = run_git(project_path, "rev-parse", "--is-inside-work-tree")
             if not ok:
-                return jsonify({"error": t("api.error.sourceBranchNotFound", source=source)}), 404
-            source_ref = source
+                run_git(project_path, "init")
+                run_git(project_path, "commit", "--allow-empty", "-m", "Initial commit")
+
+            has_remote, remotes, _ = run_git(project_path, "remote")
+            if has_remote and remotes.strip():
+                run_git(project_path, "fetch", "origin")
+
+            source_ref = f"origin/{source}"
+            ok, _, _ = run_git(project_path, "rev-parse", "--verify", source_ref)
+            source_from_origin = ok
+            if not ok:
+                ok, _, _ = run_git(project_path, "rev-parse", "--verify", source)
+                if not ok:
+                    return jsonify({"error": t("api.error.sourceBranchNotFound", source=source)}), 404
+                source_ref = source
 
         existing = db.execute(
             "SELECT id FROM workspaces WHERE project_id = ? AND sanitized_branch = ? AND status = 'active'",
@@ -773,23 +984,38 @@ def create_workspace(project_id):
         if existing:
             return jsonify({"error": t("api.error.workspaceAlreadyExists", branch=branch)}), 409
 
-        if use_worktree:
+        if project_type == "multi":
+            working_dir, err = _setup_multi_workspace(project_path, sanitized)
+            if err:
+                return err
+            _install_worktree_configs(db, project_path, working_dir, install_git_hooks=False)
+        elif use_worktree:
             working_dir, err = _setup_worktree_workspace(project_path, branch, sanitized, source_ref)
             if err:
                 return err
-            _install_worktree_configs(project_path, working_dir)
+            _install_worktree_configs(db, project_path, working_dir)
         else:
             working_dir, err = _setup_checkout_workspace(project_path, branch, source_ref)
             if err:
                 return err
-            _install_checkout_configs(project_path)
+            _install_checkout_configs(db, project_path)
 
         body, workspace_id = _register_workspace(
             db, project_id, branch, sanitized, working_dir, source, locale,
-            project_path, workflow_mode,
+            project_path, workflow_mode, review_mode,
         )
         workflow_mode_service.apply_mode_phase_settings(db, workspace_id, workflow_mode)
         db.commit()
+
+        if project_type == "multi":
+            if requested_repo_ids:
+                ws_row = db.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
+                body["attached_repos"] = _attach_requested_repos(db, ws_row, project, requested_repo_ids)
+            body["lsp_prewarm"] = {"started": [], "skipped_reason": "multi_project"}
+        else:
+            body["base_sync"] = _resolve_base_sync(project_path, source, source_from_origin)
+            body["lsp_prewarm"] = _prewarm_lsp_servers(db, project_id, working_dir)
+
         try:
             results = ConfiguratorChain.default().run(db, project_id, project_path)
             warnings = [r for r in results if r["action"] != "rendered"]
@@ -809,6 +1035,18 @@ def archive_workspace(db, ws, project):
     project_path = project["path"]
     working_dir = ws["working_dir"]
     is_worktree = working_dir != project_path
+    is_multi = project["project_type"] == "multi"
+
+    if is_multi:
+        repo_rows = db.execute(
+            "SELECT pr.rel_path, wr.worktree_path FROM workspace_repos wr "
+            "JOIN project_repos pr ON pr.id = wr.repo_id WHERE wr.workspace_id = ?",
+            (ws["id"],),
+        ).fetchall()
+        for row in repo_rows:
+            repo_abs = str(Path(project_path) / row["rel_path"])
+            run_git(repo_abs, "worktree", "remove", row["worktree_path"], "--force")
+            run_git(repo_abs, "worktree", "prune")
 
     if is_worktree:
         wt_path = Path(working_dir)
@@ -822,7 +1060,10 @@ def archive_workspace(db, ws, project):
                     shutil.rmtree(proj_ws_dir)
                 shutil.copytree(wt_ws_dir, proj_ws_dir)
 
-            run_git(project_path, "worktree", "remove", str(wt_path), "--force")
+            if is_multi:
+                shutil.rmtree(wt_path, ignore_errors=True)
+            else:
+                run_git(project_path, "worktree", "remove", str(wt_path), "--force")
     else:
         _restore_project_files(project_path)
 
@@ -835,6 +1076,102 @@ def archive_workspace(db, ws, project):
     db.commit()
 
     return jsonify({"status": "archived", "branch": ws["branch"]})
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/repo-state", methods=["GET"])
+@with_workspace
+def get_repo_state(db, ws, project):
+    project_type = project["project_type"]
+    if project_type != "multi":
+        return jsonify({"project_type": project_type, "attached": [], "available": []})
+
+    prs_by_repo = {
+        pr["repo_id"]: pr for pr in pr_service.list_prs(db, ws["id"]) if pr["repo_id"] is not None
+    }
+
+    attached_rows = db.execute(
+        "SELECT wr.repo_id, pr.rel_path, pr.name, wr.branch, wr.worktree_path "
+        "FROM workspace_repos wr JOIN project_repos pr ON pr.id = wr.repo_id "
+        "WHERE wr.workspace_id = ? ORDER BY pr.rel_path",
+        (ws["id"],),
+    ).fetchall()
+    attached_ids = {row["repo_id"] for row in attached_rows}
+    attached = [{
+        "repo_id": row["repo_id"],
+        "rel_path": row["rel_path"],
+        "name": row["name"],
+        "branch": row["branch"],
+        "worktree_path": row["worktree_path"],
+        "pr": prs_by_repo.get(row["repo_id"]),
+    } for row in attached_rows]
+
+    available = [
+        {"repo_id": r["id"], "rel_path": r["rel_path"], "name": r["name"], "base_branch": r["base_branch"]}
+        for r in repo_service.list_repos(db, project["id"])
+        if r["enabled"] and r["id"] not in attached_ids
+    ]
+
+    return jsonify({"project_type": project_type, "attached": attached, "available": available})
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/repos/attach", methods=["POST"])
+@with_workspace
+def attach_workspace_repo(db, ws, project):
+    if project["project_type"] != "multi":
+        return jsonify({"error": t("api.error.notMultiProject")}), 400
+
+    body = request.get_json(silent=True) or {}
+    repo_id = body.get("repo_id")
+    if repo_id is None:
+        return jsonify({"error": t("api.error.repoIdRequired")}), 400
+
+    repo_row = repo_service.get_repo(db, project["id"], repo_id)
+    if repo_row is None:
+        return jsonify({"error": t("api.error.repoNotFound")}), 400
+
+    try:
+        result = repo_service.attach_repo(db, ws, project, repo_row)
+    except repo_service.RepoServiceError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    base_sync = result.pop("base_sync")
+    return jsonify({"attached": result, "base_sync": base_sync}), 200
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/prs", methods=["GET"])
+@with_workspace
+def list_workspace_prs(db, ws, project):
+    return jsonify({"prs": pr_service.list_prs(db, ws["id"])})
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/prs", methods=["POST"])
+@with_workspace
+def save_workspace_pr(db, ws, project):
+    body = request.get_json(silent=True) or {}
+    url = (body.get("url") or "").strip()
+    repo_id = body.get("repo_id")
+    title = body.get("title") or None
+
+    if repo_id is not None:
+        repo_row = repo_service.get_repo(db, project["id"], repo_id)
+        if repo_row is None:
+            return jsonify({"error": t("api.error.repoNotFound")}), 400
+
+    try:
+        result = pr_service.save_pr(db, ws["id"], url, repo_id=repo_id, title=title)
+    except pr_service.PrServiceError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(result), 200
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/prs/<int:pr_id>", methods=["DELETE"])
+@with_workspace
+def delete_workspace_pr(db, ws, project, pr_id):
+    deleted = pr_service.delete_pr(db, ws["id"], pr_id)
+    if not deleted:
+        return jsonify({"error": t("api.error.prNotFound")}), 404
+    return jsonify({"ok": True})
 
 
 _VALID_REVIEW_RESOLUTIONS = frozenset({"fixed", "out_of_scope", "false_positive"})
@@ -891,7 +1228,7 @@ def start_review_pipeline(workspace_id: int):
 
     with get_db_ctx() as db:
         ws = db.execute(
-            "SELECT id, phase, working_dir, source_branch FROM workspaces WHERE id = ?",
+            "SELECT id, phase, working_dir, source_branch, review_mode FROM workspaces WHERE id = ?",
             (workspace_id,)
         ).fetchone()
         if not ws:
@@ -908,11 +1245,13 @@ def start_review_pipeline(workspace_id: int):
             }), 409
 
         base_branch = (base_branch_override or ws["source_branch"] or "main").strip()
+        strategies = review_mode_service.strategies_for(ws)
 
     thread = review_pipeline_service.start_in_background(
         workspace_id=workspace_id,
         project_path=Path(working_dir),
         base_branch=base_branch,
+        strategies=strategies,
     )
     if thread is None:
         return jsonify({"error": "already_running"}), 409

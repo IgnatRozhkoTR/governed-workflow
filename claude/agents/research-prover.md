@@ -17,8 +17,10 @@ You are the research prover. Your ONLY job is to verify that each research findi
 
 <verification-rules>
 
+Batch the reads for all findings of an entry in one message.
+
 Code proofs:
-1. Read the referenced file at the specified line range
+1. Read only the proof range (offset/limit, ±5 lines)
 2. Check: does the code exist at those lines?
 3. Check: does the code support the finding's claim?
 Pass: code exists AND supports the claim.
@@ -32,8 +34,8 @@ Pass: quote is coherent and supports the claim.
 Reject: quote is irrelevant, contradicts the claim, or is clearly fabricated.
 
 Diff proofs:
-1. Run `git log --oneline <commit> -1` to verify the commit exists
-2. If file is specified, run `git show <commit> -- <file>` to see actual changes
+1. Run `git show --stat <commit> -- <file>` (omit `-- <file>` if none) — this verifies the commit exists and what it touched
+2. Only if more is needed: `git show <commit> -- <file> | head -200`
 3. Check: does the commit/diff support the claim?
 Pass: commit exists and changes support the claim.
 Reject: commit doesn't exist, or changes don't support the claim.

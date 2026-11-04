@@ -1,6 +1,7 @@
 """Terminal WebSocket and REST routes for tmux session management."""
 import json
 import re
+import sys
 import uuid
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from core.terminal import (
     SESSION_KIND_CLAUDE,
     TMUX_NOT_INSTALLED,
     build_claude_command,
+    copy_image_to_host_clipboard,
+    copy_text_to_host_clipboard,
     create_session,
     get_session_command,
     kill_session,
@@ -19,6 +22,7 @@ from core.terminal import (
     mark_new_session,
     run_pty_websocket,
     send_keys,
+    send_paste_keystroke,
     send_prompt,
     session_exists,
     session_name,
@@ -30,6 +34,7 @@ from core.helpers import find_workspace
 
 _SAFE_NOTIFY_RE = re.compile(r'[^a-zA-Z0-9 .,!?\-_\'\"():;/]')
 _MAX_NOTIFY_LENGTH = 300
+_MAX_CLIPBOARD_BYTES = 1024 * 1024
 
 bp = Blueprint('terminal', __name__)
 
@@ -47,30 +52,58 @@ def _terminal_session_name(project, branch, session_kind):
     return session_name(project, branch, kind=kind)
 
 
+def _websocket_auth_ok() -> bool:
+    with get_db_ctx() as db:
+        return websocket_auth_ok(db, request.args.get('token', ''))
+
+
+def _attach_terminal_ws(ws, project, branch, session_kind):
+    if not _websocket_auth_ok():
+        ws.send(json.dumps({'error': 'authentication_required'}))
+        return
+
+    if not tmux_available():
+        ws.send(json.dumps({'error': TMUX_NOT_INSTALLED}))
+        return
+
+    name = _terminal_session_name(project, branch, session_kind)
+    if not name:
+        ws.send(json.dumps({'error': 'Unsupported terminal session kind'}))
+        return
+
+    if not session_exists(name):
+        ws.send(json.dumps({'error': 'No tmux session. Use Start or Resume first.'}))
+        return
+
+    run_pty_websocket(ws, name)
+
+
+def _attach_terminal_ws_by_name(ws, name):
+    """Attach to a tmux session by its exact name.
+
+    Validates against ``list_sessions()`` rather than ``session_exists()``:
+    ``tmux has-session`` performs prefix matching on the target name, which
+    would let a client attach to an unintended session by supplying a prefix
+    of a real session name. The REST listing endpoint already treats
+    ``list_sessions()`` as the authoritative set of attachable sessions, so
+    reusing it here keeps the allowlist exact and consistent with what the
+    frontend displays.
+    """
+    if not _websocket_auth_ok():
+        ws.send(json.dumps({'error': 'authentication_required'}))
+        return
+
+    live_session_names = {session['name'] for session in list_sessions()}
+    if name not in live_session_names:
+        ws.send(json.dumps({'error': 'No tmux session. Use Start or Resume first.'}))
+        return
+
+    run_pty_websocket(ws, name)
+
+
 def register_terminal_ws(app):
     """Register WebSocket routes on the Flask app."""
     sock = Sock(app)
-
-    def _attach_terminal_ws(ws, project, branch, session_kind):
-        with get_db_ctx() as db:
-            if not websocket_auth_ok(db, request.args.get('token', '')):
-                ws.send(json.dumps({'error': 'authentication_required'}))
-                return
-
-        if not tmux_available():
-            ws.send(json.dumps({'error': TMUX_NOT_INSTALLED}))
-            return
-
-        name = _terminal_session_name(project, branch, session_kind)
-        if not name:
-            ws.send(json.dumps({'error': 'Unsupported terminal session kind'}))
-            return
-
-        if not session_exists(name):
-            ws.send(json.dumps({'error': 'No tmux session. Use Start or Resume first.'}))
-            return
-
-        run_pty_websocket(ws, name)
 
     @sock.route('/ws/terminal/<project>/<path:branch>')
     def terminal_ws(ws, project, branch):
@@ -79,6 +112,10 @@ def register_terminal_ws(app):
     @sock.route('/ws/terminal/<project>/<path:branch>/<session_kind>')
     def terminal_ws_kind(ws, project, branch, session_kind):
         _attach_terminal_ws(ws, project, branch, session_kind)
+
+    @sock.route('/ws/terminal-session/<name>')
+    def terminal_ws_by_name(ws, name):
+        _attach_terminal_ws_by_name(ws, name)
 
 
 @bp.route('/api/terminal/sessions', methods=['GET'])
@@ -307,4 +344,36 @@ def terminal_paste_image(project, branch):
     dest = dest_dir / (uuid.uuid4().hex + ext)
     file.save(str(dest))
 
-    return jsonify({'ok': True, 'path': str(dest)})
+    mode = 'path'
+    if copy_image_to_host_clipboard(str(dest)):
+        name = session_name(project, branch)
+        if session_exists(name) and send_paste_keystroke(name):
+            mode = 'clipboard'
+
+    return jsonify({'ok': True, 'mode': mode, 'path': str(dest)})
+
+
+@bp.route('/api/clipboard', methods=['POST'])
+def copy_to_host_clipboard():
+    """Copy arbitrary text to the host Mac's system clipboard via pbcopy.
+
+    The admin panel is sometimes reached over an insecure origin (e.g. a LAN
+    IP), where navigator.clipboard is unavailable in the browser and the
+    document.execCommand fallback is unreliable outside direct user
+    gestures. The panel server runs on the same Mac that owns the
+    clipboard, so writing it here fixes clipboard copies regardless of
+    which origin the browser used.
+    """
+    data = request.get_json(silent=True) or {}
+    text = data.get('text')
+
+    if not isinstance(text, str):
+        return jsonify({'ok': False, 'reason': 'text must be a string'}), 400
+
+    if len(text.encode('utf-8')) > _MAX_CLIPBOARD_BYTES:
+        return jsonify({'ok': False, 'reason': 'text too large'}), 413
+
+    if sys.platform != 'darwin':
+        return jsonify({'ok': False, 'reason': 'unsupported'})
+
+    return jsonify({'ok': copy_text_to_host_clipboard(text)})

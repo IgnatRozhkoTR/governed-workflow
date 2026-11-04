@@ -23,7 +23,7 @@
 }
 
 .context-label {
-  font-size: 0.70rem;
+  font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -32,8 +32,8 @@
 
 .context-input {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
-  padding: 8px 12px;
+  font-size: 0.84rem;
+  padding: 9px 13px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -53,8 +53,8 @@
 
 .context-textarea {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
-  padding: 12px;
+  font-size: 0.84rem;
+  padding: 13px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);

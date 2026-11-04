@@ -175,14 +175,56 @@ function apiListWorkspaces(projectId) {
   return apiGet('/api/projects/' + encodeURIComponent(projectId) + '/workspaces');
 }
 
-function apiCreateWorkspace(projectId, branch, source, worktree, workflowMode) {
-  return apiPost('/api/projects/' + encodeURIComponent(projectId) + '/workspaces', {
-    branch, source, worktree, workflow_mode: workflowMode
-  });
+function apiCreateWorkspace(projectId, branch, source, worktree, workflowMode, repos) {
+  var body = { branch, source, worktree, workflow_mode: workflowMode };
+  if (repos && repos.length) body.repos = repos;
+  return apiPost('/api/projects/' + encodeURIComponent(projectId) + '/workspaces', body);
 }
 
 function apiArchiveWorkspace(projectId, branch) {
   return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/archive');
+}
+
+// ─── Multi-repo (git cockpit) endpoints ───
+
+function apiGetRepoScan(projectId) {
+  return apiGet('/api/projects/' + encodeURIComponent(projectId) + '/repo-scan');
+}
+
+function apiConvertProjectMulti(projectId, repos) {
+  return apiPost('/api/projects/' + encodeURIComponent(projectId) + '/convert-multi', { repos: repos });
+}
+
+function apiGetProjectRepos(projectId) {
+  return apiGet('/api/projects/' + encodeURIComponent(projectId) + '/repos');
+}
+
+function apiGetProjectRepo(projectId, repoId) {
+  return apiGet('/api/projects/' + encodeURIComponent(projectId) + '/repos/' + encodeURIComponent(repoId));
+}
+
+function apiUpdateProjectRepo(projectId, repoId, patch) {
+  return apiPut('/api/projects/' + encodeURIComponent(projectId) + '/repos/' + encodeURIComponent(repoId), patch);
+}
+
+function apiGetWorkspaceRepoState(projectId, branch) {
+  return apiGet('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/repo-state');
+}
+
+function apiAttachWorkspaceRepo(projectId, branch, repoId) {
+  return apiPost('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/repos/attach', { repo_id: repoId });
+}
+
+function apiListWorkspacePrs(projectId, branch) {
+  return apiGet('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/prs');
+}
+
+function apiAddWorkspacePr(projectId, branch, body) {
+  return apiPost('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/prs', body);
+}
+
+function apiDeleteWorkspacePr(projectId, branch, prId) {
+  return apiDelete('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/prs/' + encodeURIComponent(prId));
 }
 
 // ─── Workspace state endpoints ───
@@ -204,6 +246,10 @@ function apiSetPhase(projectId, branch, phase) {
 
 function apiSetWorkflowMode(projectId, branch, mode) {
   return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/workflow-mode', { mode: mode });
+}
+
+function apiSetReviewMode(projectId, branch, mode) {
+  return apiPut('/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/review-mode', { mode: mode });
 }
 
 function apiAddComment(projectId, branch, scope, target, text, filePath, lineStart, lineEnd, lHash) {
@@ -354,6 +400,27 @@ function apiGetBranches(projectId, branch, repo) {
 function apiGetRepos(projectId, branch) {
   var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/repos';
   return apiGet(url);
+}
+
+function _scratchpadsUrl(projectId, branch, suffix, repo, extraParams) {
+  var url = '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/scratchpads' + suffix;
+  var params = [];
+  if (repo && repo !== '.') params.push('repo=' + encodeURIComponent(repo));
+  if (extraParams) params = params.concat(extraParams);
+  if (params.length) url += '?' + params.join('&');
+  return url;
+}
+
+function apiGetScratchpads(projectId, branch, repo) {
+  return apiGet(_scratchpadsUrl(projectId, branch, '', repo));
+}
+
+function apiGetScratchpadContent(projectId, branch, name, repo) {
+  return apiGet(_scratchpadsUrl(projectId, branch, '/content', repo, ['name=' + encodeURIComponent(name)]));
+}
+
+function apiSaveScratchpadContent(projectId, branch, name, content, repo) {
+  return apiPut(_scratchpadsUrl(projectId, branch, '/content', repo, ['name=' + encodeURIComponent(name)]), { content: content });
 }
 
 function apiHistoryRename(projectId, branch, sha, message) {

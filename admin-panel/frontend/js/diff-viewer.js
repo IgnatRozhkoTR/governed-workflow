@@ -1,4 +1,198 @@
 // ═══════════════════════════════════════════════
+//  GENERIC FILTERABLE COMBOBOX (typable <select> replacement)
+// ═══════════════════════════════════════════════
+var _filterSelects = {};
+
+function initFilterSelect(hostId, onChange) {
+  var host = document.getElementById(hostId);
+  if (!host) return;
+  var input = host.querySelector('.filter-select-input');
+  var menu = host.querySelector('.filter-select-menu');
+  if (!input || !menu) return;
+
+  var widget = {
+    host: host,
+    input: input,
+    menu: menu,
+    options: [],
+    filtered: [],
+    value: null,
+    onChange: onChange,
+    highlightIndex: -1,
+    open: false
+  };
+  _filterSelects[hostId] = widget;
+
+  input.addEventListener('focus', function() { _openFilterSelect(hostId); });
+  input.addEventListener('click', function() { _openFilterSelect(hostId); });
+  input.addEventListener('input', function() { _filterFilterSelectOptions(hostId, input.value); });
+  input.addEventListener('keydown', function(e) { _handleFilterSelectKeydown(hostId, e); });
+  input.addEventListener('blur', function() { _closeFilterSelect(hostId, true); });
+
+  menu.addEventListener('mousedown', function(e) { e.preventDefault(); });
+  menu.addEventListener('click', function(e) {
+    var row = e.target.closest('.filter-select-option');
+    if (row && !row.classList.contains('no-matches')) {
+      _commitFilterSelect(hostId, row.dataset.value);
+    }
+  });
+}
+
+function _filterSelectLabelFor(widget, value) {
+  var match = widget.options.find(function(o) { return o.value === value; });
+  return match ? match.label : '';
+}
+
+function _openFilterSelect(hostId) {
+  var widget = _filterSelects[hostId];
+  if (!widget || widget.open) return;
+  widget.open = true;
+  widget.host.classList.add('open');
+  widget.input.select();
+  _filterFilterSelectOptions(hostId, '');
+  widget.menu.hidden = false;
+}
+
+function _closeFilterSelect(hostId, revert) {
+  var widget = _filterSelects[hostId];
+  if (!widget || !widget.open) return;
+  widget.open = false;
+  widget.host.classList.remove('open');
+  widget.menu.hidden = true;
+  widget.menu.innerHTML = '';
+  if (revert) {
+    widget.input.value = _filterSelectLabelFor(widget, widget.value);
+  }
+}
+
+function _filterFilterSelectOptions(hostId, query) {
+  var widget = _filterSelects[hostId];
+  if (!widget) return;
+  var normalizedQuery = (query || '').toLowerCase();
+  widget.filtered = normalizedQuery
+    ? widget.options.filter(function(o) { return o.label.toLowerCase().indexOf(normalizedQuery) !== -1; })
+    : widget.options.slice();
+  widget.highlightIndex = widget.filtered.length ? 0 : -1;
+  _renderFilterSelectMenu(hostId);
+}
+
+function _renderFilterSelectMenu(hostId) {
+  var widget = _filterSelects[hostId];
+  if (!widget) return;
+  widget.menu.innerHTML = '';
+
+  if (widget.filtered.length === 0) {
+    var noMatchesRow = document.createElement('div');
+    noMatchesRow.className = 'filter-select-option no-matches';
+    noMatchesRow.textContent = t('diff.noMatches');
+    widget.menu.appendChild(noMatchesRow);
+    return;
+  }
+
+  widget.filtered.forEach(function(option, index) {
+    var row = document.createElement('div');
+    row.className = 'filter-select-option';
+    if (option.value === widget.value) row.classList.add('selected');
+    if (index === widget.highlightIndex) row.classList.add('highlighted');
+    row.textContent = option.label;
+    row.dataset.value = option.value;
+    widget.menu.appendChild(row);
+  });
+}
+
+function _scrollFilterSelectHighlightIntoView(widget) {
+  var el = widget.menu.querySelector('.filter-select-option.highlighted');
+  if (el) el.scrollIntoView({ block: 'nearest' });
+}
+
+function _handleFilterSelectKeydown(hostId, e) {
+  var widget = _filterSelects[hostId];
+  if (!widget) return;
+
+  if (!widget.open) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') _openFilterSelect(hostId);
+    return;
+  }
+
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!widget.filtered.length) return;
+    var delta = e.key === 'ArrowDown' ? 1 : -1;
+    widget.highlightIndex = (widget.highlightIndex + delta + widget.filtered.length) % widget.filtered.length;
+    _renderFilterSelectMenu(hostId);
+    _scrollFilterSelectHighlightIntoView(widget);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (widget.highlightIndex >= 0 && widget.filtered[widget.highlightIndex]) {
+      _commitFilterSelect(hostId, widget.filtered[widget.highlightIndex].value);
+    }
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    _closeFilterSelect(hostId, true);
+  }
+}
+
+function _commitFilterSelect(hostId, value) {
+  var widget = _filterSelects[hostId];
+  if (!widget) return;
+  var changed = widget.value !== value;
+  widget.value = value;
+  widget.input.value = _filterSelectLabelFor(widget, value);
+  _closeFilterSelect(hostId, false);
+  if (changed && typeof widget.onChange === 'function') widget.onChange(value);
+}
+
+function setFilterSelectOptions(hostId, options, selectedValue) {
+  var widget = _filterSelects[hostId];
+  if (!widget) return;
+  widget.options = options || [];
+  widget.value = selectedValue;
+  if (!widget.open) {
+    widget.input.value = _filterSelectLabelFor(widget, selectedValue);
+  }
+}
+
+function getFilterSelectValue(hostId) {
+  var widget = _filterSelects[hostId];
+  return widget ? widget.value : undefined;
+}
+
+document.addEventListener('click', function(e) {
+  Object.keys(_filterSelects).forEach(function(hostId) {
+    var widget = _filterSelects[hostId];
+    if (widget.open && !widget.host.contains(e.target)) {
+      _closeFilterSelect(hostId, true);
+    }
+  });
+});
+
+initFilterSelect('diffRepoSelect', function(value) { setDiffRepo(value); });
+initFilterSelect('diffBaseSelect', function(value) { setDiffBase(value); });
+
+document.addEventListener('keydown', function(e) {
+  var searchInput = document.getElementById('diffFileSearch');
+  if (!searchInput) return;
+
+  if (document.activeElement === searchInput && e.key === 'Escape') {
+    searchInput.value = '';
+    filterDiffFiles('');
+    searchInput.blur();
+    return;
+  }
+
+  var panelChanges = document.getElementById('panel-changes');
+  if (!panelChanges || !panelChanges.classList.contains('active')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+  if (e.key.length !== 1 || e.key === ' ') return;
+
+  var target = e.target;
+  var tagName = target && target.tagName;
+  if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || (target && target.isContentEditable)) return;
+
+  searchInput.focus();
+});
+
+// ═══════════════════════════════════════════════
 //  DIFF FILE LIST
 // ═══════════════════════════════════════════════
 var _diffFilter = '';
@@ -144,7 +338,7 @@ function renderDiff(path) {
 
   const ui = new Diff2HtmlUI(targetEl, file.diff, {
     drawFileList: false,
-    matching: 'none',
+    matching: 'words',
     renderNothingWhenEmpty: true,
     outputFormat: state.diffMode,
     highlight: true,
@@ -386,6 +580,9 @@ async function _loadDiff(mode, commitSha) {
     DIFF_DATA = AppState.diff;
     if (e && e.payload && e.payload.error === 'base_ref_not_found') {
       showToast(t('diff.baseNotFound'));
+    } else if (e && e.payload && (e.payload.error === 'repo_required' || e.payload.error === 'repo_not_found') && !state.diffRepo) {
+      // No repo attached/selected yet (e.g. a multi-repo workspace with nothing attached):
+      // the empty picker already communicates this, so avoid spamming a toast on every load.
     } else {
       showToast(t('diff.loadFailed'));
     }
@@ -393,66 +590,50 @@ async function _loadDiff(mode, commitSha) {
 }
 
 async function loadDiffRepos() {
-  var select = document.getElementById('diffRepoSelect');
-  if (!select) return;
   var ctx = getWorkspaceContext();
   if (!ctx) return;
   try {
     var data = await apiGetRepos(ctx.projectId, ctx.branch);
     var repos = data.repos || [];
-    select.innerHTML = '';
-    repos.forEach(function(repo) {
-      var option = document.createElement('option');
-      option.value = repo.path;
-      option.textContent = repo.name;
-      select.appendChild(option);
-    });
+    var options = repos.map(function(repo) { return { value: repo.path, label: repo.name }; });
 
     var validPaths = repos.map(function(repo) { return repo.path; });
     if (validPaths.indexOf(state.diffRepo) === -1) {
-      state.diffRepo = '.';
+      state.diffRepo = validPaths.length > 0 ? validPaths[0] : '';
       localStorage.removeItem('diff_repo');
     }
-    select.value = state.diffRepo;
-    select.style.display = repos.length <= 1 ? 'none' : '';
+    setFilterSelectOptions('diffRepoSelect', options, state.diffRepo);
   } catch (e) {
     console.warn('Failed to load repos:', e.message);
-    select.style.display = 'none';
-    state.diffRepo = '.';
+    state.diffRepo = '';
+    var existingWidget = _filterSelects['diffRepoSelect'];
+    if (!existingWidget || existingWidget.options.length === 0) {
+      setFilterSelectOptions('diffRepoSelect', [{ value: '.', label: t('diff.repository') }], '.');
+    }
   }
 }
 
 async function loadDiffBases() {
-  var select = document.getElementById('diffBaseSelect');
-  if (!select) return;
   var ctx = getWorkspaceContext();
   if (!ctx) return;
+
+  var options = [{ value: '', label: t('diff.baseDefault') }];
+
   try {
     var data = await apiGetBranches(ctx.projectId, ctx.branch, state.diffRepo);
     var branches = data.branches || [];
-    select.innerHTML = '';
-
-    var defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.textContent = t('diff.baseDefault');
-    select.appendChild(defaultOption);
-
-    branches.forEach(function(branch) {
-      var option = document.createElement('option');
-      option.value = branch.name;
-      option.textContent = branch.name;
-      select.appendChild(option);
-    });
+    branches.forEach(function(branch) { options.push({ value: branch.name, label: branch.name }); });
 
     var validNames = branches.map(function(branch) { return branch.name; });
     if (state.diffBase && validNames.indexOf(state.diffBase) === -1) {
       state.diffBase = '';
       localStorage.removeItem('diff_base');
     }
-    select.value = state.diffBase;
   } catch (e) {
     console.warn('Failed to load base branches:', e.message);
   }
+
+  setFilterSelectOptions('diffBaseSelect', options, state.diffBase);
 }
 
 async function setDiffRepo(path) {
@@ -474,6 +655,8 @@ async function setDiffBase(name) {
   if (state.diffSource === 'branch') {
     await _loadDiff(state.diffSource);
     renderFileList();
+  } else {
+    await setDiffSource('branch');
   }
 }
 
@@ -481,9 +664,6 @@ async function setDiffSource(mode) {
   localStorage.setItem('diff_diffSource', mode);
   state.diffSource = mode;
   document.querySelectorAll('#diffSourceToggle .toggle-opt').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-
-  var baseSelect = document.getElementById('diffBaseSelect');
-  if (baseSelect) baseSelect.disabled = (mode !== 'branch');
 
   if (mode !== 'commit') {
     state.activeCommit = null;

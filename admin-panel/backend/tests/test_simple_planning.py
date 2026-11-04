@@ -210,7 +210,7 @@ def test_put_settings_disables_simple_planning(client, project):
     assert verify.get_json()["simple_planning"] is False
 
 
-def test_put_settings_rejects_missing_field(client, project):
+def test_put_settings_rejects_empty_body(client, project):
     resp = client.put(f"/api/projects/{project['id']}/settings", json={})
 
     assert resp.status_code == 400
@@ -223,6 +223,88 @@ def test_put_settings_rejects_non_boolean(client, project):
     )
 
     assert resp.status_code == 400
+
+
+def test_put_settings_updates_fast_mode_default_alone(client, project):
+    with patch("routes.projects.ConfiguratorChain") as MockChain:
+        MockChain.default.return_value.run.return_value = []
+        resp = client.put(
+            f"/api/projects/{project['id']}/settings",
+            json={"fast_mode_default": True},
+        )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["fast_mode_default"] is True
+    assert data["simple_planning"] is False
+
+    verify = client.get(f"/api/projects/{project['id']}/settings")
+    assert verify.get_json()["fast_mode_default"] is True
+    assert verify.get_json()["simple_planning"] is False
+
+
+def test_put_settings_updates_fast_mode_default_alone_when_simple_planning_already_enabled(client, project):
+    _set_simple_planning_flag(project["id"], True)
+
+    with patch("routes.projects.ConfiguratorChain") as MockChain:
+        MockChain.default.return_value.run.return_value = []
+        resp = client.put(
+            f"/api/projects/{project['id']}/settings",
+            json={"fast_mode_default": True},
+        )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["fast_mode_default"] is True
+    assert data["simple_planning"] is True
+
+
+def test_put_settings_updates_simple_planning_alone_preserves_fast_mode_default(client, project):
+    with patch("routes.projects.ConfiguratorChain") as MockChain:
+        MockChain.default.return_value.run.return_value = []
+        client.put(f"/api/projects/{project['id']}/settings", json={"fast_mode_default": True})
+        resp = client.put(f"/api/projects/{project['id']}/settings", json={"simple_planning": True})
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["simple_planning"] is True
+    assert data["fast_mode_default"] is True
+
+
+def test_put_settings_updates_review_mode_default_alone(client, project):
+    with patch("routes.projects.ConfiguratorChain") as MockChain:
+        MockChain.default.return_value.run.return_value = []
+        resp = client.put(
+            f"/api/projects/{project['id']}/settings",
+            json={"review_mode_default": "integration"},
+        )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["review_mode_default"] == "integration"
+    assert data["simple_planning"] is False
+
+
+def test_put_settings_rejects_non_boolean_fast_mode_default(client, project):
+    resp = client.put(
+        f"/api/projects/{project['id']}/settings",
+        json={"fast_mode_default": "yes"},
+    )
+
+    assert resp.status_code == 400
+
+
+def test_put_settings_ignores_unknown_keys(client, project):
+    with patch("routes.projects.ConfiguratorChain") as MockChain:
+        MockChain.default.return_value.run.return_value = []
+        resp = client.put(
+            f"/api/projects/{project['id']}/settings",
+            json={"fast_mode_default": True, "not_a_real_setting": "whatever"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.get_json()["fast_mode_default"] is True
 
 
 def test_put_settings_invokes_configurator(client, project):
