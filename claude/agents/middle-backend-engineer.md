@@ -1,7 +1,7 @@
 ---
 name: middle-backend-engineer
 description: DEFAULT agent for most backend implementation. CRUD, multi-file coordination, method signature propagation, standard business logic, bug fixes with known cause, simple refactoring with clear target. NOT for vague requirements, unknown root cause bugs, or major architectural changes.
-tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write
+tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write, SendMessage
 model: sonnet
 color: green
 ---
@@ -65,5 +65,5 @@ SKIP (do not flag):
 <workspace-protocol>
 When working as a teammate, the orchestrator will provide the plan file path in the task message.
 Read the relevant section for your task before implementing.
-Report completion via SendMessage with a brief summary of changes made.
+Report completion with a brief summary of changes made in your final message, or via SendMessage when spawned as a named teammate.
 </workspace-protocol>

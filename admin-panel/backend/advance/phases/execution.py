@@ -131,12 +131,14 @@ class ImplementationPhase(Phase):
 class VerificationPhase(Phase):
     """Execution sub-phase K=1: verification.
 
-    The verification run happens at the advance gate (``validate``). A run that
-    completes with status ``failed`` does NOT block the advance — it routes the
-    workspace into the 3.N.2 Fix phase where edits are allowed. ``validate``
-    threads the run status onto the instance so ``next_phase`` routes off the
-    exact run it just performed; a re-read of the latest run is the fallback for
-    callers that reach ``next_phase`` without going through ``validate``.
+    The verification run happens at the advance gate (``prepare_routing``). A
+    run that completes with status ``failed`` does NOT block the advance — it
+    routes the workspace into the 3.N.2 Fix phase where edits are allowed. The
+    run lives in ``prepare_routing`` rather than ``validate`` because YOLO skips
+    validation, and routing without a fresh run would skip the fix step. The
+    run status is threaded onto the instance so ``next_phase`` routes off the
+    exact run just performed; a re-read of the latest run is the fallback for
+    callers that reach ``next_phase`` without going through the advance.
     """
     name = "Verification"
 
@@ -153,14 +155,15 @@ class VerificationPhase(Phase):
         return f"3.{self._n}"
 
     def validate(self, ws, body, project_path):
-        phase = f"3.{self._n}.1"
+        return True, {}
+
+    def prepare_routing(self, ws, project_path):
         with get_db_ctx() as db:
             passed, _ = verification_service.run_verification(
-                db, ws["id"], phase, ws["working_dir"]
+                db, ws["id"], self.id, ws["working_dir"]
             )
             db.commit()
         self._last_run_status = "passed" if passed else "failed"
-        return True, {}
 
     def next_phase(self, ws):
         n = self._n
@@ -451,7 +454,9 @@ Call `workspace_advance`. The verification run executes during the advance and t
 
 **Actors**: Engineer sub-agents | **Code edits: ON (in sub-phase scope)**
 
-You arrive here from a failed verification run at `3.N.1` (or a code-review rejection at `3.N.3`). Call `workspace_get_verification_results` to see exactly which steps failed, and `workspace_get_comments` for any user feedback. Deploy engineer sub-agents to fix the issues — edits are allowed here. Call `workspace_advance` when done to return to `3.N.1` and re-validate. The loop is `3.N.1 → (fail) 3.N.2 → 3.N.1 → (pass) 3.N.3`.""",
+You arrive here from a failed verification run at `3.N.1` (or a code-review rejection at `3.N.3`). Call `workspace_get_verification_results` to see exactly which steps failed, and `workspace_get_comments` for any user feedback. Deploy engineer sub-agents to fix the issues — edits are allowed here. Call `workspace_advance` when done to return to `3.N.1` and re-validate. The loop is `3.N.1 → (fail) 3.N.2 → 3.N.1 → (pass) 3.N.3`.
+
+YOLO approves gates; it never skips the fix step (3.N.2).""",
 
     3: """\
 ## 3.N.3 Code Review (USER GATE)
@@ -461,7 +466,7 @@ User reviews the diff in the admin panel.
 - **Approve** (+ optional commit message) → `3.N.4`
 - **Reject** → back to `3.N.2` with comments
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+Tell the user the gate is waiting for their decision, then end the turn. Do not poll; the user's next message re-invokes the session. If `yolo_mode` is on, the gate is auto-approved: there is no wait, continue.
 
 **After rejection**: the backend sets the phase to `3.N.2`. You are now in the fix phase — code edits are ON. Do NOT call `workspace_advance` immediately. Instead:
 1. Call `workspace_get_state` to confirm you're at `3.N.2`

@@ -291,8 +291,13 @@ async def _run_async(
     status.files = {rf.path: FileResult(file=rf.path) for rf in reviewable}
     status.integration = {name: "pending" for name in _INTEGRATION_AGENTS}
 
-    await _run_file_stage(workspace_id, project_path, reviewable, status, base_branch)
-    await _run_integration_stage(workspace_id, project_path, status, base_branch)
+    conventions = await asyncio.to_thread(_load_house_conventions, project_path)
+    await _run_file_stage(
+        workspace_id, project_path, reviewable, status, base_branch, conventions
+    )
+    await _run_integration_stage(
+        workspace_id, project_path, status, base_branch, conventions
+    )
 
     status.state = "done"
     status.finished_at = time.time()
@@ -304,6 +309,7 @@ async def _run_file_stage(
     reviewable: list,
     status: PipelineStatus,
     base_ref: str,
+    conventions: str = "",
 ) -> None:
     status.state = "file_stage"
     if not reviewable:
@@ -313,7 +319,9 @@ async def _run_file_stage(
 
     async def _bounded(rf) -> None:
         async with semaphore:
-            await _review_one_file(workspace_id, project_path, rf.path, status, base_ref)
+            await _review_one_file(
+                workspace_id, project_path, rf.path, status, base_ref, conventions
+            )
 
     await asyncio.gather(*(_bounded(rf) for rf in reviewable))
 
@@ -323,6 +331,7 @@ async def _run_integration_stage(
     project_path: Path,
     status: PipelineStatus,
     base_ref: str,
+    conventions: str = "",
 ) -> None:
     status.state = "integration_stage"
     for agent_name in _INTEGRATION_AGENTS:
@@ -330,7 +339,9 @@ async def _run_integration_stage(
 
     async def _run_one(agent_name: str) -> None:
         try:
-            await _run_integration_agent(workspace_id, project_path, agent_name, base_ref)
+            await _run_integration_agent(
+                workspace_id, project_path, agent_name, base_ref, conventions
+            )
             status.integration[agent_name] = "done"
         except Exception as exc:  # noqa: BLE001 - each agent isolated
             log.exception("integration agent %s failed", agent_name)
@@ -349,11 +360,12 @@ async def _review_one_file(
     file_path: str,
     status: PipelineStatus,
     base_ref: str,
+    conventions: str = "",
 ) -> None:
     result = status.files[file_path]
     result.status = "running"
     try:
-        findings = await _spawn_file_reviewer(project_path, file_path, base_ref)
+        findings = await _spawn_file_reviewer(project_path, file_path, base_ref, conventions)
     except Exception as exc:  # noqa: BLE001 - failures captured on FileResult, never propagate
         log.exception("file reviewer failed for %s", file_path)
         result.status = "failed"
@@ -398,8 +410,35 @@ def _git_text(project_path: Path, argv: list[str]) -> str:
         return ""
 
 
+_HOUSE_CONVENTIONS_RELATIVE_PATH = Path(".claude") / "rules" / "review-house-conventions.md"
+_HOUSE_CONVENTIONS_HEADING = (
+    "Project house conventions — accepted patterns; do not report findings that match these"
+)
+
+
+def _load_house_conventions(project_path: Path) -> str:
+    try:
+        return (project_path / _HOUSE_CONVENTIONS_RELATIVE_PATH).read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return ""
+
+
+def _with_house_conventions(prompt: str, conventions: str) -> str:
+    if not conventions:
+        return prompt
+    return (
+        f"{prompt}\n\n"
+        f"## {_HOUSE_CONVENTIONS_HEADING}\n\n"
+        f"{conventions}\n\n"
+        f"## End of project house conventions"
+    )
+
+
 async def _spawn_file_reviewer(
-    project_path: Path, file_path: str, base_ref: str = "main"
+    project_path: Path,
+    file_path: str,
+    base_ref: str = "main",
+    conventions: str = "",
 ) -> list[dict]:
     hunk = _get_file_diff(project_path, file_path, base_ref)
     prompt = (
@@ -414,7 +453,7 @@ async def _spawn_file_reviewer(
     )
     stdout = await _spawn_claude_agent(
         agent=_FILE_REVIEWER_AGENT,
-        prompt=prompt,
+        prompt=_with_house_conventions(prompt, conventions),
         project_path=project_path,
         # The file-reviewer needs turns for Read tool calls plus a final text
         # turn for the JSON envelope. Empirically the haiku-class agent uses
@@ -432,6 +471,7 @@ async def _run_integration_agent(
     project_path: Path,
     agent_name: str,
     base_ref: str,
+    conventions: str = "",
 ) -> None:
     diff = await asyncio.to_thread(_get_branch_diff, project_path, base_ref)
     prompt = (
@@ -443,7 +483,7 @@ async def _run_integration_agent(
     )
     stdout = await _spawn_claude_agent(
         agent=agent_name,
-        prompt=prompt,
+        prompt=_with_house_conventions(prompt, conventions),
         project_path=project_path,
         max_turns=None,
         timeout_s=_timeout_s() * _INTEGRATION_TIMEOUT_MULTIPLIER,

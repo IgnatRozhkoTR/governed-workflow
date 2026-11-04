@@ -706,3 +706,47 @@ def test_run_integration_agent_passes_no_max_turns(tmp_path):
 
     assert len(recorded_kwargs) == 1
     assert recorded_kwargs[0]["max_turns"] is None
+
+
+HOUSE_CONVENTIONS_RELATIVE = Path(".claude") / "rules" / "review-house-conventions.md"
+
+
+def _capture_prompts(tmp_path: Path) -> list[str]:
+    from services.review_pipeline_service import _run_integration_agent, _spawn_file_reviewer
+
+    prompts: list[str] = []
+
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
+        prompts.append(prompt)
+        return "{}"
+
+    conventions = review_pipeline_service._load_house_conventions(tmp_path)
+    with patch("services.review_pipeline_service._get_file_diff", return_value="DIFF"), \
+         patch("services.review_pipeline_service._get_branch_diff", return_value="DIFF"), \
+         patch("services.review_pipeline_service._spawn_claude_agent", side_effect=fake_spawn):
+        asyncio.run(_spawn_file_reviewer(tmp_path, "a.py", "main", conventions))
+        asyncio.run(_run_integration_agent(1, tmp_path, "architecture-reviewer", "main", conventions))
+    return prompts
+
+
+def test_house_conventions_file_content_is_included_in_both_prompts(tmp_path):
+    conventions_file = tmp_path / HOUSE_CONVENTIONS_RELATIVE
+    conventions_file.parent.mkdir(parents=True)
+    conventions_file.write_text("- Nested classes need no import\n", encoding="utf-8")
+
+    prompts = _capture_prompts(tmp_path)
+
+    assert len(prompts) == 2
+    for prompt in prompts:
+        assert "Project house conventions" in prompt
+        assert "- Nested classes need no import" in prompt
+
+
+def test_house_conventions_absent_leaves_prompts_unchanged(tmp_path):
+    assert review_pipeline_service._load_house_conventions(tmp_path) == ""
+
+    prompts = _capture_prompts(tmp_path)
+
+    assert len(prompts) == 2
+    for prompt in prompts:
+        assert "house conventions" not in prompt

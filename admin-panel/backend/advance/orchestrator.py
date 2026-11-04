@@ -435,6 +435,7 @@ def perform_advance(ws, project_path, body=None):
         if rejected:
             return {"phase": phase_str, "status": "blocked", "guard_errors": rejected}, 422
 
+    phase.prepare_routing(ws, project_path)
     candidate = phase.next_phase(ws)
 
     with get_db_ctx() as db:

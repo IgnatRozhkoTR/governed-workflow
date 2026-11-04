@@ -549,6 +549,72 @@ def _flip_verification_step(project_id, command):
         db.close()
 
 
+from services import verification_service
+
+
+def _latest_verification_status(ws_id, phase):
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT status FROM verification_runs WHERE workspace_id = ? AND phase = ? "
+            "ORDER BY id DESC LIMIT 1",
+            (ws_id, phase),
+        ).fetchone()
+    finally:
+        db.close()
+    return row["status"] if row else None
+
+
+def test_execution_validation_routes_to_fixes_when_yolo_and_verification_fails(workspace, project):
+    """YOLO still runs verification at 3.1.1, so a failed run routes to the 3.1.2 fix step."""
+    _setup_execution_phase(workspace["id"], "3.1.1")
+    set_phase(workspace["id"], "3.1.1", yolo_mode=1)
+    _assign_verification_profile(project["id"], "exit 1")
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+
+    assert code == 200
+    assert result["phase"] == "3.1.2"
+    assert _latest_verification_status(workspace["id"], "3.1.1") == "failed"
+
+
+def test_execution_validation_ignores_stale_pass_when_yolo_and_verification_fails(workspace, project):
+    """An earlier passing run must not mask a fresh failure under YOLO."""
+    _setup_execution_phase(workspace["id"], "3.1.1")
+    set_phase(workspace["id"], "3.1.1", yolo_mode=1)
+    _assign_verification_profile(project["id"], "exit 0")
+    db = get_db()
+    try:
+        verification_service.run_verification(db, workspace["id"], "3.1.1", project["path"])
+        db.commit()
+    finally:
+        db.close()
+    assert _latest_verification_status(workspace["id"], "3.1.1") == "passed"
+    _flip_verification_step(project["id"], "exit 1")
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+
+    assert code == 200
+    assert result["phase"] == "3.1.2"
+
+
+def test_execution_validation_routes_past_review_when_yolo_and_verification_passes(workspace, project):
+    """YOLO + passing run routes to 3.1.3, whose gate YOLO then auto-approves into 3.1.4."""
+    _setup_execution_phase(workspace["id"], "3.1.1")
+    set_phase(workspace["id"], "3.1.1", yolo_mode=1)
+    _assign_verification_profile(project["id"], "exit 0")
+
+    ws = _get_ws_row(workspace["id"])
+    result, code = perform_advance(ws, project["path"])
+
+    assert code == 200
+    assert result["previous_phase"] == "3.1.3"
+    assert result["phase"] == "3.1.4"
+    assert _latest_verification_status(workspace["id"], "3.1.1") == "passed"
+
+
 def test_execution_commit_blocked_no_hash(workspace, project):
     """Phase 3.1.4 blocks when no commit_hash is provided."""
     _setup_execution_phase(workspace["id"], "3.1.4")

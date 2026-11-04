@@ -1,7 +1,7 @@
 ---
 name: middle-backend-test-engineer
 description: Default test engineer for standard tasks with clear patterns. CRUD tests, simple validation, happy path and error cases. Use when specs are clear and patterns exist. For complex scenarios, use senior-backend-test-engineer.
-tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write
+tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write, SendMessage
 model: sonnet
 color: pink
 ---
@@ -46,5 +46,5 @@ DO NOT WRITE:
 <workspace-protocol>
 When working as a teammate, the orchestrator will provide the plan file path in the task message.
 Read the relevant section for your task before implementing.
-Report completion via SendMessage with a brief summary of changes made.
+Report completion with a brief summary of changes made in your final message, or via SendMessage when spawned as a named teammate.
 </workspace-protocol>

@@ -177,3 +177,34 @@ def test_declarative_phase_carries_manifest_short_description():
 def test_get_phase_permissions_matches_runtime_policy(phase_id, expected):
     """get_phase_permissions mirrors the regex-driven policy used at advance-time."""
     assert get_phase_permissions(phase_id) == expected
+
+
+def test_agentic_review_description_schedules_cron_recheck_when_pipeline_incomplete():
+    text = PHASE_REGISTRY["4.0"].description_for_skill()
+
+    assert "CronCreate" in text
+    assert "CronDelete" in text
+    assert "is_complete" in text
+    assert "review-pipeline-status" not in text
+
+
+@pytest.mark.parametrize("phase_id", ["1.4", "4.2"])
+def test_user_gate_descriptions_do_not_instruct_polling(phase_id):
+    text = PHASE_REGISTRY[phase_id].description_for_skill()
+
+    assert "once per minute" not in text
+    assert "end the turn" in text
+    assert "yolo_mode" in text
+
+
+def test_code_review_gate_description_does_not_instruct_polling():
+    text = PHASE_REGISTRY["3.x.3"].description_for_skill()
+
+    assert "once per minute" not in text
+    assert "end the turn" in text
+
+
+def test_fix_step_description_states_yolo_never_skips_it():
+    text = PHASE_REGISTRY["3.x.2"].description_for_skill()
+
+    assert "YOLO approves gates; it never skips the fix step (3.N.2)." in text

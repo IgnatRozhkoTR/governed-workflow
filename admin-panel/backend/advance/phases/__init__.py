@@ -61,6 +61,13 @@ class Phase(ABC):
     def validate(self, ws, body, project_path) -> tuple:
         """Phase-specific validation. Returns (ok: bool, details: dict)."""
 
+    def prepare_routing(self, ws, project_path) -> None:
+        """Gather the inputs ``next_phase`` routes on, immediately before it is called.
+
+        Runs on every advance, YOLO included: YOLO waives validation, progress
+        checks and guards, but never the evidence that decides the route.
+        """
+
     @abstractmethod
     def next_phase(self, ws) -> str:
         """The phase to advance to after successful validation."""

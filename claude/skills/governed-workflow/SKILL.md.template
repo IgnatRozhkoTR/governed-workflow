@@ -179,11 +179,17 @@ The `ReviewGuard` only blocks at user gate phases (3.N.3, 4.2) — it does NOT b
 | Code | Meaning |
 |------|---------|
 | 200 | Advanced |
-| 202 | User gate — poll and wait |
+| 202 | User gate — tell the user the gate is waiting, then end the turn (do not poll) |
 | 422 | Validation failed — read error, fix, retry |
 | 409 | Already at gate or phase changed |
 
 On 422: read the error message. It names exactly what is missing. Fix it, then call `workspace_advance` again.
+
+### Server-side waits
+
+Human gates: do not poll. The user's next message re-invokes the session. When `yolo_mode` is on, gates are auto-approved: there is no wait, continue. YOLO approves gates; it never skips the fix step (3.N.2).
+
+Some server-side jobs (the 4.0 review pipeline, for example) send no completion notification. Do not end the turn and wait for the user, and do not hand-poll. Check the job once; if it is not done, `CronCreate` a recurring job (about every 3 minutes) whose prompt re-checks it. When the check shows completion, the job runs `CronDelete` on itself and continues the phase. Only then end the turn.
 
 ---
 

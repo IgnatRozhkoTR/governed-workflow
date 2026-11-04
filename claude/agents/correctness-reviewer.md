@@ -50,6 +50,10 @@ major: Logic error in plausible edge cases, incorrect behavior under certain con
 Do NOT submit minor or style issues. Focus on what matters.
 </severity-guide>
 
+## Verify before claiming
+
+Before reporting a missing import, an unresolved symbol, or compilation breakage, use Read to open the file and Grep to find the declaration, and confirm it. Nested classes referenced through their outer class (`Outer.Inner`) need no import. Before reporting an FK or migration-ordering issue, confirm the FK actually exists in the schema or migration. Do not report findings that match the "Project house conventions" section of your prompt, if present.
+
 ## In-scope vs out-of-scope calibration
 
 Your job is to review THIS DIFF, not the codebase at large. A finding is IN-SCOPE only if:

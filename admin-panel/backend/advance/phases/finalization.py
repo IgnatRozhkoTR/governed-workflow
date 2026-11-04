@@ -25,8 +25,11 @@ On entry to 4.0 the admin panel **automatically launches** the headless review p
 
 ### What you do at 4.0
 
-1. Watch the **Review Pipeline** card on the workspace page in the admin panel, or poll `GET /api/workspaces/<id>/review-pipeline-status`. States: `queued` → `filtering` → `file_stage` → `integration_stage` → `done` (or `failed`).
-2. When state is `done` or `failed`:
+1. Call `workspace_review_pipeline_summary` once.
+2. If `is_complete` is false, the pipeline sends no completion notification, so schedule your own re-check: `CronCreate` a recurring job (about every 3 minutes) whose prompt calls `workspace_review_pipeline_summary`. Once `is_complete` is true the job runs `CronDelete` on itself and continues 4.0 (fetch review issues, triage, fix, advance).
+3. Only then end the turn. Do not hand-poll and do not wait for the user to ask.
+
+When the pipeline is complete (`done` or `failed`):
    - Call `workspace_get_review_issues` to see the findings.
    - Call `workspace_update_progress(phase="4.0", summary="Pipeline complete. N findings.")`.
    - Before calling `workspace_advance`, call `workspace_review_pipeline_summary` (or `GET /api/workspaces/<id>/review-pipeline/summary`). Confirm `is_complete=true` and `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: re-trigger via the Run Review button (workspace page) or `POST /api/workspaces/<id>/review-pipeline/start`, OR proceed with the partial result if the failures are recoverable.
@@ -126,7 +129,7 @@ class FinalApprovalPhase(Phase):
 - **Approve** → `5.1`
 - **Reject** → back to `4.1`
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+Tell the user the gate is waiting for their decision, then end the turn. Do not poll; the user's next message re-invokes the session. If `yolo_mode` is on, the gate is auto-approved: there is no wait, continue.
 
 **After rejection**: the backend sets the phase to `4.1`. Do NOT call `workspace_advance` immediately. Instead:
 1. Call `workspace_get_state` to confirm you're at `4.1`
@@ -145,7 +148,7 @@ If the user asks for a review, spawn the `integration-reviewer` agent and relay 
 - **Approve** → workflow completes (fast mode skips reflection, `5.1`/`5.2`)
 - **Reject** → back to `4.1` with the user's comments
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat. Auto-approved when `yolo_mode` is on.
+Tell the user the gate is waiting for their decision, then end the turn. Do not poll; the user's next message re-invokes the session. When `yolo_mode` is on the gate is auto-approved: there is no wait, continue.
 
 **After rejection**: the backend sets the phase to `4.1`. Do NOT call `workspace_advance` immediately. Instead:
 1. Call `workspace_get_state` to confirm you're at `4.1`

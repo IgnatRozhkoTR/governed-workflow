@@ -1,7 +1,7 @@
 ---
 name: senior-backend-engineer
 description: RARE USE - Only for genuinely complex problems middle cannot handle. Vague requirements without spec, debugging unknown root causes, major refactoring without defined target, escalation when middle failed. NOT for standard implementation, CRUD, or clear spec tasks.
-tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write
+tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write, SendMessage
 model: opus
 color: purple
 ---
@@ -62,5 +62,5 @@ SKIP (do not flag):
 <workspace-protocol>
 When working as a teammate, the orchestrator will provide the plan file path in the task message.
 Read the relevant section for your task before implementing.
-Report completion via SendMessage with a brief summary of changes made.
+Report completion with a brief summary of changes made in your final message, or via SendMessage when spawned as a named teammate.
 </workspace-protocol>

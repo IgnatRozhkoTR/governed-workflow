@@ -279,7 +279,7 @@ The user reviews the full preparation package in the Pre-planning tab: assessmen
 - **Approve** → advances to `2.0`
 - **Reject** → back to `1.1` with comments
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+Tell the user the gate is waiting for their decision, then end the turn. Do not poll; the user's next message re-invokes the session. If `yolo_mode` is on, the gate is auto-approved: there is no wait, continue.
 
 **After rejection**: the backend sets the phase to `1.1`. Do NOT call `workspace_advance` immediately. Instead:
 1. Call `workspace_get_state` to confirm you're at `1.1`
@@ -391,6 +391,8 @@ Call `workspace_advance`. The verification run executes during the advance and t
 
 You arrive here from a failed verification run at `3.N.1` (or a code-review rejection at `3.N.3`). Call `workspace_get_verification_results` to see exactly which steps failed, and `workspace_get_comments` for any user feedback. Deploy engineer sub-agents to fix the issues — edits are allowed here. Call `workspace_advance` when done to return to `3.N.1` and re-validate. The loop is `3.N.1 → (fail) 3.N.2 → 3.N.1 → (pass) 3.N.3`.
 
+YOLO approves gates; it never skips the fix step (3.N.2).
+
 ---
 
 ## 3.N.3 Code Review (USER GATE)
@@ -400,7 +402,7 @@ User reviews the diff in the admin panel.
 - **Approve** (+ optional commit message) → `3.N.4`
 - **Reject** → back to `3.N.2` with comments
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+Tell the user the gate is waiting for their decision, then end the turn. Do not poll; the user's next message re-invokes the session. If `yolo_mode` is on, the gate is auto-approved: there is no wait, continue.
 
 **After rejection**: the backend sets the phase to `3.N.2`. You are now in the fix phase — code edits are ON. Do NOT call `workspace_advance` immediately. Instead:
 1. Call `workspace_get_state` to confirm you're at `3.N.2`
@@ -435,8 +437,11 @@ On entry to 4.0 the admin panel **automatically launches** the headless review p
 
 ### What you do at 4.0
 
-1. Watch the **Review Pipeline** card on the workspace page in the admin panel, or poll `GET /api/workspaces/<id>/review-pipeline-status`. States: `queued` → `filtering` → `file_stage` → `integration_stage` → `done` (or `failed`).
-2. When state is `done` or `failed`:
+1. Call `workspace_review_pipeline_summary` once.
+2. If `is_complete` is false, the pipeline sends no completion notification, so schedule your own re-check: `CronCreate` a recurring job (about every 3 minutes) whose prompt calls `workspace_review_pipeline_summary`. Once `is_complete` is true the job runs `CronDelete` on itself and continues 4.0 (fetch review issues, triage, fix, advance).
+3. Only then end the turn. Do not hand-poll and do not wait for the user to ask.
+
+When the pipeline is complete (`done` or `failed`):
    - Call `workspace_get_review_issues` to see the findings.
    - Call `workspace_update_progress(phase="4.0", summary="Pipeline complete. N findings.")`.
    - Before calling `workspace_advance`, call `workspace_review_pipeline_summary` (or `GET /api/workspaces/<id>/review-pipeline/summary`). Confirm `is_complete=true` and `is_ok=true`. If `files_failed > 0` or `integration_failed > 0`, decide: re-trigger via the Run Review button (workspace page) or `POST /api/workspaces/<id>/review-pipeline/start`, OR proceed with the partial result if the failures are recoverable.
@@ -475,7 +480,7 @@ When complete:
 - **Approve** → `5.1`
 - **Reject** → back to `4.1`
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+Tell the user the gate is waiting for their decision, then end the turn. Do not poll; the user's next message re-invokes the session. If `yolo_mode` is on, the gate is auto-approved: there is no wait, continue.
 
 **After rejection**: the backend sets the phase to `4.1`. Do NOT call `workspace_advance` immediately. Instead:
 1. Call `workspace_get_state` to confirm you're at `4.1`
@@ -588,11 +593,17 @@ The `ReviewGuard` only blocks at user gate phases (3.N.3, 4.2) — it does NOT b
 | Code | Meaning |
 |------|---------|
 | 200 | Advanced |
-| 202 | User gate — poll and wait |
+| 202 | User gate — tell the user the gate is waiting, then end the turn (do not poll) |
 | 422 | Validation failed — read error, fix, retry |
 | 409 | Already at gate or phase changed |
 
 On 422: read the error message. It names exactly what is missing. Fix it, then call `workspace_advance` again.
+
+### Server-side waits
+
+Human gates: do not poll. The user's next message re-invokes the session. When `yolo_mode` is on, gates are auto-approved: there is no wait, continue. YOLO approves gates; it never skips the fix step (3.N.2).
+
+Some server-side jobs (the 4.0 review pipeline, for example) send no completion notification. Do not end the turn and wait for the user, and do not hand-poll. Check the job once; if it is not done, `CronCreate` a recurring job (about every 3 minutes) whose prompt re-checks it. When the check shows completion, the job runs `CronDelete` on itself and continues the phase. Only then end the turn.
 
 ---
 

@@ -22,3 +22,7 @@ Serves at http://localhost:5111. SQLite DB auto-created at `backend/admin-panel.
 - `frontend/` — frontend (single `admin.html` + modular JS/CSS/i18n). See `frontend/CLAUDE.md`.
 
 See subfolder `CLAUDE.md` files for details on each layer.
+
+## Review house conventions
+
+Optional per-project file `<project>/.claude/rules/review-house-conventions.md`. The 4.0 review pipeline reads it once per run and appends it to every file-reviewer and integration-reviewer prompt as accepted patterns that must not be reported. Absent file means no change. Entries are short, project-specific lines, e.g. "Repositories deliberately return nullable values instead of Optional" or "Mock-only tests do not need repository factory helpers".

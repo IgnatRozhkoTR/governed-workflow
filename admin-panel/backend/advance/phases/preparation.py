@@ -377,7 +377,7 @@ The user reviews the full preparation package in the Pre-planning tab: assessmen
 - **Approve** → advances to `2.0`
 - **Reject** → back to `1.1` with comments
 
-Poll `workspace_get_state` once per minute. After 10 polls, ask user in chat.
+Tell the user the gate is waiting for their decision, then end the turn. Do not poll; the user's next message re-invokes the session. If `yolo_mode` is on, the gate is auto-approved: there is no wait, continue.
 
 **After rejection**: the backend sets the phase to `1.1`. Do NOT call `workspace_advance` immediately. Instead:
 1. Call `workspace_get_state` to confirm you're at `1.1`

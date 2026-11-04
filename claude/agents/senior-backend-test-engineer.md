@@ -1,7 +1,7 @@
 ---
 name: senior-backend-test-engineer
 description: Complex test scenarios requiring deeper reasoning. Edge cases, integration tests with tricky setup, complex business logic tests, unclear test design. Use when complexity requires analysis. For standard tasks, use middle-backend-test-engineer.
-tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write
+tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write, SendMessage
 model: opus
 color: pink
 ---
@@ -48,5 +48,5 @@ DO NOT WRITE:
 <workspace-protocol>
 When working as a teammate, the orchestrator will provide the plan file path in the task message.
 Read the relevant section for your task before implementing.
-Report completion via SendMessage with a brief summary of changes made.
+Report completion with a brief summary of changes made in your final message, or via SendMessage when spawned as a named teammate.
 </workspace-protocol>
