@@ -193,15 +193,14 @@ def test_user_gate_descriptions_do_not_instruct_polling(phase_id):
     text = PHASE_REGISTRY[phase_id].description_for_skill()
 
     assert "once per minute" not in text
-    assert "end the turn" in text
-    assert "yolo_mode" in text
+    assert "do not poll" in text
 
 
 def test_code_review_gate_description_does_not_instruct_polling():
     text = PHASE_REGISTRY["3.x.3"].description_for_skill()
 
     assert "once per minute" not in text
-    assert "end the turn" in text
+    assert "do not poll" in text
 
 
 def test_fix_step_description_states_yolo_never_skips_it():

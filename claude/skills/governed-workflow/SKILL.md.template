@@ -133,7 +133,7 @@ Full tool roster is granted via this agent's frontmatter; consult tool descripti
 
 When `workspace_advance` returns 202 (awaiting approval), tell the user the gate is waiting and end the turn — do not poll. Re-check `workspace_get_state` once when the user messages or a scheduled check fires.
 
-Under `yolo_mode` gates auto-approve: no wait. YOLO approves gates; it never skips the fix step (3.N.2).
+Under `yolo_mode` gates auto-approve: no wait. YOLO approves gates; it never skips a verification fix step.
 
 ## User Gate Rejection — Critical Rule
 
@@ -169,7 +169,7 @@ On 422: read the error message. It names exactly what is missing. Fix it, then c
 
 ### Server-side waits
 
-Some server-side jobs (the 4.0 review pipeline) send no completion notification. Check once; if not done, `CronCreate` a recurring re-check (about every 3 minutes) that, on completion, runs `CronDelete` and continues the phase. Then end the turn. Do not hand-poll.
+Some server-side jobs (the automated review pipeline) send no completion notification. Check once; if not done, `CronCreate` a recurring re-check (about every 3 minutes) that, on completion, runs `CronDelete` and continues the phase. Then end the turn. Do not hand-poll.
 
 ---
 
