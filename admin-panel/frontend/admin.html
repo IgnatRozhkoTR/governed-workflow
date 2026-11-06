@@ -129,11 +129,7 @@
         </div>
       </div>
       <div class="btn-dropdown" style="position: relative; display: inline-block;">
-        <button class="btn btn-sm" id="resumeBtn" onclick="showTerminalDropdown('resume', this)" data-i18n="buttons.resume">Resume</button>
-        <div class="btn-dropdown-menu" id="resumeDropdown" style="display:none;">
-          <button class="btn-dropdown-item" onclick="doResume('fullscreen')" data-i18n="actions.fullscreen">Full screen</button>
-          <button class="btn-dropdown-item" onclick="doResume('split')" data-i18n="actions.sidePanel">Side panel</button>
-        </div>
+        <button class="btn btn-sm" id="resumeBtn" onclick="doResume()" data-i18n="buttons.resume">Resume</button>
       </div>
     </div>
     <select id="localeSelect" class="locale-select" onchange="onLocaleChange(this.value)">

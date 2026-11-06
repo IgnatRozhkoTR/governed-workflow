@@ -280,8 +280,8 @@ function doStart(mode) {
   doTerminalActionWithKind('start', 'startBtn', mode, 'claude');
 }
 
-function doResume(mode) {
-  doTerminalActionWithKind('resume', 'resumeBtn', mode, 'claude');
+function doResume() {
+  doTerminalActionWithKind('resume', 'resumeBtn', 'fullscreen', 'claude');
 }
 
 function doNotify(type) {
