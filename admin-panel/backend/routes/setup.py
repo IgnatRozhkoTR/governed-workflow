@@ -27,12 +27,16 @@ def _resolve_preset_profiles(profile_ids):
     if not profile_ids:
         return profile_ids
 
-    with get_db_ctx() as db:
-        placeholders = ",".join("?" * len(profile_ids))
-        rows = db.execute(
-            f"SELECT id, name, language FROM verification_profiles WHERE id IN ({placeholders})",
-            profile_ids,
-        ).fetchall()
+    try:
+        with get_db_ctx() as db:
+            placeholders = ",".join("?" * len(profile_ids))
+            rows = db.execute(
+                f"SELECT id, name, language FROM verification_profiles WHERE id IN ({placeholders})",
+                profile_ids,
+            ).fetchall()
+    except Exception:
+        logger.warning("setup_start: could not fetch preset profiles, falling back to raw IDs")
+        return profile_ids
 
     rows_by_id = {r["id"]: dict(r) for r in rows}
     return [rows_by_id.get(pid, pid) for pid in profile_ids]

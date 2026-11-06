@@ -1706,9 +1706,9 @@ class TestTranslateServiceError:
 
     def test_preserves_message(self):
         from mcp_tools import translate_service_error
-        mapping = {"no_fields_to_update": ("validation", False)}
-        envelope = translate_service_error({"error": "no_fields_to_update"}, mapping)
-        assert envelope["error"] == "no_fields_to_update"
+        mapping = {"nothing_to_update": ("validation", False)}
+        envelope = translate_service_error({"error": "nothing_to_update"}, mapping)
+        assert envelope["error"] == "nothing_to_update"
 
     def test_default_retryable_flag_respected(self):
         from mcp_tools import translate_service_error
