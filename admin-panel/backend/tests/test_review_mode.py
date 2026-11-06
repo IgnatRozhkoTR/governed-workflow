@@ -304,7 +304,7 @@ def test_get_project_settings_returns_review_mode_default(client, project):
 def test_put_project_settings_updates_review_mode_default(client, project):
     resp = client.put(
         f"/api/projects/{project['id']}/settings",
-        json={"simple_planning": False, "review_mode_default": "integration"},
+        json={"review_mode_default": "integration"},
     )
     assert resp.status_code == 200
     assert resp.json["review_mode_default"] == "integration"
@@ -314,7 +314,7 @@ def test_put_project_settings_updates_review_mode_default(client, project):
 def test_put_project_settings_rejects_invalid_review_mode_default(client, project):
     resp = client.put(
         f"/api/projects/{project['id']}/settings",
-        json={"simple_planning": False, "review_mode_default": "turbo"},
+        json={"review_mode_default": "turbo"},
     )
     assert resp.status_code == 400
 
@@ -329,7 +329,7 @@ def test_put_project_settings_omitted_review_mode_default_preserves_existing(cli
 
     resp = client.put(
         f"/api/projects/{project['id']}/settings",
-        json={"simple_planning": False},
+        json={"fast_mode_default": False},
     )
     assert resp.status_code == 200
     assert resp.json["review_mode_default"] == "full"

@@ -147,10 +147,10 @@
 }
 
 /* ═══════════════════════════════════════════════ */
-/*  SIMPLE PLANNING TOGGLE                         */
+/*  PROJECT DEFAULTS TOGGLES                       */
 /* ═══════════════════════════════════════════════ */
 
-.simple-planning__row {
+.project-defaults__row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -158,13 +158,13 @@
   border-bottom: 1px solid var(--border);
 }
 
-.simple-planning__label {
+.project-defaults__label {
   font-size: 0.82rem;
   color: var(--text-primary);
   cursor: pointer;
 }
 
-.simple-planning__desc {
+.project-defaults__desc {
   font-size: 0.78rem;
   color: var(--text-muted);
   margin-top: 6px;

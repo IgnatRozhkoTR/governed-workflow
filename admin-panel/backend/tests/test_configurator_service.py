@@ -511,19 +511,16 @@ def _default_phase_ids() -> list:
         conn.close()
 
 
-def _render_case(case: str, workflow_mode: str, simple_planning: bool):
+def _render_case(case: str, workflow_mode: str):
     phase_ids = _TOGGLE_CASES[case] or _default_phase_ids()
     template = SkillConfigurator.DEFAULT_TEMPLATE_PATH.read_text()
-    rendered = SkillConfigurator.render(
-        template, phase_ids, simple_planning=simple_planning, workflow_mode=workflow_mode
-    )
+    rendered = SkillConfigurator.render(template, phase_ids, workflow_mode=workflow_mode)
     return phase_ids, rendered
 
 
 @pytest.mark.parametrize("case", sorted(_TOGGLE_CASES))
 @pytest.mark.parametrize("workflow_mode", ["standard", "fast"])
-@pytest.mark.parametrize("simple_planning", [False, True])
-def test_rendered_skill_never_references_a_disabled_phase(case, workflow_mode, simple_planning):
+def test_rendered_skill_never_references_a_disabled_phase(case, workflow_mode):
     """No phase id outside the enabled set survives anywhere in the output.
 
     Phases are toggled per device/project/workspace scope, which is an axis
@@ -533,7 +530,7 @@ def test_rendered_skill_never_references_a_disabled_phase(case, workflow_mode, s
     declares which phases exist and leaves routing to the backend, so every
     phase id it mentions must be one of its own enabled phases.
     """
-    phase_ids, rendered = _render_case(case, workflow_mode, simple_planning)
+    phase_ids, rendered = _render_case(case, workflow_mode)
 
     dangling = _referenced_phase_ids(rendered) - _renderable_phase_ids(phase_ids)
 
@@ -542,15 +539,14 @@ def test_rendered_skill_never_references_a_disabled_phase(case, workflow_mode, s
 
 @pytest.mark.parametrize("case", sorted(_TOGGLE_CASES))
 @pytest.mark.parametrize("workflow_mode", ["standard", "fast"])
-@pytest.mark.parametrize("simple_planning", [False, True])
-def test_phase_map_and_body_sections_cover_the_same_phases(case, workflow_mode, simple_planning):
+def test_phase_map_and_body_sections_cover_the_same_phases(case, workflow_mode):
     """Every phase with a body section has a Phase Map row and vice versa.
 
     The table and the body are built by two separate skip predicates
     (``short_description`` vs ``description_for_skill``). If they ever
     disagree, a phase is documented in one view and invisible in the other.
     """
-    phase_ids, rendered = _render_case(case, workflow_mode, simple_planning)
+    phase_ids, rendered = _render_case(case, workflow_mode)
 
     assert _phase_map_ids(rendered) == _body_section_ids(rendered)
     assert _phase_map_ids(rendered) == set(phase_ids)
@@ -563,7 +559,7 @@ def test_progress_documentation_states_no_phase_transitions():
     phase that any project could switch off. Each phase section now carries
     its own progress requirement instead.
     """
-    _, rendered = _render_case("default", "standard", False)
+    _, rendered = _render_case("default", "standard")
 
     section = rendered.split("## Progress Documentation", 1)[1]
     assert "→" not in section

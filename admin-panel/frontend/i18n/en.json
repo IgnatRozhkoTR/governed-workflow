@@ -88,8 +88,6 @@
   "config.envVars": "Environment variables (KEY=VALUE per line)",
   "config.yoloMode": "YOLO",
   "config.phaseSettingsDesc": "Enable or disable phases for this scope. Always-on phases cannot be disabled.",
-  "config.simplePlanning": "Simple planning",
-  "config.simplePlanningDesc": "Plans use a single sub-phase with no diagrams and no acceptance criteria. Best for large but conceptually simple projects.",
   "config.fastModeDefault": "Always fast mode",
   "config.fastModeDefaultDesc": "New workspaces created for this project default to fast mode.",
   "config.yoloModeDefault": "Always YOLO",

@@ -20,11 +20,9 @@ from services.project_settings_service import (
     get_fast_mode_default,
     get_yolo_mode_default,
     get_review_mode_default,
-    get_simple_planning,
     set_fast_mode_default,
     set_yolo_mode_default,
     set_review_mode_default,
-    set_simple_planning,
 )
 from services.repo_service import UNSET, get_repo, list_repos, scan_repos, set_repos, update_repo
 
@@ -184,7 +182,6 @@ def _ensure_git_rules_symlink(project_path):
 @with_project
 def get_project_settings(db, project):
     return jsonify({
-        "simple_planning": get_simple_planning(db, project["id"]),
         "fast_mode_default": get_fast_mode_default(db, project["id"]),
         "yolo_mode_default": get_yolo_mode_default(db, project["id"]),
         "review_mode_default": get_review_mode_default(db, project["id"]),
@@ -197,11 +194,7 @@ def get_project_settings(db, project):
 def put_project_settings(db, project):
     body = request.get_json(silent=True) or {}
     if not body:
-        return jsonify({"error": "at least one of simple_planning, fast_mode_default, yolo_mode_default, review_mode_default is required"}), 400
-
-    simple_planning = body.get("simple_planning")
-    if simple_planning is not None and not isinstance(simple_planning, bool):
-        return jsonify({"error": "simple_planning must be a boolean"}), 400
+        return jsonify({"error": "at least one of fast_mode_default, yolo_mode_default, review_mode_default is required"}), 400
 
     fast_mode_default = body.get("fast_mode_default")
     if fast_mode_default is not None and not isinstance(fast_mode_default, bool):
@@ -216,8 +209,6 @@ def put_project_settings(db, project):
         return jsonify({"error": "review_mode_default must be a string"}), 400
 
     try:
-        if simple_planning is not None:
-            set_simple_planning(db, project["id"], simple_planning)
         if fast_mode_default is not None:
             set_fast_mode_default(db, project["id"], fast_mode_default)
         if yolo_mode_default is not None:
@@ -238,7 +229,6 @@ def put_project_settings(db, project):
 
     response = {
         "ok": True,
-        "simple_planning": get_simple_planning(db, project["id"]),
         "fast_mode_default": get_fast_mode_default(db, project["id"]),
         "yolo_mode_default": get_yolo_mode_default(db, project["id"]),
         "review_mode_default": get_review_mode_default(db, project["id"]),

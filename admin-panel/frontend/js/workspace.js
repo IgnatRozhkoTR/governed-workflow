@@ -2,7 +2,6 @@ let _wsCurrentView = 'project-list';
 let _wsSelectedProjectId = null;
 let _wsSelectedProjectName = null;
 let _wsShowArchived = false;
-let _wsSimplePlanningPrior = false;
 let _wsFastModeDefaultPrior = false;
 let _wsSelectedProjectType = 'single';
 
@@ -247,7 +246,7 @@ async function openProject(projectId) {
     );
   }
 
-  _wsLoadSimplePlanning(projectId);
+  _wsLoadProjectDefaults(projectId);
 
   var advanceModesBody = document.getElementById('advanceModesProjectBody');
   if (advanceModesBody && typeof renderAdvanceModeSection === 'function') {
@@ -493,19 +492,14 @@ function _wsInitSelector() {
           <div id="phaseSettingsProjectBody"></div>
         </div>
 
-        <div class="ws-section" id="simplePlanningCard" style="display: none;">
-          <div class="ws-section-title">${t('config.simplePlanning')}</div>
-          <div id="simplePlanningBody">
-            <div class="simple-planning__row">
-              <input type="checkbox" class="phase-settings__checkbox" id="simplePlanningCheck">
-              <label for="simplePlanningCheck" class="simple-planning__label">${t('config.simplePlanning')}</label>
-            </div>
-            <div class="simple-planning__desc">${t('config.simplePlanningDesc')}</div>
-            <div class="simple-planning__row" style="margin-top: 10px;">
+        <div class="ws-section" id="projectDefaultsCard" style="display: none;">
+          <div class="ws-section-title">${t('settings.section.workflow.projectDefaultsTitle')}</div>
+          <div id="projectDefaultsBody">
+            <div class="project-defaults__row">
               <input type="checkbox" class="phase-settings__checkbox" id="fastModeDefaultCheck">
-              <label for="fastModeDefaultCheck" class="simple-planning__label">${t('config.fastModeDefault')}</label>
+              <label for="fastModeDefaultCheck" class="project-defaults__label">${t('config.fastModeDefault')}</label>
             </div>
-            <div class="simple-planning__desc">${t('config.fastModeDefaultDesc')}</div>
+            <div class="project-defaults__desc">${t('config.fastModeDefaultDesc')}</div>
           </div>
         </div>
 
@@ -558,11 +552,6 @@ function _wsInitSelector() {
     </div>
   `;
 
-  var simplePlanningCheck = document.getElementById('simplePlanningCheck');
-  if (simplePlanningCheck) {
-    simplePlanningCheck.onchange = _wsOnSimplePlanningChange;
-  }
-
   var fastModeDefaultCheck = document.getElementById('fastModeDefaultCheck');
   if (fastModeDefaultCheck) {
     fastModeDefaultCheck.onchange = _wsOnFastModeDefaultChange;
@@ -604,51 +593,20 @@ function _wsBackToProjects() {
   loadProjects();
 }
 
-async function _wsLoadSimplePlanning(projectId) {
-  var card = document.getElementById('simplePlanningCard');
-  var checkbox = document.getElementById('simplePlanningCheck');
+async function _wsLoadProjectDefaults(projectId) {
+  var card = document.getElementById('projectDefaultsCard');
   var fastModeDefaultCheckbox = document.getElementById('fastModeDefaultCheck');
   var createFastModeCheckbox = document.getElementById('ws-fast-mode');
-  if (!card || !checkbox) return;
+  if (!card) return;
 
   try {
     var data = await apiGet('/api/projects/' + encodeURIComponent(projectId) + '/settings');
-    _wsSimplePlanningPrior = !!data.simple_planning;
-    checkbox.checked = _wsSimplePlanningPrior;
     _wsFastModeDefaultPrior = !!data.fast_mode_default;
     if (fastModeDefaultCheckbox) fastModeDefaultCheckbox.checked = _wsFastModeDefaultPrior;
     if (createFastModeCheckbox) createFastModeCheckbox.checked = _wsFastModeDefaultPrior;
     card.style.display = '';
   } catch (err) {
     card.style.display = 'none';
-  }
-}
-
-async function _wsOnSimplePlanningChange() {
-  var checkbox = document.getElementById('simplePlanningCheck');
-  if (!checkbox || !_wsSelectedProjectId) return;
-
-  var newValue = checkbox.checked;
-  checkbox.disabled = true;
-
-  try {
-    var result = await apiPut(
-      '/api/projects/' + encodeURIComponent(_wsSelectedProjectId) + '/settings',
-      { simple_planning: newValue }
-    );
-    _wsSimplePlanningPrior = newValue;
-    showToast(t('messages.phaseSettingsSaved'));
-    var warnings = result.configurator_warnings;
-    if (warnings && warnings.length > 0) {
-      warnings.forEach(function(w) {
-        showToast(w.reason || w.action);
-      });
-    }
-  } catch (err) {
-    checkbox.checked = _wsSimplePlanningPrior;
-    showToast(t('messages.phaseSettingsSaveFailed').replace('{error}', err.message));
-  } finally {
-    checkbox.disabled = false;
   }
 }
 

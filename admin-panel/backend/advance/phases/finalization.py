@@ -10,7 +10,7 @@ class AgenticReviewPhase(Phase):
     name = "Agentic Review"
     short_description = "Headless review pipeline runs file and integration reviewers"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         return """\
 ## 4.0 Blind Code Review (automated)
 
@@ -54,7 +54,7 @@ class AddressFixPhase(Phase):
     name = "Address Fix"
     short_description = "Engineers address review findings across the merged scope"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         if workflow_mode == "fast":
             return self._fast_description()
         return self._standard_description()
@@ -117,7 +117,7 @@ class FinalApprovalPhase(Phase):
     reject_target = "4.1"
     short_description = "User reviews the resolved findings and approves delivery"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         if workflow_mode == "fast":
             return self._fast_description()
         return self._standard_description()
@@ -160,7 +160,7 @@ class ReflectionPhase(Phase):
     name = "Reflection"
     short_description = "Reflector sub-agent emits proposals; auto-apply easy ones"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         return """\
 ## Phase 5.1: Reflection
 
@@ -194,7 +194,7 @@ class ManualImplementationPhase(Phase):
     name = "Manual implementation"
     short_description = "Implement the manual proposals queued by the reflector"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         return """\
 ## Phase 5.2: Manual implementation
 
@@ -225,7 +225,7 @@ class DonePhase(Phase):
     name = "Done"
     short_description = "Push and open the MR/PR; task complete"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         return """\
 ## 6 Done
 

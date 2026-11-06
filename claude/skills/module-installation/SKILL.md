@@ -22,7 +22,7 @@ A module that wants to expose MCP tools ships `<module>/mcp_module.py` exporting
 single `register(mcp) -> None` function. The loader is
 `admin-panel/backend/services/module_mcp_loader.py`; it is wired into the host at
 `admin-panel/backend/mcp_server.py`, called as `register_module_mcp_tools(mcp)`
-between `register_module_phases_from_disk()` and `_deregister_simple_mode_tools()`.
+right after `register_module_phases_from_disk()`.
 
 The file **must** be named `mcp_module.py`, not `mcp_tools.py` — the backend already
 ships an `mcp_tools/` package, and a module directory added to `sys.path` under that

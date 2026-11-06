@@ -139,7 +139,6 @@ def test_put_settings_updates_yolo_mode_default_alone(client, project):
     data = resp.get_json()
     assert data["ok"] is True
     assert data["yolo_mode_default"] is True
-    assert data["simple_planning"] is False
     assert data["fast_mode_default"] is False
     assert client.get(_settings_url(project)).get_json()["yolo_mode_default"] is True
 
@@ -155,7 +154,6 @@ def test_put_settings_can_disable_yolo_mode_default(client, project):
 
 
 @pytest.mark.parametrize("other_setting", [
-    {"simple_planning": True},
     {"fast_mode_default": True},
     {"review_mode_default": "integration"},
 ])
@@ -170,13 +168,13 @@ def test_put_other_settings_preserves_yolo_mode_default(client, project, other_s
 
 
 def test_put_yolo_mode_default_preserves_other_settings(client, project):
-    _put_settings(client, project, {"fast_mode_default": True, "simple_planning": True})
+    _put_settings(client, project, {"fast_mode_default": True, "review_mode_default": "integration"})
 
     resp = _put_settings(client, project, {"yolo_mode_default": True})
 
     data = resp.get_json()
     assert data["fast_mode_default"] is True
-    assert data["simple_planning"] is True
+    assert data["review_mode_default"] == "integration"
 
 
 @pytest.mark.parametrize("bad_value", ["yes", 1, 0, "true", [True], {"v": True}])

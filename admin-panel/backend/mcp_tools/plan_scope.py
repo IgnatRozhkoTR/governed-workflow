@@ -19,14 +19,6 @@ def _plan_error(result: dict) -> dict:
     return mcp_error(category, result["error"], retryable=False)
 
 
-def _simple_mode_error(operation: str) -> dict:
-    return mcp_error(
-        "business",
-        f"{operation} is not available in simple planning mode.",
-        retryable=False,
-    )
-
-
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=False, destructiveHint=False))
 @with_mcp_workspace
 def workspace_set_plan(
@@ -66,7 +58,6 @@ def workspace_set_plan(
     sequentially."""
     result = plan_service.set_plan(
         db, ws, plan,
-        simple_mode=bool(project["simple_planning"]),
         fast_mode=ws_field(ws, "workflow_mode", "standard") == "fast",
     )
     if "error" in result:
@@ -110,9 +101,6 @@ def workspace_extend_plan(
       replace_diagrams=True to replace the entire diagram list instead.
 
     plan_status is set to 'pending'. Existing sub-phases are unchanged."""
-    if project["simple_planning"]:
-        return _simple_mode_error("Extending the plan")
-
     result = plan_service.extend_plan(db, ws, subphase, scope, diagrams, replace_diagrams)
     if "error" in result:
         return mcp_error("validation", result["error"], retryable=False)
@@ -150,7 +138,6 @@ def workspace_update_subphase(
       not_found  — subphase_id is not in the plan.
       validation — nothing supplied to update, blank name, empty/malformed tasks,
                    scope without a 'must' list, or the workspace is before phase 2.0.
-      business   — simple planning mode.
 
     Example
       workspace_update_subphase(subphase_id="3.2",
@@ -158,9 +145,6 @@ def workspace_update_subphase(
 
     This is a structural change: plan_status is reset to 'pending' and the user
     must re-approve the plan."""
-    if project["simple_planning"]:
-        return _simple_mode_error("Updating a sub-phase")
-
     result = plan_service.update_subphase(
         db, ws, subphase_id, name=name or None, tasks=tasks, scope=scope,
     )
@@ -202,9 +186,6 @@ def workspace_delete_subphase(
     the current sub-phase no longer exists the workspace is rewound to 2.0.
     This is a structural change: plan_status is reset to 'pending' and the user
     must re-approve the plan."""
-    if project["simple_planning"]:
-        return _simple_mode_error("Deleting a sub-phase")
-
     result = plan_service.delete_subphase(db, ws, subphase_id)
     if "error" in result:
         return _plan_error(result)
@@ -238,7 +219,6 @@ def workspace_set_plan_diagrams(
       validation — diagrams is not a list of {title, diagram} objects, an entry
                    has a blank title or body, an empty list was passed with
                    replace=False, or the workspace is before phase 2.0.
-      business   — simple planning mode, where diagrams are not used.
 
     Example
       workspace_set_plan_diagrams(diagrams=[{"title": "Class Diagram",
@@ -246,9 +226,6 @@ def workspace_set_plan_diagrams(
 
     Diagrams are documentation, so plan_status is deliberately NOT reset — the
     plan stays approved and the agent keeps its permission to edit files."""
-    if project["simple_planning"]:
-        return _simple_mode_error("System diagrams")
-
     result = plan_service.set_diagrams(db, ws, diagrams, replace)
     if "error" in result:
         return _plan_error(result)

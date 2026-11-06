@@ -125,11 +125,10 @@ function _flashSettingsInline(elementId) {
 }
 
 // ═══════════════════════════════════════════════
-//  PROJECT SETTINGS CACHE (simple_planning, fast_mode_default, review_mode_default)
+//  PROJECT SETTINGS CACHE (fast_mode_default, yolo_mode_default, review_mode_default)
 // ═══════════════════════════════════════════════
-// The PUT /api/projects/<id>/settings endpoint requires simple_planning on
-// every call, so any single-field toggle here must merge against the last
-// known full settings object rather than sending a partial payload.
+// Single-field toggles merge against the last known full settings object
+// so every PUT carries the complete project settings.
 var _settingsProjectCache = null;
 
 document.addEventListener('workspace-reset', function() { _settingsProjectCache = null; });
@@ -146,7 +145,6 @@ async function _fetchSettingsProjectCache(projectId) {
 async function _putSettingsProjectCache(projectId, patch) {
   var current = _settingsProjectCache || await _fetchSettingsProjectCache(projectId) || {};
   var payload = {
-    simple_planning: !!current.simple_planning,
     fast_mode_default: !!current.fast_mode_default,
     yolo_mode_default: !!current.yolo_mode_default,
     review_mode_default: current.review_mode_default || 'files_integration'
@@ -167,9 +165,7 @@ function loadWorkflowProjectSettings() {
 
   _fetchSettingsProjectCache(ctx.projectId).then(function(settings) {
     if (!settings) return;
-    var simpleCheck = document.getElementById('settingsSimplePlanningCheck');
     var fastCheck = document.getElementById('settingsFastModeDefaultCheck');
-    if (simpleCheck) simpleCheck.checked = !!settings.simple_planning;
     if (fastCheck) fastCheck.checked = !!settings.fast_mode_default;
     var yoloCheck = document.getElementById('settingsYoloModeDefaultCheck');
     if (yoloCheck) yoloCheck.checked = !!settings.yolo_mode_default;
@@ -178,23 +174,6 @@ function loadWorkflowProjectSettings() {
   var advanceModesBody = document.getElementById('advanceModesSettingsBody');
   if (advanceModesBody && typeof renderAdvanceModeSection === 'function') {
     renderAdvanceModeSection(advanceModesBody, ctx.projectId);
-  }
-}
-
-async function onSettingsSimplePlanningChange(checkbox) {
-  var ctx = getWorkspaceContext();
-  if (!ctx) return;
-
-  var previous = !checkbox.checked;
-  checkbox.disabled = true;
-  try {
-    await _putSettingsProjectCache(ctx.projectId, { simple_planning: checkbox.checked });
-    _flashSettingsInline('settingsSimplePlanningFlash');
-  } catch (e) {
-    checkbox.checked = previous;
-    showToast(t('messages.phaseSettingsSaveFailed').replace('{error}', e.message));
-  } finally {
-    checkbox.disabled = false;
   }
 }
 

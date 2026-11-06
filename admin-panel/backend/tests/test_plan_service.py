@@ -171,7 +171,7 @@ def test_set_plan_fast_mode_accepts_single_subphase(workspace):
 
 
 def test_set_plan_fast_mode_allows_system_diagram(workspace):
-    """Unlike simple_mode, fast_mode does not restrict system diagrams."""
+    """fast_mode restricts the sub-phase count but not system diagrams."""
     set_phase(workspace["id"], "2.0")
     ws = _ws_row(workspace["id"])
     plan = json.loads(make_plan_json(1))
@@ -185,22 +185,6 @@ def test_set_plan_fast_mode_allows_system_diagram(workspace):
         db.close()
 
     assert result.get("ok") is True
-
-
-def test_set_plan_simple_mode_takes_precedence_over_fast_mode(workspace):
-    """When both flags are set, simple_mode's stricter diagram check still applies."""
-    set_phase(workspace["id"], "2.0")
-    ws = _ws_row(workspace["id"])
-    plan = json.loads(make_plan_json(1))
-    plan["systemDiagram"] = [{"title": "Diagram", "diagram": "graph LR\nA-->B"}]
-
-    db = get_db()
-    try:
-        result = plan_service.set_plan(db, ws, plan, simple_mode=True, fast_mode=True)
-    finally:
-        db.close()
-
-    assert result.get("errorCode") == "simple_no_diagrams"
 
 
 # ── granular plan edits ─────────────────────────────────────────────────────────

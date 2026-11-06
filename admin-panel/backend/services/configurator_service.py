@@ -122,11 +122,10 @@ class SkillConfigurator(Configurator):
         if template is None:
             return [skip]
 
-        simple_planning = self._fetch_simple_planning(db, project_id)
-        results = [self._render_project_root(db, project_id, project_path, template, simple_planning)]
+        results = [self._render_project_root(db, project_id, project_path, template)]
         for ws in _active_workspaces(db, project_id):
             if ws["working_dir"]:
-                results.append(self._render_workspace(db, template, simple_planning, ws))
+                results.append(self._render_workspace(db, template, ws))
         return results
 
     def configure_workspace(
@@ -137,8 +136,7 @@ class SkillConfigurator(Configurator):
             return [skip]
         if not ws["working_dir"]:
             return [_skipped("SKILL.md", "workspace has no working_dir")]
-        simple_planning = self._fetch_simple_planning(db, project["id"])
-        return [self._render_workspace(db, template, simple_planning, ws)]
+        return [self._render_workspace(db, template, ws)]
 
     def _resolve_template_path(self, db: sqlite3.Connection) -> Path:
         """Pick the SKILL.md.template source: last-enabled module override, else the engine default."""
@@ -171,7 +169,7 @@ class SkillConfigurator(Configurator):
 
     def _render_project_root(
         self, db: sqlite3.Connection, project_id: int, project_path: Path,
-        template: str, simple_planning: bool,
+        template: str,
     ) -> dict:
         """Render the canonical project-scope SKILL.md seed at the project root."""
         target = project_path / self.OUTPUT_REL_PATH
@@ -184,60 +182,39 @@ class SkillConfigurator(Configurator):
         from services import phase_resolver
 
         phase_ids = phase_resolver.resolve_for_project(db, project_id, include_templated=True)
-        rendered = self.render(template, phase_ids, simple_planning=simple_planning)
+        rendered = self.render(template, phase_ids)
         return self._write_target(target, rendered)
 
     def _render_workspace(
-        self, db: sqlite3.Connection, template: str, simple_planning: bool, ws: sqlite3.Row,
+        self, db: sqlite3.Connection, template: str, ws: sqlite3.Row,
     ) -> dict:
         """Render SKILL.md for a single worktree using its workspace-scope phase set."""
         from services import phase_resolver
 
         phase_ids = phase_resolver.resolve_for_workspace(db, ws["id"], include_templated=True)
         workflow_mode = ws["workflow_mode"] if "workflow_mode" in ws.keys() else "standard"
-        rendered = self.render(
-            template, phase_ids, simple_planning=simple_planning, workflow_mode=workflow_mode
-        )
+        rendered = self.render(template, phase_ids, workflow_mode=workflow_mode)
         return self._write_target(Path(ws["working_dir"]) / self.OUTPUT_REL_PATH, rendered)
 
     @classmethod
-    def render(
-        cls, template: str, phase_ids: list[str],
-        simple_planning: bool = False, workflow_mode: str = "standard",
-    ) -> str:
+    def render(cls, template: str, phase_ids: list[str], workflow_mode: str = "standard") -> str:
         """Substitute the {{PHASES}} and {{PHASE_MAP}} placeholders for *phase_ids*.
 
-        When simple_planning is True, {{#FULL_PLANNING}}...{{/FULL_PLANNING}} blocks
-        are removed entirely. When False, the markers are stripped and the inner
-        content is kept (full-mode rendering). ``workflow_mode`` is threaded into
-        each phase's ``description_for_skill`` for mode-specific rendering, and
-        also gates {{#STANDARD_MODE}}...{{/STANDARD_MODE}} /
+        ``workflow_mode`` is threaded into each phase's ``description_for_skill``
+        for mode-specific rendering, and also gates {{#STANDARD_MODE}}...{{/STANDARD_MODE}} /
         {{#FAST_MODE}}...{{/FAST_MODE}} blocks in the fixed template text —
         the non-matching mode's block is removed, the matching mode's markers
         are stripped and its content kept.
         """
         rendered = template.replace(
-            cls.PLACEHOLDER_PHASES, cls._build_phase_block(phase_ids, simple_planning, workflow_mode)
+            cls.PLACEHOLDER_PHASES, cls._build_phase_block(phase_ids, workflow_mode)
         ).replace(
             cls.PLACEHOLDER_PHASE_MAP, cls._build_phase_map(phase_ids)
         )
-        rendered = cls._apply_full_planning_blocks(rendered, simple_planning)
         return cls._apply_workflow_mode_blocks(rendered, workflow_mode)
 
     @staticmethod
-    def _fetch_simple_planning(db: sqlite3.Connection, project_id: int | str | None) -> bool:
-        """Read the simple_planning flag for the project; returns False when not found."""
-        if project_id is None:
-            return False
-        row = db.execute(
-            "SELECT simple_planning FROM projects WHERE id = ?", (project_id,)
-        ).fetchone()
-        return bool(row["simple_planning"]) if row else False
-
-    @staticmethod
-    def _build_phase_block(
-        phase_ids: list[str], simple_planning: bool = False, workflow_mode: str = "standard",
-    ) -> str:
+    def _build_phase_block(phase_ids: list[str], workflow_mode: str = "standard") -> str:
         """Concatenate each enabled phase's description_for_skill() in resolved order.
 
         Skips phases without a registered instance or with an empty description.
@@ -249,30 +226,10 @@ class SkillConfigurator(Configurator):
             phase = get_phase(pid)
             if phase is None:
                 continue
-            block = phase.description_for_skill(
-                simple_planning=simple_planning, workflow_mode=workflow_mode
-            ).strip()
+            block = phase.description_for_skill(workflow_mode=workflow_mode).strip()
             if block:
                 blocks.append(block)
         return "\n\n---\n\n".join(blocks)
-
-    @staticmethod
-    def _apply_full_planning_blocks(content: str, simple_planning: bool) -> str:
-        """Strip {{#FULL_PLANNING}}...{{/FULL_PLANNING}} conditional blocks.
-
-        When simple_planning is False (full mode): strip the markers and keep the
-        inner content. When True (simple mode): remove the entire block including
-        the markers and their enclosed content.
-        """
-        import re
-
-        if simple_planning:
-            pattern = r'\{\{#FULL_PLANNING\}\}.*?\{\{/FULL_PLANNING\}\}'
-            return re.sub(pattern, '', content, flags=re.DOTALL)
-
-        content = content.replace('{{#FULL_PLANNING}}', '')
-        content = content.replace('{{/FULL_PLANNING}}', '')
-        return content
 
     @staticmethod
     def _apply_workflow_mode_blocks(content: str, workflow_mode: str) -> str:
@@ -280,7 +237,7 @@ class SkillConfigurator(Configurator):
 
         The block matching the active mode has its markers stripped and its
         content kept; the other mode's block is removed entirely, markers and
-        content alike. Mirrors ``_apply_full_planning_blocks``.
+        content alike.
         """
         import re
 

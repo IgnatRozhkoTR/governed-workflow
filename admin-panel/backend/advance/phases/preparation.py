@@ -11,7 +11,7 @@ class InitPhase(Phase):
     name = "Init"
     short_description = "Spawn plan-advisor"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         return """\
 ## 0 Init — Spawn Plan-Advisor
 
@@ -52,7 +52,7 @@ class AssessmentPhase(Phase):
     name = "Assessment"
     short_description = "plan-advisor surveys the codebase and raises research topics"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         return """\
 ## 1.0 Assessment
 
@@ -95,7 +95,7 @@ class ResearchPhase(Phase):
     name = "Research"
     short_description = "Parallel researcher sub-agents investigate each topic"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         return """\
 ## 1.1 Research
 
@@ -200,7 +200,7 @@ class ProverPhase(Phase):
     name = "Research Proving"
     short_description = "Prover sub-agent verifies every research entry"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         if workflow_mode == "fast":
             return self._fast_description()
         return self._standard_description()
@@ -297,7 +297,7 @@ class ImpactAnalysisPhase(Phase):
     name = "Impact Analysis"
     short_description = "Document cross-cutting effects before planning"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         return """\
 ## 1.3 Impact Analysis
 
@@ -331,7 +331,7 @@ class PreparationReviewPhase(Phase):
     reject_target = "1.1"
     short_description = "User reviews assessment, research, and impact analysis"
 
-    def description_for_skill(self, simple_planning: bool = False, workflow_mode: str = "standard") -> str:
+    def description_for_skill(self, workflow_mode: str = "standard") -> str:
         return """\
 ## 1.4 Preparation Review (USER GATE)
 

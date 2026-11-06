@@ -92,13 +92,6 @@ def workspace_propose_criteria(
           description="UserService.createUser saves to DB",
           details_json='{"file": "tests/UserServiceTest.java", "test_names": ["createUser_shouldPersist"]}')
     """
-    if project["simple_planning"]:
-        return mcp_error(
-            "business",
-            "Acceptance criteria are not used in simple planning mode.",
-            retryable=False,
-        )
-
     if phase_key(ws["phase"]) < phase_key("2.0"):
         return mcp_error(
             "validation",
@@ -165,13 +158,6 @@ def workspace_get_criteria(
       workspace_get_criteria(status="proposed")
       workspace_get_criteria(type="unit_test", status="accepted")
     """
-    if project["simple_planning"]:
-        return mcp_error(
-            "business",
-            "Acceptance criteria are not used in simple planning mode.",
-            retryable=False,
-        )
-
     criteria = criteria_service.get_criteria(
         db, ws["id"], status=status or None, criterion_type=type or None
     )
@@ -237,13 +223,6 @@ def workspace_update_criteria(
       workspace_update_criteria(criterion_id=3,
           details_json='{"file": "tests/UserTest.java", "test_names": ["testCreate"]}')
     """
-    if project["simple_planning"]:
-        return mcp_error(
-            "business",
-            "Acceptance criteria are not used in simple planning mode.",
-            retryable=False,
-        )
-
     result = criteria_service.update_criterion(
         db, criterion_id, ws["id"],
         description=description or None, details_json=details_json or None
@@ -305,13 +284,6 @@ def workspace_delete_criteria(
     Example
       workspace_delete_criteria(criterion_id=3)
     """
-    if project["simple_planning"]:
-        return mcp_error(
-            "business",
-            "Acceptance criteria are not used in simple planning mode.",
-            retryable=False,
-        )
-
     criterion = criteria_service.get_criterion(db, criterion_id, ws["id"])
     if criterion is None:
         return mcp_error(
