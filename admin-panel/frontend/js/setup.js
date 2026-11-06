@@ -132,9 +132,6 @@ function renderSetupPage() {
     + '<input id="setup-custom-name" class="ws-input" style="margin-bottom: 8px;" placeholder="' + t('setup.customProfileNamePlaceholder') + '">'
     + '<input id="setup-custom-config" class="ws-input" style="margin-bottom: 8px;" placeholder="' + t('setup.customConfigPlaceholder') + '">'
     + '<textarea id="setup-custom-details" class="ws-input" style="margin-bottom: 8px; min-height: 60px; resize: vertical;" placeholder="' + t('setup.customDetailsPlaceholder') + '"></textarea>'
-    + '<div style="color: var(--text-muted); font-size: 0.78rem; margin-bottom: 4px;">' + t('setup.lspServerLabel') + '</div>'
-    + '<input id="setup-custom-lsp-command" class="ws-input" style="margin-bottom: 8px;" placeholder="' + t('setup.lspCommandPlaceholder') + '">'
-    + '<input id="setup-custom-lsp-install-command" class="ws-input" style="margin-bottom: 8px;" placeholder="' + t('setup.lspInstallCommandPlaceholder') + '">'
     + '<button class="btn btn-sm" style="margin-top: 8px;" onclick="addCustomProfile()">' + t('setup.addProfileBtn') + '</button>'
     + '</div>'
     + '</div>'
@@ -201,32 +198,22 @@ function renderSetupLanguages(profiles) {
     var id = profile.id;
     var name = _wsEscape(profile.name || '');
     var language = _wsEscape(profile.language || '');
-    var lspCommand = profile.lsp_command ? _wsEscape(profile.lsp_command) : '';
-
-    var lspBadge = lspCommand
-      ? '<span class="badge setup-lsp-badge" title="' + lspCommand + '">LSP</span>'
-      : '';
 
     return '<div class="setup-lang-item" style="display: flex; align-items: center; gap: 8px;">'
       + '<label class="ws-checkbox-label" style="flex: 1;">'
       + '<input type="checkbox" class="setup-language-checkbox" data-profile-id="' + id + '">'
       + '<span>' + name + '</span>'
       + (language ? '<span style="color: var(--text-muted); font-size: 0.78rem;">(' + language + ')</span>' : '')
-      + lspBadge
       + '</label>'
       + '<button class="btn btn-sm btn-outline" style="font-size: 0.72rem; color: var(--danger, #dc3545); border-color: var(--danger, #dc3545);" onclick="deleteVerificationProfile(' + id + ')">&times;</button>'
       + '</div>';
   }).join('');
 
   var customHtml = _setupCustomProfiles.map(function(cp, index) {
-    var lspBadge = cp.lsp_command
-      ? '<span class="badge setup-lsp-badge" title="' + _wsEscape(cp.lsp_command) + '">LSP</span>'
-      : '';
     return '<div class="setup-lang-item" style="display: flex; align-items: center; gap: 8px;">'
       + '<span style="font-size: 0.82rem;">' + _wsEscape(cp.name) + '</span>'
       + (cp.config ? '<span style="color: var(--text-muted); font-size: 0.78rem;">(' + _wsEscape(cp.config) + ')</span>' : '')
       + '<span class="badge setup-custom-badge">custom</span>'
-      + lspBadge
       + '<button class="btn btn-sm btn-outline" style="margin-left: auto; font-size: 0.72rem;" onclick="removeCustomProfile(' + index + ')">' + t('setup.removeToolBtn') + '</button>'
       + '</div>';
   }).join('');
@@ -257,27 +244,21 @@ function addCustomProfile() {
   var nameEl = document.getElementById('setup-custom-name');
   var configEl = document.getElementById('setup-custom-config');
   var detailsEl = document.getElementById('setup-custom-details');
-  var lspCommandEl = document.getElementById('setup-custom-lsp-command');
-  var lspInstallCommandEl = document.getElementById('setup-custom-lsp-install-command');
 
   var name = nameEl ? nameEl.value.trim() : '';
   var config = configEl ? configEl.value.trim() : '';
   var details = detailsEl ? detailsEl.value.trim() : '';
-  var lspCommand = lspCommandEl ? lspCommandEl.value.trim() : '';
-  var lspInstallCommand = lspInstallCommandEl ? lspInstallCommandEl.value.trim() : '';
 
   if (!name) {
     if (nameEl) nameEl.focus();
     return;
   }
 
-  _setupCustomProfiles.push({ name: name, config: config, details: details, lsp_command: lspCommand, lsp_install_command: lspInstallCommand });
+  _setupCustomProfiles.push({ name: name, config: config, details: details });
 
   if (nameEl) nameEl.value = '';
   if (configEl) configEl.value = '';
   if (detailsEl) detailsEl.value = '';
-  if (lspCommandEl) lspCommandEl.value = '';
-  if (lspInstallCommandEl) lspInstallCommandEl.value = '';
 
   _reRenderLanguages();
 }
@@ -312,10 +293,7 @@ function getSetupConfig() {
   });
 
   var customLanguages = _setupCustomProfiles.map(function(cp) {
-    var entry = { name: cp.name, config: cp.config, details: cp.details };
-    if (cp.lsp_command) entry.lsp_command = cp.lsp_command;
-    if (cp.lsp_install_command) entry.lsp_install_command = cp.lsp_install_command;
-    return entry;
+    return { name: cp.name, config: cp.config, details: cp.details };
   });
 
   return {

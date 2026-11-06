@@ -8,4 +8,4 @@ Flask HTTP handlers. One Blueprint per domain, registered by `app.py`.
 - All responses are JSON.
 - Routes are thin — delegate logic to the corresponding service in `services/`.
 - Workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
-- WebSocket routes (terminal, setup, LSP) use `flask-sock`.
+- WebSocket routes (terminal, setup) use `flask-sock`.

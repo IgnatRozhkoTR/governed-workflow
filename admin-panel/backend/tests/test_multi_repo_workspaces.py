@@ -49,12 +49,6 @@ def test_create_multi_workspace_rejects_worktree_false(client, multi_project):
     assert r.status_code == 400
 
 
-def test_create_multi_workspace_skips_lsp_prewarm(client, multi_project):
-    r = _create_multi_workspace(client, multi_project, branch="feature/multi-lsp")
-    assert r.status_code == 201, r.json
-    assert r.json["lsp_prewarm"]["skipped_reason"] == "multi_project"
-
-
 def test_create_multi_workspace_with_repos_list_attaches_and_returns_results(client, multi_project):
     repo_a_id = multi_project["repos"]["service-a"]["id"]
     repo_b_id = multi_project["repos"]["service-b"]["id"]

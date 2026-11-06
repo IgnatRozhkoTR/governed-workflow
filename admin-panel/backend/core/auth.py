@@ -89,7 +89,7 @@ def register_auth_guard(app):
 
         if _is_websocket_upgrade(request):
             # WebSocket handlers enforce auth themselves before accepting data
-            # (see routes/terminal_routes.py, routes/lsp.py, routes/setup.py).
+            # (see routes/terminal_routes.py, routes/setup.py).
             # At the HTTP layer we let the upgrade handshake through so flask-sock
             # can negotiate; the socket is closed on the inside if the token is
             # missing/invalid.

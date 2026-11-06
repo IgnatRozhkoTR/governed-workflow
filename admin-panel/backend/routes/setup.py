@@ -22,55 +22,31 @@ _SETUP_SESSION = "ws-setup"
 bp = Blueprint('setup', __name__)
 
 
-def _resolve_preset_profile_lsp(profile_ids):
-    """Return a list of preset profile descriptors including LSP fields when present."""
+def _resolve_preset_profiles(profile_ids):
+    """Return id/name/language descriptors for the selected preset profiles; unknown ids pass through."""
     if not profile_ids:
         return profile_ids
 
-    try:
-        with get_db_ctx() as db:
-            placeholders = ",".join("?" * len(profile_ids))
-            rows = db.execute(
-                f"SELECT id, name, language, lsp_command, lsp_install_command "
-                f"FROM verification_profiles WHERE id IN ({placeholders})",
-                profile_ids,
-            ).fetchall()
-    except Exception:
-        logger.warning("setup_start: could not fetch profile LSP data, falling back to raw IDs")
-        return profile_ids
+    with get_db_ctx() as db:
+        placeholders = ",".join("?" * len(profile_ids))
+        rows = db.execute(
+            f"SELECT id, name, language FROM verification_profiles WHERE id IN ({placeholders})",
+            profile_ids,
+        ).fetchall()
 
-    result = []
-    rows_by_id = {r["id"]: r for r in rows}
-    for pid in profile_ids:
-        row = rows_by_id.get(pid)
-        if row is None:
-            result.append(pid)
-            continue
-        entry = {"id": row["id"], "name": row["name"], "language": row["language"]}
-        if row["lsp_command"]:
-            entry["lsp_server"] = row["lsp_command"]
-        if row["lsp_install_command"]:
-            entry["lsp_install"] = row["lsp_install_command"]
-        result.append(entry)
-    return result
+    rows_by_id = {r["id"]: dict(r) for r in rows}
+    return [rows_by_id.get(pid, pid) for pid in profile_ids]
 
 
 def _format_custom_languages(custom_languages):
-    """Normalise custom language entries, keeping LSP fields when present."""
-    result = []
-    for cl in custom_languages:
-        entry = {"name": cl.get("name", ""), "config": cl.get("config", ""), "details": cl.get("details", "")}
-        lsp_command = cl.get("lsp_command", "").strip()
-        lsp_install_command = cl.get("lsp_install_command", "").strip()
-        if lsp_command:
-            entry["lsp_server"] = lsp_command
-        if lsp_install_command:
-            entry["lsp_install"] = lsp_install_command
-        result.append(entry)
-    return result
+    """Normalise custom language entries to the fields the setup skill reads."""
+    return [
+        {"name": cl.get("name", ""), "config": cl.get("config", ""), "details": cl.get("details", "")}
+        for cl in custom_languages
+    ]
 
 
-def _build_setup_prompt(modules, modules_to_disable, preset_profiles_with_lsp, custom_languages_with_lsp):
+def _build_setup_prompt(modules, modules_to_disable, preset_profiles, custom_languages):
     """Build the Claude Code prompt for the setup skill."""
     skill_path = DEFAULT_SKILLS_DIR / "setup" / "SKILL.md"
     prompt_lines = [
@@ -79,8 +55,8 @@ def _build_setup_prompt(modules, modules_to_disable, preset_profiles_with_lsp, c
         "Configuration:",
         "- Modules to enable: " + json.dumps(modules),
         "- Modules to disable: " + json.dumps(modules_to_disable),
-        "- Preset verification profiles to assign: " + json.dumps(preset_profiles_with_lsp),
-        "- Custom verification profiles to create: " + json.dumps(custom_languages_with_lsp),
+        "- Preset verification profiles to assign: " + json.dumps(preset_profiles),
+        "- Custom verification profiles to create: " + json.dumps(custom_languages),
         "",
         "Complete the setup and report the results.",
     ]
@@ -134,8 +110,8 @@ def setup_start():
     selected_set = set(modules)
     modules_to_disable = [m for m in available_module_ids if m not in selected_set]
 
-    preset_profiles_with_lsp = _resolve_preset_profile_lsp(languages)
-    custom_languages_with_lsp = _format_custom_languages(custom_languages)
+    preset_profiles = _resolve_preset_profiles(languages)
+    custom_profiles = _format_custom_languages(custom_languages)
 
     if session_exists(_SETUP_SESSION):
         logger.info("setup_start: killing existing session '%s'", _SETUP_SESSION)
@@ -145,7 +121,7 @@ def setup_start():
     create_session(_SETUP_SESSION, home_dir)
     logger.info("setup_start: created tmux session '%s' in %s", _SETUP_SESSION, home_dir)
 
-    prompt = _build_setup_prompt(modules, modules_to_disable, preset_profiles_with_lsp, custom_languages_with_lsp)
+    prompt = _build_setup_prompt(modules, modules_to_disable, preset_profiles, custom_profiles)
     logger.info("setup_start: prompt constructed (%d chars)", len(prompt))
 
     keys_sent = send_keys(_SETUP_SESSION, 'claude --dangerously-skip-permissions')

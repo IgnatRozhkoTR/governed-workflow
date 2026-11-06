@@ -12,7 +12,7 @@ paths:
 
 - Vanilla JS. No framework, no bundler, no TypeScript, no jQuery.
 - Scripts are loaded as plain `<script>` tags in `admin.html`. **ES modules are NOT used** — there is no `import` / `export`. Functions and globals attach to the window scope via plain declarations.
-- One feature per file under `frontend/js/`. The filename mirrors the feature (e.g. `rules.js`, `phase-settings.js`, `lsp-client.js`).
+- One feature per file under `frontend/js/`. The filename mirrors the feature (e.g. `rules.js`, `phase-settings.js`, `file-explorer.js`).
 
 ## Declarations
 

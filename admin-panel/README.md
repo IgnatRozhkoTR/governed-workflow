@@ -94,7 +94,7 @@ Add to your `.mcp.json` (use absolute expanded paths — no `~` or `$HOME`):
 | Phase Control | Tab bar | Phase progression timeline, approval status, Phase Toggles, verification results |
 | Files | Sidebar | File browser with markdown preview |
 | Code Changes | Sidebar | Git diff viewer |
-| Configuration | Sidebar | Claude command, Git configuration, Git Rules, Rules, LSP Shortcuts, Modules, Verification Profiles, Task Context |
+| Configuration | Sidebar | Claude command, Git configuration, Git Rules, Rules, Modules, Verification Profiles, Task Context |
 | Review | Sidebar | Blind code review findings and resolution workflow |
 | Terminal | Sidebar | Built-in terminal (tmux + xterm.js) |
 | Setup | Project selector | Module selection, verification profile configuration, embedded terminal to run the setup skill |
@@ -126,7 +126,6 @@ All workspace endpoints are scoped under `/api/ws/<project_id>/<branch>/`.
 | Terminal | `POST .../terminal/start`, `POST .../terminal/resume`, `GET .../terminal/status`, `POST .../terminal/kill`, `POST .../terminal/notify`, `WS /ws/terminal/<project>/<branch>` |
 | Command | `GET/PUT .../command` |
 | Verification | `GET /api/verification/profiles`, `POST /api/verification/profiles`, `POST .../profiles/<id>/steps`, `PUT/DELETE /api/verification/steps/<id>`, `GET/POST .../verification/assign`, `DELETE .../verification/unassign/<id>`, `GET .../verification/results` |
-| LSP | `GET .../lsp/profiles`, `GET .../lsp/status`, `POST .../lsp/start`, `POST .../lsp/stop`, `POST .../lsp/check-installed`, `PUT .../lsp/profiles/<id>/toggle`, `WS /ws/lsp/<project>/<branch>` |
 | Phase Settings | `GET/PUT /api/phase-settings/device`, `GET/PUT /api/projects/<pid>/phase-settings`, `GET/PUT .../phase-settings`, `GET /api/phases/available` |
 | Modules | `GET /api/modules`, `GET /api/modules/enabled`, `POST /api/modules/enabled` |
 | Setup | `POST /api/setup/start`, `GET /api/setup/status`, `WS /ws/setup-terminal` |

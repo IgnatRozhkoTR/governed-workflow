@@ -800,57 +800,38 @@ class TestUpdateVerificationProfile:
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_create_verification_profile
         result = workspace_create_verification_profile(
-            name="Test Java", language="java", lsp_command="jdtls"
+            name="Test Java", language="java", description="Original"
         )
         assert result["ok"]
         return result["id"]
 
-    def test_update_lsp_command(self, workspace, monkeypatch):
-        profile_id = self._create_profile(workspace, monkeypatch)
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_update_verification_profile
+    def _stored_description(self, profile_id):
         from core.db import get_db
-        result = workspace_update_verification_profile(profile_id=profile_id, lsp_command="bash")
-        assert result["ok"]
         db = get_db()
-        row = db.execute("SELECT lsp_command FROM verification_profiles WHERE id = ?", (profile_id,)).fetchone()
+        row = db.execute("SELECT description FROM verification_profiles WHERE id = ?", (profile_id,)).fetchone()
         db.close()
-        assert row["lsp_command"] == "bash"
+        return row["description"]
 
-    def test_update_multiple_fields(self, workspace, monkeypatch):
+    def test_update_description(self, workspace, monkeypatch):
         profile_id = self._create_profile(workspace, monkeypatch)
-        monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_update_verification_profile
-        from core.db import get_db
-        result = workspace_update_verification_profile(
-            profile_id=profile_id,
-            lsp_command="bash",
-            lsp_args='["-c", "JAVA_HOME=/usr/lib/jvm/java-17 exec jdtls"]'
-        )
+        result = workspace_update_verification_profile(profile_id=profile_id, description="  Updated notes  ")
         assert result["ok"]
-        db = get_db()
-        row = db.execute(
-            "SELECT lsp_command, lsp_args FROM verification_profiles WHERE id = ?", (profile_id,)
-        ).fetchone()
-        db.close()
-        assert row["lsp_command"] == "bash"
-        assert row["lsp_args"] == '["-c", "JAVA_HOME=/usr/lib/jvm/java-17 exec jdtls"]'
+        assert self._stored_description(profile_id) == "Updated notes"
+
+    def test_update_blank_description_clears_it(self, workspace, monkeypatch):
+        profile_id = self._create_profile(workspace, monkeypatch)
+        from mcp_server import workspace_update_verification_profile
+        result = workspace_update_verification_profile(profile_id=profile_id, description="")
+        assert result["ok"]
+        assert self._stored_description(profile_id) is None
 
     def test_update_nonexistent_profile(self, workspace, monkeypatch):
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_update_verification_profile
-        result = workspace_update_verification_profile(profile_id=9999, lsp_command="bash")
+        result = workspace_update_verification_profile(profile_id=9999, description="x")
         assert result["error"] == "profile_not_found"
         assert result["errorCategory"] == "not_found"
-        assert result["isRetryable"] is False
-
-    def test_update_no_fields(self, workspace, monkeypatch):
-        profile_id = self._create_profile(workspace, monkeypatch)
-        monkeypatch.chdir(workspace["working_dir"])
-        from mcp_server import workspace_update_verification_profile
-        result = workspace_update_verification_profile(profile_id=profile_id)
-        assert result["error"] == "no_fields_to_update"
-        assert result["errorCategory"] == "validation"
         assert result["isRetryable"] is False
 
 
@@ -1599,7 +1580,7 @@ class TestErrorEnvelopeContract:
         monkeypatch.chdir(workspace["working_dir"])
         from mcp_server import workspace_update_verification_profile
         self._assert_envelope(workspace_update_verification_profile(
-            profile_id=9999, lsp_command="x"
+            profile_id=9999, description="x"
         ))
 
     def test_add_verification_step_not_found(self, workspace, monkeypatch):

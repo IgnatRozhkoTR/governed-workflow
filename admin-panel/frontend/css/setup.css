@@ -128,15 +128,6 @@
   color: var(--text-primary);
 }
 
-.setup-lsp-badge {
-  font-size: 0.65rem;
-  padding: 1px 6px;
-  background: var(--info, #0d6efd);
-  color: #fff;
-  border-radius: 3px;
-  margin-left: 4px;
-}
-
 .setup-custom-badge {
   font-size: 0.65rem;
   padding: 1px 6px;

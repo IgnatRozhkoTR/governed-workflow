@@ -1,7 +1,6 @@
 """Workspace and branch management routes."""
 import json
 import logging
-import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -30,7 +29,7 @@ from core.paths import (
 from core.terminal import session_name
 from services.git_rules_service import migrate_legacy_git_rules
 from services import base_sync_service
-from services import comment_service, lsp_service, proposal_service, review_pipeline_service
+from services import comment_service, proposal_service, review_pipeline_service
 from services import pr_service, repo_service
 from services import review_mode_service
 from services import workflow_mode_service
@@ -871,31 +870,6 @@ def _register_workspace(
     }, workspace_id
 
 
-def _prewarm_lsp_servers(db, project_id, working_dir):
-    """Best-effort kick off every LSP-enabled profile assigned to *project_id*.
-
-    Reuses the same async start machinery and per-instance locks as the
-    normal LSP start route, so a background pre-warm followed by a user
-    clicking "start" is a clean no-op. Never raises: indexing/Gradle sync
-    happening early is a nice-to-have, not something creation should fail on.
-    """
-    if os.environ.get("GOVERNED_WORKFLOW_DISABLE_LSP_PREWARM"):
-        return {"started": [], "skipped_reason": "disabled_by_env"}
-
-    try:
-        results = lsp_service.start_all_lsp_servers_async(db, project_id, working_dir)
-        db.commit()
-    except Exception:
-        logger.exception("LSP pre-warm failed for project=%s", project_id)
-        return {"started": [], "skipped_reason": "prewarm_failed"}
-
-    if not results:
-        return {"started": [], "skipped_reason": "no_lsp_enabled_profiles"}
-
-    started = [r["profile_name"] for r in results if "error" not in r]
-    return {"started": started, "skipped_reason": None}
-
-
 def _attach_requested_repos(db, ws, project, repo_ids):
     """Attach each requested repo id, collecting a per-repo result or error.
 
@@ -1011,10 +985,8 @@ def create_workspace(project_id):
             if requested_repo_ids:
                 ws_row = db.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
                 body["attached_repos"] = _attach_requested_repos(db, ws_row, project, requested_repo_ids)
-            body["lsp_prewarm"] = {"started": [], "skipped_reason": "multi_project"}
         else:
             body["base_sync"] = _resolve_base_sync(project_path, source, source_from_origin)
-            body["lsp_prewarm"] = _prewarm_lsp_servers(db, project_id, working_dir)
 
         try:
             results = ConfiguratorChain.default().run(db, project_id, project_path)

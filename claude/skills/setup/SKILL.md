@@ -78,19 +78,6 @@ For each selected preset language profile:
 For each custom language configuration:
 
 1. Create the verification profile via `workspace_create_verification_profile` MCP tool.
-   **If the configuration includes LSP settings**, pass them in the same call:
-   ```
-   workspace_create_verification_profile(
-     name="Go",
-     language="go",
-     description="Go compilation, lint, and test",
-     lsp_command="gopls",
-     lsp_args='["serve"]',
-     lsp_install_check_command="which gopls",
-     lsp_install_command="go install golang.org/x/tools/gopls@latest"
-   )
-   ```
-   The `lsp_command` parameter is **required** for the LSP button to appear in the admin panel header. If omitted, the profile will work for verification but LSP integration will be missing.
 2. For each tool specified in the configuration:
    - If `install_check_command` is not provided, auto-detect it: use `which <tool>` as the default
    - If `install_command` is not provided, auto-detect based on OS and package manager:
@@ -104,72 +91,6 @@ For each custom language configuration:
      - If it fails, explain what the user needs to do manually (license acceptance, account creation, manual download, etc.)
    - Run a smoke test of the tool to confirm it works end-to-end
 3. Assign the profile to the workspace
-
-### LSP Server Setup
-
-For each profile that includes LSP configuration (`lsp_server` field in the configuration):
-
-1. Check the profile's `description` field via `workspace_get_verification_profiles`. If it contains setup instructions (look for phrases like "LSP setup requires", "LSP setup uses", or "call `workspace_update_verification_profile`"), follow those instructions now — before smoke-testing:
-   - Execute any discovery or install commands described
-   - Once the required path or value is resolved, call `workspace_update_verification_profile` with the profile's ID and the resolved LSP fields (e.g., updated `lsp_command` and `lsp_args`)
-   - Continue with the updated profile values for all subsequent steps
-2. Check if the LSP server binary is installed by running the `lsp_install_check_command` from the profile (use the updated value if it was just changed), or `which <lsp_server>` if no check command is provided
-3. If not installed, run the `lsp_install` command from the configuration
-   - If the install command fails, report clearly: what binary is missing, what was attempted, and what the user must do manually
-4. Smoke-test the server to confirm it runs: try `<lsp_server> --help` or `<lsp_server> --version`
-   - If the binary exits with a non-zero code but the LSP protocol requires no flags, treat it as passing if the binary is found
-   - If the binary is not found at all, report it as a failure
-5. Report LSP server status alongside the profile status: installed / not installed / failed
-
-#### LSP runtime version matching (Java / jdtls specifically)
-
-Java's LSP server (`jdtls`) is JVM-based, and each jdtls release has a *minimum required JDK*. Mismatches are the most common cause of `LSP server closed stdout before responding to initialize`. The Java profile description carries the version matrix and discovery commands — follow them, but the core idea is:
-
-- Detect installed jdtls version: `brew info jdtls` (macOS) or check the binary's wrapper script.
-- Approximate matrix: jdtls < 1.28 → JDK 11+; jdtls 1.28–1.37 → JDK 17+; jdtls ≥ 1.38 → JDK 21+.
-- Confirmation: run `JAVA_HOME=<candidate> jdtls --jvm-arg=-Xmx1G </dev/null` once. If it errors with `jdtls requires at least Java N`, switch to JDK N and retry. If it starts cleanly and waits for stdin, the JDK is correct.
-- After resolution, call `workspace_update_verification_profile` to write `lsp_command='bash'` and `lsp_args='["-c", "JAVA_HOME=<resolved> exec jdtls --jvm-arg=-Xmx1G"]'`.
-
-#### LSP runtime troubleshooting (jdtls workspace cache)
-
-If a jdtls-based profile starts cleanly via `bash -c` from the terminal but the admin panel reports `LSP server closed stdout before responding to initialize`, jdtls's per-project workspace cache is almost certainly corrupt. jdtls hashes the project working directory and stores Eclipse workspace state at:
-- macOS: `~/Library/Caches/jdtls/jdtls-<hash>/`
-- Linux: `~/.cache/jdtls/jdtls-<hash>/`
-
-When that state references files that no longer exist on disk (after a rebuild, branch switch, or stale build artifacts), Eclipse's `ResourcesPlugin` throws `ObjectNotFoundException` during init and the server exits before responding. Fix: delete the offending `jdtls-<hash>/` directory and retry the LSP start. The fresh cache rebuilds in under a minute. The actual error stack lives in the cache's `.metadata/.log` file — read it to confirm the diagnosis before wiping anything else.
-
-#### LSP runtime setup (Kotlin / kotlin-lsp specifically)
-
-Kotlin uses the official JetBrains `kotlin-lsp` (the `Kotlin/kotlin-lsp` project, distributed by JetBrains). It is **not** the same as the community `fwcd/kotlin-language-server` — pick the JetBrains one, it's based on IntelliJ infrastructure and gives correct cross-module references for JVM Gradle projects.
-
-Important: Kotlin and Java are **different LSP servers** even though both target the JVM. jdtls cannot index `.kt` files; kotlin-lsp cannot index `.java` files. If a project mixes both you need both profiles assigned.
-
-Install:
-- macOS: `brew install --cask kotlin-lsp`
-- Linux: download the latest archive from `https://github.com/Kotlin/kotlin-lsp/releases`, extract it, and symlink `kotlin-lsp.sh` to a directory on PATH as `kotlin-lsp`.
-
-Smoke test: `kotlin-lsp --help` should print usage. The binary ships its own bundled JRE — there is no `JAVA_HOME` or system Java requirement, and the version-matching dance you do for jdtls does **not** apply here.
-
-LSP profile fields for Kotlin:
-- `lsp_command`: `kotlin-lsp`
-- `lsp_args`: `["--stdio"]`
-- `lsp_install_check_command`: `which kotlin-lsp`
-- `lsp_install_command` (macOS): `brew install --cask kotlin-lsp`
-
-First-start timing: kotlin-lsp performs its full Gradle import + index pass on the first `initialize` request. For a fresh, never-imported multi-module project this takes 30-90 seconds before references will work. Subsequent starts reuse the cache and are much faster. If a `textDocument/references` query returns empty immediately after start, wait and retry — it is almost always still indexing.
-
-Limitations (per upstream, status as of 262.x): Kotlin Multiplatform and Maven are not yet supported. Only JVM Gradle projects work reliably. If the profile is assigned to a KMP or Maven Kotlin project, expect kotlin-lsp to either return partial results or fail to import; report this clearly to the user instead of silently treating it as success.
-
-For custom profiles with LSP:
-
-1. The user provides the binary name (`lsp_server`) and install command (`lsp_install`) in the configuration
-2. Follow the same check → install → smoke-test flow described above
-3. Pass LSP parameters in `workspace_create_verification_profile` for a clean setup, or add/update them later via `workspace_update_verification_profile`. The following parameters map from the user's configuration:
-   - `lsp_server` → `lsp_command` parameter
-   - `lsp_install` → `lsp_install_command` parameter
-   - Auto-derive `lsp_install_check_command` as `which <lsp_server>` if not provided
-   - Set `lsp_args` if the LSP protocol requires specific flags (e.g., `'["--stdio"]'`)
-4. After creation, verify the profile ID was returned and the LSP button appears in the admin panel
 
 ### Phase 3: Final Verification
 

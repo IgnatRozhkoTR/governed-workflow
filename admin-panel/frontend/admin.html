@@ -74,7 +74,6 @@
 <link rel="stylesheet" href="css/preplanning.css?v=11">
 <link rel="stylesheet" href="css/terminal.css?v=16">
 <link rel="stylesheet" href="css/verification.css?v=13">
-<link rel="stylesheet" href="css/lsp.css?v=12">
 <link rel="stylesheet" href="css/setup.css?v=13">
 <link rel="stylesheet" href="css/mobile.css?v=11">
 <link rel="stylesheet" href="css/workspace.css?v=11">
@@ -136,11 +135,6 @@
       <option value="en">EN</option>
       <option value="ru">RU</option>
     </select>
-    <div class="lsp-control" style="position: relative;">
-      <button id="lspIndicator" class="btn btn-sm" onclick="toggleLspDropdown()" title="Language Servers" style="display:none;">LSP</button>
-      <div id="lspDropdown" class="lsp-dropdown" style="display:none;">
-      </div>
-    </div>
     <button class="header-refresh-btn" onclick="location.reload()" title="Refresh page" data-i18n-title="header.refresh">&#x21bb;</button>
     <button class="btn btn-sm" onclick="showProjectSelector()" title="Switch project" id="switchProjectBtn" data-i18n="header.switch">Switch</button>
     <span class="badge badge-warning" id="phaseLabel">Phase 3 — Planning</span>
@@ -223,7 +217,6 @@
           <button type="button" class="settings-nav-item" data-section="git" data-i18n="settings.nav.git">Git</button>
           <button type="button" class="settings-nav-item" data-section="claude" data-i18n="settings.nav.claude">Claude</button>
           <button type="button" class="settings-nav-item" data-section="system" data-i18n="settings.nav.system">System</button>
-          <button type="button" class="settings-nav-item" data-section="interface" data-i18n="settings.nav.interface">Interface</button>
         </div>
       </nav>
 
@@ -556,18 +549,6 @@
             <div class="settings-subsection-title" data-i18n="settings.section.system.modulesTitle">Modules</div>
             <div id="modulesCardBody"></div>
           </div>
-        </section>
-
-        <!-- Interface -->
-        <section class="settings-section" data-section="interface">
-          <div class="settings-section-header">
-            <h2 data-i18n="settings.section.interface.title">Interface</h2>
-            <span class="settings-scope-badge" data-i18n="settings.scope.browser">Browser</span>
-          </div>
-          <p class="settings-section-desc" data-i18n="settings.section.interface.desc">Browser-local editor preferences.</p>
-
-          <div class="settings-subsection-title" data-i18n="settings.section.interface.lspShortcutsTitle" style="margin-bottom: 12px;">LSP Keyboard Shortcuts</div>
-          <div id="lspShortcutsBody"></div>
         </section>
 
       </div>
@@ -979,9 +960,6 @@
 <script src="js/research.js?v=11"></script>
 <script src="js/diff-viewer.js?v=16"></script>
 <script src="js/monaco-editor.js?v=11"></script>
-<script src="js/lsp-shortcuts.js?v=11"></script>
-<script src="js/lsp-client.js?v=11"></script>
-<script src="js/lsp-controls.js?v=12"></script>
 <script src="js/file-explorer.js?v=13"></script>
 <script src="js/git-config.js?v=11"></script>
 <script src="js/git-cockpit.js?v=1"></script>

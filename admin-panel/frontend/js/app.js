@@ -38,9 +38,6 @@ async function initApp() {
     return;
   }
 
-  stopLspPolling();
-  _lspProfiles = [];
-
   resetAppState();
   ACTIVE_TERMINAL_KIND = 'claude';
 
@@ -122,8 +119,6 @@ async function initApp() {
   renderApprovalStatus();
   renderContext();
   loadVerificationData();
-  loadLspProfiles();
-  startLspPolling();
   loadCriteria();
   loadGitConfig();
   loadGitRules();
@@ -133,7 +128,6 @@ async function initApp() {
   loadChannelsPreference();
   loadModulesCard();
   if (typeof renderNetworkMode === 'function') renderNetworkMode();
-  if (typeof renderLspShortcutsConfig === 'function') renderLspShortcutsConfig();
 
   // Restore diff toggle states from localStorage
   document.querySelectorAll('#viewModeToggle .toggle-opt').forEach(function(b) {

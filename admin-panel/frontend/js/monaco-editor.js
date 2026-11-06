@@ -76,9 +76,8 @@ function initMonaco() {
     require(['vs/editor/editor.main'], function() {
       monaco.editor.registerEditorOpener({
         openCodeEditor: function(source, resource, selectionOrPosition) {
-          // In-document jump: target URI matches the currently-open editor's model URI
-          // (Monaco auto-assigns it as `inmemory://model/N`). Navigate within the
-          // editor instead of falling through to the external-source toast.
+          // Only in-document jumps are supported: the target URI must match the open
+          // model's URI (Monaco auto-assigns it as `inmemory://model/N`).
           var currentEditor = window._monacoEditor;
           var currentModel = currentEditor && currentEditor.getModel();
           if (currentModel && resource.toString() === currentModel.uri.toString()) {
@@ -94,31 +93,6 @@ function initMonaco() {
             return true;
           }
 
-          if (resource.scheme && resource.scheme !== 'file') {
-            if (typeof showToast === 'function') {
-              showToast('External library source (' + resource.scheme + '://) — open the project in your IDE to navigate into it');
-            }
-            return true;
-          }
-
-          var path = resource.path;
-          var relativePath = (typeof lspUriToPath === 'function')
-            ? lspUriToPath(resource.toString())
-            : path;
-
-          var lineNumber = null;
-          if (selectionOrPosition) {
-            if (typeof selectionOrPosition.startLineNumber === 'number') {
-              lineNumber = selectionOrPosition.startLineNumber;
-            } else if (typeof selectionOrPosition.lineNumber === 'number') {
-              lineNumber = selectionOrPosition.lineNumber;
-            }
-          }
-
-          if (typeof selectExplorerFile === 'function') {
-            selectExplorerFile(relativePath, lineNumber);
-            return true;
-          }
           return false;
         }
       });
@@ -153,10 +127,6 @@ function createEditor(container, content, language, filePath, readOnly) {
 
     window._monacoEditor = editor;
     window._monacoCurrentFile = filePath;
-
-    if (typeof applyLspShortcuts === 'function') {
-      applyLspShortcuts();
-    }
 
     return editor;
   });

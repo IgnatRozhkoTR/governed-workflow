@@ -13,7 +13,6 @@ from core.decorators import with_project
 from core.helpers import run_git, write_json
 from core.i18n import t
 from core.paths import DEFAULT_GIT_RULES
-from services import lsp_service
 from services.advance_mode_service import seed_default_modes
 from services.configurator_service import ConfiguratorChain
 from services.project_settings_service import (
@@ -324,10 +323,6 @@ def delete_project(project_id):
     try:
         db.execute("DELETE FROM projects WHERE id = ?", (project_id,))
         db.commit()
-        try:
-            lsp_service.remove_lsp_cache_dirs(project_id)
-        except Exception:
-            log.exception("Failed to clean up LSP cache dirs for project=%s", project_id)
         return jsonify({"ok": True})
     finally:
         db.close()

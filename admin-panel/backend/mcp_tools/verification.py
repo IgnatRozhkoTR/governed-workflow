@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal
 
 from mcp.types import ToolAnnotations
 from pydantic import Field
@@ -18,7 +18,6 @@ _FAIL_SEVERITY = Literal["blocking", "warning"]
 
 _PROFILE_ERROR_MAPPING = {
     "profile_not_found": ("not_found", False),
-    "no_fields_to_update": ("validation", False),
 }
 
 _STEP_ERROR_MAPPING = {
@@ -143,49 +142,18 @@ def workspace_create_verification_profile(
     name: Annotated[str, Field(description="Display name, e.g. 'Go', 'Java (Custom)'.", min_length=1)],
     language: Annotated[str, Field(description="Language key, e.g. 'go', 'rust', 'java'.", min_length=1)],
     description: Annotated[str, Field(description="What this profile checks.")] = "",
-    lsp_command: Annotated[
-        str,
-        Field(description="LSP server binary, e.g. 'jdtls', 'pyright-langserver'. Required for LSP button to appear."),
-    ] = "",
-    lsp_args: Annotated[
-        str,
-        Field(description="JSON array of CLI args, e.g. '[\"--stdio\"]'. Optional."),
-    ] = "",
-    lsp_install_check_command: Annotated[
-        str,
-        Field(description="Command to check whether the LSP server is installed, e.g. 'which jdtls'. Optional."),
-    ] = "",
-    lsp_install_command: Annotated[
-        str,
-        Field(description="Command to install the LSP server, e.g. 'brew install jdtls'. Optional."),
-    ] = "",
-    lsp_workspace_config: Annotated[
-        str,
-        Field(description="JSON workspace config for the LSP server. Optional."),
-    ] = "",
-    lsp_port: Annotated[
-        int,
-        Field(description="Fixed port for the LSP server. 0 = auto-assign.", ge=0),
-    ] = 0,
 ) -> dict:
     """Create a new verification profile. NOT workspace-bound.
 
     Purpose
-      Profiles define language-level verification: which steps to run and how
-      to start the LSP server. After creation, add steps with
-      workspace_add_verification_step, then assign to a project with
-      workspace_assign_verification_profile.
+      Profiles define language-level verification: which steps to run.
+      After creation, add steps with workspace_add_verification_step, then
+      assign to a project with workspace_assign_verification_profile.
 
     Parameters
       name:        Display name, e.g. 'Go', 'Java (Custom)'.
       language:    Language key, e.g. 'go', 'rust', 'java'.
       description: What this profile checks.
-      lsp_command: LSP server binary or shell command. Required for LSP button.
-      lsp_args:    JSON array of CLI args.
-      lsp_install_check_command: Shell command to verify LSP is installed.
-      lsp_install_command: Shell command to install the LSP server.
-      lsp_workspace_config: JSON workspace settings for the LSP.
-      lsp_port:    Fixed port; 0 = auto-assign.
 
     Returns
       {ok: True, id: <int>}
@@ -202,11 +170,6 @@ def workspace_create_verification_profile(
     try:
         result = verification_service.create_profile(
             db, name, language, description=description or None,
-            lsp_command=lsp_command or None, lsp_args=lsp_args or None,
-            lsp_install_check_command=lsp_install_check_command or None,
-            lsp_install_command=lsp_install_command or None,
-            lsp_workspace_config=lsp_workspace_config or None,
-            lsp_port=lsp_port if lsp_port else None,
         )
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
@@ -226,57 +189,27 @@ def workspace_create_verification_profile(
 def workspace_update_verification_profile(
     db,
     profile_id: Annotated[int, Field(description="ID of the profile to update (from workspace_get_verification_profiles).", ge=1)],
-    description: Annotated[Optional[str], Field(description="Updated description text. Omit to keep current.")] = None,
-    lsp_command: Annotated[Optional[str], Field(description="LSP server binary or shell command. Pass '' to clear.")] = None,
-    lsp_args: Annotated[Optional[str], Field(description="JSON array of CLI args. Pass '' to clear.")] = None,
-    lsp_install_check_command: Annotated[Optional[str], Field(description="Command to check LSP installation. Pass '' to clear.")] = None,
-    lsp_install_command: Annotated[Optional[str], Field(description="Command to install the LSP server. Pass '' to clear.")] = None,
-    lsp_workspace_config: Annotated[Optional[str], Field(description="JSON workspace config for the LSP. Pass '' to clear.")] = None,
-    lsp_port: Annotated[Optional[int], Field(description="Fixed port (0 = auto). Omit to keep current.", ge=0)] = None,
+    description: Annotated[str, Field(description="New description text. Pass '' to clear.")],
 ) -> dict:
-    """Update LSP configuration and/or description on an existing profile. NOT workspace-bound.
+    """Replace the description of an existing profile. NOT workspace-bound.
 
     Purpose
-      Only fields explicitly provided (non-None) are updated. Pass an empty
-      string to clear a string field. Calling with only profile_id returns a
-      validation error (no_fields_to_update).
+      Profile descriptions carry setup notes the agent reads when it assigns
+      or configures a profile. Pass an empty string to clear the description.
 
     Parameters
-      profile_id:                 ID of the profile to update.
-      description:                New description text.
-      lsp_command:                LSP server binary or shell command.
-      lsp_args:                   JSON array of CLI args.
-      lsp_install_check_command:  Check command for LSP installation.
-      lsp_install_command:        Install command for the LSP server.
-      lsp_workspace_config:       JSON workspace config.
-      lsp_port:                   Fixed port; 0 = auto.
+      profile_id:  ID of the profile to update.
+      description: New description text.
 
     Returns
       {ok: True}
 
     Errors
       not_found  — profile_id does not reference a known profile.
-      validation — no fields were provided to update.
       transient  — DB failure; caller should retry.
     """
-    kwargs = {}
-    if description is not None:
-        kwargs["description"] = description
-    if lsp_command is not None:
-        kwargs["lsp_command"] = lsp_command
-    if lsp_args is not None:
-        kwargs["lsp_args"] = lsp_args
-    if lsp_install_check_command is not None:
-        kwargs["lsp_install_check_command"] = lsp_install_check_command
-    if lsp_install_command is not None:
-        kwargs["lsp_install_command"] = lsp_install_command
-    if lsp_workspace_config is not None:
-        kwargs["lsp_workspace_config"] = lsp_workspace_config
-    if lsp_port is not None:
-        kwargs["lsp_port"] = lsp_port
-
     try:
-        result = verification_service.update_profile(db, profile_id, **kwargs)
+        result = verification_service.update_profile_description(db, profile_id, description)
     except TRANSIENT_DB_EXCEPTIONS as exc:
         return mcp_error("transient", str(exc), retryable=True)
 

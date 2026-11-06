@@ -3,7 +3,6 @@
 // ═══════════════════════════════════════════════
 
 var explorerState = { selectedFile: null, filter: '', mdMode: 'preview', dirCache: {}, totalFiles: 0 };
-var _explorerPreviousLspFile = null;
 var _explorerSaveBtn = null;
 var _explorerEditorDirty = false;
 
@@ -190,12 +189,6 @@ function isMarkdownFile(path) {
 }
 
 function renderExplorerContent(path, lines, lineNumber) {
-  if (_explorerPreviousLspFile && _explorerPreviousLspFile !== path) {
-    unregisterLspProviders();
-    lspDidCloseDocument(_explorerPreviousLspFile);
-    _explorerPreviousLspFile = null;
-  }
-
   var contentEl = document.getElementById('explorerContent');
   var isMd = isMarkdownFile(path);
 
@@ -305,9 +298,6 @@ function renderExplorerContent(path, lines, lineNumber) {
     var editorReadOnly = !(isMd && explorerState.mdMode === 'source');
     _explorerEditorDirty = false;
     createEditor(editorContainer, fileContent, language, path, editorReadOnly).then(function(editor) {
-      lspDidOpenDocument(path, fileContent, language);
-      registerLspProviders(editor, path, language);
-      _explorerPreviousLspFile = path;
       if (lineNumber) {
         revealLine(lineNumber);
       }
@@ -365,10 +355,5 @@ document.addEventListener('workspace-reset', function() {
   _explorerFileLines = [];
   _explorerSaveBtn = null;
   _explorerEditorDirty = false;
-  if (_explorerPreviousLspFile) {
-    unregisterLspProviders();
-    lspDidCloseDocument(_explorerPreviousLspFile);
-    _explorerPreviousLspFile = null;
-  }
   disposeEditor();
 });
