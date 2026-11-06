@@ -7,15 +7,12 @@
 !.github/**
 !README.md
 !CLAUDE.md
-!AGENTS.md
 !LICENSE
 
 !admin-panel/
 !admin-panel/**
 !claude/
 !claude/**
-!codex/
-!codex/**
 claude/skills/code-review/
 claude/skills/evy-sync/
 claude/skills/pack-sessions-skill/

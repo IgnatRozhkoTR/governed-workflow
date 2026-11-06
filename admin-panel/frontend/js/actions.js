@@ -113,9 +113,6 @@ async function refreshState() {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
 
-  var refreshBtn = document.querySelector('.header-refresh-btn');
-  if (refreshBtn) refreshBtn.classList.add('refreshing');
-
   try {
     var response = await apiGetState(ctx.projectId, ctx.branch, _lastStateEtag);
 
@@ -139,8 +136,6 @@ async function refreshState() {
     EventBus.emit('state:refreshed', stateData);
   } catch (e) {
     console.warn('Failed to refresh state:', e.message);
-  } finally {
-    if (refreshBtn) refreshBtn.classList.remove('refreshing');
   }
 }
 
