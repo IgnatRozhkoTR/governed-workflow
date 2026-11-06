@@ -148,6 +148,7 @@ async function _putSettingsProjectCache(projectId, patch) {
   var payload = {
     simple_planning: !!current.simple_planning,
     fast_mode_default: !!current.fast_mode_default,
+    yolo_mode_default: !!current.yolo_mode_default,
     review_mode_default: current.review_mode_default || 'files_integration'
   };
   Object.assign(payload, patch);
@@ -170,6 +171,8 @@ function loadWorkflowProjectSettings() {
     var fastCheck = document.getElementById('settingsFastModeDefaultCheck');
     if (simpleCheck) simpleCheck.checked = !!settings.simple_planning;
     if (fastCheck) fastCheck.checked = !!settings.fast_mode_default;
+    var yoloCheck = document.getElementById('settingsYoloModeDefaultCheck');
+    if (yoloCheck) yoloCheck.checked = !!settings.yolo_mode_default;
   });
 
   var advanceModesBody = document.getElementById('advanceModesSettingsBody');
@@ -187,6 +190,23 @@ async function onSettingsSimplePlanningChange(checkbox) {
   try {
     await _putSettingsProjectCache(ctx.projectId, { simple_planning: checkbox.checked });
     _flashSettingsInline('settingsSimplePlanningFlash');
+  } catch (e) {
+    checkbox.checked = previous;
+    showToast(t('messages.phaseSettingsSaveFailed').replace('{error}', e.message));
+  } finally {
+    checkbox.disabled = false;
+  }
+}
+
+async function onSettingsYoloModeDefaultChange(checkbox) {
+  var ctx = getWorkspaceContext();
+  if (!ctx) return;
+
+  var previous = !checkbox.checked;
+  checkbox.disabled = true;
+  try {
+    await _putSettingsProjectCache(ctx.projectId, { yolo_mode_default: checkbox.checked });
+    _flashSettingsInline('settingsYoloModeDefaultFlash');
   } catch (e) {
     checkbox.checked = previous;
     showToast(t('messages.phaseSettingsSaveFailed').replace('{error}', e.message));

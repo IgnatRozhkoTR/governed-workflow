@@ -18,9 +18,11 @@ from services.configurator_service import ConfiguratorChain
 from services.project_settings_service import (
     ProjectSettingsError,
     get_fast_mode_default,
+    get_yolo_mode_default,
     get_review_mode_default,
     get_simple_planning,
     set_fast_mode_default,
+    set_yolo_mode_default,
     set_review_mode_default,
     set_simple_planning,
 )
@@ -184,6 +186,7 @@ def get_project_settings(db, project):
     return jsonify({
         "simple_planning": get_simple_planning(db, project["id"]),
         "fast_mode_default": get_fast_mode_default(db, project["id"]),
+        "yolo_mode_default": get_yolo_mode_default(db, project["id"]),
         "review_mode_default": get_review_mode_default(db, project["id"]),
         "project_type": project["project_type"],
     })
@@ -194,7 +197,7 @@ def get_project_settings(db, project):
 def put_project_settings(db, project):
     body = request.get_json(silent=True) or {}
     if not body:
-        return jsonify({"error": "at least one of simple_planning, fast_mode_default, review_mode_default is required"}), 400
+        return jsonify({"error": "at least one of simple_planning, fast_mode_default, yolo_mode_default, review_mode_default is required"}), 400
 
     simple_planning = body.get("simple_planning")
     if simple_planning is not None and not isinstance(simple_planning, bool):
@@ -203,6 +206,10 @@ def put_project_settings(db, project):
     fast_mode_default = body.get("fast_mode_default")
     if fast_mode_default is not None and not isinstance(fast_mode_default, bool):
         return jsonify({"error": "fast_mode_default must be a boolean"}), 400
+
+    yolo_mode_default = body.get("yolo_mode_default")
+    if yolo_mode_default is not None and not isinstance(yolo_mode_default, bool):
+        return jsonify({"error": "yolo_mode_default must be a boolean"}), 400
 
     review_mode_default = body.get("review_mode_default")
     if review_mode_default is not None and not isinstance(review_mode_default, str):
@@ -213,6 +220,8 @@ def put_project_settings(db, project):
             set_simple_planning(db, project["id"], simple_planning)
         if fast_mode_default is not None:
             set_fast_mode_default(db, project["id"], fast_mode_default)
+        if yolo_mode_default is not None:
+            set_yolo_mode_default(db, project["id"], yolo_mode_default)
         if review_mode_default is not None:
             set_review_mode_default(db, project["id"], review_mode_default)
         db.commit()
@@ -231,6 +240,7 @@ def put_project_settings(db, project):
         "ok": True,
         "simple_planning": get_simple_planning(db, project["id"]),
         "fast_mode_default": get_fast_mode_default(db, project["id"]),
+        "yolo_mode_default": get_yolo_mode_default(db, project["id"]),
         "review_mode_default": get_review_mode_default(db, project["id"]),
     }
     if warnings:

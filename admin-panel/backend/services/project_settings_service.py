@@ -58,6 +58,37 @@ def set_fast_mode_default(db: sqlite3.Connection, project_id: str, enabled: bool
         )
 
 
+def get_yolo_mode_default(db: sqlite3.Connection, project_id: str) -> bool:
+    """Return the yolo_mode_default flag for the given project."""
+    row = db.execute(
+        "SELECT yolo_mode_default FROM projects WHERE id = ?", (project_id,)
+    ).fetchone()
+    if row is None:
+        raise ProjectSettingsError(
+            f"Project '{project_id}' not found.", code="project_not_found"
+        )
+    return bool(row["yolo_mode_default"])
+
+
+def set_yolo_mode_default(db: sqlite3.Connection, project_id: str, enabled: bool) -> None:
+    """Persist the yolo_mode_default flag for the given project."""
+    result = db.execute(
+        "UPDATE projects SET yolo_mode_default = ? WHERE id = ?",
+        (1 if enabled else 0, project_id),
+    )
+    if result.rowcount == 0:
+        raise ProjectSettingsError(
+            f"Project '{project_id}' not found.", code="project_not_found"
+        )
+
+
+def resolve_yolo_mode(project, requested_yolo_mode=None) -> bool:
+    """Resolve the creation-time yolo_mode: an explicit request wins, else the project default."""
+    if requested_yolo_mode is not None:
+        return requested_yolo_mode
+    return bool(project["yolo_mode_default"])
+
+
 def get_review_mode_default(db: sqlite3.Connection, project_id: str) -> str:
     """Return the review_mode_default for the given project."""
     row = db.execute(

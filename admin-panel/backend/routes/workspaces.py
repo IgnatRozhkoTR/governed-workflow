@@ -32,6 +32,7 @@ from services import base_sync_service
 from services import comment_service, proposal_service, review_pipeline_service
 from services import pr_service, repo_service
 from services import review_mode_service
+from services.project_settings_service import resolve_yolo_mode
 from services import workflow_mode_service
 from services.configurator_service import ConfiguratorChain
 from services.modules_discovery import resolve_enabled_module_overrides
@@ -839,7 +840,7 @@ def _resolve_base_sync(project_path, source, source_from_origin):
 
 def _register_workspace(
     db, project_id, branch, sanitized, working_dir, source, locale, project_path,
-    workflow_mode, review_mode,
+    workflow_mode, review_mode, yolo_mode,
 ):
     """Insert workspace into DB and return the (response-body dict, workspace id)."""
     ws_path = workspace_dir(project_path, branch)
@@ -850,11 +851,11 @@ def _register_workspace(
     cursor = db.execute(
         "INSERT INTO workspaces (project_id, branch, sanitized_branch, session_id, "
         "working_dir, created, status, phase, plan_json, source_branch, locale, workflow_mode, "
-        "review_mode) "
-        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?, ?)",
+        "review_mode, yolo_mode) "
+        "VALUES (?, ?, ?, NULL, ?, ?, 'active', '0', ?, ?, ?, ?, ?, ?)",
         (project_id, branch, sanitized, str(working_dir), created,
          '{"description":"","systemDiagram":"","execution":[]}', source, locale, workflow_mode,
-         review_mode)
+         review_mode, 1 if yolo_mode else 0)
     )
     workspace_id = cursor.lastrowid
     db.commit()
@@ -928,6 +929,11 @@ def create_workspace(project_id):
         except ValueError:
             return jsonify({"error": t("api.error.invalidReviewMode")}), 400
 
+        requested_yolo_mode = body.get("yolo_mode")
+        if requested_yolo_mode is not None and not isinstance(requested_yolo_mode, bool):
+            return jsonify({"error": "yolo_mode must be a boolean"}), 400
+        yolo_mode = resolve_yolo_mode(project, requested_yolo_mode)
+
         project_path = project["path"]
         sanitized = sanitize_branch(branch)
 
@@ -976,7 +982,7 @@ def create_workspace(project_id):
 
         body, workspace_id = _register_workspace(
             db, project_id, branch, sanitized, working_dir, source, locale,
-            project_path, workflow_mode, review_mode,
+            project_path, workflow_mode, review_mode, yolo_mode,
         )
         workflow_mode_service.apply_mode_phase_settings(db, workspace_id, workflow_mode)
         db.commit()
