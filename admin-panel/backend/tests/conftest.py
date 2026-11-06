@@ -75,7 +75,7 @@ def clean_db(setup_db, admin_token):
     from core.device_settings import set_admin_token
     import sqlite3
     tables = [
-        "acceptance_criteria", "review_issues", "discussions",
+        "acceptance_criteria", "discussions",
         "research_entries", "progress_entries", "session_history",
         "phase_history", "proposals", "workspaces", "projects",
         "modules_enabled",

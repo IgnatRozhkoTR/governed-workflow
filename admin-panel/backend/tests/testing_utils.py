@@ -112,23 +112,6 @@ def add_discussion(workspace_id, text="Architecture question", author="agent", t
     return discussion_id
 
 
-def add_review_issue(ws_id, file_path="src/main.py", code_snippet="def main():", severity="major"):
-    """Insert a review issue."""
-    from core.db import get_db
-    now = datetime.now().isoformat()
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO review_issues (workspace_id, file_path, line_start, line_end, "
-        "severity, description, code_snippet, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (ws_id, file_path, 1, 3, severity, "Test issue", code_snippet, now)
-    )
-    issue_id = cursor.lastrowid
-    db.commit()
-    db.close()
-    return issue_id
-
-
 def add_criterion(ws_id, cr_type="unit_test", description="Test criterion",
                   status="proposed", source="user", details_json=None):
     """Insert an acceptance criterion."""

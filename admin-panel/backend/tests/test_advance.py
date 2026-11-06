@@ -3,7 +3,7 @@ import pytest
 
 import advance.orchestrator as orchestrator
 
-from testing_utils import set_phase, add_progress, add_research, add_discussion, add_review_issue, add_criterion, add_comment, make_plan_json
+from testing_utils import set_phase, add_progress, add_research, add_discussion, add_criterion, add_comment, make_plan_json
 
 
 # ── Approve/Reject endpoint tests ────────────────────────────────────────────
@@ -334,24 +334,6 @@ def test_agentic_review_passes_with_progress(workspace, project):
 # ── AddressFixAdvancer (phase 4.1) ─────────────────────────────────────────────
 
 
-def _add_review_issue_row(ws_id, file_path="src/main.py", code_snippet="def main():",
-                          resolution="open"):
-    """Insert a review issue with full control over resolution."""
-    from datetime import datetime
-    now = datetime.now().isoformat()
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO review_issues (workspace_id, file_path, line_start, line_end, "
-        "severity, description, code_snippet, resolution, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (ws_id, file_path, 1, 5, "major", "Test issue", code_snippet, resolution, now)
-    )
-    issue_id = cursor.lastrowid
-    db.commit()
-    db.close()
-    return issue_id
-
-
 def test_address_fix_blocked_without_progress(workspace, project):
     """Phase 4.1 blocks without a progress entry for '4'."""
     plan = make_plan_json(1)
@@ -409,12 +391,9 @@ def test_address_fix_passes_all_fixed(workspace, project):
         plan_status="approved",
     )
     add_progress(workspace["id"], "4", "All fixes addressed")
-    # code_snippet is "old buggy code" which does NOT exist in any file
-    _add_review_issue_row(
-        workspace["id"],
-        file_path="src/main.py",
-        code_snippet="old buggy code that was removed",
-        resolution="fixed",
+    add_comment(
+        workspace["id"], scope="review", text="Review finding",
+        resolution="fixed", file_path="src/main.py", line_start=1, line_end=5,
     )
 
     ws = _get_ws_row(workspace["id"])
