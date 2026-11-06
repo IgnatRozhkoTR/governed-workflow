@@ -2,11 +2,18 @@
 import json
 import os
 import subprocess
+import tempfile
 from datetime import datetime
 
-# Git environment to avoid needing global git config
+_ISOLATED_XDG_CONFIG_HOME = tempfile.mkdtemp(prefix="gw-test-xdg-")
+
+# Git environment isolated from the user's global/XDG/system git config (e.g. a
+# global core.excludesFile ignoring .claude/ or CLAUDE.md) with a fixed identity.
 GIT_ENV = {
     **os.environ,
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "XDG_CONFIG_HOME": _ISOLATED_XDG_CONFIG_HOME,
     "GIT_AUTHOR_NAME": "Test",
     "GIT_AUTHOR_EMAIL": "test@test.com",
     "GIT_COMMITTER_NAME": "Test",

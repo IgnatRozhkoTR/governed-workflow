@@ -13,7 +13,7 @@ from pathlib import Path
 from advance.orchestrator import perform_advance
 from core.db import get_db
 
-from testing_utils import _git, add_progress, make_plan_json, set_phase
+from testing_utils import GIT_ENV, _git, add_progress, make_plan_json, set_phase
 
 
 def _get_ws_row(ws_id):
@@ -45,7 +45,7 @@ def _commit_file(working_dir, relative_path, content, message):
     _git(working_dir, "commit", "-m", message)
     return subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=working_dir,
+        cwd=working_dir, env=GIT_ENV,
         capture_output=True,
         text=True,
     ).stdout.strip()
@@ -145,7 +145,7 @@ def test_diff_outside_scope_is_rejected(workspace, project):
     _git(working_dir, "add", ".")
     _git(working_dir, "commit", "-m", "Add file outside scope")
     commit_hash = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=working_dir,
+        ["git", "rev-parse", "HEAD"], cwd=working_dir, env=GIT_ENV,
         capture_output=True, text=True,
     ).stdout.strip()
 
@@ -203,7 +203,7 @@ def test_yolo_mode_bypasses_commit_progression(workspace, project):
     _git(working_dir, "add", ".")
     _git(working_dir, "commit", "-m", "Add file outside scope")
     out_of_scope_hash = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=working_dir,
+        ["git", "rev-parse", "HEAD"], cwd=working_dir, env=GIT_ENV,
         capture_output=True, text=True,
     ).stdout.strip()
 
@@ -249,7 +249,7 @@ def test_lazy_init_on_entering_execution_start_sets_head(workspace, project):
     _setup_execution_phase(workspace["id"], "2.0")
 
     head = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=workspace["working_dir"],
+        ["git", "rev-parse", "HEAD"], cwd=workspace["working_dir"], env=GIT_ENV,
         capture_output=True, text=True,
     ).stdout.strip()
 

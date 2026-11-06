@@ -660,7 +660,7 @@ def test_execution_commit_passes(workspace, project):
     import subprocess
     commit_hash = subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=working_dir,
+        cwd=working_dir, env=GIT_ENV,
         capture_output=True,
         text=True,
     ).stdout.strip()
@@ -684,7 +684,7 @@ def _make_commit(working_dir):
     _git(working_dir, "commit", "-m", "Test commit")
     return subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=working_dir,
+        cwd=working_dir, env=GIT_ENV,
         capture_output=True,
         text=True,
     ).stdout.strip()

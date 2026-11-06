@@ -10,6 +10,7 @@ if SERVER_DIR not in sys.path:
     sys.path.insert(0, SERVER_DIR)
 
 import subprocess
+from testing_utils import GIT_ENV
 
 from services.diff_filter import (
     list_reviewable_files,
@@ -241,14 +242,14 @@ def test_count_modified_respects_extra_excludes():
 # ── resolve_review_base + three-dot integration tests (real git) ──────────────
 
 def _g(repo, *args):
-    subprocess.run(["git", *args], cwd=str(repo), check=True,
+    subprocess.run(["git", *args], cwd=str(repo), check=True, env=GIT_ENV,
                    capture_output=True, text=True)
 
 
 def _make_repo_with_origin(tmp_path):
     """develop@X with a.py, pushed to a bare origin. Returns (repo, X_sha)."""
     origin = tmp_path / "origin.git"
-    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True, text=True, env=GIT_ENV)
     repo = tmp_path / "repo"
     repo.mkdir()
     _g(repo, "init")
@@ -258,7 +259,7 @@ def _make_repo_with_origin(tmp_path):
     (repo / "a.py").write_text("a = 1\n")
     _g(repo, "add", ".")
     _g(repo, "commit", "-m", "X: initial")
-    x_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(repo),
+    x_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(repo), env=GIT_ENV,
                            check=True, capture_output=True, text=True).stdout.strip()
     _g(repo, "remote", "add", "origin", str(origin))
     _g(repo, "push", "-u", "origin", "develop")
