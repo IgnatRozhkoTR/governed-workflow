@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════
-//  CLAUDE COMMAND & CHANNELS CONFIG
+//  CLAUDE COMMAND CONFIG
 // ═══════════════════════════════════════════════
 
 function loadClaudeCommand() {
@@ -116,14 +116,6 @@ async function onWorkflowModeToggleClick() {
 
 EventBus.on('state:refreshed', renderWorkflowModeCard);
 
-function loadChannelsPreference() {
-  var defaultValue = 'plugin:telegram@claude-plugins-official';
-  var enabled = localStorage.getItem('channels_enabled') === 'true';
-  var value = localStorage.getItem('channels_value') || defaultValue;
-  localStorage.setItem('channels_enabled', enabled ? 'true' : 'false');
-  localStorage.setItem('channels_value', value);
-}
-
 // ═══════════════════════════════════════════════
 //  MODULES CARD (dashboard)
 // ═══════════════════════════════════════════════
@@ -172,13 +164,6 @@ async function saveModuleToggle() {
 
   try {
     await apiPost('/api/modules/enabled', { modules: enabled });
-
-    // Update channels preference for backward compatibility
-    var telegramEnabled = enabled.indexOf('telegram') !== -1;
-    localStorage.setItem('channels_enabled', telegramEnabled ? 'true' : 'false');
-    if (telegramEnabled) {
-      localStorage.setItem('channels_value', 'plugin:telegram@claude-plugins-official');
-    }
   } catch (e) {
     if (typeof showToast === 'function') showToast('Failed to save: ' + e.message);
   }

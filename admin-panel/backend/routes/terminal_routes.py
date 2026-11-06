@@ -153,14 +153,11 @@ def terminal_start(project, branch):
         if session_exists(name):
             kill_session(name)
 
-        data = request.get_json(silent=True)
-        channels = data.get('channels', '') if data else ''
-
         label = ws['sanitized_branch'] or branch
         create_session(name, working_dir, env={'WORKSPACE': label})
         write_launch_env_file(working_dir, ws_field(ws, 'env_vars', ''))
         mark_new_session(working_dir)
-        send_keys(name, build_claude_command(ws, channels=channels))
+        send_keys(name, build_claude_command(ws))
 
         return jsonify({
             'session': name,
@@ -183,15 +180,12 @@ def terminal_resume(project, branch):
         name = session_name(project, branch)
         working_dir = ws['working_dir']
 
-        data = request.get_json(silent=True)
-        channels = data.get('channels', '') if data else ''
-
         created = False
         if not session_exists(name):
             label = ws['sanitized_branch'] or branch
             create_session(name, working_dir, env={'WORKSPACE': label})
             write_launch_env_file(working_dir, ws_field(ws, 'env_vars', ''))
-            send_keys(name, build_claude_command(ws, resume=True, channels=channels))
+            send_keys(name, build_claude_command(ws, resume=True))
             created = True
 
         return jsonify({

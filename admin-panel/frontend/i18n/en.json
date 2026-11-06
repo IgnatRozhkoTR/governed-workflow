@@ -87,7 +87,6 @@
   "config.restrictToWorkspace": "Restrict file modifications to workspace directory",
   "config.externalPaths": "Allowed external paths (comma-separated)",
   "config.envVars": "Environment variables (KEY=VALUE per line)",
-  "config.channels": "Channels",
   "config.yoloMode": "YOLO",
   "config.phaseSettingsDesc": "Enable or disable phases for this scope. Always-on phases cannot be disabled.",
   "config.simplePlanning": "Simple planning",

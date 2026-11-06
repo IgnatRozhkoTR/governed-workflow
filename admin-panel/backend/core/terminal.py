@@ -331,7 +331,7 @@ def mark_new_session(working_dir):
     (state_dir / _FORCE_NEW_SESSION_FLAG).write_text("")
 
 
-def build_claude_command(ws, resume=False, channels=None):
+def build_claude_command(ws, resume=False):
     """Build the claude command wrapped in a respawn loop.
 
     The loop restarts claude after each exit. A force-new-session flag skips
@@ -343,9 +343,6 @@ def build_claude_command(ws, resume=False, channels=None):
     skip = ws_field(ws, 'skip_permissions', 1)
     if skip:
         base += ' --dangerously-skip-permissions'
-    ch = channels if channels is not None else ws_field(ws, 'channels', '')
-    if ch:
-        base += f' --channels {ch}'
     working_dir = ws['working_dir']
     quoted_wd = shlex.quote(working_dir)
     return (

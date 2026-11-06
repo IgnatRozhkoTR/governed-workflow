@@ -84,7 +84,7 @@ def test_list_modules_route_reads_both_roots(client, tmp_path, monkeypatch):
 # --- original tests ---
 
 def test_list_modules(client):
-    """GET /api/modules returns list (may be empty or contain telegram)."""
+    """GET /api/modules returns a list, which may be empty."""
     response = client.get("/api/modules")
     assert response.status_code == 200
     data = response.get_json()
@@ -106,15 +106,6 @@ def test_list_modules_structure(client):
         assert module["has_skill"] is True
 
 
-def test_list_modules_contains_telegram(client):
-    """GET /api/modules includes telegram module from the repo modules directory."""
-    response = client.get("/api/modules")
-    assert response.status_code == 200
-    data = response.get_json()
-    ids = [m["id"] for m in data["modules"]]
-    assert "telegram" in ids
-
-
 def test_get_enabled_modules_empty(client):
     """GET /api/modules/enabled returns empty list initially."""
     response = client.get("/api/modules/enabled")
@@ -125,7 +116,7 @@ def test_get_enabled_modules_empty(client):
 
 def test_set_enabled_modules(client):
     """POST /api/modules/enabled saves module IDs."""
-    response = client.post("/api/modules/enabled", json={"modules": ["telegram"]})
+    response = client.post("/api/modules/enabled", json={"modules": ["mod-a"]})
     assert response.status_code == 200
     data = response.get_json()
     assert data == {"status": "saved"}
@@ -133,17 +124,17 @@ def test_set_enabled_modules(client):
 
 def test_set_enabled_modules_replaces(client):
     """POST /api/modules/enabled replaces previous list entirely."""
-    client.post("/api/modules/enabled", json={"modules": ["telegram", "other"]})
-    client.post("/api/modules/enabled", json={"modules": ["telegram"]})
+    client.post("/api/modules/enabled", json={"modules": ["mod-a", "other"]})
+    client.post("/api/modules/enabled", json={"modules": ["mod-a"]})
     response = client.get("/api/modules/enabled")
     assert response.status_code == 200
     data = response.get_json()
-    assert data["modules"] == ["telegram"]
+    assert data["modules"] == ["mod-a"]
 
 
 def test_set_enabled_modules_empty(client):
     """POST /api/modules/enabled with empty list clears all."""
-    client.post("/api/modules/enabled", json={"modules": ["telegram"]})
+    client.post("/api/modules/enabled", json={"modules": ["mod-a"]})
     client.post("/api/modules/enabled", json={"modules": []})
     response = client.get("/api/modules/enabled")
     assert response.status_code == 200
@@ -153,11 +144,11 @@ def test_set_enabled_modules_empty(client):
 
 def test_get_enabled_after_set(client):
     """GET returns what was previously POSTed."""
-    client.post("/api/modules/enabled", json={"modules": ["telegram", "other-module"]})
+    client.post("/api/modules/enabled", json={"modules": ["mod-a", "other-module"]})
     response = client.get("/api/modules/enabled")
     assert response.status_code == 200
     data = response.get_json()
-    assert sorted(data["modules"]) == sorted(["telegram", "other-module"])
+    assert sorted(data["modules"]) == sorted(["mod-a", "other-module"])
 
 
 # --- resolve_enabled_module_overrides ---

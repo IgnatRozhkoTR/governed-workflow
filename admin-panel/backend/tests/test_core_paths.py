@@ -83,22 +83,3 @@ def test_admin_token_setup_command_is_absolute():
     assert cmd.startswith("python3 /")
     assert cmd.endswith("admin-panel/backend/app.py auth-token")
     assert str(REPO_ROOT) in cmd
-
-
-def test_telegram_state_dir_env_override(monkeypatch, tmp_path):
-    """GOVERNED_WORKFLOW_TELEGRAM_STATE env var overrides TELEGRAM_STATE_DIR."""
-    fake_tg = tmp_path / "tg-state"
-    fake_tg.mkdir()
-
-    monkeypatch.setenv("GOVERNED_WORKFLOW_TELEGRAM_STATE", str(fake_tg))
-
-    if "core.paths" in sys.modules:
-        del sys.modules["core.paths"]
-
-    import core.paths as paths_mod
-    try:
-        assert paths_mod.TELEGRAM_STATE_DIR == fake_tg
-    finally:
-        del sys.modules["core.paths"]
-        monkeypatch.delenv("GOVERNED_WORKFLOW_TELEGRAM_STATE", raising=False)
-        import core.paths  # noqa: F401 — re-import original

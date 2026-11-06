@@ -43,12 +43,6 @@ STATE_DIR: Path = Path(
     os.environ.get("GOVERNED_WORKFLOW_STATE_DIR") or REPO_ROOT / ".local" / "state"
 )
 
-TELEGRAM_STATE_DIR: Path = Path(
-    os.environ.get("GOVERNED_WORKFLOW_TELEGRAM_STATE")
-    or REPO_ROOT / ".local" / "channels" / "telegram"
-)
-
-
 def hook_command(name: str, interpreter: str = "python3") -> str:
     """Return the shell command string for invoking a hook by filename.
 

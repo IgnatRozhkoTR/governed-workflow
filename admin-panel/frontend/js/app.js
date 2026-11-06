@@ -125,7 +125,6 @@ async function initApp() {
   loadRules();
   loadClaudeCommand();
   if (typeof renderWorkflowModeCard === 'function') renderWorkflowModeCard();
-  loadChannelsPreference();
   loadModulesCard();
   if (typeof renderNetworkMode === 'function') renderNetworkMode();
 
@@ -231,16 +230,7 @@ function doTerminalActionWithKind(endpoint, btnId, mode, sessionKind) {
   var btn = document.getElementById(btnId);
   if (btn) btn.disabled = true;
 
-  var body = {};
-  if ((sessionKind || 'claude') === 'claude') {
-    var channelsEnabled = localStorage.getItem('channels_enabled') === 'true';
-    var channelsValue = localStorage.getItem('channels_value') || '';
-    if (channelsEnabled && channelsValue) {
-      body.channels = channelsValue;
-    }
-  }
-
-  apiPost('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/terminal/' + endpoint, body)
+  apiPost('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/terminal/' + endpoint, {})
     .then(function(result) {
       ACTIVE_TERMINAL_KIND = result.kind || sessionKind || 'claude';
       if (mode === 'split') {

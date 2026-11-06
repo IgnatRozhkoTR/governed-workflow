@@ -36,8 +36,7 @@ fails to import, or whose `register()` raises, is logged and skipped.
 
 - `claude/modules-local/<name>/` — local/per-device modules. Git-ignored. Use this
   for anything containing machine-specific paths or credentials.
-- `claude/modules/<name>/` — modules meant to ship with the repo. Git-tracked (e.g.
-  `telegram/`).
+- `claude/modules/<name>/` — modules meant to ship with the repo. Git-tracked.
 
 **A standalone sibling `.mcp.json` entry pointing at code outside
 `claude/modules(-local)/` is not an acceptable end state.** It's a redundant second

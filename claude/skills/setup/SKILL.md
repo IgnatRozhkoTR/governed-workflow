@@ -16,7 +16,7 @@ This skill is invoked automatically by the admin panel's setup wizard. It receiv
 ## Input
 
 The setup configuration is passed as the initial prompt. It contains:
-- **modules to enable**: List of module IDs to enable (e.g., `["telegram"]`)
+- **modules to enable**: List of module IDs to enable (e.g., `["my_module"]`)
 - **modules to disable**: List of module IDs to disable (e.g., `["other_module"]`)
 - **languages**: List of language profile configurations to set up
 
