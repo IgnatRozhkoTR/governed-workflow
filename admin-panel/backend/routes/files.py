@@ -1,12 +1,13 @@
 """File read and diff routes."""
 import logging
 import os
+import re
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 
 from core.decorators import with_workspace
-from core.helpers import run_git, DEFAULT_SOURCE_BRANCH
+from core.helpers import run_git, run_git_bytes, DEFAULT_SOURCE_BRANCH
 from core.i18n import t
 from services import repo_service
 
@@ -146,6 +147,70 @@ def read_file(db, ws, project):
         "lines": lines,
         "total_lines": len(lines)
     })
+
+
+def _is_valid_ref(ref: str) -> bool:
+    return bool(ref) and not ref.startswith("-") and ".." not in ref and not any(
+        c.isspace() or c == ":" for c in ref
+    )
+
+
+def _read_working_tree_bytes(file_path: Path):
+    """Return ``(content, error_response)``; exactly one is not None."""
+    if file_path.is_dir():
+        return None, (jsonify({"error": t("api.error.pathRequired")}), 400)
+    try:
+        return file_path.read_bytes(), None
+    except FileNotFoundError:
+        return None, (jsonify({"error": t("api.error.fileNotFound")}), 404)
+    except OSError as e:
+        return None, (jsonify({"error": str(e)}), 500)
+
+
+_LITERAL_REF_PATTERN = re.compile(r"HEAD(?:[~^]\d*)*|[0-9a-fA-F]{7,40}")
+
+
+def _resolve_file_content_ref(working_dir, ref):
+    if _LITERAL_REF_PATTERN.fullmatch(ref):
+        ok, _, _ = run_git(working_dir, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+        return ref if ok else None
+    return _resolve_explicit_base_ref(working_dir, ref)
+
+
+def _read_bytes_at_ref(working_dir: str, ref: str, rel_path: str):
+    """Return ``(content, error_response)``; exactly one is not None."""
+    if not _is_valid_ref(ref):
+        return None, (jsonify({"error": "invalid_ref"}), 400)
+    resolved = _resolve_file_content_ref(working_dir, ref)
+    if resolved is None:
+        return None, (jsonify({"error": "base_ref_not_found", "base": ref}), 400)
+    ok, content, _ = run_git_bytes(working_dir, "show", f"{resolved}:{rel_path}")
+    if not ok:
+        return None, (jsonify({"error": t("api.error.fileNotFound")}), 404)
+    return content, None
+
+
+@bp.route("/api/ws/<project_id>/<path:branch>/file-content", methods=["GET"])
+@with_workspace
+def read_file_content(db, ws, project):
+    rel_path = request.args.get("path", "")
+    ref = request.args.get("ref", "").strip()
+    if not rel_path:
+        return jsonify({"error": t("api.error.pathRequired")}), 400
+    working_dir, error = _resolve_repo_dir(db, ws, project, request.args.get("repo", ""))
+    if error:
+        return jsonify({"error": error}), 400
+    file_path = (Path(working_dir) / rel_path).resolve()
+    if Path(rel_path).is_absolute() or not _is_within(file_path, Path(working_dir).resolve()):
+        return jsonify({"error": t("api.error.pathOutsideWorkingDir")}), 400
+    if "ref" in request.args:
+        content, failure = _read_bytes_at_ref(working_dir, ref, rel_path)
+    else:
+        content, failure = _read_working_tree_bytes(file_path)
+    if failure:
+        return failure
+    return Response(content, mimetype="application/octet-stream",
+                    headers={"X-Content-Size": str(len(content)), "Cache-Control": "no-cache"})
 
 
 @bp.route("/api/ws/<project_id>/<path:branch>/file", methods=["PUT"])

@@ -158,3 +158,41 @@ def test_compute_phase_sequence_filters_to_subset_parametrized(enabled):
     unfiltered = compute_phase_sequence(plan, registered_phase_ids=_ALL_REGISTERED)
     assert all(p in enabled for p in result)
     assert all(p in result for p in enabled if p in unfiltered)
+
+
+# ── run_git_bytes ────────────────────────────────────────────────────────────
+
+
+def _init_repo_with_blob(tmp_path, payload):
+    from testing_utils import _git
+    _git(tmp_path, "init")
+    (tmp_path / "blob.bin").write_bytes(payload)
+    _git(tmp_path, "add", "blob.bin")
+    _git(tmp_path, "commit", "-m", "blob")
+
+
+def test_run_git_bytes_returnsExactBytes_whenOutputIsNonUtf8(tmp_path):
+    from core.helpers import run_git_bytes
+    payload = b"a\r\n\xff\xfe\x00\x80b\n"
+    _init_repo_with_blob(tmp_path, payload)
+    ok, stdout, stderr = run_git_bytes(str(tmp_path), "show", "HEAD:blob.bin")
+    assert ok is True
+    assert stdout == payload
+    assert isinstance(stdout, bytes)
+
+
+def test_run_git_bytes_returnsFalseAndStrStderr_whenGitFails(tmp_path):
+    from core.helpers import run_git_bytes
+    _init_repo_with_blob(tmp_path, b"x")
+    ok, stdout, stderr = run_git_bytes(str(tmp_path), "show", "HEAD:missing.txt")
+    assert ok is False
+    assert stdout == b""
+    assert isinstance(stderr, str) and stderr
+
+
+def test_run_git_bytes_returnsUnavailableMessage_whenCwdMissing(tmp_path):
+    from core.helpers import run_git_bytes
+    ok, stdout, stderr = run_git_bytes(str(tmp_path / "gone"), "status")
+    assert ok is False
+    assert stdout == b""
+    assert "working directory unavailable" in stderr

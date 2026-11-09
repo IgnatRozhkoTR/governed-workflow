@@ -211,6 +211,7 @@ class CommitApprovalPhase(Phase):
     """Execution sub-phase K=3: user gate for commit approval."""
     name = "Commit Approval"
     is_user_gate = True
+    accepts_commit_message = True
 
     def __init__(self, n):
         self._n = n

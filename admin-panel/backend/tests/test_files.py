@@ -1049,3 +1049,183 @@ def test_diff_history_branches_multi_project_unattached_repo_returns_repo_not_fo
         resp = client.get(f"/api/ws/{multi_project['id']}/{branch}/{endpoint}?repo=service-c")
         assert resp.status_code == 400, endpoint
         assert resp.json["error"] == "repo_not_found", endpoint
+
+
+# ---------------------------------------------------------------------------
+# file-content endpoint tests
+# ---------------------------------------------------------------------------
+
+_FILE_CONTENT_URL = "/api/ws/test-project/feature/test/file-content"
+
+
+def _head_sha(working_dir):
+    import subprocess
+    from testing_utils import GIT_ENV
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=working_dir, capture_output=True, text=True, env=GIT_ENV, check=True
+    ).stdout.strip()
+
+
+def test_file_content_returns_working_tree_bytes_when_no_ref(client, workspace):
+    Path(workspace["working_dir"]).joinpath("a.txt").write_bytes(b"hello\n")
+    r = client.get(f"{_FILE_CONTENT_URL}?path=a.txt")
+    assert r.status_code == 200
+    assert r.mimetype == "application/octet-stream"
+    assert r.data == b"hello\n"
+
+
+def test_file_content_preserves_crlf_trailing_newline_and_non_utf8_bytes(client, workspace):
+    payload = b"a\r\nb\r\n\xff\xfe\x00\x80end\n\n"
+    Path(workspace["working_dir"]).joinpath("raw.bin").write_bytes(payload)
+    r = client.get(f"{_FILE_CONTENT_URL}?path=raw.bin")
+    assert r.status_code == 200
+    assert r.data == payload
+
+
+def test_file_content_preserves_missing_trailing_newline_when_no_ref(client, workspace):
+    Path(workspace["working_dir"]).joinpath("nonl.txt").write_bytes(b"no newline")
+    r = client.get(f"{_FILE_CONTENT_URL}?path=nonl.txt")
+    assert r.data == b"no newline"
+
+
+def test_file_content_returns_committed_bytes_when_ref_given(client, workspace):
+    wd = workspace["working_dir"]
+    Path(wd).joinpath("v.txt").write_bytes(b"old\r\n")
+    _git(wd, "add", "v.txt")
+    _git(wd, "commit", "-m", "add v")
+    Path(wd).joinpath("v.txt").write_bytes(b"new\n")
+    r = client.get(f"{_FILE_CONTENT_URL}?path=v.txt&ref=HEAD")
+    assert r.status_code == 200
+    assert r.mimetype == "application/octet-stream"
+    assert r.data == b"old\r\n"
+
+
+def test_file_content_preserves_non_utf8_bytes_when_ref_given(client, workspace):
+    wd = workspace["working_dir"]
+    payload = b"\xff\xfe\x00\r\n\x80tail\n"
+    Path(wd).joinpath("bin.dat").write_bytes(payload)
+    _git(wd, "add", "bin.dat")
+    _git(wd, "commit", "-m", "add bin")
+    r = client.get(f"{_FILE_CONTENT_URL}?path=bin.dat&ref=HEAD")
+    assert r.status_code == 200
+    assert r.data == payload
+
+
+def test_file_content_prefers_origin_ref_over_local_ref(client, workspace):
+    wd = workspace["working_dir"]
+    Path(wd).joinpath("p.txt").write_text("from-origin\n")
+    _git(wd, "add", "p.txt")
+    _git(wd, "commit", "-m", "origin version")
+    _git(wd, "update-ref", "refs/remotes/origin/topic", _head_sha(wd))
+    Path(wd).joinpath("p.txt").write_text("from-local\n")
+    _git(wd, "commit", "-am", "local version")
+    _git(wd, "branch", "topic")
+    r = client.get(f"{_FILE_CONTENT_URL}?path=p.txt&ref=topic")
+    assert r.status_code == 200
+    assert r.data == b"from-origin\n"
+
+
+def _commit_file_with_diverging_origin_head(wd):
+    Path(wd).joinpath("h.txt").write_text("origin-default\n")
+    _git(wd, "add", "h.txt")
+    _git(wd, "commit", "-m", "origin default")
+    _git(wd, "update-ref", "refs/remotes/origin/main", _head_sha(wd))
+    _git(wd, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+    Path(wd).joinpath("h.txt").write_text("worktree-head\n")
+    _git(wd, "commit", "-am", "worktree head")
+
+
+def test_file_content_uses_worktree_head_when_origin_head_points_elsewhere(client, workspace):
+    wd = workspace["working_dir"]
+    _commit_file_with_diverging_origin_head(wd)
+    r = client.get(f"{_FILE_CONTENT_URL}?path=h.txt&ref=HEAD")
+    assert r.status_code == 200
+    assert r.data == b"worktree-head\n"
+
+
+def test_file_content_resolves_full_sha_ref_as_given(client, workspace):
+    wd = workspace["working_dir"]
+    _commit_file_with_diverging_origin_head(wd)
+    r = client.get(f"{_FILE_CONTENT_URL}?path=h.txt&ref={_head_sha(wd)}")
+    assert r.status_code == 200
+    assert r.data == b"worktree-head\n"
+
+
+def test_file_content_resolves_head_ancestor_ref_as_given(client, workspace):
+    wd = workspace["working_dir"]
+    _commit_file_with_diverging_origin_head(wd)
+    r = client.get(f"{_FILE_CONTENT_URL}?path=h.txt&ref=HEAD~1")
+    assert r.status_code == 200
+    assert r.data == b"origin-default\n"
+
+
+def test_file_content_falls_back_to_local_ref_when_origin_ref_missing(client, workspace):
+    wd = workspace["working_dir"]
+    Path(wd).joinpath("l.txt").write_text("local-only\n")
+    _git(wd, "add", "l.txt")
+    _git(wd, "commit", "-m", "local")
+    _git(wd, "branch", "localonly")
+    r = client.get(f"{_FILE_CONTENT_URL}?path=l.txt&ref=localonly")
+    assert r.status_code == 200
+    assert r.data == b"local-only\n"
+
+
+@pytest.mark.parametrize("ref", ["", "   ", "-x", "--output=/tmp/x", "a b", "a\tb", "a:b", "a..b", "HEAD..HEAD"])
+def test_file_content_returns_invalid_ref_when_ref_malformed(client, workspace, ref):
+    Path(workspace["working_dir"]).joinpath("a.txt").write_text("x\n")
+    r = client.get(_FILE_CONTENT_URL, query_string={"path": "a.txt", "ref": ref})
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "invalid_ref"
+
+
+def test_file_content_returns_base_ref_not_found_when_ref_unresolvable(client, workspace):
+    r = client.get(f"{_FILE_CONTENT_URL}?path=a.txt&ref=no-such-branch")
+    assert r.status_code == 400
+    body = r.get_json()
+    assert body["error"] == "base_ref_not_found"
+    assert body["base"] == "no-such-branch"
+
+
+def test_file_content_returns_404_when_file_missing_in_working_tree(client, workspace):
+    r = client.get(f"{_FILE_CONTENT_URL}?path=ghost.txt")
+    assert r.status_code == 404
+
+
+def test_file_content_returns_404_when_file_missing_at_ref(client, workspace):
+    Path(workspace["working_dir"]).joinpath("untracked.txt").write_text("x\n")
+    r = client.get(f"{_FILE_CONTENT_URL}?path=untracked.txt&ref=HEAD")
+    assert r.status_code == 404
+
+
+def test_file_content_returns_400_when_path_missing(client, workspace):
+    r = client.get(_FILE_CONTENT_URL)
+    assert r.status_code == 400
+
+
+def test_file_content_returns_400_when_path_is_directory(client, workspace):
+    Path(workspace["working_dir"]).joinpath("somedir").mkdir()
+    r = client.get(f"{_FILE_CONTENT_URL}?path=somedir")
+    assert r.status_code == 400
+
+
+def test_file_content_rejects_absolute_path(client, workspace):
+    abs_file = Path(workspace["working_dir"]) / "abs.txt"
+    abs_file.write_text("x\n")
+    r = client.get(_FILE_CONTENT_URL, query_string={"path": str(abs_file)})
+    assert r.status_code == 400
+
+
+def test_file_content_rejects_path_traversal(client, workspace):
+    r = client.get(f"{_FILE_CONTENT_URL}?path=../../etc/passwd")
+    assert r.status_code == 400
+
+
+def test_file_content_rejects_path_traversal_when_ref_given(client, workspace):
+    r = client.get(f"{_FILE_CONTENT_URL}?path=../../etc/passwd&ref=HEAD")
+    assert r.status_code == 400
+
+
+def test_file_content_returns_404_for_unknown_workspace(client, project):
+    r = client.get("/api/ws/test-project/nope/file-content?path=a.txt")
+    assert r.status_code == 404

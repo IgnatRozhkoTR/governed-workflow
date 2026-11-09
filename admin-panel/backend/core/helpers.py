@@ -131,19 +131,33 @@ def run_git_with(cwd, args, env_overrides=None, stdin_input=None):
     env = None
     if env_overrides:
         env = {**os.environ, **env_overrides}
+    return _run_git_process(
+        cwd, args, "", text=True, errors="replace", env=env, input=stdin_input,
+    )
+
+
+def run_git_bytes(cwd, *args):
+    """Invoke ``git`` in ``cwd`` and return ``(ok, stdout_bytes, stderr_str)``.
+
+    Binary-safe variant of ``run_git``: stdout is returned undecoded so file
+    contents from ``git show <rev>:<path>`` survive byte for byte.
+    """
+    ok, stdout, stderr = _run_git_process(cwd, args, b"")
+    return ok, stdout, stderr if isinstance(stderr, str) else stderr.decode("utf-8", "replace")
+
+
+def _run_git_process(cwd, args, empty_stdout, **run_kwargs):
+    """Run git and map a stale ``cwd`` to ``(False, empty_stdout, <message>)``."""
     try:
         result = subprocess.run(
             ["git"] + list(args),
             cwd=cwd,
             capture_output=True,
-            text=True,
             timeout=30,
-            errors="replace",
-            env=env,
-            input=stdin_input,
+            **run_kwargs,
         )
     except (FileNotFoundError, NotADirectoryError) as exc:
-        return False, "", f"working directory unavailable: {exc}"
+        return False, empty_stdout, f"working directory unavailable: {exc}"
     return result.returncode == 0, result.stdout, result.stderr
 
 

@@ -62,6 +62,14 @@ def normalize_phase(phase):
 bp = Blueprint("state", __name__)
 
 
+def _pending_gate(ws):
+    from advance.phases import get_phase
+    phase = get_phase(ws["phase"])
+    if phase is None or not phase.is_user_gate:
+        return None
+    return {"phase": ws["phase"], "accepts_commit_message": phase.accepts_commit_message}
+
+
 @bp.route("/api/ws/<project_id>/<path:branch>/state", methods=["GET"])
 @with_workspace
 def get_workspace_state(db, ws, project):
@@ -127,6 +135,7 @@ def get_workspace_state(db, ws, project):
         "sessions": sessions,
         "impact_analysis": impact_analysis,
         "yolo_mode": bool(ws_field(ws, "yolo_mode", 0)),
+        "pending_gate": _pending_gate(ws),
     }
 
     body_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")

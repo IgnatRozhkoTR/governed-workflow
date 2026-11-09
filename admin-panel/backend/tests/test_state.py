@@ -304,3 +304,30 @@ def test_mcp_get_state_exposes_fast_workflow_mode_and_omits_optional_phases(work
     for phase_id in ("1.3", "1.4", "4.0"):
         assert phase_id not in result["phase_sequence"]
 
+
+
+def _pending_gate(client, workspace):
+    return client.get(_ws_url(workspace, "state")).get_json()["pending_gate"]
+
+
+@pytest.mark.parametrize("phase", ["0", "1.0", "1.1", "3.1.0", "3.1.1", "3.1.2", "3.1.4", "6"])
+def test_pending_gate_is_null_when_phase_is_not_user_gate(client, workspace, phase):
+    set_phase(workspace["id"], phase)
+    assert _pending_gate(client, workspace) is None
+
+
+def test_pending_gate_is_null_when_phase_unregistered(client, workspace):
+    set_phase(workspace["id"], "99.9")
+    assert _pending_gate(client, workspace) is None
+
+
+@pytest.mark.parametrize("phase", ["1.4", "4.2"])
+def test_pending_gate_rejects_commit_message_when_gate_is_not_code_review(client, workspace, phase):
+    set_phase(workspace["id"], phase)
+    assert _pending_gate(client, workspace) == {"phase": phase, "accepts_commit_message": False}
+
+
+@pytest.mark.parametrize("phase", ["3.1.3", "3.2.3"])
+def test_pending_gate_accepts_commit_message_when_code_review_gate(client, workspace, phase):
+    set_phase(workspace["id"], phase)
+    assert _pending_gate(client, workspace) == {"phase": phase, "accepts_commit_message": True}

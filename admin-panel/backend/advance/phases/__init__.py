@@ -43,6 +43,8 @@ class Phase(ABC):
         """Whether this phase requires explicit user approval to proceed."""
         return False
 
+    accepts_commit_message = False
+
     @property
     def approve_target(self) -> str | None:
         """Phase to transition to on gate approval. Only for gates."""
