@@ -94,6 +94,8 @@ When assigning tasks to agents, use this decision matrix:
 2. Deploy test engineer(s) for tests — AFTER the production code is written
 3. Both share the same sub-phase scope; test engineer reads the implementation to understand what to test
 
+Parallel engineers that share a boundary get a binding interface contract first; see `/planning`, `group`.
+
 When planning tasks, structure each sub-phase with separate tasks for implementation and testing, assigned to the appropriate agent types. Never create a single task that asks an engineer to "implement + write tests".
 
 ---

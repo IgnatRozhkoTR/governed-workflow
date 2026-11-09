@@ -68,6 +68,7 @@ Every task has a human layer and an agent layer:
 - **`agent`**: Agent type to assign. See the agent selection matrix in the main SKILL.md.
 
 - **`group`**: Optional. Tasks with the same group name run in parallel (fork/join). Tasks without a group or with unique group names run sequentially. Groups execute in order of first appearance within the sub-phase.
+  - **Interface contract**: When a group has 2 or more engineers whose code meets at a shared boundary, write a short contract into the plan description or a scratchpad before dispatch. List the command ids, shared types and interfaces with their exact shape (e.g. `WorkspaceRef`), the argument type each handler receives, and the event and context-key names. Pass the contract to every engineer in the group as binding. Engineers must not rename or redefine a contract item; if one needs a change, they report it back instead of diverging locally. Validation checks the code against the contract.
 
 - **`status`**: Always `"pending"` at plan creation.
 
