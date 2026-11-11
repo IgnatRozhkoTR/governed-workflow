@@ -147,8 +147,7 @@ def run_verification(db, ws, project):
     """Manually trigger verification for the current workspace."""
     body = request.get_json(silent=True) or {}
     phase = body.get("phase", ws["phase"])
-    passed, run_id = verification_service.run_verification(db, ws["id"], phase, ws["working_dir"])
-    db.commit()
+    _, run_id = verification_service.run_verification(db, ws["id"], phase, ws["working_dir"])
     if run_id is None:
         return jsonify({"message": "No verification profiles assigned"}), 200
     result = verification_service.get_verification_results(db, ws["id"], run_id=run_id)

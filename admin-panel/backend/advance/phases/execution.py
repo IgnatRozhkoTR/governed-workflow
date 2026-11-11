@@ -162,7 +162,6 @@ class VerificationPhase(Phase):
             passed, _ = verification_service.run_verification(
                 db, ws["id"], self.id, ws["working_dir"]
             )
-            db.commit()
         self._last_run_status = "passed" if passed else "failed"
 
     def next_phase(self, ws):

@@ -172,113 +172,135 @@ def _get_project_id_for_workspace(db, workspace_id):
 
 
 def run_verification(db, workspace_id, phase, working_dir):
-    """Run all assigned verification profiles for a workspace. Returns (passed, run_id)."""
+    """Run all assigned verification profiles for a workspace. Returns (passed, run_id).
+
+    Every write is committed immediately so no SQLite write lock is held while
+    shell steps execute; other connections stay free to write during a long run.
+    """
+    assignments = _load_assignments(db, workspace_id)
+    if not assignments:
+        return True, None
+
+    run_id = _start_run(db, workspace_id, phase)
+    try:
+        all_passed = _run_assignments(db, run_id, assignments, working_dir)
+    except BaseException:
+        db.rollback()
+        _finish_run(db, run_id, "failed")
+        raise
+    _finish_run(db, run_id, "passed" if all_passed else "failed")
+    return all_passed, run_id
+
+
+def _load_assignments(db, workspace_id):
+    """Return the profile assignments of the workspace's project."""
     project_id = _get_project_id_for_workspace(db, workspace_id)
-    assignments = db.execute(
+    if not project_id:
+        return []
+    return db.execute(
         "SELECT pp.subpath, vp.id as profile_id, vp.name as profile_name "
         "FROM project_verification_profiles pp "
         "JOIN verification_profiles vp ON pp.profile_id = vp.id "
         "WHERE pp.project_id = ?",
         (project_id,)
-    ).fetchall() if project_id else []
+    ).fetchall()
 
-    if not assignments:
-        return True, None
 
-    now = datetime.now().isoformat()
-    run_cursor = db.execute(
+def _start_run(db, workspace_id, phase):
+    """Insert and commit a 'running' verification run; return its id."""
+    cursor = db.execute(
         "INSERT INTO verification_runs (workspace_id, phase, status, started_at) VALUES (?, ?, 'running', ?)",
-        (workspace_id, phase, now)
+        (workspace_id, phase, datetime.now().isoformat())
     )
-    run_id = run_cursor.lastrowid
-    all_passed = True
+    db.commit()
+    return cursor.lastrowid
 
-    for assignment in assignments:
-        profile_id = assignment["profile_id"]
-        profile_name = assignment["profile_name"]
-        subpath = assignment["subpath"]
-        step_dir = str(Path(working_dir) / subpath) if subpath != "." else working_dir
 
-        steps = db.execute(
-            "SELECT * FROM verification_steps WHERE profile_id = ? AND enabled = 1 ORDER BY sort_order",
-            (profile_id,)
-        ).fetchall()
-
-        for step in steps:
-            start_time = time.time()
-            status = "passed"
-            output = ""
-
-            if step["install_check_command"]:
-                check_result = subprocess.run(
-                    step["install_check_command"], shell=True, cwd=step_dir,
-                    capture_output=True, text=True, timeout=10
-                )
-                if check_result.returncode != 0:
-                    if step["install_command"]:
-                        install_result = subprocess.run(
-                            step["install_command"], shell=True, cwd=step_dir,
-                            capture_output=True, text=True, timeout=300
-                        )
-                        if install_result.returncode != 0:
-                            status = "skipped"
-                            output = f"Install failed: {install_result.stderr.strip()}"
-                            duration_ms = int((time.time() - start_time) * 1000)
-                            db.execute(
-                                "INSERT INTO verification_step_results (run_id, step_name, profile_name, status, output, duration_ms) "
-                                "VALUES (?, ?, ?, ?, ?, ?)",
-                                (run_id, step["name"], profile_name, status, output, duration_ms)
-                            )
-                            continue
-                        output = "Tool installed. "
-                    else:
-                        status = "skipped"
-                        output = f"Tool not found (check: {step['install_check_command']}), no install command configured."
-                        duration_ms = int((time.time() - start_time) * 1000)
-                        db.execute(
-                            "INSERT INTO verification_step_results (run_id, step_name, profile_name, status, output, duration_ms) "
-                            "VALUES (?, ?, ?, ?, ?, ?)",
-                            (run_id, step["name"], profile_name, status, output, duration_ms)
-                        )
-                        continue
-
-            timeout_val = step["timeout"] if step["timeout"] > 0 else None
-            try:
-                result = subprocess.run(
-                    step["command"], shell=True, cwd=step_dir,
-                    capture_output=True, text=True, timeout=timeout_val
-                )
-                if result.returncode != 0:
-                    status = "warning" if step["fail_severity"] == "warning" else "failed"
-                    output += result.stdout.strip() + "\n" + result.stderr.strip()
-                    if step["fail_severity"] == "blocking":
-                        all_passed = False
-                else:
-                    output += result.stdout.strip()
-            except subprocess.TimeoutExpired:
-                status = "failed" if step["fail_severity"] == "blocking" else "warning"
-                output += f"Timed out after {step['timeout']}s"
-                if step["fail_severity"] == "blocking":
-                    all_passed = False
-            except (OSError, subprocess.CalledProcessError) as e:
-                status = "failed" if step["fail_severity"] == "blocking" else "warning"
-                output += f"Error: {str(e)}"
-                if step["fail_severity"] == "blocking":
-                    all_passed = False
-
-            duration_ms = int((time.time() - start_time) * 1000)
-            db.execute(
-                "INSERT INTO verification_step_results (run_id, step_name, profile_name, status, output, duration_ms) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (run_id, step["name"], profile_name, status, output.strip(), duration_ms)
-            )
-
-    final_status = "passed" if all_passed else "failed"
+def _finish_run(db, run_id, status):
+    """Commit the final status and completion time of a verification run."""
     db.execute(
         "UPDATE verification_runs SET status = ?, completed_at = ? WHERE id = ?",
-        (final_status, datetime.now().isoformat(), run_id)
+        (status, datetime.now().isoformat(), run_id)
     )
-    return all_passed, run_id
+    db.commit()
+
+
+def _run_assignments(db, run_id, assignments, working_dir):
+    """Run the enabled steps of every assigned profile; return whether all blocking steps passed."""
+    all_passed = True
+    for assignment in assignments:
+        subpath = assignment["subpath"]
+        step_dir = str(Path(working_dir) / subpath) if subpath != "." else working_dir
+        steps = db.execute(
+            "SELECT * FROM verification_steps WHERE profile_id = ? AND enabled = 1 ORDER BY sort_order",
+            (assignment["profile_id"],)
+        ).fetchall()
+        for step in steps:
+            status = _run_and_record_step(db, run_id, step, assignment["profile_name"], step_dir)
+            if status == "failed":
+                all_passed = False
+    return all_passed
+
+
+def _run_and_record_step(db, run_id, step, profile_name, step_dir):
+    """Execute one step, commit its result row, and return its status."""
+    start_time = time.time()
+    status, output = _execute_step(step, step_dir)
+    duration_ms = int((time.time() - start_time) * 1000)
+    db.execute(
+        "INSERT INTO verification_step_results (run_id, step_name, profile_name, status, output, duration_ms) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (run_id, step["name"], profile_name, status, output.strip(), duration_ms)
+    )
+    db.commit()
+    return status
+
+
+def _execute_step(step, step_dir):
+    """Ensure the step's tool is available, then run its command; return (status, output)."""
+    try:
+        skip_reason, install_note = _prepare_tool(step, step_dir)
+        if skip_reason:
+            return "skipped", skip_reason
+        return _run_step_command(step, step_dir, install_note)
+    except subprocess.TimeoutExpired as e:
+        return _failure_status(step), f"Timed out after {e.timeout}s"
+    except OSError as e:
+        return _failure_status(step), f"Error: {e}"
+
+
+def _prepare_tool(step, step_dir):
+    """Run the install check and, if needed, the install. Return (skip_reason, install_note)."""
+    if not step["install_check_command"]:
+        return None, ""
+    if _shell(step["install_check_command"], step_dir, timeout=10).returncode == 0:
+        return None, ""
+    if not step["install_command"]:
+        return (f"Tool not found (check: {step['install_check_command']}), "
+                "no install command configured."), ""
+    install_result = _shell(step["install_command"], step_dir, timeout=300)
+    if install_result.returncode != 0:
+        return f"Install failed: {install_result.stderr.strip()}", ""
+    return None, "Tool installed. "
+
+
+def _run_step_command(step, step_dir, output_prefix):
+    """Run the step's main command; return (status, output)."""
+    timeout = step["timeout"] if step["timeout"] > 0 else None
+    result = _shell(step["command"], step_dir, timeout=timeout)
+    if result.returncode != 0:
+        return _failure_status(step), output_prefix + result.stdout.strip() + "\n" + result.stderr.strip()
+    return "passed", output_prefix + result.stdout.strip()
+
+
+def _failure_status(step):
+    """Status recorded for a failing step: 'failed' when blocking, otherwise 'warning'."""
+    return "warning" if step["fail_severity"] == "warning" else "failed"
+
+
+def _shell(command, cwd, timeout):
+    """Run a shell command capturing text output."""
+    return subprocess.run(command, shell=True, cwd=cwd, capture_output=True, text=True, timeout=timeout)
 
 
 def get_verification_results(db, workspace_id, phase=None, run_id=None):
