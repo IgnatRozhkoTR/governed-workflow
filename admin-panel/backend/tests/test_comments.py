@@ -318,3 +318,42 @@ class TestBatchResolveReviewIssues:
         assert result["count"] == 1
         issues = workspace_get_review_issues(status="out_of_scope")
         assert any(i["id"] == iid for i in issues)
+
+
+def _review_resolution_and_guard_status(workspace):
+    from advance.guards import ReviewGuard
+    from core.db import get_db
+    from testing_utils import set_phase
+
+    set_phase(workspace["id"], "4.2")
+    db = get_db()
+    ws = db.execute("SELECT * FROM workspaces WHERE id = ?", (workspace["id"],)).fetchone()
+    db.close()
+    return ReviewGuard().evaluate("4.2", ws, {})["status"]
+
+
+def test_resolve_review_thread_sets_user_resolution_and_unblocks_guard(client, workspace):
+    comment_id = client.post(BASE, json={"scope": "review", "text": "Fix this"}).json["id"]
+    assert _review_resolution_and_guard_status(workspace) == "rejected"
+
+    client.put(f"{BASE}/{comment_id}/resolve", json={"resolved": True})
+
+    assert _review_resolution_and_guard_status(workspace) == "approved"
+
+
+def test_unresolve_review_thread_blocks_guard_again(client, workspace):
+    comment_id = client.post(BASE, json={"scope": "review", "text": "Fix this"}).json["id"]
+    client.put(f"{BASE}/{comment_id}/resolve", json={"resolved": True})
+
+    client.put(f"{BASE}/{comment_id}/resolve", json={"resolved": False})
+
+    assert _review_resolution_and_guard_status(workspace) == "rejected"
+
+
+def test_resolve_keeps_existing_non_open_resolution(client, workspace):
+    comment_id = add_comment(workspace["id"], scope="review", text="Done", resolution="fixed")
+
+    client.put(f"{BASE}/{comment_id}/resolve", json={"resolved": True})
+
+    comments = client.get(BASE).json["comments"]
+    assert [c["resolution"] for c in comments if c["id"] == comment_id] == ["fixed"]

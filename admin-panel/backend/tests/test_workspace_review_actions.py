@@ -41,7 +41,7 @@ def _get_discussion(disc_id):
 
 
 class TestResolveAllReviewIssues:
-    def test_bulk_resolves_only_open_review_items(self, client, workspace):
+    def test_bulk_resolves_open_and_resolved_but_open_review_items(self, client, workspace):
         open_a = _add_review_issue(workspace["id"], "A")
         open_b = _add_review_issue(workspace["id"], "B")
         already_resolved = _add_review_issue(workspace["id"], "C", resolved=True)
@@ -53,19 +53,13 @@ class TestResolveAllReviewIssues:
             json={"resolution": "out_of_scope"},
         )
         assert r.status_code == 200, r.json
-        assert r.json["resolved_count"] == 2
+        assert r.json["resolved_count"] == 3
 
-        for issue_id in (open_a, open_b):
+        for issue_id in (open_a, open_b, already_resolved):
             row = _get_discussion(issue_id)
             assert row["status"] == "resolved"
             assert row["resolution"] == "out_of_scope"
             assert row["resolved_at"] is not None
-
-        unchanged = _get_discussion(already_resolved)
-        assert unchanged["status"] == "resolved"
-        # Pre-resolved row's resolution must stay 'open' (its previous value) — bulk only
-        # touches currently-open items so we don't overwrite a deliberate resolution.
-        assert unchanged["resolution"] == "open"
 
         plan_row = _get_discussion(plan_comment)
         assert plan_row["scope"] == "plan"

@@ -7,6 +7,8 @@ from datetime import datetime
 
 from core.i18n import t
 
+USER_RESOLUTION = "out_of_scope"
+
 
 def load_replies(db, parent_id):
     """Load reply discussions for a given parent comment/discussion."""
@@ -94,7 +96,7 @@ def resolve_comment(db, comment_id, workspace_id, resolved=True, block_review_sc
     {"error": ...} on failure.
     """
     comment = db.execute(
-        "SELECT id, scope FROM discussions WHERE id = ? AND workspace_id = ? AND scope IS NOT NULL",
+        "SELECT id, scope, parent_id FROM discussions WHERE id = ? AND workspace_id = ? AND scope IS NOT NULL",
         (comment_id, workspace_id)
     ).fetchone()
     if not comment:
@@ -109,16 +111,24 @@ def resolve_comment(db, comment_id, workspace_id, resolved=True, block_review_sc
             "error_key": "review_scope_blocked",
         }
 
+    is_review_root = comment["scope"] == "review" and comment["parent_id"] is None
     if resolved:
         db.execute(
             "UPDATE discussions SET status = 'resolved', resolved_at = ? WHERE id = ?",
             (datetime.now().isoformat(), comment_id)
         )
+        if is_review_root:
+            db.execute(
+                "UPDATE discussions SET resolution = ? WHERE id = ? AND resolution = 'open'",
+                (USER_RESOLUTION, comment_id)
+            )
     else:
         db.execute(
             "UPDATE discussions SET status = 'open', resolved_at = NULL WHERE id = ?",
             (comment_id,)
         )
+        if is_review_root:
+            db.execute("UPDATE discussions SET resolution = 'open' WHERE id = ?", (comment_id,))
     return {"ok": True, "comment_id": comment_id, "resolved": resolved}
 
 
@@ -273,18 +283,18 @@ def resolve_comments_batch(
 
 
 def resolve_all_open_review_issues(db, workspace_id, resolution):
-    """Bulk-resolve every open scope='review' discussion for a workspace.
+    """Bulk-resolve every unresolved scope='review' discussion for a workspace.
 
-    For every row matching workspace_id with scope='review' and status='open',
-    sets resolution to the given value and marks the row resolved with the
-    current timestamp. Caller owns the transaction (commits after the call).
+    Covers rows with status='open' and rows already status='resolved' whose
+    resolution is still 'open' (the guard blocks on those). Sets resolution to
+    the given value and marks the row resolved, keeping an existing resolved_at. Caller owns the transaction (commits after the call).
 
     Returns the number of rows updated.
     """
     cursor = db.execute(
         "UPDATE discussions "
-        "SET resolution = ?, status = 'resolved', resolved_at = ? "
-        "WHERE workspace_id = ? AND scope = 'review' AND status = 'open'",
+        "SET resolution = ?, status = 'resolved', resolved_at = COALESCE(resolved_at, ?) "
+        "WHERE workspace_id = ? AND scope = 'review' AND (status = 'open' OR resolution = 'open')",
         (resolution, datetime.now().isoformat(), workspace_id)
     )
     return cursor.rowcount
