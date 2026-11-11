@@ -26,12 +26,32 @@ TMUX_NOT_INSTALLED = "tmux is not installed. Run: brew install tmux"
 SESSION_KIND_CLAUDE = "claude"
 
 
+def spawn_pty_process(argv):
+    """Fork argv onto a new PTY without leaking the server's fds to the child.
+
+    Werkzeug marks its listening socket inheritable, so a bare pty.fork + exec
+    would keep port 5111 bound for as long as the child lives.
+    """
+    pid, master_fd = pty.fork()
+    if pid == 0:
+        try:
+            os.closerange(3, _max_open_fds())
+            os.execvp(argv[0], argv)
+        finally:
+            os._exit(127)
+    return pid, master_fd
+
+
+def _max_open_fds():
+    try:
+        return min(os.sysconf('SC_OPEN_MAX'), 65536)
+    except (ValueError, OSError):
+        return 4096
+
+
 def run_pty_websocket(ws, tmux_session_name):
     """Attach a PTY to a WebSocket, bridging tmux session I/O to the browser."""
-    pid, master_fd = pty.fork()
-
-    if pid == 0:
-        os.execvp('tmux', ['tmux', 'attach', '-t', tmux_session_name])
+    pid, master_fd = spawn_pty_process(['tmux', 'attach', '-t', tmux_session_name])
 
     running = True
     ws_lock = threading.Lock()
