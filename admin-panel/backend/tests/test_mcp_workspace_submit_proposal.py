@@ -128,3 +128,30 @@ def test_submit_proposal_returns_error_when_no_workspace(monkeypatch, tmp_path):
     )
 
     assert "error" in result
+
+
+@pytest.mark.parametrize("payload", ['[1, 2]', '"text"', '42', 'null', 'true'])
+def test_submit_proposal_rejects_payload_json_that_is_not_an_object(workspace, monkeypatch, payload):
+    result = _call(workspace, monkeypatch, payload_json=payload)
+
+    assert result["errorCategory"] == "validation"
+    assert result["isRetryable"] is False
+    assert "JSON object" in result["error"]
+
+
+def test_create_proposal_service_rejects_non_object_payload(workspace):
+    from core.db import get_db
+    from services import proposal_service
+
+    db = get_db()
+    try:
+        with pytest.raises(proposal_service.ProposalServiceError) as exc_info:
+            proposal_service.create_proposal(
+                db, workspace_id=workspace["id"], project_id=workspace["project_id"],
+                type="rule_new", implementation_kind="manual",
+                title="t", body="b", payload_json="[1]",
+            )
+    finally:
+        db.close()
+
+    assert exc_info.value.code == "invalid_payload_json"

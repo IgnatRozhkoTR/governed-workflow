@@ -22,7 +22,7 @@ from services import research_service
 from services import review_mode_service
 from services import scope_service
 from services import workflow_mode_service
-from services.phase_sequencer import resolve_phase_sequence
+from services.phase_sequencer import full_phase_sequence, resolve_phase_sequence
 
 def _group_comments(comments):
     """Group a flat list of comment dicts by 'scope:target' key."""
@@ -117,6 +117,7 @@ def get_workspace_state(db, ws, project):
         "workflow_mode": ws_field(ws, "workflow_mode", "standard"),
         "review_mode": ws_field(ws, "review_mode", "files_integration"),
         "enabled_phases": phase_sequence,
+        "available_phases": full_phase_sequence(plan),
         "locale": ws["locale"],
         "session_id": ws["session_id"],
         "working_dir": ws["working_dir"],
@@ -247,6 +248,10 @@ def set_phase(db, ws, project):
     new_phase = normalize_phase(new_phase)
     if new_phase is None:
         return jsonify({"error": t("api.error.invalidPhase")}), 400
+
+    available = full_phase_sequence(plan_service.get_plan(ws))
+    if new_phase not in available:
+        return jsonify({"error": t("api.error.phaseNotAvailable", phase=new_phase)}), 400
 
     old_phase = ws["phase"]
     db.execute("UPDATE workspaces SET phase = ? WHERE id = ?", (new_phase, ws["id"]))

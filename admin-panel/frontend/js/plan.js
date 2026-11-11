@@ -533,7 +533,7 @@ function togglePlanTask(headerEl, e) {
 }
 
 function _buildPlanTaskHtml(item, itemIndex, task, taskIndex) {
-  var commentTarget = 'Task: ' + task.title;
+  var commentTarget = 'task:' + task.title;
   var statusCls = (task.status || '').replace(/[^a-z0-9-]/gi, '');
   var taskKey = (item.id || ('group' + itemIndex)) + '::' + taskIndex;
 
@@ -568,7 +568,7 @@ function _buildPlanGroupHtml(item, itemIndex) {
   headerHtml += '<span>' + escapeHtml(item.name || t('plan.group')) + '</span>';
   if (item.mode) headerHtml += ' <span class="badge badge-info">' + escapeHtml(item.mode) + '</span>';
   headerHtml += '<span class="plan-group-progress">' + t('plan.progress', {done: done, total: total}) + '</span>';
-  var subphaseComment = t('plan.subPhaseComment', {id: item.id || '', name: item.name || ''});
+  var subphaseComment = 'subphase:' + (item.id || '');
   headerHtml += renderCommentIcon('plan', subphaseComment);
   headerHtml += '</div>';
 
@@ -603,7 +603,7 @@ function renderPlan() {
   }
 
   if (items.length > 0) {
-    html += '<div style="text-align: right; margin-bottom: 8px;">' + renderCommentIcon('plan', t('plan.entirePlan')) + '</div>';
+    html += '<div style="text-align: right; margin-bottom: 8px;">' + renderCommentIcon('plan', 'plan') + '</div>';
   }
 
   items.forEach(function(item, itemIndex) {

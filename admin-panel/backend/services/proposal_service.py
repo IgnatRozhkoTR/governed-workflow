@@ -1,4 +1,5 @@
 """Proposal CRUD: create, list, fetch, and resolve agent-submitted change proposals."""
+import json
 from datetime import datetime
 
 
@@ -29,6 +30,13 @@ class ProposalServiceError(Exception):
         self.code = code
 
 
+def _is_json_object(raw: str) -> bool:
+    try:
+        return isinstance(json.loads(raw), dict)
+    except (TypeError, ValueError):
+        return False
+
+
 def create_proposal(
     db,
     *,
@@ -46,6 +54,8 @@ def create_proposal(
         raise ProposalServiceError(code="invalid_implementation_kind")
     if type not in ALLOWED_TYPES:
         raise ProposalServiceError(code="invalid_proposal_type")
+    if payload_json is not None and not _is_json_object(payload_json):
+        raise ProposalServiceError(code="invalid_payload_json")
 
     cursor = db.execute(
         "INSERT INTO proposals "

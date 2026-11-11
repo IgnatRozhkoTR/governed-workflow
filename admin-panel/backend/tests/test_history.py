@@ -872,3 +872,69 @@ def test_ahead_of_origin_shas_uses_local_ref_fallback(tmp_path):
     result = _ahead_of_origin_shas(str(repo), "develop")
     assert feat_sha in result
     assert base_sha not in result
+
+
+# ---------------------------------------------------------------------------
+# repo parameter targets an inner repository
+# ---------------------------------------------------------------------------
+
+def _url(ws, action):
+    return f"/api/ws/{ws['project_id']}/develop/history/{action}"
+
+
+@pytest.fixture
+def inner_repo(history_repo):
+    """Nested repo on branch 'develop' with one pushed and two local commits, ignored by the outer repo."""
+    inner = history_repo / "inner"
+    inner.mkdir()
+    (history_repo / ".git" / "info" / "exclude").write_text("inner/\n")
+    _git(inner, "init")
+    _git(inner, "config", "user.name", "Inner")
+    _git(inner, "config", "user.email", "inner@test.com")
+    _git(inner, "checkout", "-b", "develop")
+    _commit_file(inner, "base.py", "b = 0\n", "inner-pushed")
+    _set_origin_ref(inner)
+    _commit_file(inner, "one.py", "o = 1\n", "inner-local-1")
+    _commit_file(inner, "two.py", "t = 2\n", "inner-local-2")
+    return inner
+
+
+def test_undo_with_repo_param_resets_inner_repo_only(client, history_workspace, inner_repo, history_repo):
+    outer_head = _rev_parse(history_repo)
+    inner_before = _rev_parse(inner_repo)
+
+    r = client.post(f"{_url(history_workspace, 'undo')}?repo=inner")
+
+    assert r.status_code == 200
+    assert _rev_parse(history_repo) == outer_head
+    assert _rev_parse(inner_repo) == _rev_parse(inner_repo, f"{inner_before}~1")
+
+
+def test_rename_with_repo_in_body_rewords_inner_head(client, history_workspace, inner_repo, history_repo):
+    outer_subject = _log_subject(history_repo)
+
+    r = client.post(_url(history_workspace, "rename"), json={"message": "inner renamed", "repo": "inner"})
+
+    assert r.status_code == 200
+    assert _log_subject(inner_repo) == "inner renamed"
+    assert _log_subject(history_repo) == outer_subject
+
+
+def test_squash_with_repo_param_squashes_inner_commits(client, history_workspace, inner_repo):
+    shas = [_rev_parse(inner_repo), _rev_parse(inner_repo, "HEAD~1")]
+
+    r = client.post(
+        f"{_url(history_workspace, 'squash')}?repo=inner",
+        json={"commits": shas, "message": "inner squashed"},
+    )
+
+    assert r.status_code == 200
+    assert _subjects_oldest_first(inner_repo) == ["inner squashed"]
+
+
+@pytest.mark.parametrize("action", ["rename", "undo", "squash"])
+def test_history_mutation_with_unknown_repo_returns_400(client, history_workspace, action):
+    r = client.post(f"{_url(history_workspace, action)}?repo=missing", json={"message": "x"})
+
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "repo_not_found"

@@ -3,6 +3,7 @@ from flask import Blueprint, jsonify, request
 
 from core.decorators import with_workspace
 from core.helpers import run_git, run_git_with, DEFAULT_SOURCE_BRANCH
+from routes.files import _resolve_repo_dir
 
 bp = Blueprint("history", __name__)
 
@@ -239,6 +240,23 @@ def _reword_non_head(working_dir, target, message, ahead):
     }, 200
 
 
+def _resolve_working_dir(db, ws, project):
+    """Resolve the target repo from ``repo`` (query string or JSON body).
+
+    Returns (working_dir, None) or (None, (response, 400)). An omitted repo
+    keeps the single-repo behaviour of targeting the workspace directory.
+    """
+    body = request.get_json(silent=True)
+    body_repo = body.get("repo") if isinstance(body, dict) else None
+    repo = request.args.get("repo") or body_repo or ""
+    if not isinstance(repo, str):
+        return None, (jsonify({"ok": False, "error": "repo must be a string"}), 400)
+    working_dir, error = _resolve_repo_dir(db, ws, project, repo.strip())
+    if error:
+        return None, (jsonify({"ok": False, "error": error}), 400)
+    return working_dir, None
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -247,7 +265,9 @@ def _reword_non_head(working_dir, target, message, ahead):
 @with_workspace
 def rename_commit(db, ws, project):
     """Reword a local-unpushed commit (defaults to HEAD when 'sha' is omitted)."""
-    working_dir = ws["working_dir"]
+    working_dir, repo_failure = _resolve_working_dir(db, ws, project)
+    if repo_failure is not None:
+        return repo_failure
     source_branch = ws["source_branch"] or DEFAULT_SOURCE_BRANCH
 
     failure = _check_universal_preconditions(ws, working_dir)
@@ -289,7 +309,9 @@ def rename_commit(db, ws, project):
 @with_workspace
 def undo_commit(db, ws, project):
     """Undo HEAD commit via git reset --soft HEAD~1 (only if HEAD is local-unpushed)."""
-    working_dir = ws["working_dir"]
+    working_dir, repo_failure = _resolve_working_dir(db, ws, project)
+    if repo_failure is not None:
+        return repo_failure
     source_branch = ws["source_branch"] or DEFAULT_SOURCE_BRANCH
 
     failure = _check_universal_preconditions(ws, working_dir)
@@ -316,7 +338,9 @@ def undo_commit(db, ws, project):
 @with_workspace
 def squash_commits(db, ws, project):
     """Squash a contiguous selection of 2+ local-unpushed commits into one."""
-    working_dir = ws["working_dir"]
+    working_dir, repo_failure = _resolve_working_dir(db, ws, project)
+    if repo_failure is not None:
+        return repo_failure
     source_branch = ws["source_branch"] or DEFAULT_SOURCE_BRANCH
 
     failure = _check_universal_preconditions(ws, working_dir)

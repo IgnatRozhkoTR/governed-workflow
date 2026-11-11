@@ -505,8 +505,20 @@ def _resolve_explicit_base_ref(working_dir, base_override):
     return None
 
 
+def _diff_against_merge_base(working_dir, ref):
+    """Run ``git diff`` from the merge-base of ref and HEAD to the working tree.
+
+    The merge-base keeps commits that landed on the source branch after the
+    workspace branched off from showing up as reverse changes. Falls back to
+    the ref itself when no common ancestor exists.
+    """
+    ok_base, base_sha, _ = run_git(working_dir, "merge-base", ref, "HEAD")
+    start = base_sha.strip() if ok_base and base_sha.strip() else ref
+    return run_git(working_dir, "diff", "--find-renames", start)
+
+
 def _diff_for_branch(working_dir, source_branch, base_override=None):
-    """Return diff output against the source branch, or an explicit base ref if provided.
+    """Return diff output against the merge-base with the source branch, or the tip of an explicit base ref.
 
     Returns None when base_override was given but no matching ref could be verified,
     to distinguish that failure from a genuinely empty diff ("").
@@ -520,7 +532,7 @@ def _diff_for_branch(working_dir, source_branch, base_override=None):
 
     for ref in (f"origin/{source_branch}", source_branch, "HEAD", None):
         if ref is not None:
-            ok, diff_output, _ = run_git(working_dir, "diff", "--find-renames", ref)
+            ok, diff_output, _ = _diff_against_merge_base(working_dir, ref)
         else:
             ok, diff_output, _ = run_git(working_dir, "diff", "--find-renames")
         if ok:

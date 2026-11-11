@@ -1229,3 +1229,45 @@ def test_file_content_rejects_path_traversal_when_ref_given(client, workspace):
 def test_file_content_returns_404_for_unknown_workspace(client, project):
     r = client.get("/api/ws/test-project/nope/file-content?path=a.txt")
     assert r.status_code == 404
+
+
+def test_diff_branch_mode_compares_against_merge_base_not_source_tip(client, workspace):
+    wd = workspace["working_dir"]
+    _git(wd, "checkout", "-b", "feature/test")
+    _commit_file(wd, "on_feature.py", "f = 1\n", "Feature-only file")
+    _git(wd, "checkout", "develop")
+    _commit_file(wd, "later_on_develop.py", "d = 1\n", "Develop moved on")
+    _git(wd, "checkout", "feature/test")
+
+    r = client.get("/api/ws/test-project/feature/test/diff?mode=branch")
+
+    assert r.status_code == 200
+    paths = {f["path"] for f in r.json["files"]}
+    assert paths == {"on_feature.py"}
+
+
+def test_diff_branch_mode_includes_uncommitted_changes_on_top_of_merge_base(client, workspace):
+    wd = workspace["working_dir"]
+    _git(wd, "checkout", "-b", "feature/test")
+    _commit_file(wd, "on_feature.py", "f = 1\n", "Feature-only file")
+    Path(wd).joinpath("on_feature.py").write_text("f = 2\n")
+
+    r = client.get("/api/ws/test-project/feature/test/diff?mode=branch")
+
+    assert r.status_code == 200
+    feature = next(f for f in r.json["files"] if f["path"] == "on_feature.py")
+    assert feature["additions"] == 1
+
+
+def test_diff_uncommitted_mode_ignores_source_branch_movement(client, workspace):
+    wd = workspace["working_dir"]
+    _git(wd, "checkout", "-b", "feature/test")
+    _git(wd, "checkout", "develop")
+    _commit_file(wd, "later_on_develop.py", "d = 1\n", "Develop moved on")
+    _git(wd, "checkout", "feature/test")
+    Path(wd).joinpath("scratch.py").write_text("s = 1\n")
+
+    r = client.get("/api/ws/test-project/feature/test/diff?mode=uncommitted")
+
+    assert r.status_code == 200
+    assert [f["path"] for f in r.json["files"]] == ["scratch.py"]

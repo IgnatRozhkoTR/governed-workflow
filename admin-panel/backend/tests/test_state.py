@@ -331,3 +331,50 @@ def test_pending_gate_rejects_commit_message_when_gate_is_not_code_review(client
 def test_pending_gate_accepts_commit_message_when_code_review_gate(client, workspace, phase):
     set_phase(workspace["id"], phase)
     assert _pending_gate(client, workspace) == {"phase": phase, "accepts_commit_message": True}
+
+
+def _set_plan_with_two_items(workspace):
+    from core.db import get_db
+    db = get_db()
+    db.execute(
+        "UPDATE workspaces SET plan_json = ? WHERE id = ?",
+        ('{"description":"","systemDiagram":"","execution":[{"id":"3.1","name":"A","tasks":[]},{"id":"3.2","name":"B","tasks":[]}]}',
+         workspace["id"]),
+    )
+    db.commit()
+    db.close()
+
+
+def test_state_available_phases_includes_fix_subphases(client, workspace):
+    _set_plan_with_two_items(workspace)
+
+    available = client.get(_ws_url(workspace, "state")).get_json()["available_phases"]
+
+    assert "3.1.2" in available
+    assert "3.2.2" in available
+    assert "3.3.2" not in available
+
+
+def test_set_phase_accepts_fix_subphase_of_existing_item(client, workspace):
+    _set_plan_with_two_items(workspace)
+
+    response = client.put(_ws_url(workspace, "phase"), json={"phase": "3.2.2"})
+
+    assert response.status_code == 200
+    assert response.get_json()["phase"] == "3.2.2"
+
+
+def test_set_phase_rejects_execution_phase_of_nonexistent_item(client, workspace):
+    _set_plan_with_two_items(workspace)
+
+    response = client.put(_ws_url(workspace, "phase"), json={"phase": "3.9.2"})
+
+    assert response.status_code == 400
+    assert "3.9.2" in response.get_json()["error"]
+
+
+def test_set_phase_rejects_execution_phase_when_plan_has_no_items(client, workspace):
+    response = client.put(_ws_url(workspace, "phase"), json={"phase": "3.1.0"})
+
+    assert response.status_code == 400
+    assert "3.1.0" in response.get_json()["error"]

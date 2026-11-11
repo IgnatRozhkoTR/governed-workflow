@@ -20,6 +20,7 @@ _VALID_IMPLEMENTATION_KINDS = frozenset({"auto", "manual"})
 _SERVICE_ERROR_TO_CATEGORY = {
     "invalid_proposal_type": ("validation", False),
     "invalid_implementation_kind": ("validation", False),
+    "invalid_payload_json": ("validation", False),
 }
 
 
@@ -60,7 +61,7 @@ def workspace_submit_proposal(
 
     Errors:
         invalid_argument — unknown type, unknown implementation_kind, or
-            payload_json is not valid JSON.
+            payload_json is not a valid JSON object.
 
     Example:
         workspace_submit_proposal(
@@ -88,11 +89,18 @@ def workspace_submit_proposal(
 
     if payload_json is not None:
         try:
-            json.loads(payload_json)
+            parsed_payload = json.loads(payload_json)
         except (json.JSONDecodeError, ValueError):
             return mcp_error(
                 "validation",
                 "payload_json must be valid JSON",
+                retryable=False,
+                details={"payload_json_preview": payload_json[:120]},
+            )
+        if not isinstance(parsed_payload, dict):
+            return mcp_error(
+                "validation",
+                "payload_json must be a JSON object",
                 retryable=False,
                 details={"payload_json_preview": payload_json[:120]},
             )
