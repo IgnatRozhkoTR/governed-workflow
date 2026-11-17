@@ -701,5 +701,18 @@
   "messages.gcRepoAttachFailed": "Failed to attach repository: {error}",
   "messages.gcOverrideSaved": "Override rules saved",
   "messages.gcOverrideCleared": "Override rules cleared",
-  "messages.gcSelectAtLeastOne": "Select at least one repository."
+  "messages.gcSelectAtLeastOne": "Select at least one repository.",
+  "annotation.stale": "stale",
+  "annotation.staleTooltip": "The annotated code changed and this note could not be re-attached to it",
+  "annotation.edit": "Edit",
+  "annotation.delete": "Delete",
+  "annotation.save": "Save",
+  "annotation.cancel": "Cancel",
+  "annotation.confirmDelete": "Delete this annotation?",
+  "annotation.expand": "Show annotation",
+  "annotation.collapse": "Hide annotation",
+  "annotation.lines": "Lines {start}-{end}",
+  "annotation.toggleAtCursor": "Toggle annotation on this line",
+  "annotation.textPlaceholder": "Annotation text (markdown)",
+  "annotation.failed": "Annotation request failed: {error}"
 }

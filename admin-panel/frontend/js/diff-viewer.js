@@ -350,6 +350,7 @@ function renderDiff(path) {
   attachDiffLineClickHandlers(targetEl, path);
   renderDiffLineCommentIndicators(targetEl, path);
   autoExpandUnresolvedThreads(targetEl, path);
+  decorateDiffAnnotations(targetEl, path);
 }
 
 function getDiffLineNumber(td) {
@@ -568,6 +569,7 @@ async function _loadDiff(mode, commitSha) {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
   try {
+    invalidateAnnotations();
     var diffData = await apiGetDiff(ctx.projectId, ctx.branch, mode, commitSha, state.diffRepo, state.diffBase);
     if (diffData) {
       AppState.diff = diffData;

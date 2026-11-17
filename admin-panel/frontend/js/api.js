@@ -146,6 +146,15 @@ async function apiPut(path, body) {
   return _checkAndParseResponse(res);
 }
 
+async function apiPatch(path, body) {
+  const res = await fetch(API_BASE + path, {
+    method: 'PATCH',
+    headers: _authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body)
+  });
+  return _checkAndParseResponse(res);
+}
+
 async function apiDelete(path) {
   const res = await fetch(API_BASE + path, { method: 'DELETE', headers: _authHeaders() });
   return _checkAndParseResponse(res);
@@ -380,6 +389,23 @@ function apiGetDiff(projectId, branch, mode, commit, repo, base) {
   if (base && (!mode || mode === 'branch')) q.push('base=' + encodeURIComponent(base));
   if (q.length) url += '?' + q.join('&');
   return apiGet(url);
+}
+
+function _annotationsUrl(projectId, branch, suffix) {
+  return '/api/ws/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(branch) + '/annotations' + (suffix || '');
+}
+
+function apiGetAnnotations(projectId, branch, filePath, repo, ref) {
+  var q = ['file=' + encodeURIComponent(filePath), 'repo=' + encodeURIComponent(repo || ''), 'ref=' + encodeURIComponent(ref || '')];
+  return apiGet(_annotationsUrl(projectId, branch) + '?' + q.join('&'));
+}
+
+function apiUpdateAnnotation(projectId, branch, annotationId, patch) {
+  return apiPatch(_annotationsUrl(projectId, branch, '/' + encodeURIComponent(annotationId)), patch);
+}
+
+function apiDeleteAnnotation(projectId, branch, annotationId) {
+  return apiDelete(_annotationsUrl(projectId, branch, '/' + encodeURIComponent(annotationId)));
 }
 
 function apiGetCommitHistory(projectId, branch, ref, repo) {

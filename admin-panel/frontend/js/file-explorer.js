@@ -175,6 +175,7 @@ async function selectExplorerFile(path, lineNumber) {
   if (!ctx) return;
 
   try {
+    invalidateAnnotations();
     var data = await apiReadFile(ctx.projectId, ctx.branch, path);
     _explorerFileLines = data.lines || [];
     renderExplorerContent(path, _explorerFileLines, lineNumber);
@@ -301,6 +302,7 @@ function renderExplorerContent(path, lines, lineNumber) {
       if (lineNumber) {
         revealLine(lineNumber);
       }
+      attachEditorAnnotations(editor, path);
       if (!editorReadOnly) {
         editor.onDidChangeModelContent(function() {
           var isDirty = editor.getValue() !== _explorerFileLines.join('\n');

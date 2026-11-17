@@ -701,5 +701,18 @@
   "messages.gcRepoAttachFailed": "Не удалось подключить репозиторий: {error}",
   "messages.gcOverrideSaved": "Переопределение правил сохранено",
   "messages.gcOverrideCleared": "Переопределение правил очищено",
-  "messages.gcSelectAtLeastOne": "Выберите хотя бы один репозиторий."
+  "messages.gcSelectAtLeastOne": "Выберите хотя бы один репозиторий.",
+  "annotation.stale": "устарела",
+  "annotation.staleTooltip": "Размеченный код изменился, и заметку не удалось привязать к нему заново",
+  "annotation.edit": "Изменить",
+  "annotation.delete": "Удалить",
+  "annotation.save": "Сохранить",
+  "annotation.cancel": "Отмена",
+  "annotation.confirmDelete": "Удалить эту аннотацию?",
+  "annotation.expand": "Показать аннотацию",
+  "annotation.collapse": "Скрыть аннотацию",
+  "annotation.lines": "Строки {start}-{end}",
+  "annotation.toggleAtCursor": "Показать или скрыть аннотацию на этой строке",
+  "annotation.textPlaceholder": "Текст аннотации (markdown)",
+  "annotation.failed": "Не удалось выполнить запрос аннотации: {error}"
 }
