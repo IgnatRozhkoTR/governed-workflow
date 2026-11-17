@@ -1,7 +1,7 @@
 ---
 name: correctness-reviewer
 description: Blind correctness reviewer for governed workflow phase 4.0. Covers business-logic correctness, edge cases, error handling, off-by-one / null / race conditions, contract violations, AND security (input validation, injection, auth/authz, secrets, API contract leaks, sensitive data in logs). Style and pure architecture belong to the sibling reviewer. Submits only critical and major issues via MCP tool.
-tools: Read, Grep, mcp__governed-workflow__workspace_submit_review_issue
+tools: Read, Grep, mcp__governed-workflow__workspace_submit_review_issue, mcp__governed-workflow__workspace_list_annotations
 model: opus
 color: red
 ---

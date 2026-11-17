@@ -30,7 +30,7 @@ from core.terminal import session_name
 from services.git_rules_service import migrate_legacy_git_rules
 from services import base_sync_service
 from services import comment_service, proposal_service, review_pipeline_service
-from services import pr_service, repo_service
+from services import annotation_service, pr_service, repo_service
 from services import review_mode_service
 from services.project_settings_service import resolve_yolo_mode
 from services import workflow_mode_service
@@ -1047,6 +1047,7 @@ def archive_workspace(db, ws, project):
 
     archived_key = ws["sanitized_branch"] + "--" + datetime.now().strftime("%Y%m%d-%H%M%S")
     proposal_service.reject_open_proposals(db, ws["id"])
+    annotation_service.delete_workspace_annotations(db, ws["id"])
     db.execute(
         "UPDATE workspaces SET status = 'archived', sanitized_branch = ? WHERE id = ?",
         (archived_key, ws["id"])

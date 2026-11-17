@@ -177,15 +177,30 @@ def _resolve_file_content_ref(working_dir, ref):
     return _resolve_explicit_base_ref(working_dir, ref)
 
 
-def _read_bytes_at_ref(working_dir: str, ref: str, rel_path: str):
-    """Return ``(content, error_response)``; exactly one is not None."""
+def read_file_bytes_at_ref(working_dir: str, ref: str, rel_path: str) -> tuple[bytes | None, str | None]:
+    """Return ``(content, error_code)``; exactly one is not None.
+
+    Error codes: ``invalid_ref``, ``base_ref_not_found``, ``file_not_found``.
+    """
     if not _is_valid_ref(ref):
-        return None, (jsonify({"error": "invalid_ref"}), 400)
+        return None, "invalid_ref"
     resolved = _resolve_file_content_ref(working_dir, ref)
     if resolved is None:
-        return None, (jsonify({"error": "base_ref_not_found", "base": ref}), 400)
+        return None, "base_ref_not_found"
     ok, content, _ = run_git_bytes(working_dir, "show", f"{resolved}:{rel_path}")
     if not ok:
+        return None, "file_not_found"
+    return content, None
+
+
+def _read_bytes_at_ref(working_dir: str, ref: str, rel_path: str):
+    """Return ``(content, error_response)``; exactly one is not None."""
+    content, error_code = read_file_bytes_at_ref(working_dir, ref, rel_path)
+    if error_code == "invalid_ref":
+        return None, (jsonify({"error": "invalid_ref"}), 400)
+    if error_code == "base_ref_not_found":
+        return None, (jsonify({"error": "base_ref_not_found", "base": ref}), 400)
+    if error_code == "file_not_found":
         return None, (jsonify({"error": t("api.error.fileNotFound")}), 404)
     return content, None
 

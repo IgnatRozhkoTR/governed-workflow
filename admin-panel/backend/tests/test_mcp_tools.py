@@ -1424,6 +1424,10 @@ EXPECTED_ANNOTATIONS = {
     "scratchpad_replace": (False, True, True),
     "scratchpad_patch": (False, False, False),
     "scratchpad_delete": (False, True, True),
+    "workspace_annotate": (False, False, False),
+    "workspace_update_annotation": (False, True, False),
+    "workspace_delete_annotation": (False, False, True),
+    "workspace_list_annotations": (True, True, False),
 }
 
 
@@ -1435,7 +1439,7 @@ class TestMcpToolContracts:
     def test_all_tools_have_annotations(self):
         from mcp.types import ToolAnnotations
         tools = self._tools()
-        assert len(tools) == 50, f"expected 50 registered tools, got {len(tools)}"
+        assert len(tools) == 54, f"expected 54 registered tools, got {len(tools)}"
         for name, tool in tools.items():
             ann = tool.annotations
             assert ann is not None, f"{name} missing annotations"

@@ -1,7 +1,7 @@
 ---
 name: resolution-reviewer
 description: Blind adjudicator run at the end of the automated phase 4.0 review pipeline (review mode "full" only). Judges every OPEN review finding against the actual code and dismisses invalid ones as false_positive or out_of_scope, leaving genuinely valid findings open for engineers at 4.1.
-tools: Read, Grep, mcp__governed-workflow__workspace_get_review_issues, mcp__governed-workflow__workspace_resolve_review_issue
+tools: Read, Grep, mcp__governed-workflow__workspace_get_review_issues, mcp__governed-workflow__workspace_resolve_review_issue, mcp__governed-workflow__workspace_list_annotations
 model: opus
 color: yellow
 ---

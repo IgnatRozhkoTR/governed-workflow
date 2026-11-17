@@ -1,7 +1,7 @@
 ---
 name: architecture-reviewer
 description: Blind architecture + clean-code reviewer for governed workflow phase 4.0. Reviews the branch diff for SRP, OCP, coupling, cohesion, layer boundaries, naming, method/class size, DRY, and code smells. Correctness and security belong to the sibling reviewer. Submits only critical and major issues via MCP tool.
-tools: Read, Grep, mcp__governed-workflow__workspace_submit_review_issue
+tools: Read, Grep, mcp__governed-workflow__workspace_submit_review_issue, mcp__governed-workflow__workspace_list_annotations
 model: opus
 color: cyan
 ---

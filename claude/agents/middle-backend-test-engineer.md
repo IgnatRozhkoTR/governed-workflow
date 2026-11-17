@@ -1,7 +1,7 @@
 ---
 name: middle-backend-test-engineer
 description: Default test engineer for standard tasks with clear patterns. CRUD tests, simple validation, happy path and error cases. Use when specs are clear and patterns exist. For complex scenarios, use senior-backend-test-engineer.
-tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write, SendMessage
+tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write, SendMessage, mcp__governed-workflow__workspace_annotate, mcp__governed-workflow__workspace_update_annotation, mcp__governed-workflow__workspace_delete_annotation, mcp__governed-workflow__workspace_list_annotations
 model: sonnet
 color: pink
 ---
@@ -33,6 +33,10 @@ test-standards applies in full (naming, AAA, meaningful assertions, independence
 - No test that only verifies "no exception thrown" unless that IS the contract
 - No tests that exercise the mock framework rather than the code under test
 </quality-gate>
+
+<annotations>
+Explain non-obvious decisions, trade-offs and business reasons on the lines you write with `workspace_annotate`, not with code comments. Read `.claude/skills/annotations/SKILL.md` before annotating.
+</annotations>
 
 <workspace-protocol>
 When working as a teammate, the orchestrator will provide the plan file path in the task message.

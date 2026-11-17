@@ -750,3 +750,75 @@ def test_house_conventions_absent_leaves_prompts_unchanged(tmp_path):
     assert len(prompts) == 2
     for prompt in prompts:
         assert "house conventions" not in prompt
+
+
+def _annotate_file(workspace, file_path, line, text):
+    from core.db import get_db
+    from core.helpers import find_workspace
+    from services import annotation_service
+    db = get_db()
+    try:
+        ws = find_workspace(db, workspace["project_id"], workspace["branch"])
+        project = db.execute("SELECT * FROM projects WHERE id = ?", (workspace["project_id"],)).fetchone()
+        annotation_service.create_annotation(
+            db, ws, project, repo="", file_path=file_path, line_start=line, line_end=line,
+            text=text, author="agent",
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
+def _file_reviewer_prompts_after_run(ws) -> dict[str, str]:
+    prompts: dict[str, str] = {}
+
+    async def fake_spawn(agent, prompt, project_path, max_turns, timeout_s, suppress_mcp=False):
+        if agent == review_pipeline_service._FILE_REVIEWER_AGENT:
+            file_path = next(p for p in ("src/alpha.py", "src/beta.py") if p in prompt)
+            prompts[file_path] = prompt
+        return _file_envelope([])
+
+    reviewable = [ReviewableFile(path="src/alpha.py", status="M"), ReviewableFile(path="src/beta.py", status="M")]
+    with patch.object(review_pipeline_service.diff_filter, "list_reviewable_files", return_value=reviewable), \
+         patch.object(review_pipeline_service, "_get_file_diff", return_value="DIFF"), \
+         patch.object(review_pipeline_service, "_spawn_claude_agent", side_effect=fake_spawn):
+        review_pipeline_service.start_in_background(
+            workspace_id=ws["id"], project_path=Path(ws["working_dir"]), base_branch="develop",
+        )
+        _wait_for_state(ws["id"])
+    return prompts
+
+
+@pytest.fixture
+def annotated_alpha(repo_with_files):
+    alpha = Path(repo_with_files["working_dir"]) / "src" / "alpha.py"
+    alpha.write_text("keep = 1\nchange = 2\nlast = 3\n")
+    _annotate_file(repo_with_files, "src/alpha.py", 1, "KEPT_NOTE")
+    _annotate_file(repo_with_files, "src/alpha.py", 2, "STALE_NOTE")
+    _annotate_file(repo_with_files, "src/beta.py", 1, "BETA_NOTE")
+    alpha.write_text("inserted\nkeep = 1\nrewritten = 99\nlast = 3\n")
+    return repo_with_files
+
+
+def test_file_reviewer_prompt_includes_non_stale_annotation_at_resolved_lines(annotated_alpha):
+    prompts = _file_reviewer_prompts_after_run(annotated_alpha)
+
+    assert "- Lines 2-2: KEPT_NOTE" in prompts["src/alpha.py"]
+
+
+def test_file_reviewer_prompt_excludes_stale_annotation(annotated_alpha):
+    prompts = _file_reviewer_prompts_after_run(annotated_alpha)
+
+    assert "STALE_NOTE" not in prompts["src/alpha.py"]
+
+
+def test_file_reviewer_prompt_excludes_other_files_annotations(annotated_alpha):
+    prompts = _file_reviewer_prompts_after_run(annotated_alpha)
+
+    assert ("BETA_NOTE" not in prompts["src/alpha.py"], "BETA_NOTE" in prompts["src/beta.py"]) == (True, True)
+
+
+def test_file_reviewer_prompt_has_no_annotation_section_when_file_has_none(repo_with_files):
+    prompts = _file_reviewer_prompts_after_run(repo_with_files)
+
+    assert "Author annotations" not in prompts["src/alpha.py"]

@@ -1,7 +1,7 @@
 ---
 name: senior-backend-test-engineer
 description: Complex test scenarios requiring deeper reasoning. Edge cases, integration tests with tricky setup, complex business logic tests, unclear test design. Use when complexity requires analysis. For standard tasks, use middle-backend-test-engineer.
-tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write, SendMessage
+tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write, SendMessage, mcp__governed-workflow__workspace_annotate, mcp__governed-workflow__workspace_update_annotation, mcp__governed-workflow__workspace_delete_annotation, mcp__governed-workflow__workspace_list_annotations
 model: opus
 color: pink
 ---
@@ -35,6 +35,10 @@ test-standards applies in full (naming, AAA, meaningful assertions, independence
 - No test that only verifies "no exception thrown" unless that IS the contract
 - No tests that exercise the mock framework rather than the code under test
 </quality-gate>
+
+<annotations>
+Explain non-obvious decisions, trade-offs and business reasons on the lines you write with `workspace_annotate`, not with code comments. Read `.claude/skills/annotations/SKILL.md` before annotating.
+</annotations>
 
 <workspace-protocol>
 When working as a teammate, the orchestrator will provide the plan file path in the task message.

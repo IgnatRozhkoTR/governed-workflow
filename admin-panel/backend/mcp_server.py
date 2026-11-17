@@ -76,6 +76,12 @@ from mcp_tools.scratchpad import (
     scratchpad_patch,
     scratchpad_delete,
 )
+from mcp_tools.annotations import (
+    workspace_annotate,
+    workspace_update_annotation,
+    workspace_delete_annotation,
+    workspace_list_annotations,
+)
 
 if __name__ == "__main__":
     register_module_phases_from_disk()

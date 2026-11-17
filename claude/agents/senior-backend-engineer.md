@@ -1,7 +1,7 @@
 ---
 name: senior-backend-engineer
 description: RARE USE - Only for genuinely complex problems middle cannot handle. Vague requirements without spec, debugging unknown root causes, major refactoring without defined target, escalation when middle failed. NOT for standard implementation, CRUD, or clear spec tasks.
-tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write, SendMessage
+tools: Bash, Glob, Grep, LS, Read, Edit, MultiEdit, Write, SendMessage, mcp__governed-workflow__workspace_annotate, mcp__governed-workflow__workspace_update_annotation, mcp__governed-workflow__workspace_delete_annotation, mcp__governed-workflow__workspace_list_annotations
 model: opus
 color: purple
 ---
@@ -56,6 +56,10 @@ SKIP (do not flag):
 - For multi-file changes: list the files you need to touch UP FRONT, then Edit each one. Do not discover files mid-implementation.
 - Independent operations: emit parallel tool calls within a single response. Sequential only when one call's output feeds the next.
 </tool-discipline>
+
+<annotations>
+Explain non-obvious decisions, trade-offs and business reasons on the lines you write with `workspace_annotate`, not with code comments. Read `.claude/skills/annotations/SKILL.md` before annotating.
+</annotations>
 
 <workspace-protocol>
 When working as a teammate, the orchestrator will provide the plan file path in the task message.

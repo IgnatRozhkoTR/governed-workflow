@@ -60,8 +60,9 @@ from pathlib import Path
 from typing import Literal
 
 from core.db import get_db
-from services import diff_filter
+from services import annotation_service, diff_filter
 from services._claude_runner import spawn_claude_agent
+from services.annotation_anchor import split_lines
 from services.comment_service import submit_review_issue
 
 log = logging.getLogger(__name__)
@@ -430,7 +431,12 @@ async def _review_one_file(
     result = status.files[file_path]
     result.status = "running"
     try:
-        findings = await _spawn_file_reviewer(project_path, file_path, base_ref, conventions)
+        annotations = await asyncio.to_thread(
+            _load_file_annotations, workspace_id, project_path, file_path
+        )
+        findings = await _spawn_file_reviewer(
+            project_path, file_path, base_ref, conventions, annotations
+        )
     except Exception as exc:  # noqa: BLE001 - failures captured on FileResult, never propagate
         log.exception("file reviewer failed for %s", file_path)
         result.status = "failed"
@@ -499,11 +505,54 @@ def _with_house_conventions(prompt: str, conventions: str) -> str:
     )
 
 
+_ANNOTATIONS_TOOL_HINT = (
+    "The implementer may have left annotations: short notes on line ranges explaining "
+    "non-obvious decisions, trade-offs and business reasons. Call workspace_list_annotations "
+    "(optionally with file_path) to read them for context. They explain intent; they are "
+    "neither findings nor proof that the code is correct."
+)
+_AUTHOR_ANNOTATIONS_HEADING = (
+    "Author annotations — the implementer's notes on why this code is the way it is; "
+    "context for your review, not findings and not proof of correctness"
+)
+
+
+def _load_file_annotations(workspace_id: int, project_path: Path, file_path: str) -> list[dict]:
+    """Annotations of one reviewed file that still match its working-tree content."""
+    absolute_path = project_path / file_path
+    if not absolute_path.is_file():
+        return []
+    lines = split_lines(absolute_path.read_bytes().decode("utf-8", errors="replace"))
+    db = get_db()
+    try:
+        annotations = annotation_service.annotations_for_lines(
+            db, workspace_id, annotation_service.PRIMARY_REPO, file_path, lines
+        )
+    finally:
+        db.close()
+    return [annotation for annotation in annotations if not annotation["stale"]]
+
+
+def _with_author_annotations(prompt: str, annotations: list[dict]) -> str:
+    if not annotations:
+        return prompt
+    notes = "\n".join(
+        f"- Lines {a['line_start']}-{a['line_end']}: {a['text']}" for a in annotations
+    )
+    return (
+        f"{prompt}\n\n"
+        f"## {_AUTHOR_ANNOTATIONS_HEADING}\n\n"
+        f"{notes}\n\n"
+        f"## End of author annotations"
+    )
+
+
 async def _spawn_file_reviewer(
     project_path: Path,
     file_path: str,
     base_ref: str = "main",
     conventions: str = "",
+    annotations: list[dict] | None = None,
 ) -> list[dict]:
     hunk = _get_file_diff(project_path, file_path, base_ref)
     prompt = (
@@ -516,9 +565,10 @@ async def _spawn_file_reviewer(
         f'"type": "...", "line": <int>, "summary": "..."}}]}}\n'
         f'If you find no issues, emit exactly {{"file": "{file_path}", "findings": []}}.'
     )
+    prompt = _with_author_annotations(_with_house_conventions(prompt, conventions), annotations or [])
     stdout = await _spawn_claude_agent(
         agent=_FILE_REVIEWER_AGENT,
-        prompt=_with_house_conventions(prompt, conventions),
+        prompt=prompt,
         project_path=project_path,
         # The file-reviewer needs turns for Read tool calls plus a final text
         # turn for the JSON envelope. Empirically the haiku-class agent uses
@@ -544,7 +594,8 @@ async def _run_integration_agent(
         f"Branch diff (against {base_ref}):\n{diff}\n\n"
         "The diff above shows exactly what changed. Use Read to open any changed file in full "
         "and Grep to navigate the codebase when you need surrounding context. Submit only "
-        "critical and major issues via the MCP tool."
+        "critical and major issues via the MCP tool.\n\n"
+        f"{_ANNOTATIONS_TOOL_HINT}"
     )
     stdout = await _spawn_claude_agent(
         agent=agent_name,
@@ -572,7 +623,8 @@ async def _run_adjudication_agent(
         "wrong, or 'out_of_scope' for findings that are real but fall outside the "
         "diff above. Leave genuinely valid findings untouched — their resolution "
         "stays 'open' for engineers to fix at phase 4.1. Be conservative: when "
-        "unsure whether a finding is invalid, leave it open rather than dismiss it."
+        "unsure whether a finding is invalid, leave it open rather than dismiss it.\n\n"
+        f"{_ANNOTATIONS_TOOL_HINT}"
     )
     stdout = await _spawn_claude_agent(
         agent=_RESOLUTION_REVIEWER_AGENT,
