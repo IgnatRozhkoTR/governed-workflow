@@ -42,3 +42,5 @@ Pass `repo` (the attached repo's rel_path) only in multi-repo workspaces.
 - Prefer one annotation on a range (the whole method or block) over many single-line notes.
 - Update an existing annotation instead of adding a second one to the same lines.
 - When you change annotated code, update the annotation or delete it if it no longer applies. Re-anchor stale ones with `workspace_update_annotation`.
+- The first sentence is shown as a one-line plain-text preview inline next to the code, and markdown syntax is not rendered there. Start with a plain, self-contained sentence that makes sense alone.
+- Keep markdown light: an occasional `code` span or short list in the rest is fine, since the expanded view renders it. No headings, no tables.

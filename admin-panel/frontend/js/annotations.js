@@ -31,9 +31,25 @@ function loadAnnotations(filePath, repo, ref) {
   return _annotationCache[key];
 }
 
+function markdownToPlainPreview(markdown) {
+  var plain = String(markdown || '')
+    .replace(/^\s*(```|~~~).*$/gm, ' ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/<[^>]+>/g, '')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*>+\s?/gm, '')
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, '')
+    .replace(/(\*\*|__|\*|_|~~)(?=\S)([^\n]*?\S)\1/g, '$2')
+    .replace(/`+([^`\n]*)`+/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain;
+}
+
 function annotationPreviewText(ann) {
-  var firstLine = String(ann.text || '').split('\n').filter(function(l) { return l.trim(); })[0] || '';
-  var plain = firstLine.replace(/[`*_#>]/g, '').trim();
+  var firstBlock = String(ann.text || '').split(/\n\s*\n/).filter(function(b) { return b.trim(); })[0] || '';
+  var plain = markdownToPlainPreview(firstBlock);
   return plain.length > ANNOTATION_PREVIEW_MAX_CHARS ? plain.slice(0, ANNOTATION_PREVIEW_MAX_CHARS) + '…' : plain;
 }
 
