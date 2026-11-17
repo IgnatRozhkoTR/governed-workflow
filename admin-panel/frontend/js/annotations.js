@@ -236,6 +236,7 @@ function _expandDiffAnnotation(ann, row, btn, redecorate) {
   });
   annRow.firstChild.appendChild(block);
   anchor.parentNode.insertBefore(annRow, anchor.nextSibling);
+  _fitBlockToVisibleWidth(block);
   if (spacer) {
     peer.parentNode.insertBefore(spacer, peer.nextSibling);
     spacer.firstChild.style.height = annRow.firstChild.offsetHeight + 'px';
@@ -249,6 +250,26 @@ function _expandDiffAnnotation(ann, row, btn, redecorate) {
   btn.setAttribute('aria-expanded', 'true');
   btn.setAttribute('aria-label', t('annotation.collapse'));
   _annotationExpanded[ann.id] = true;
+}
+
+function _scrollContainerOf(el) {
+  for (var node = el.parentElement; node; node = node.parentElement) {
+    var overflowX = getComputedStyle(node).overflowX;
+    if (overflowX === 'auto' || overflowX === 'scroll') return node;
+  }
+  return null;
+}
+
+function _fitBlockToVisibleWidth(block) {
+  var scroller = _scrollContainerOf(block);
+  if (!scroller || typeof ResizeObserver === 'undefined') return;
+  function fit() { block.style.width = Math.max(scroller.clientWidth - 16, 0) + 'px'; }
+  fit();
+  var observer = new ResizeObserver(function() {
+    if (!block.isConnected) { observer.disconnect(); return; }
+    fit();
+  });
+  observer.observe(scroller);
 }
 
 function _createAnnotationRow(referenceTr, ann) {
@@ -280,7 +301,7 @@ function _decorateDiffContainer(container, annotations, redecorate) {
     var endRow = rows.filter(function(r) { return r.line === annotationEndLine(ann); })[0];
     if (!endRow) return;
     _markDiffGutter(rows, ann);
-    var host = endRow.tr.querySelector('.d2h-code-line, .d2h-code-side-line');
+    var host = endRow.tr.querySelector('.d2h-code-line-ctn, .d2h-code-side-line-ctn') || endRow.tr.querySelector('.d2h-code-line, .d2h-code-side-line');
     if (!host) return;
     var btn = _makeInlineAnnotationButton(ann, function(button) {
       if (button.getAttribute('aria-expanded') === 'true') {
@@ -328,6 +349,7 @@ function _monacoDecorationFor(ann, model) {
     {
       range: new monaco.Range(end, maxColumn, end, maxColumn),
       options: {
+        showIfCollapsed: true,
         hoverMessage: ann.stale ? { value: t('annotation.staleTooltip') } : null,
         after: {
           content: '   ▸ ' + prefix + annotationPreviewText(ann),
