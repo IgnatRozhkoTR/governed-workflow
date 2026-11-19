@@ -1,6 +1,6 @@
 .proposal-card {
-  border-bottom: 1px solid var(--border);
-  padding: 14px 16px;
+  border-bottom: 1px solid var(--ln);
+  padding: 16px 18px;
 }
 
 .proposal-card:last-child {
@@ -17,7 +17,7 @@
 
 .proposal-card__title {
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--tx);
   flex: 1;
   min-width: 0;
 }
@@ -30,8 +30,8 @@
 }
 
 .proposal-card__body {
-  color: var(--text-secondary);
-  font-size: 0.88rem;
+  color: var(--dim);
+  font-size: 14px;
   line-height: 1.55;
   margin-bottom: 8px;
 }
@@ -40,8 +40,8 @@
 .proposal-card__body p:last-child { margin-bottom: 0; }
 
 .proposal-reason {
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  font-size: 13px;
+  color: var(--dim);
   margin-bottom: 8px;
 }
 
@@ -51,12 +51,12 @@
 
 .proposal-payload {
   margin-bottom: 8px;
-  font-size: 0.82rem;
+  font-size: 13px;
 }
 
 .proposal-payload summary {
   cursor: pointer;
-  color: var(--text-muted);
+  color: var(--dim);
   font-weight: 600;
   user-select: none;
 }
@@ -64,13 +64,13 @@
 .proposal-payload pre {
   margin-top: 6px;
   padding: 8px;
-  background: var(--bg-raised);
-  border-radius: var(--radius-sm);
-  font-size: 0.78rem;
+  background: var(--sf2);
+  border-radius: var(--r-sm);
+  font-size: 12px;
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-all;
-  color: var(--text-secondary);
+  color: var(--dim);
 }
 
 .proposal-card__footer {
@@ -83,8 +83,8 @@
 }
 
 .proposal-card__date {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+  font-size: 12px;
+  color: var(--dim);
 }
 
 .proposal-card__actions {
@@ -92,7 +92,11 @@
   gap: 6px;
 }
 
-.proposal-status--proposed { background: var(--accent-dim); color: var(--accent); }
-.proposal-status--executed { background: var(--success-dim); color: var(--success); }
-.proposal-status--failed   { background: var(--danger-dim);  color: var(--danger); }
-.proposal-status--rejected { background: var(--bg-hover);    color: var(--text-muted); }
+.proposal-status--proposed { background: var(--prbg); color: var(--prtx); }
+.proposal-status--executed { background: var(--okbg); color: var(--oktx); }
+.proposal-status--failed   { background: var(--badbg); color: var(--badtx); }
+.proposal-status--rejected { background: var(--sf2); color: var(--dim); }
+
+.proposal-payload pre {
+  font-family: var(--f-mono);
+}

@@ -50,6 +50,7 @@ function _setupInjectView() {
   var setupView = document.createElement('div');
   setupView.id = 'ws-setup-view';
   setupView.innerHTML = renderSetupPage();
+  hydrateStaticIcons(setupView);
   container.appendChild(setupView);
 }
 
@@ -60,6 +61,7 @@ async function loadSetupData() {
   if (!setupView) return;
 
   setupView.innerHTML = renderSetupPage();
+  hydrateStaticIcons(setupView);
 
   var modulesEl = document.getElementById('setup-modules');
   var languagesEl = document.getElementById('setup-languages');
@@ -110,46 +112,44 @@ async function loadSetupData() {
 
 function renderSetupPage() {
   return '<div class="setup-container">'
-    + '<button class="ws-back-btn" onclick="hideSetupPage()">'
-    + '<span class="ws-back-arrow">&larr;</span> ' + t('setup.backToProjects')
-    + '</button>'
+    + '<button class="btn" onclick="hideSetupPage()" data-icon="back">' + t('setup.backToProjects') + '</button>'
     + '<div class="setup-header">'
     + '<div class="setup-title">' + t('setup.title') + '</div>'
     + '<div class="setup-subtitle">' + t('setup.subtitle') + '</div>'
     + '</div>'
 
-    + '<div class="setup-section">'
-    + '<div class="setup-section-title">' + t('setup.modulesTitle') + '</div>'
+    + '<div class="card setup-section">'
+    + '<div class="ch setup-section-title">' + t('setup.modulesTitle') + '</div>'
     + '<div id="setup-modules"><div class="setup-empty-msg">' + t('research.loading') + '</div></div>'
     + '</div>'
 
-    + '<div class="setup-section">'
-    + '<div class="setup-section-title">' + t('setup.profilesTitle') + '</div>'
+    + '<div class="card setup-section">'
+    + '<div class="ch setup-section-title">' + t('setup.profilesTitle') + '</div>'
     + '<div id="setup-languages"><div class="setup-empty-msg">' + t('research.loading') + '</div></div>'
 
     + '<div class="setup-custom-form">'
-    + '<div class="setup-section-title" style="margin-top: 16px;">' + t('setup.customProfileTitle') + '</div>'
-    + '<input id="setup-custom-name" class="ws-input" style="margin-bottom: 8px;" placeholder="' + t('setup.customProfileNamePlaceholder') + '">'
-    + '<input id="setup-custom-config" class="ws-input" style="margin-bottom: 8px;" placeholder="' + t('setup.customConfigPlaceholder') + '">'
-    + '<textarea id="setup-custom-details" class="ws-input" style="margin-bottom: 8px; min-height: 60px; resize: vertical;" placeholder="' + t('setup.customDetailsPlaceholder') + '"></textarea>'
-    + '<button class="btn btn-sm" style="margin-top: 8px;" onclick="addCustomProfile()">' + t('setup.addProfileBtn') + '</button>'
+    + '<div class="setup-subtitle-row">' + t('setup.customProfileTitle') + '</div>'
+    + '<input id="setup-custom-name" class="inp" placeholder="' + t('setup.customProfileNamePlaceholder') + '">'
+    + '<input id="setup-custom-config" class="inp" placeholder="' + t('setup.customConfigPlaceholder') + '">'
+    + '<textarea id="setup-custom-details" class="ta" placeholder="' + t('setup.customDetailsPlaceholder') + '"></textarea>'
+    + '<button class="btn pri xs" onclick="addCustomProfile()">' + t('setup.addProfileBtn') + '</button>'
     + '</div>'
     + '</div>'
 
-    + '<div class="setup-section" id="phaseSettingsDeviceCard">'
-    + '<div class="setup-section-title">' + t('cards.phaseSettings') + '</div>'
+    + '<div class="card setup-section" id="phaseSettingsDeviceCard">'
+    + '<div class="ch setup-section-title">' + t('cards.phaseSettings') + '</div>'
     + '<div id="setup-phase-settings-body"></div>'
     + '</div>'
 
-    + '<div id="setup-error" style="color: var(--danger); font-size: 0.78rem; margin-top: 8px;"></div>'
-    + '<button class="btn btn-primary setup-start-btn" style="margin-top: 20px; width: 100%; justify-content: center;" onclick="startSetup()">'
+    + '<div id="setup-error" class="setup-error"></div>'
+    + '<button class="btn pri lg block setup-start-btn" onclick="startSetup()">'
     + t('setup.startBtn')
     + '</button>'
 
     + '<div class="setup-terminal-section" id="setup-terminal-section" style="display: none;">'
     + '<div class="setup-terminal-header">'
     + '<span id="setup-terminal-status" class="terminal-status">' + t('terminal.disconnected') + '</span>'
-    + '<button class="btn btn-sm btn-outline" onclick="disconnectSetupTerminal()" id="setup-terminal-disconnect-btn" style="display: none;">'
+    + '<button class="btn xs" onclick="disconnectSetupTerminal()" id="setup-terminal-disconnect-btn" style="display: none;">'
     + t('setup.terminalDisconnectBtn')
     + '</button>'
     + '</div>'
@@ -205,7 +205,7 @@ function renderSetupLanguages(profiles) {
       + '<span>' + name + '</span>'
       + (language ? '<span style="color: var(--text-muted); font-size: 0.78rem;">(' + language + ')</span>' : '')
       + '</label>'
-      + '<button class="btn btn-sm btn-outline" style="font-size: 0.72rem; color: var(--danger, #dc3545); border-color: var(--danger, #dc3545);" onclick="deleteVerificationProfile(' + id + ')">&times;</button>'
+      + '<button class="btn xs danger" onclick="deleteVerificationProfile(' + id + ')">&times;</button>'
       + '</div>';
   }).join('');
 
@@ -214,7 +214,7 @@ function renderSetupLanguages(profiles) {
       + '<span style="font-size: 0.82rem;">' + _wsEscape(cp.name) + '</span>'
       + (cp.config ? '<span style="color: var(--text-muted); font-size: 0.78rem;">(' + _wsEscape(cp.config) + ')</span>' : '')
       + '<span class="badge setup-custom-badge">custom</span>'
-      + '<button class="btn btn-sm btn-outline" style="margin-left: auto; font-size: 0.72rem;" onclick="removeCustomProfile(' + index + ')">' + t('setup.removeToolBtn') + '</button>'
+      + '<button class="btn xs ml-auto" onclick="removeCustomProfile(' + index + ')">' + t('setup.removeToolBtn') + '</button>'
       + '</div>';
   }).join('');
 

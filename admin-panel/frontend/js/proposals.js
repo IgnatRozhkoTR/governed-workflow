@@ -52,9 +52,9 @@ function buildProposalCardHtml(p) {
         '<div class="proposal-card__header">' +
             '<span class="proposal-card__title">' + escapeHtml(p.title) + '</span>' +
             '<div class="proposal-card__badges">' +
-                '<span class="badge">' + escapeHtml(t('proposals.type.' + p.type)) + '</span>' +
-                '<span class="badge">' + escapeHtml(t('proposals.kind.' + p.implementation_kind)) + '</span>' +
-                '<span class="badge proposal-status--' + escapeHtml(p.status) + '">' + escapeHtml(t('proposals.status.' + p.status)) + '</span>' +
+                '<span class="pill line">' + escapeHtml(t('proposals.type.' + p.type)) + '</span>' +
+                '<span class="pill line">' + escapeHtml(t('proposals.kind.' + p.implementation_kind)) + '</span>' +
+                '<span class="pill proposal-status--' + escapeHtml(p.status) + '">' + escapeHtml(t('proposals.status.' + p.status)) + '</span>' +
             '</div>' +
         '</div>' +
         '<div class="proposal-card__body">' + bodyHtml + '</div>' +
@@ -83,8 +83,8 @@ function buildPayloadHtml(payloadJson) {
 
 function buildProposalActionsHtml(id) {
     return '<div class="proposal-card__actions">' +
-        '<button class="btn btn-sm" onclick="resolveProposalAction(' + id + ', \'executed\')">' + t('proposals.markApplied') + '</button>' +
-        '<button class="btn btn-sm" onclick="resolveProposalAction(' + id + ', \'rejected\')">' + t('proposals.reject') + '</button>' +
+        '<button class="btn pri xs" onclick="resolveProposalAction(' + id + ', \'executed\')">' + t('proposals.markApplied') + '</button>' +
+        '<button class="btn xs" onclick="resolveProposalAction(' + id + ', \'rejected\')">' + t('proposals.reject') + '</button>' +
     '</div>';
 }
 

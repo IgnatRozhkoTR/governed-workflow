@@ -21,7 +21,7 @@ function renderRules() {
   if (!list) return;
 
   if (RULES_DATA.length === 0) {
-    list.innerHTML = '<p style="color: var(--text-secondary); font-size: 13px;">' + t('rules.noEntries') + '</p>';
+    list.innerHTML = '<p class="dim">' + t('rules.noEntries') + '</p>';
     return;
   }
 
@@ -36,14 +36,14 @@ function renderRules() {
 
     var errorHtml = '';
     if (r.error) {
-      errorHtml = '<div style="color: var(--danger); font-size: 12px; margin-top: 4px;">' + escapeHtml(r.error) + '</div>';
+      errorHtml = '<div class="rules-item-error">' + escapeHtml(r.error) + '</div>';
     }
 
-    var editBtn = '<button class="btn btn-sm" onclick="openRuleModal(\'' + encodeURIComponent(r.name) + '\')"' +
+    var editBtn = '<button class="btn xs" onclick="openRuleModal(\'' + encodeURIComponent(r.name) + '\')"' +
       (isDefault ? ' disabled title="' + t('rules.sourceDefault') + '"' : '') + '>' +
       t('buttons.edit') + '</button>';
     var deleteBtn = isDefault ? '' :
-      ' <button class="btn btn-sm btn-danger" onclick="deleteRuleConfirm(\'' + encodeURIComponent(r.name) + '\')" title="' + t('buttons.delete') + '">&times;</button>';
+      ' <button class="btn xs danger" onclick="deleteRuleConfirm(\'' + encodeURIComponent(r.name) + '\')" title="' + t('buttons.delete') + '">&times;</button>';
 
     return '<div class="rules-item">' +
       '<div class="rules-item-header">' +
@@ -51,11 +51,11 @@ function renderRules() {
           '<span class="rules-item-name">' + nameSafe + '</span>' +
           ' <span class="rules-item-source">' + sourceLabel + '</span>' +
         '</div>' +
-        '<div style="display: flex; align-items: center; gap: 6px;">' +
+        '<div class="rules-item-actions">' +
           editBtn + deleteBtn +
         '</div>' +
       '</div>' +
-      (descSafe ? '<div style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">' + descSafe + '</div>' : '') +
+      (descSafe ? '<div class="rules-item-desc">' + descSafe + '</div>' : '') +
       (pathsHtml ? '<div class="rules-item-paths">' + pathsHtml + '</div>' : '') +
       errorHtml +
     '</div>';
@@ -68,34 +68,21 @@ function ensureRuleModal() {
 
   modal = document.createElement('div');
   modal.id = 'ruleEditModal';
-  modal.className = 'file-preview-modal';
+  modal.className = 'dlg-scrim rule-scrim';
   modal.onclick = function(e) { if (e.target === modal) modal.classList.remove('open'); };
-  modal.innerHTML = '<div class="file-preview-content" style="max-width: 720px;">' +
-    '<div class="file-preview-header">' +
-      '<span class="file-preview-path" id="ruleEditTitle"></span>' +
-      '<button class="file-preview-close" onclick="document.getElementById(\'ruleEditModal\').classList.remove(\'open\')">&times;</button>' +
-    '</div>' +
-    '<div class="file-preview-body" style="padding: 16px;">' +
-      '<div style="margin-bottom: 12px;">' +
-        '<label style="display: block; font-weight: 500; margin-bottom: 4px;" data-i18n="rules.name">Name</label>' +
-        '<input type="text" id="ruleFieldName" class="context-input" style="width: 100%;" data-i18n-placeholder="placeholders.ruleName" />' +
-      '</div>' +
-      '<div style="margin-bottom: 12px;">' +
-        '<label style="display: block; font-weight: 500; margin-bottom: 4px;" data-i18n="rules.description">Description</label>' +
-        '<input type="text" id="ruleFieldDescription" class="context-input" style="width: 100%;" />' +
-      '</div>' +
-      '<div style="margin-bottom: 12px;">' +
-        '<label style="display: block; font-weight: 500; margin-bottom: 4px;" data-i18n="rules.paths">Paths (globs, one per line)</label>' +
-        '<textarea id="ruleFieldPaths" class="context-textarea" style="width: 100%; min-height: 80px; font-family: monospace; font-size: 13px;" data-i18n-placeholder="placeholders.rulePaths"></textarea>' +
-      '</div>' +
-      '<div style="margin-bottom: 12px;">' +
-        '<label style="display: block; font-weight: 500; margin-bottom: 4px;" data-i18n="rules.body">Body (Markdown)</label>' +
-        '<textarea id="ruleFieldBody" class="context-textarea" style="width: 100%; min-height: 260px; font-family: monospace; font-size: 13px;" data-i18n-placeholder="placeholders.ruleBody"></textarea>' +
-      '</div>' +
-      '<div style="display: flex; justify-content: flex-end; gap: 8px;">' +
-        '<button class="btn btn-sm" onclick="document.getElementById(\'ruleEditModal\').classList.remove(\'open\')" data-i18n="buttons.close">Close</button>' +
-        '<button class="btn btn-sm btn-primary" id="ruleSaveButton" data-i18n="buttons.saveRule">Save rule</button>' +
-      '</div>' +
+  modal.innerHTML = '<div class="dlg rule-dlg" role="dialog">' +
+    '<h3 id="ruleEditTitle"></h3>' +
+    '<label class="lbl"><span data-i18n="rules.name">Name</span>' +
+      '<input type="text" id="ruleFieldName" class="inp" data-i18n-placeholder="placeholders.ruleName" /></label>' +
+    '<label class="lbl"><span data-i18n="rules.description">Description</span>' +
+      '<input type="text" id="ruleFieldDescription" class="inp" /></label>' +
+    '<label class="lbl"><span data-i18n="rules.paths">Paths (globs, one per line)</span>' +
+      '<textarea id="ruleFieldPaths" class="ta mono rule-paths" data-i18n-placeholder="placeholders.rulePaths"></textarea></label>' +
+    '<label class="lbl"><span data-i18n="rules.body">Body (Markdown)</span>' +
+      '<textarea id="ruleFieldBody" class="ta mono rule-body" data-i18n-placeholder="placeholders.ruleBody"></textarea></label>' +
+    '<div class="hs rule-actions">' +
+      '<button class="btn ghost" onclick="document.getElementById(\'ruleEditModal\').classList.remove(\'open\')" data-i18n="buttons.close">Close</button>' +
+      '<button class="btn pri" id="ruleSaveButton" data-i18n="buttons.saveRule">Save rule</button>' +
     '</div>' +
   '</div>';
   document.body.appendChild(modal);

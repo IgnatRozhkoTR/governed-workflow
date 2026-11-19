@@ -17,39 +17,32 @@
 /* ─── Header ──────────────────────────────────── */
 
 .setup-header {
-  margin-bottom: 28px;
+  margin: 16px 0 20px;
 }
 
 .setup-title {
-  font-size: 1.6rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: var(--f-head);
+  font-size: 26px;
+  font-weight: 600;
   margin-bottom: 4px;
 }
 
 .setup-subtitle {
-  font-size: 0.88rem;
-  color: var(--text-muted);
+  font-size: 14px;
+  color: var(--dim);
 }
 
 /* ─── Section cards ───────────────────────────── */
 
 .setup-section {
-  margin-bottom: 20px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
+  margin-bottom: 16px;
 }
 
 .setup-section-title {
-  font-size: 0.78rem;
+  font-family: var(--f-head);
+  font-size: 16px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  padding: 14px 18px 12px;
-  border-bottom: 1px solid var(--border);
+  color: var(--tx);
 }
 
 #setup-phase-settings-body {
@@ -69,7 +62,7 @@
   align-items: flex-start;
   gap: 12px;
   padding: 12px 18px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--ln);
   transition: background var(--transition);
 }
 
@@ -78,11 +71,11 @@
 }
 
 .setup-module-item:hover {
-  background: var(--bg-hover);
+  background: var(--sf2);
 }
 
 .setup-module-item input[type="checkbox"] {
-  accent-color: var(--accent);
+  accent-color: var(--pr);
   width: 15px;
   height: 15px;
   flex-shrink: 0;
@@ -95,15 +88,15 @@
   flex-direction: column;
   gap: 2px;
   cursor: pointer;
-  font-size: 0.88rem;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--tx);
 }
 
 .setup-module-desc {
-  font-size: 0.78rem;
+  font-size: 13px;
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--dim);
 }
 
 /* ─── Language profiles ───────────────────────── */
@@ -116,7 +109,7 @@
 
 .setup-lang-item {
   padding: 12px 18px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--ln);
 }
 
 .setup-lang-item:last-child {
@@ -125,14 +118,14 @@
 
 .setup-lang-item > .ws-checkbox-label {
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--tx);
 }
 
 .setup-custom-badge {
-  font-size: 0.65rem;
+  font-size: 12px;
   padding: 1px 6px;
-  background: var(--accent);
-  color: var(--accent-text);
+  background: var(--pr);
+  color: var(--prink);
   border-radius: 3px;
   margin-left: 4px;
 }
@@ -141,7 +134,7 @@
 
 .setup-custom-form {
   padding: 14px 18px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--ln);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -150,32 +143,28 @@
 /* ─── Start button ────────────────────────────── */
 
 .setup-start-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 13px 20px;
   margin-top: 8px;
-  background: var(--accent);
-  border: none;
-  border-radius: var(--radius);
-  color: var(--accent-text);
-  font-family: var(--font-sans);
-  font-size: 0.88rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  transition: background var(--transition), opacity var(--transition);
-}
-
-.setup-start-btn:hover {
-  background: var(--accent-hover);
 }
 
 .setup-start-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.setup-error {
+  color: var(--badtx);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.setup-subtitle-row {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+}
+
+.ml-auto {
+  margin-left: auto;
 }
 
 /* ─── Embedded terminal ───────────────────────── */
@@ -189,17 +178,18 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
+  background: var(--term);
+  color: var(--termtx);
+  border: 1px solid var(--ln);
   border-bottom: none;
-  border-radius: var(--radius) var(--radius) 0 0;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
 
 #setup-terminal-container {
   height: 400px;
-  background: var(--bg-base);
-  border: 1px solid var(--border);
-  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--term);
+  border: 1px solid var(--ln);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
   overflow: hidden;
 }
 
@@ -215,7 +205,7 @@
 
 .setup-empty-msg {
   padding: 20px 18px;
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  font-size: 13px;
+  color: var(--dim);
   text-align: center;
 }
