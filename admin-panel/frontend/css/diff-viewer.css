@@ -283,6 +283,16 @@
   border: 1px solid var(--ln);
   border-radius: var(--r-lg);
   box-shadow: var(--sh);
+  container-type: inline-size;
+}
+
+.line-comment-row > td > .review-thread,
+.line-comment-row > td > .line-comment-form,
+.line-comment-row > td > .comment-thread {
+  position: sticky;
+  left: 0;
+  box-sizing: border-box;
+  width: calc(100cqw - 32px);
 }
 
 .diff-path-header {
