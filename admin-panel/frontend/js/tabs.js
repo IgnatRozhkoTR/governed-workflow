@@ -81,7 +81,7 @@ function _syncTabChrome(tabId) {
   if (splitMain) splitMain.classList.toggle('no-padding', FULL_BLEED_TABS.indexOf(tabId) !== -1);
 
   var activeTabBtn = document.querySelector('#wsTabs .tab.active');
-  if (activeTabBtn) activeTabBtn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  if (activeTabBtn) activeTabBtn.scrollIntoView({ block: 'nearest', inline: 'center' });
 
   if (typeof renderGateBar === 'function') renderGateBar();
 }
@@ -209,6 +209,14 @@ document.querySelectorAll('#wsTabs .tab').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
+window.addEventListener('hashchange', function() {
+  var hashTab = location.hash.slice(1).split('/')[0];
+  if (!isKnownTab(hashTab)) return;
+  var tabId = resolveTabId(hashTab);
+  if (tabId !== hashTab) history.replaceState(null, '', '#' + tabId);
+  if (tabId !== getActiveTabId()) switchTab(tabId);
+});
+
 // Resolves which panel a given workspace context should show (last tab used
 // in that workspace, or Overview on first ever visit) and applies it:
 // writes the resolved hash first (so a stale hash from a previously active
@@ -252,6 +260,7 @@ function applyStoredTabForContext(ctx) {
   var tabId;
   if (isKnownTab(hashTab)) {
     tabId = resolveTabId(hashTab);
+    if (tabId !== hashTab) history.replaceState(null, '', '#' + tabId);
     _syncTabChrome(tabId);
   } else {
     if (!isKnownTab(_loadLastTab(ctx)) && !ctx) return; // no hash, no workspace: keep the static default panel

@@ -63,6 +63,7 @@ function refreshReviewPipeline(force) {
     var card = document.getElementById('reviewPipelineCard');
     var workspaceId = LOCK_DATA && LOCK_DATA.workspace_id;
     if (!card || !workspaceId || typeof renderReviewPipelineCard !== 'function') return;
+    if (!force && getActiveTabId() !== 'review') return;
     if (!force && card.dataset.workspaceId === String(workspaceId)) return;
     renderReviewPipelineCard(card, workspaceId, { phase: LOCK_DATA.phase });
 }

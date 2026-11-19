@@ -216,3 +216,7 @@
 }
 .sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--sf3); align-self: center; }
 .sheet h2 { margin: 0; font-size: 20px; }
+
+@media (min-width: 601px) {
+  #wsTabs { padding-right: 24px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+}

@@ -124,8 +124,8 @@
   :is(input, select, textarea):not([type=checkbox]):not([type=radio]):not([type=range]) { font-size: 16px; }
   :is(input, select):not([type=checkbox]):not([type=radio]):not([type=range]) { min-height: 44px; }
   .chip { min-height: 44px; }
-  .tab, .seg button, .toggle-opt { min-height: 44px; }
-  .seg button, .toggle-opt { padding: 0 14px; }
+  .tab, .seg button { min-height: 44px; }
+  .seg button { padding: 0 14px; }
 
   .dlg-scrim, .file-preview-modal.open { align-items: flex-end; }
   .dlg-scrim > .dlg,
@@ -178,7 +178,7 @@
     width: 100%;
     max-width: 100%;
     border-right: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ln);
   }
 
   .diff-file-list > *:not(.diff-file-list-header) {
@@ -286,9 +286,9 @@
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    border: 1px solid var(--border);
-    background: var(--bg-raised);
-    color: var(--text-primary);
+    border: 1px solid var(--ln);
+    background: var(--sf2);
+    color: var(--tx);
     font-size: 18px;
     display: flex;
     align-items: center;
@@ -300,7 +300,7 @@
 
   .term-scroll-btn:active {
     opacity: 1;
-    background: var(--accent-dim);
+    background: var(--prbg);
   }
 
   .file-preview-content {
@@ -368,6 +368,5 @@
 
 @media (max-width: 480px) {
   .diff-file-list { max-height: 150px; }
-  .toggle-group { flex-wrap: wrap; }
 }
 

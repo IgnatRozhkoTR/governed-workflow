@@ -46,14 +46,3 @@
   --scrim: rgba(20,25,34,0.35);
   color-scheme: light;
 }
-
-/* ═══════════════════════════════════════════════ */
-/*  LEGACY ALIASES                                 */
-/*  Only css/mobile.css still reads these names.   */
-/* ═══════════════════════════════════════════════ */
-:root, [data-theme="dark"], [data-theme="light"] {
-  --bg-raised: var(--sf2);
-  --border: var(--ln);
-  --text-primary: var(--tx);
-  --accent-dim: var(--prbg);
-}
