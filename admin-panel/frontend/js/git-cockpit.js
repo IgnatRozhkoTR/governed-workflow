@@ -98,7 +98,7 @@ function _gcRenderPrs() {
   if (!list) return;
 
   if (!_gcPrs.length) {
-    list.innerHTML = '<div class="gc-empty-state">' + t('gitCockpit.prs.empty') + '</div>';
+    list.innerHTML = '<div class="gc-hint-text">' + t('gitCockpit.prs.empty') + '</div>';
     return;
   }
 
@@ -224,13 +224,13 @@ function _gcRenderMultiReposBody() {
   ((_gcRepoState && _gcRepoState.attached) || []).forEach(function(a) { attachedByRepoId[a.repo_id] = a; });
 
   var rowsHtml = (_gcRepos || []).length === 0
-    ? '<div class="gc-empty-state">' + t('gitCockpit.repos.noRepos') + '</div>'
+    ? '<div class="gc-hint-text">' + t('gitCockpit.repos.noRepos') + '</div>'
     : _gcRepos.map(function(repo) { return _gcRepoRowHtml(repo, attachedByRepoId[repo.id]); }).join('');
 
   multiBody.innerHTML =
     '<div class="gc-repo-list">' + rowsHtml + '</div>' +
     '<div class="gc-repo-actions-row">' +
-      '<button class="btn btn-sm btn-outline" onclick="gcOpenConvertPanel(\'edit\')">' + t('gitCockpit.repos.editSelectionBtn') + '</button>' +
+      '<button class="btn xs" onclick="gcOpenConvertPanel(\'edit\')">' + t('gitCockpit.repos.editSelectionBtn') + '</button>' +
     '</div>';
 }
 
@@ -245,7 +245,7 @@ function _gcRepoRowHtml(repo, attached) {
     : '<span class="gc-badge gc-badge--detached">' + t('gitCockpit.repos.notAttached') + '</span>';
 
   var attachBtn = !isAttached
-    ? '<button class="btn btn-sm" onclick="gcAttachRepo(' + repo.id + ', this)">' + t('gitCockpit.repos.attachBtn') + '</button>'
+    ? '<button class="btn xs" onclick="gcAttachRepo(' + repo.id + ', this)">' + t('gitCockpit.repos.attachBtn') + '</button>'
     : '';
 
   var overrideDot = repo.has_rules_override ? '<span class="gc-override-dot"></span>' : '';
@@ -261,7 +261,7 @@ function _gcRepoRowHtml(repo, attached) {
       '<span class="settings-inline-flash" id="gcBaseFlash-' + repo.id + '"></span>' +
       statusBadge +
       attachBtn +
-      '<button class="btn btn-sm btn-ghost" id="gcOverrideBtn-' + repo.id + '" onclick="gcToggleOverride(' + repo.id + ')">' +
+      '<button class="btn xs ghost" id="gcOverrideBtn-' + repo.id + '" onclick="gcToggleOverride(' + repo.id + ')">' +
         '<span class="gc-override-btn-label">' + t('gitCockpit.repos.overrideBtn') + '</span>' +
         overrideDot +
       '</button>' +
@@ -330,8 +330,8 @@ async function gcToggleOverride(repoId) {
         escapeHtml(full.git_rules_override || '') +
       '</textarea>' +
       '<div class="gc-override-actions">' +
-        '<button class="btn btn-sm" onclick="gcClearOverride(' + repoId + ')">' + t('gitCockpit.repos.overrideClear') + '</button>' +
-        '<button class="btn btn-sm btn-primary" onclick="gcSaveOverride(' + repoId + ')">' + t('gitCockpit.repos.overrideSave') + '</button>' +
+        '<button class="btn xs" onclick="gcClearOverride(' + repoId + ')">' + t('gitCockpit.repos.overrideClear') + '</button>' +
+        '<button class="btn xs pri" onclick="gcSaveOverride(' + repoId + ')">' + t('gitCockpit.repos.overrideSave') + '</button>' +
       '</div>';
   } catch (e) {
     panel.innerHTML = '<div class="gc-override-error">' + escapeHtml(e.message) + '</div>';
@@ -450,8 +450,8 @@ function _gcConvertChecklistHtml(candidates, mode) {
   return '<div class="gc-checklist-title">' + t('gitCockpit.repos.checklistTitle') + '</div>' +
     '<div class="gc-checklist-rows">' + rowsHtml + '</div>' +
     '<div class="gc-checklist-actions">' +
-      '<button class="btn btn-sm" onclick="gcCancelConvert()">' + t('gitCockpit.repos.cancelConvert') + '</button>' +
-      '<button class="btn btn-sm btn-primary" onclick="gcConfirmConvert()">' + t('gitCockpit.repos.confirmConvert') + '</button>' +
+      '<button class="btn xs" onclick="gcCancelConvert()">' + t('gitCockpit.repos.cancelConvert') + '</button>' +
+      '<button class="btn xs pri" onclick="gcConfirmConvert()">' + t('gitCockpit.repos.confirmConvert') + '</button>' +
     '</div>';
 }
 
@@ -479,7 +479,7 @@ async function gcConfirmConvert() {
     return;
   }
 
-  var confirmBtn = panel.querySelector('.gc-checklist-actions .btn-primary');
+  var confirmBtn = panel.querySelector('.gc-checklist-actions .pri');
   if (confirmBtn) confirmBtn.disabled = true;
 
   try {

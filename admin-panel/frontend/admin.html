@@ -170,16 +170,16 @@
     <div class="sub" id="phaseSubChips"></div>
   </div>
   <nav class="tabs tab-bar" id="wsTabs" aria-label="Workspace sections">
-    <button class="tab tab-btn" data-tab="overview" data-i18n="tabs.overview">Overview</button>
-    <button class="tab tab-btn" data-tab="preplanning" data-i18n="tabs.preplanning">Pre-planning</button>
-    <button class="tab tab-btn" data-tab="plan" data-i18n="tabs.plan">Plan</button>
-    <button class="tab tab-btn" data-tab="research" data-i18n="tabs.research">Research</button>
-    <button class="tab tab-btn" data-tab="changes"><span data-i18n="tabs.changes">Changes</span><span class="cnt" id="changesCount" style="display:none"></span></button>
-    <button class="tab tab-btn" data-tab="review"><span data-i18n="tabs.review">Review</span><span class="cnt" id="reviewBadge" style="display:none"></span></button>
-    <button class="tab tab-btn" data-tab="terminal" data-i18n="tabs.terminal">Terminal</button>
-    <button class="tab tab-btn" data-tab="files" data-i18n="tabs.files">Files</button>
-    <button class="tab tab-btn" data-tab="reflection"><span data-i18n="tabs.reflection">Reflection</span><span class="cnt" id="reflectionBadge" style="display:none"></span></button>
-    <button class="tab tab-btn" data-tab="dashboard" data-i18n="tabs.settings">Settings</button>
+    <button class="tab" data-tab="overview" data-i18n="tabs.overview">Overview</button>
+    <button class="tab" data-tab="preplanning" data-i18n="tabs.preplanning">Pre-planning</button>
+    <button class="tab" data-tab="plan" data-i18n="tabs.plan">Plan</button>
+    <button class="tab" data-tab="research" data-i18n="tabs.research">Research</button>
+    <button class="tab" data-tab="changes"><span data-i18n="tabs.changes">Changes</span><span class="cnt" id="changesCount" style="display:none"></span></button>
+    <button class="tab" data-tab="review"><span data-i18n="tabs.review">Review</span><span class="cnt" id="reviewBadge" style="display:none"></span></button>
+    <button class="tab" data-tab="terminal" data-i18n="tabs.terminal">Terminal</button>
+    <button class="tab" data-tab="files" data-i18n="tabs.files">Files</button>
+    <button class="tab" data-tab="reflection"><span data-i18n="tabs.reflection">Reflection</span><span class="cnt" id="reflectionBadge" style="display:none"></span></button>
+    <button class="tab" data-tab="dashboard" data-i18n="tabs.settings">Settings</button>
   </nav>
   <div class="gatebar" id="gateBar" role="status" hidden></div>
 </header>
@@ -286,23 +286,25 @@
 
         <!-- Task -->
         <section class="settings-section active" data-section="task">
-          <div class="settings-task-commands">
-            <span class="settings-task-commands-label" data-i18n="labels.claude">Claude</span>
-            <div class="btn-dropdown" style="position: relative; display: inline-block;">
-              <button class="btn btn-sm" id="startBtn" onclick="showTerminalDropdown('start', this)" data-i18n="buttons.start">Start</button>
-              <div class="btn-dropdown-menu" id="startDropdown" style="display:none;">
-                <button class="btn-dropdown-item" onclick="doStart('fullscreen')" data-i18n="actions.fullscreen">Full screen</button>
-                <button class="btn-dropdown-item" onclick="doStart('split')" data-i18n="actions.sidePanel">Side panel</button>
-              </div>
-            </div>
-            <button class="btn btn-sm btn-outline" onclick="copyWorkspacePath()" id="copyPathBtn" data-i18n="actions.copyPath">Path</button>
-          </div>
-
           <div class="settings-section-header">
             <h2 data-i18n="settings.section.task.title">Task Context</h2>
             <span class="settings-scope-badge" data-i18n="settings.scope.workspace">Workspace</span>
           </div>
           <p class="settings-section-desc" data-i18n="settings.section.task.desc">Ticket details and task description for this workspace.</p>
+
+          <div class="settings-row">
+            <div class="settings-row-label" data-i18n="labels.claude">Claude</div>
+            <div class="settings-row-control settings-task-commands">
+              <div class="btn-dropdown">
+                <button class="btn" id="startBtn" onclick="showTerminalDropdown('start', this)" data-i18n="buttons.start">Start</button>
+                <div class="btn-dropdown-menu" id="startDropdown" style="display:none;">
+                  <button class="btn-dropdown-item" onclick="doStart('fullscreen')" data-i18n="actions.fullscreen">Full screen</button>
+                  <button class="btn-dropdown-item" onclick="doStart('split')" data-i18n="actions.sidePanel">Side panel</button>
+                </div>
+              </div>
+              <button class="btn" onclick="copyWorkspacePath()" id="copyPathBtn" data-i18n="actions.copyPath">Path</button>
+            </div>
+          </div>
 
           <div class="context-fields">
             <div class="context-row">
@@ -319,7 +321,7 @@
               <label class="context-label" data-i18n="labels.context">Context</label>
               <textarea class="context-textarea" id="contextText" placeholder="Describe the task, requirements, acceptance criteria..." data-i18n-placeholder="placeholders.describeTask"></textarea>
             </div>
-            <div class="context-field" style="margin-top: 4px;">
+            <div class="context-field">
               <label class="context-label" data-i18n="labels.fileDirectoryReferences">File &amp; Directory References</label>
               <div class="context-ref-row">
                 <div class="context-ref-input-wrap">
@@ -331,9 +333,11 @@
                          onkeydown="if(event.key==='Enter'){event.preventDefault();addManualContextRef(this.value);}">
                   <div id="contextRefDropdown" class="ref-dropdown" style="display:none;"></div>
                 </div>
-                <button class="btn btn-sm" onclick="saveContext()" data-i18n="buttons.saveContext">Save Context</button>
               </div>
-              <div id="contextRefsList" class="refs-list" style="margin-top: 8px;"></div>
+              <div id="contextRefsList" class="refs-list"></div>
+            </div>
+            <div class="settings-actions">
+              <button class="btn pri" onclick="saveContext()" data-i18n="buttons.saveContext">Save Context</button>
             </div>
           </div>
 
@@ -461,8 +465,8 @@
           <div id="verificationAssigned"></div>
           <div class="verification-assign-row">
             <select id="verificationProfileSelect"></select>
-            <input type="text" id="verificationSubpath" placeholder="subpath (default: .)" title="Subpath (default: .)">
-            <button class="btn btn-sm" onclick="assignVerificationProfile()" data-i18n="verification.assign">Assign</button>
+            <input type="text" id="verificationSubpath" placeholder="subpath (default: .)" title="Subpath (default: .)" data-i18n-placeholder="verification.subpathPlaceholder" data-i18n-title="verification.subpathPlaceholder">
+            <button class="btn" onclick="assignVerificationProfile()" data-i18n="verification.assign">Assign</button>
           </div>
         </section>
 
@@ -475,7 +479,7 @@
           <p class="settings-section-desc" data-i18n="settings.section.rules.desc">Project-specific rules enforced during implementation and review.</p>
 
           <div id="rulesList"></div>
-          <div class="settings-actions" style="margin-top: 10px;">
+          <div class="settings-actions">
             <button class="btn pri" onclick="openRuleModal()" data-i18n="buttons.newRule">New rule</button>
           </div>
         </section>
@@ -488,7 +492,7 @@
           </div>
           <p class="settings-section-desc" data-i18n="settings.section.git.desc">Configure how this project connects to its Git remote.</p>
 
-          <div class="settings-subsection" style="margin-top:0; padding-top:0; border-top:none;">
+          <div class="settings-subsection">
             <div class="settings-subsection-title" data-i18n="gitCockpit.overview.title">Overview</div>
             <div class="gc-overview-list" id="gcOverviewBody"></div>
           </div>
@@ -500,47 +504,43 @@
               <input type="text" class="context-input gc-pr-url-input" id="gcPrUrlInput" placeholder="https://…" data-i18n-placeholder="gitCockpit.prs.urlPlaceholder">
               <select class="context-input gc-pr-repo-select" id="gcPrRepoSelect" style="display:none;"></select>
               <input type="text" class="context-input gc-pr-title-input" id="gcPrTitleInput" placeholder="Title" data-i18n-placeholder="gitCockpit.prs.titlePlaceholder">
-              <button class="btn btn-sm btn-primary" onclick="gcAddPr()" data-i18n="gitCockpit.prs.add">Add</button>
+              <button class="btn" onclick="gcAddPr()" data-icon="plus"><span data-i18n="gitCockpit.prs.add">Add</span></button>
             </div>
           </div>
 
           <div class="settings-subsection">
             <div class="settings-subsection-title" data-i18n="gitCockpit.repos.title">Repositories</div>
-
-            <div class="context-fields">
-              <div class="context-row">
-                <div class="context-field">
-                  <label class="context-label" data-i18n="labels.provider">Provider</label>
-                  <select class="context-input" id="gitProvider" style="min-width: 140px;" onchange="toggleGitLabFields()">
-                    <option value="local" data-i18n="gitProvider.local">Local</option>
-                    <option value="github" data-i18n="gitProvider.github">GitHub</option>
-                    <option value="gitlab" data-i18n="gitProvider.gitlab">GitLab</option>
-                  </select>
-                </div>
-                <div id="gitLabFields" style="display:none; gap: inherit; flex: 1; flex-wrap: wrap;">
-                <div class="context-field context-field-grow">
-                  <label class="context-label" data-i18n="labels.host">Host</label>
-                  <input type="text" class="context-input" id="gitHost" placeholder="e.g. gitlab.example.com" data-i18n-placeholder="placeholders.gitHost">
-                </div>
-                <div class="context-field context-field-grow">
-                  <label class="context-label" data-i18n="labels.apiToken">API Token</label>
-                  <input type="password" class="context-input" id="gitToken" placeholder="Enter token..." data-i18n-placeholder="placeholders.enterToken">
-                </div>
-                </div>
-              </div>
-              <div class="context-row">
-                <div class="context-field" id="gitDefaultBranchRow">
-                  <label class="context-label" data-i18n="labels.defaultBranch">Default Branch</label>
-                  <input type="text" class="context-input" id="gitDefaultBranch" placeholder="develop" style="width: 160px;" data-i18n-placeholder="placeholders.develop">
-                </div>
-                <div style="margin-left: auto; display: flex; align-items: flex-end;">
-                  <button class="btn btn-sm btn-primary" onclick="saveGitConfig()" data-i18n="buttons.saveGitConfig">Save Git Config</button>
-                </div>
+            <div class="settings-row">
+              <label class="settings-row-label" for="gitProvider" data-i18n="labels.provider">Provider</label>
+              <div class="settings-row-control">
+                <select class="context-input gc-control" id="gitProvider" onchange="toggleGitLabFields()">
+                  <option value="local" data-i18n="gitProvider.local">Local</option>
+                  <option value="github" data-i18n="gitProvider.github">GitHub</option>
+                  <option value="gitlab" data-i18n="gitProvider.gitlab">GitLab</option>
+                </select>
               </div>
             </div>
-
-            <div id="gcConvertBtnWrap" style="margin-top: 14px;">
-              <button class="btn btn-sm btn-outline" onclick="gcOpenConvertPanel('convert')" data-i18n="gitCockpit.repos.convertBtn">Convert to multi-repo</button>
+            <div class="context-row gc-gitlab-fields" id="gitLabFields" style="display:none;">
+              <div class="context-field context-field-grow">
+                <label class="context-label" data-i18n="labels.host">Host</label>
+                <input type="text" class="context-input" id="gitHost" placeholder="e.g. gitlab.example.com" data-i18n-placeholder="placeholders.gitHost">
+              </div>
+              <div class="context-field context-field-grow">
+                <label class="context-label" data-i18n="labels.apiToken">API Token</label>
+                <input type="password" class="context-input" id="gitToken" placeholder="Enter token..." data-i18n-placeholder="placeholders.enterToken">
+              </div>
+            </div>
+            <div class="settings-row" id="gitDefaultBranchRow">
+              <label class="settings-row-label" for="gitDefaultBranch" data-i18n="labels.defaultBranch">Default Branch</label>
+              <div class="settings-row-control">
+                <input type="text" class="context-input gc-control mono" id="gitDefaultBranch" placeholder="develop" data-i18n-placeholder="placeholders.develop">
+              </div>
+            </div>
+            <div class="settings-actions">
+              <span id="gcConvertBtnWrap" class="grow">
+                <button class="btn" onclick="gcOpenConvertPanel('convert')" data-i18n="gitCockpit.repos.convertBtn">Convert to multi-repo</button>
+              </span>
+              <button class="btn pri" onclick="saveGitConfig()" data-i18n="buttons.saveGitConfig">Save Git Config</button>
             </div>
 
             <div id="gcConvertPanel" class="gc-checklist-panel" style="display:none;"></div>
@@ -550,11 +550,11 @@
 
           <div class="settings-subsection">
             <div class="settings-subsection-title" data-i18n="cards.gitRules">Git Rules</div>
-            <p class="settings-row-desc" style="margin: -6px 0 10px;" data-i18n="gitCockpit.rules.shadowNote">Repo overrides above take precedence over this project default when set.</p>
-            <div style="margin-bottom: 8px; font-size: 0.75rem; color: var(--text-muted);" id="gitRulesSource">Source: Not configured</div>
-            <textarea class="context-textarea" id="gitRulesContent" style="width: 100%; min-height: 300px; font-family: monospace; font-size: 13px;" placeholder="Git rules will appear here..." data-i18n-placeholder="placeholders.gitRules"></textarea>
-            <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-              <button class="btn btn-sm btn-primary" onclick="saveGitRules()" data-i18n="buttons.saveRules">Save Rules</button>
+            <p class="settings-row-desc" data-i18n="gitCockpit.rules.shadowNote">Repo overrides above take precedence over this project default when set.</p>
+            <div class="gc-rules-source" id="gitRulesSource">Source: Not configured</div>
+            <textarea class="context-textarea gc-rules-editor" id="gitRulesContent" placeholder="Git rules will appear here..." data-i18n-placeholder="placeholders.gitRules"></textarea>
+            <div class="settings-actions">
+              <button class="btn pri" onclick="saveGitRules()" data-i18n="buttons.saveRules">Save Rules</button>
             </div>
           </div>
         </section>
@@ -705,18 +705,18 @@
           <span class="pill" id="scopeMayCount"></span>
         </div>
         <div class="card-body">
-          <div id="scopeSubTabs" style="display: none; margin-bottom: 14px;"></div>
+          <div id="scopeSubTabs" style="display: none;"></div>
           <div class="scope-section">
             <div class="scope-heading">
-              <span style="color: var(--warn);">◆</span> <span data-i18n="scope.mustModify">Must Modify</span>
-              <button class="scope-add-btn" onclick="addScopeEntry('must')" title="Add entry">+</button>
+              <span class="scope-mark must">◆</span> <span data-i18n="scope.mustModify">Must Modify</span>
+              <button class="scope-add-btn" onclick="addScopeEntry('must')" title="Add entry" data-i18n-title="scope.addEntry">+</button>
             </div>
             <ul class="scope-list" id="scopeMust"></ul>
           </div>
           <div class="scope-section">
             <div class="scope-heading">
-              <span style="color: var(--pr);">◇</span> <span data-i18n="scope.mayModify">May Modify</span>
-              <button class="scope-add-btn" onclick="addScopeEntry('may')" title="Add entry">+</button>
+              <span class="scope-mark may">◇</span> <span data-i18n="scope.mayModify">May Modify</span>
+              <button class="scope-add-btn" onclick="addScopeEntry('may')" title="Add entry" data-i18n-title="scope.addEntry">+</button>
             </div>
             <ul class="scope-list" id="scopeMay"></ul>
           </div>
@@ -729,7 +729,7 @@
         <section class="card">
           <div class="ch">
             <h3 class="grow" data-i18n="cards.executionPlan">Execution Plan</h3>
-            <span id="planStatusBadge" class="badge badge-warning" data-i18n="badges.pending">Pending</span>
+            <span id="planStatusBadge" class="pill warn" data-i18n="badges.pending">Pending</span>
             <button class="btn xs pri" id="planApproveBtn" data-i18n="buttons.approve">Approve</button>
             <button class="btn xs danger" id="planRejectBtn" data-i18n="buttons.reject">Reject</button>
           </div>
@@ -783,26 +783,26 @@
           <input type="text" class="ws-input filter-select-input" autocomplete="off" spellcheck="false">
           <div class="filter-select-menu" hidden></div>
         </div>
-        <div class="toggle-group" id="viewModeToggle">
-          <button class="toggle-opt active" data-mode="tree" onclick="setFileView('tree')" data-i18n="diff.tree">Tree</button>
-          <button class="toggle-opt" data-mode="flat" onclick="setFileView('flat')" data-i18n="diff.list">List</button>
+        <div class="seg" id="viewModeToggle">
+          <button class="on" data-mode="tree" onclick="setFileView('tree')" data-i18n="diff.tree">Tree</button>
+          <button data-mode="flat" onclick="setFileView('flat')" data-i18n="diff.list">List</button>
         </div>
-        <div class="toggle-group" id="diffModeToggle">
-          <button class="toggle-opt active" data-mode="side-by-side" onclick="setDiffMode('side-by-side')" data-i18n="diff.sideBySide">Side by Side</button>
-          <button class="toggle-opt" data-mode="line-by-line" onclick="setDiffMode('line-by-line')" data-i18n="diff.inline">Inline</button>
+        <div class="seg" id="diffModeToggle">
+          <button class="on" data-mode="side-by-side" onclick="setDiffMode('side-by-side')" data-i18n="diff.sideBySide">Side by Side</button>
+          <button data-mode="line-by-line" onclick="setDiffMode('line-by-line')" data-i18n="diff.inline">Inline</button>
         </div>
-        <div class="toggle-group" id="diffSourceToggle">
-          <button class="toggle-opt active" data-mode="branch" onclick="setDiffSource('branch')" data-i18n="diff.branch">Branch</button>
-          <button class="toggle-opt" data-mode="uncommitted" onclick="setDiffSource('uncommitted')" data-i18n="diff.uncommitted">Uncommitted</button>
-          <button class="toggle-opt" data-mode="commit" onclick="setDiffSource('commit')" data-i18n="diff.commit">Commit</button>
+        <div class="seg" id="diffSourceToggle">
+          <button class="on" data-mode="branch" onclick="setDiffSource('branch')" data-i18n="diff.branch">Branch</button>
+          <button data-mode="uncommitted" onclick="setDiffSource('uncommitted')" data-i18n="diff.uncommitted">Uncommitted</button>
+          <button data-mode="commit" onclick="setDiffSource('commit')" data-i18n="diff.commit">Commit</button>
         </div>
         <div class="filter-select" id="diffBaseSelect" data-i18n-title="diff.diffAgainst">
           <input type="text" class="ws-input filter-select-input" autocomplete="off" spellcheck="false">
           <div class="filter-select-menu" hidden></div>
         </div>
-        <button class="btn btn-sm" id="historyToggleBtn" onclick="toggleHistoryPanel()" data-i18n="diff.historyToggle">History</button>
-        <button class="btn btn-sm" id="viewFileBtn" style="display: none;" onclick="openSelectedFile()" data-i18n="buttons.viewFile">View File</button>
-        <span class="badge badge-info" id="diffFileCount">3 files changed</span>
+        <button class="btn xs" id="historyToggleBtn" onclick="toggleHistoryPanel()" data-i18n="diff.historyToggle">History</button>
+        <button class="btn xs" id="viewFileBtn" style="display: none;" onclick="openSelectedFile()" data-i18n="buttons.viewFile">View File</button>
+        <span class="pill info" id="diffFileCount">3 files changed</span>
       </div>
       <div id="diffHistoryPanel" class="diff-history-panel" style="display: none;">
         <div class="diff-history-body">
@@ -812,11 +812,11 @@
             <div class="diff-history-panel-header">
               <span data-i18n="diff.history">History</span>
               <span id="diffHistoryBranchLabel" class="diff-history-branch-label"></span>
-              <span id="diffHistorySelectionCount" class="badge badge-info" style="display: none;"></span>
+              <span id="diffHistorySelectionCount" class="pill info" style="display: none;"></span>
               <div class="diff-history-panel-actions">
-                <button id="historyRenameBtn" class="btn xs" onclick="historyRename()" disabled title="Rename is only available for the latest local unpushed commit" data-i18n="history.rename">Rename</button>
-                <button id="historyUndoBtn" class="btn xs" onclick="historyUndo()" disabled title="Undo is only available for the latest local unpushed commit" data-i18n="history.undo">Undo</button>
-                <button id="historySquashBtn" class="btn xs" onclick="historySquash()" disabled title="Squash requires a contiguous selection of 2+ local unpushed commits" data-i18n="history.squash">Squash</button>
+                <button id="historyRenameBtn" class="btn xs" onclick="historyRename()" disabled data-i18n="history.rename">Rename</button>
+                <button id="historyUndoBtn" class="btn xs" onclick="historyUndo()" disabled data-i18n="history.undo">Undo</button>
+                <button id="historySquashBtn" class="btn xs" onclick="historySquash()" disabled data-i18n="history.squash">Squash</button>
               </div>
               <button class="btn xs ghost" onclick="closeHistoryPanel()" data-i18n="buttons.close">Close</button>
             </div>
@@ -828,7 +828,7 @@
         <div class="diff-file-list" id="diffFileList">
           <div class="diff-file-list-header">
             <span data-i18n="diff.changedFiles">Changed Files</span>
-            <span style="font-family: var(--font-mono);" id="fileCount">3</span>
+            <span class="mono" id="fileCount">3</span>
           </div>
         </div>
         <div class="diff-resize-handle" id="diffResizeHandle"></div>
@@ -849,14 +849,13 @@
     </div>
     <div class="card files-view" id="filesProjectView">
       <div class="diff-controls">
-        <input type="text" id="fileExplorerSearch" class="ws-input" placeholder="Filter files..." data-i18n-placeholder="placeholders.filterFiles" style="flex: 1; max-width: 300px; height: 28px; font-size: 0.75rem;" oninput="filterExplorerFiles(this.value)">
-        <span class="badge badge-info" id="explorerFileCount">0 files</span>
+        <input type="text" id="fileExplorerSearch" class="ws-input explorer-search" placeholder="Filter files..." data-i18n-placeholder="placeholders.filterFiles" oninput="filterExplorerFiles(this.value)">
       </div>
       <div class="diff-layout">
         <div class="diff-file-list" id="explorerFileList">
           <div class="diff-file-list-header">
             <span data-i18n="explorer.projectFiles">Project Files</span>
-            <span style="font-family: var(--font-mono);" id="explorerCount">0</span>
+            <span class="mono" id="explorerCount">0</span>
           </div>
         </div>
         <div class="diff-resize-handle" id="explorerResizeHandle"></div>
@@ -866,14 +865,11 @@
       </div>
     </div>
     <div class="card files-view" id="filesScratchpadsView" hidden>
-      <div class="diff-controls">
-        <span class="badge badge-info" id="scratchpadsFileCount">0 files</span>
-      </div>
       <div class="diff-layout">
         <div class="diff-file-list" id="scratchpadsList">
           <div class="diff-file-list-header">
             <span data-i18n="scratchpads.title">Scratchpads</span>
-            <span style="font-family: var(--font-mono);" id="scratchpadsCount">0</span>
+            <span class="mono" id="scratchpadsCount">0</span>
           </div>
         </div>
         <div class="diff-resize-handle" id="scratchpadsResizeHandle"></div>
@@ -924,10 +920,10 @@
       </aside>
       <div class="term">
         <div class="terminal-toolbar">
-          <span class="terminal-status" id="terminalStatus">Disconnected</span>
+          <span class="terminal-status" id="terminalStatus" data-i18n="terminal.disconnected">Disconnected</span>
           <span class="grow"></span>
           <div class="terminal-actions">
-            <button class="btn xs" id="terminalConnectBtn" onclick="connectTerminal()">Connect</button>
+            <button class="btn xs" id="terminalConnectBtn" onclick="connectTerminal()" data-i18n="terminal.connect">Connect</button>
             <button class="btn xs" onclick="toggleSplitTerminal()" data-i18n="terminal.sidePanel">Side panel</button>
             <button class="btn xs" id="terminalDisconnectBtn" onclick="disconnectTerminal()" style="display:none;" data-i18n="terminal.disconnect">Disconnect</button>
             <button class="btn xs danger" id="terminalKillBtn" onclick="killTerminalSession()" style="display:none;" data-i18n="terminal.kill">Kill</button>
@@ -944,10 +940,10 @@
 <div class="split-terminal" id="splitTerminal">
   <div class="term">
     <div class="split-terminal-toolbar">
-      <span class="terminal-status" id="splitTerminalStatus">Disconnected</span>
+      <span class="terminal-status" id="splitTerminalStatus" data-i18n="terminal.disconnected">Disconnected</span>
       <span class="grow"></span>
       <div class="terminal-actions">
-        <button class="btn xs" id="splitConnectBtn" onclick="connectSplitTerminal()">Connect</button>
+        <button class="btn xs" id="splitConnectBtn" onclick="connectSplitTerminal()" data-i18n="terminal.connect">Connect</button>
         <button class="btn xs" id="splitDisconnectBtn" onclick="disconnectSplitTerminal()" style="display:none;" data-i18n="terminal.disconnect">Disconnect</button>
         <button class="btn ic xs" onclick="toggleSplitTerminal()" title="Close" aria-label="Close" data-i18n-title="buttons.close">&times;</button>
       </div>
@@ -969,7 +965,7 @@
 </div><!-- /shell-main -->
 
 <div class="term-scroll-controls" id="termScrollControls">
-  <button class="term-scroll-btn" onclick="sendTermEscape()" style="font-size: 12px; font-weight: 600;">ESC</button>
+  <button class="term-scroll-btn term-esc-btn" onclick="sendTermEscape()">ESC</button>
   <button class="term-scroll-btn" ontouchstart="event.preventDefault();startTermScroll(-3)" ontouchend="stopTermScroll()" onmousedown="startTermScroll(-3)" onmouseup="stopTermScroll()">&#9650;</button>
   <button class="term-scroll-btn" ontouchstart="event.preventDefault();startTermScroll(3)" ontouchend="stopTermScroll()" onmousedown="startTermScroll(3)" onmouseup="stopTermScroll()">&#9660;</button>
 </div>
@@ -1052,15 +1048,15 @@ if (window.matchMedia('(max-width: 768px)').matches) {
   document.addEventListener('click', function(e) {
     var hdr = e.target.closest('.diff-file-list-header');
     if (hdr) {
+      hdr.closest('.diff-file-list').classList.toggle('mobile-open');
+    }
+  });
+}
 if (window.matchMedia('(max-width: 600px)').matches) {
   document.getElementById('panel-preplanning').querySelector('.narrow .card').classList.add('collapsed');
   document.addEventListener('click', function(e) {
     var head = e.target.closest('#panel-preplanning .card > .ch');
     if (head && !e.target.closest('button, a')) head.parentElement.classList.toggle('collapsed');
-  });
-}
-      hdr.closest('.diff-file-list').classList.toggle('mobile-open');
-    }
   });
 }
 function toggleMobileMenu() {
@@ -1070,7 +1066,7 @@ function toggleMobileMenu() {
 document.addEventListener('click', function(e) {
   var dd = document.getElementById('mobileMenuDropdown');
   var btn = document.getElementById('mobileMenuBtn');
-  if (dd && dd.classList.contains('open') && !dd.contains(e.target) && e.target !== btn) {
+  if (dd && dd.classList.contains('open') && (!dd.contains(e.target) || e.target === dd) && !(btn && btn.contains(e.target))) {
     dd.classList.remove('open');
   }
 });

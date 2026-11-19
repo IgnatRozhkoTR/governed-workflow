@@ -13,7 +13,7 @@ async function loadVerificationData() {
         VERIFICATION_PROFILES = allProfiles.profiles || [];
     } catch(e) {
         console.warn('Failed to load verification profiles:', e.message);
-        if (typeof showToast === 'function') showToast('Failed to load verification profiles: ' + e.message);
+        if (typeof showToast === 'function') showToast(t('verification.profilesLoadFailed', {error: e.message}));
     }
 
     if (ctx) {
@@ -52,7 +52,7 @@ function renderAssignedProfiles() {
     container.innerHTML = '';
 
     if (WORKSPACE_VERIFICATION.length === 0) {
-        container.innerHTML = '<div class="no-items-msg">' + t('verification.noProfiles') + '</div>';
+        container.innerHTML = '<div class="empty">' + t('verification.noProfiles') + '</div>';
         return;
     }
 
@@ -79,7 +79,7 @@ function renderAssignedProfiles() {
 
         el.innerHTML = '<div class="verification-profile-header">'
             + '<span class="verification-profile-name">' + escapeHtml(profile.name) + subpathNote + '</span>'
-            + '<button class="btn btn-sm btn-outline" onclick="unassignVerificationProfile(' + profile.assignment_id + ')">' + t('verification.remove') + '</button>'
+            + '<button class="btn xs" onclick="unassignVerificationProfile(' + profile.assignment_id + ')">' + t('verification.remove') + '</button>'
             + '</div>'
             + '<div class="verification-steps">' + stepsHtml + '</div>';
 

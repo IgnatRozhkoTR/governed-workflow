@@ -86,7 +86,7 @@ async function navigateToResearchEntry(entry) {
     if (titleEl && titleEl.textContent === (entry.topic || '')) {
       g.classList.remove('collapsed');
       g.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      g.style.outline = '2px solid var(--accent)';
+      g.style.outline = '2px solid var(--pr)';
       setTimeout(function() { g.style.outline = ''; }, 3000);
     }
   });
@@ -373,7 +373,7 @@ function togglePPInlineComment(btn, scope, targetId) {
   form.innerHTML =
     '<input type="text" placeholder="' + t('comments.addComment') + '" ' +
       'onkeydown="if(event.key===\'Enter\'){event.preventDefault();submitPPComment(this, \'' + escapeAttr(scope) + '\', \'' + escapeAttr(String(targetId)) + '\');}">' +
-    '<button class="btn btn-sm" onclick="submitPPComment(this.previousElementSibling, \'' + escapeAttr(scope) + '\', \'' + escapeAttr(String(targetId)) + '\')">' + t('comments.save') + '</button>';
+    '<button class="btn xs" onclick="submitPPComment(this.previousElementSibling, \'' + escapeAttr(scope) + '\', \'' + escapeAttr(String(targetId)) + '\')">' + t('comments.save') + '</button>';
 
   card.appendChild(form);
   form.querySelector('input').focus();

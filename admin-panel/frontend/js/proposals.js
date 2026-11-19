@@ -28,7 +28,7 @@ function renderProposalsTab() {
 
     if (filtered.length === 0) {
         var empty = document.createElement('div');
-        empty.className = 'no-items-msg';
+        empty.className = 'empty';
         empty.textContent = t('proposals.empty');
         container.innerHTML = '';
         container.appendChild(empty);
@@ -61,7 +61,7 @@ function buildProposalCardHtml(p) {
         reasonHtml +
         payloadHtml +
         '<div class="proposal-card__footer">' +
-            '<span class="proposal-card__date">' + escapeHtml(p.created_at) + '</span>' +
+            '<span class="proposal-card__date" title="' + escapeHtml(p.created_at) + '">' + escapeHtml(formatRelativeDate(p.created_at)) + '</span>' +
             actionsHtml +
         '</div>' +
     '</div>';

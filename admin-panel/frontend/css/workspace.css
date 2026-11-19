@@ -146,16 +146,16 @@
   gap: 8px;
   margin-top: 8px;
   padding: 8px 12px;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  background: var(--sf2);
+  border: 1px solid var(--ln);
+  border-radius: var(--r-sm);
 }
 
 .command-block code {
   flex: 1;
-  font-family: var(--font-mono);
+  font-family: var(--f-mono);
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: var(--dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -165,53 +165,12 @@
   flex-shrink: 0;
 }
 
-.ws-sessions-toggle {
-  margin-top: 6px;
-}
-
-.ws-sessions-link {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-decoration: none;
-}
-
-.ws-sessions-link:hover {
-  color: var(--accent);
-}
-
-.ws-sessions-dropdown {
-  margin-top: 6px;
-  padding: 8px 10px;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-
-.ws-session-history-item {
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.ws-session-history-item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.ws-session-history-item:first-child {
-  padding-top: 0;
-}
-
-.ws-session-history-date {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-
 .ws-create-result-card {
   margin-top: 12px;
   padding: 16px;
-  background: var(--success-dim);
-  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
-  border-radius: var(--radius);
+  background: var(--okbg);
+  border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
+  border-radius: var(--r-lg);
 }
 
 .ws-result-row {
@@ -224,14 +183,14 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-muted);
+  color: var(--dim);
   margin-bottom: 4px;
 }
 
 .ws-result-value {
-  font-family: var(--font-mono);
+  font-family: var(--f-mono);
   font-size: 0.82rem;
-  color: var(--text-primary);
+  color: var(--tx);
   word-break: break-all;
 }
 
@@ -243,12 +202,12 @@
 .rp-empty,
 .rp-fetch-error {
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--dim);
   padding: 8px 0;
 }
 
 .rp-fetch-error {
-  color: var(--danger);
+  color: var(--bad);
 }
 
 .rp-card-body {
@@ -274,46 +233,46 @@
 }
 
 .rp-badge--queued {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
+  background: var(--sf3);
+  color: var(--dim);
 }
 
 .rp-badge--filtering {
-  background: var(--info-dim);
-  color: var(--info);
+  background: var(--prbg);
+  color: var(--pr);
 }
 
 .rp-badge--file-stage {
-  background: var(--warning-dim);
-  color: var(--warning);
+  background: var(--warnbg);
+  color: var(--warn);
 }
 
 .rp-badge--integration-stage {
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: var(--prbg);
+  color: var(--pr);
 }
 
 .rp-badge--done {
-  background: var(--success-dim);
-  color: var(--success);
+  background: var(--okbg);
+  color: var(--ok);
 }
 
 .rp-badge--failed {
-  background: var(--danger-dim);
-  color: var(--danger);
+  background: var(--badbg);
+  color: var(--bad);
 }
 
 .rp-elapsed {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--dim);
 }
 
 .rp-pipeline-error {
   font-size: 0.78rem;
-  color: var(--danger);
+  color: var(--bad);
   padding: 6px 10px;
-  background: var(--danger-dim);
-  border-radius: var(--radius-sm);
+  background: var(--badbg);
+  border-radius: var(--r-sm);
 }
 
 .rp-section {
@@ -337,8 +296,8 @@
 
 .rp-progress-label {
   font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
+  color: var(--dim);
+  font-family: var(--f-mono);
 }
 
 .rp-files-list,
@@ -354,7 +313,7 @@
   align-items: center;
   gap: 8px;
   padding: 4px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--ln);
   font-size: 0.8rem;
 }
 
@@ -370,41 +329,41 @@
   text-align: center;
 }
 
-.rp-status-icon--done    { color: var(--success); }
-.rp-status-icon--failed  { color: var(--danger); }
-.rp-status-icon--running { color: var(--info); }
-.rp-status-icon--pending { color: var(--text-muted); }
+.rp-status-icon--done    { color: var(--ok); }
+.rp-status-icon--failed  { color: var(--bad); }
+.rp-status-icon--running { color: var(--pr); }
+.rp-status-icon--pending { color: var(--dim); }
 
 .rp-file-path {
   flex: 1;
-  font-family: var(--font-mono);
+  font-family: var(--f-mono);
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: var(--dim);
   overflow-wrap: anywhere;
 }
 
 .rp-findings-count {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--dim);
   flex-shrink: 0;
 }
 
 .rp-file-error {
   font-size: 0.72rem;
-  color: var(--danger);
+  color: var(--bad);
   margin-top: 2px;
 }
 
 .rp-reviewer-name {
   flex: 1;
-  font-family: var(--font-mono);
+  font-family: var(--f-mono);
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: var(--dim);
 }
 
 .rp-reviewer-status {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--dim);
   flex-shrink: 0;
 }
 

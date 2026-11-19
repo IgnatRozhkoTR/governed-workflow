@@ -358,10 +358,30 @@ function renderDiff(path) {
   });
   ui.draw();
   ui.highlightCode();
+  trimWordHighlightWhitespace(targetEl);
   attachDiffLineClickHandlers(targetEl, path);
   renderDiffLineCommentIndicators(targetEl, path);
   autoExpandUnresolvedThreads(targetEl, path);
   decorateDiffAnnotations(targetEl, path);
+}
+
+function trimWordHighlightWhitespace(root) {
+  root.querySelectorAll('.d2h-code-line-ctn ins, .d2h-code-line-ctn del, .d2h-code-side-line-ctn ins, .d2h-code-side-line-ctn del').forEach(function(mark) {
+    _moveEdgeWhitespaceOutside(mark, true);
+    _moveEdgeWhitespaceOutside(mark, false);
+    if (!mark.textContent) mark.remove();
+  });
+}
+
+function _moveEdgeWhitespaceOutside(mark, isLeading) {
+  var walker = document.createTreeWalker(mark, NodeFilter.SHOW_TEXT);
+  var textNode = walker.nextNode();
+  if (!isLeading) { var next; while ((next = walker.nextNode())) textNode = next; }
+  if (!textNode) return;
+  var match = textNode.data.match(isLeading ? /^\s+/ : /\s+$/);
+  if (!match) return;
+  textNode.data = isLeading ? textNode.data.slice(match[0].length) : textNode.data.slice(0, -match[0].length);
+  mark.parentNode.insertBefore(document.createTextNode(match[0]), isLeading ? mark : mark.nextSibling);
 }
 
 function getDiffLineNumber(td) {
@@ -565,14 +585,14 @@ function renderDiffView() {
 function setFileView(mode) {
   state.fileView = mode;
   localStorage.setItem('diff_fileView', mode);
-  document.querySelectorAll('#viewModeToggle .toggle-opt').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.querySelectorAll('#viewModeToggle button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
   renderFileList();
 }
 
 function setDiffMode(mode) {
   state.diffMode = mode;
   localStorage.setItem('diff_diffMode', mode);
-  document.querySelectorAll('#diffModeToggle .toggle-opt').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.querySelectorAll('#diffModeToggle button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
   if (state.selectedFile) renderDiff(state.selectedFile);
 }
 
@@ -617,6 +637,7 @@ async function loadDiffRepos() {
       localStorage.removeItem('diff_repo');
     }
     setFilterSelectOptions('diffRepoSelect', options, state.diffRepo);
+    document.getElementById('diffRepoSelect').hidden = options.length < 2;
   } catch (e) {
     console.warn('Failed to load repos:', e.message);
     state.diffRepo = '';
@@ -677,7 +698,7 @@ async function setDiffBase(name) {
 async function setDiffSource(mode) {
   localStorage.setItem('diff_diffSource', mode);
   state.diffSource = mode;
-  document.querySelectorAll('#diffSourceToggle .toggle-opt').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.querySelectorAll('#diffSourceToggle button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
 
   if (mode !== 'commit') {
     state.activeCommit = null;
@@ -984,17 +1005,17 @@ function updateRewriteButtonsState() {
   renameBtn.disabled = !activeIsLocalUnpushed;
   renameBtn.title = activeIsLocalUnpushed
     ? ''
-    : 'Rename is only available for a selected local unpushed commit';
+    : t('history.renameUnavailable');
 
   undoBtn.disabled = !headIsLocalUnpushed;
   undoBtn.title = headIsLocalUnpushed
     ? ''
-    : 'Undo is only available for the latest local unpushed commit';
+    : t('history.undoUnavailable');
 
   squashBtn.disabled = !squashable;
   squashBtn.title = squashable
     ? ''
-    : 'Squash requires a contiguous selection of 2+ local unpushed commits';
+    : t('history.squashUnavailable');
 }
 
 // ── Inline promise-based dialog helper ──────────────────────────────────────
@@ -1031,7 +1052,7 @@ function _showHistoryDialog(options) {
       var msg = document.createElement('p');
       msg.style.margin = '0';
       msg.style.fontSize = '0.85rem';
-      msg.style.color = 'var(--text-secondary)';
+      msg.style.color = 'var(--dim)';
       msg.textContent = options.message;
       body.appendChild(msg);
     }
@@ -1047,7 +1068,7 @@ function _showHistoryDialog(options) {
       var lbl = document.createElement('label');
       lbl.style.fontSize = '0.78rem';
       lbl.style.fontWeight = '600';
-      lbl.style.color = 'var(--text-muted)';
+      lbl.style.color = 'var(--dim)';
       lbl.textContent = options.inputLabel;
       body.appendChild(lbl);
 
@@ -1056,45 +1077,42 @@ function _showHistoryDialog(options) {
         inputEl.rows = 5;
         inputEl.style.width = '100%';
         inputEl.style.boxSizing = 'border-box';
-        inputEl.style.fontFamily = 'var(--font-mono)';
+        inputEl.style.fontFamily = 'var(--f-mono)';
         inputEl.style.fontSize = '0.8rem';
         inputEl.style.padding = '8px 10px';
-        inputEl.style.border = '1px solid var(--border)';
-        inputEl.style.borderRadius = 'var(--radius-sm)';
-        inputEl.style.background = 'var(--bg-input)';
-        inputEl.style.color = 'var(--text-primary)';
+        inputEl.style.border = '1px solid var(--ln)';
+        inputEl.style.borderRadius = 'var(--r-sm)';
+        inputEl.style.background = 'var(--bg)';
+        inputEl.style.color = 'var(--tx)';
         inputEl.style.resize = 'vertical';
       } else {
         inputEl = document.createElement('input');
         inputEl.type = 'text';
         inputEl.style.width = '100%';
         inputEl.style.boxSizing = 'border-box';
-        inputEl.style.fontFamily = 'var(--font-mono)';
+        inputEl.style.fontFamily = 'var(--f-mono)';
         inputEl.style.fontSize = '0.85rem';
         inputEl.style.padding = '8px 10px';
-        inputEl.style.border = '1px solid var(--border)';
-        inputEl.style.borderRadius = 'var(--radius-sm)';
-        inputEl.style.background = 'var(--bg-input)';
-        inputEl.style.color = 'var(--text-primary)';
+        inputEl.style.border = '1px solid var(--ln)';
+        inputEl.style.borderRadius = 'var(--r-sm)';
+        inputEl.style.background = 'var(--bg)';
+        inputEl.style.color = 'var(--tx)';
       }
       if (options.inputValue !== undefined) inputEl.value = options.inputValue;
       body.appendChild(inputEl);
     }
 
     var footer = document.createElement('div');
-    footer.style.display = 'flex';
-    footer.style.justifyContent = 'flex-end';
-    footer.style.gap = '8px';
-    footer.style.paddingTop = '4px';
+    footer.className = 'history-dialog-footer';
 
     var cancelBtn = document.createElement('button');
-    cancelBtn.className = 'btn btn-sm';
-    cancelBtn.textContent = 'Cancel';
+    cancelBtn.className = 'btn xs';
+    cancelBtn.textContent = t('buttons.cancel');
     cancelBtn.onclick = function() { overlay.remove(); resolve(null); };
 
     var confirmBtn = document.createElement('button');
-    confirmBtn.className = 'btn btn-sm btn-primary';
-    confirmBtn.textContent = options.confirmLabel || 'Confirm';
+    confirmBtn.className = 'btn xs pri';
+    confirmBtn.textContent = options.confirmLabel || t('buttons.confirm');
     confirmBtn.onclick = function() {
       overlay.remove();
       resolve(inputEl ? inputEl.value : true);
@@ -1211,7 +1229,7 @@ async function historySquash() {
 
   var editedMessage = await _showHistoryDialog({
     title: t('history.dialogs.squashTitle', { count: count }),
-    extraHtml: '<pre style="font-size:0.75rem;color:var(--text-muted);background:var(--bg-base);padding:8px 10px;border-radius:var(--radius-sm);margin:0;overflow:auto;max-height:80px;">' + commitList + '</pre>',
+    extraHtml: '<pre style="font-size:0.75rem;color:var(--dim);background:var(--bg);padding:8px 10px;border-radius:var(--r-sm);margin:0;overflow:auto;max-height:80px;">' + commitList + '</pre>',
     inputLabel: t('history.dialogs.squashMessage'),
     inputValue: defaultMessage,
     textarea: true,

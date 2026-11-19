@@ -99,8 +99,6 @@ function renderScratchpadSections() {
   var total = _spTotalFileCount();
   var countEl = document.getElementById('scratchpadsCount');
   if (countEl) countEl.textContent = total;
-  var badgeEl = document.getElementById('scratchpadsFileCount');
-  if (badgeEl) badgeEl.textContent = total + ' files';
 }
 
 function _spExtractTitle(content, fallbackName) {
@@ -177,17 +175,16 @@ function renderScratchpadContent() {
   header.textContent = spState.selectedName;
 
   var toggle = document.createElement('div');
-  toggle.className = 'toggle-group md-toggle';
-  toggle.style.marginLeft = '12px';
+  toggle.className = 'seg md-toggle';
 
   var srcBtn = document.createElement('button');
-  srcBtn.className = 'toggle-opt' + (spState.mode === 'source' ? ' active' : '');
+  srcBtn.className = (spState.mode === 'source' ? 'on' : '');
   srcBtn.dataset.mode = 'source';
   srcBtn.textContent = t('buttons.source');
   srcBtn.onclick = function() { setScratchpadMode('source'); };
 
   var prevBtn = document.createElement('button');
-  prevBtn.className = 'toggle-opt' + (spState.mode === 'preview' ? ' active' : '');
+  prevBtn.className = (spState.mode === 'preview' ? 'on' : '');
   prevBtn.dataset.mode = 'preview';
   prevBtn.textContent = t('buttons.preview');
   prevBtn.onclick = function() { setScratchpadMode('preview'); };

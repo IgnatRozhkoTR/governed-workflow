@@ -181,7 +181,7 @@ function renderCommentThread(scope, target) {
   html += '<div class="comment-thread-form">' +
     '<input type="text" class="comment-thread-input" placeholder="' + t('comments.addComment') + '" ' +
     'onkeydown="handleCommentInput(event, \'' + escapeAttr(scope) + '\', \'' + escapeAttr(target || '') + '\')">' +
-    '<button class="btn btn-sm comment-thread-save" onclick="submitComment(\'' + escapeAttr(scope) + '\', \'' + escapeAttr(target || '') + '\', this)">' + t('comments.save') + '</button>' +
+    '<button class="btn xs comment-thread-save" onclick="submitComment(\'' + escapeAttr(scope) + '\', \'' + escapeAttr(target || '') + '\', this)">' + t('comments.save') + '</button>' +
     '</div>';
 
   return html;
@@ -308,7 +308,7 @@ function renderLineCommentThread(scope, target, lineNum, currentHash) {
   html += '<div class="comment-thread-form">' +
     '<input type="text" class="comment-thread-input" placeholder="' + t('comments.addComment') + '" ' +
     'onkeydown="handleCommentInput(event, \'' + escapeAttr(scope) + '\', \'' + escapeAttr(target || '') + '\')">' +
-    '<button class="btn btn-sm comment-thread-save" onclick="submitComment(\'' + escapeAttr(scope) + '\', \'' + escapeAttr(target || '') + '\', this)">' + t('comments.save') + '</button>' +
+    '<button class="btn xs comment-thread-save" onclick="submitComment(\'' + escapeAttr(scope) + '\', \'' + escapeAttr(target || '') + '\', this)">' + t('comments.save') + '</button>' +
     '</div>';
 
   return html;

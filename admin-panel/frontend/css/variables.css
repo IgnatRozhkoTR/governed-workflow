@@ -11,6 +11,7 @@
   --f-head: 'Space Grotesk', 'Inter', system-ui, sans-serif;
   --f-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --side-w: 264px;
+  --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 :root, [data-theme="dark"] {
@@ -48,55 +49,11 @@
 
 /* ═══════════════════════════════════════════════ */
 /*  LEGACY ALIASES                                 */
-/*  Older component CSS still reads these names.   */
+/*  Only css/mobile.css still reads these names.   */
 /* ═══════════════════════════════════════════════ */
 :root, [data-theme="dark"], [data-theme="light"] {
-  --font-sans: var(--f-ui);
-  --font-mono: var(--f-mono);
-  --radius: var(--r-lg);
-  --radius-sm: var(--r-sm);
-  --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-sm: var(--sh);
-  --shadow-md: var(--shpop);
-
-  --bg-base: var(--bg);
-  --bg-primary: var(--bg);
-  --bg-input: var(--bg);
-  --bg-surface: var(--sf);
   --bg-raised: var(--sf2);
-  --bg-secondary: var(--sf2);
-  --bg-hover: var(--sf3);
-  --bg-tertiary: var(--sf3);
-  --bg-active: var(--sf3);
   --border: var(--ln);
-  --border-active: var(--dim);
-  --text: var(--tx);
   --text-primary: var(--tx);
-  --text-secondary: var(--dim);
-  --text-muted: var(--dim);
-  --accent: var(--pr);
-  --accent-hover: var(--pr);
-  --accent-text: var(--prink);
   --accent-dim: var(--prbg);
-  --info: var(--pr);
-  --info-dim: var(--prbg);
-  --success: var(--ok);
-  --success-dim: var(--okbg);
-  --danger: var(--bad);
-  --danger-dim: var(--badbg);
-  --warning: var(--warn);
-  --warning-dim: var(--warnbg);
-  --phase-track: var(--ln);
-  --phase-fill: var(--ok);
-  --tab-indicator: var(--pr);
-  --card-glow: none;
-  --sidebar-width: 0px;
-  --scrollbar-thumb: var(--sf3);
-  --scrollbar-track: transparent;
-  --diff-add-bg: var(--addbg);
-  --diff-del-bg: var(--delbg);
-  --diff-add-text: var(--addtx);
-  --diff-del-text: var(--deltx);
-  --diff-add-word-bg: var(--addhi);
-  --diff-del-word-bg: var(--delhi);
 }

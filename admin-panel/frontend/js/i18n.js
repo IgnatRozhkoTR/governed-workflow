@@ -65,7 +65,7 @@ function setLocale(locale) {
     return loadI18n(locale);
   }).then(function() {
     var activeTab = null;
-    document.querySelectorAll('.tab-btn.active').forEach(function(btn) {
+    document.querySelectorAll('#wsTabs .tab.active').forEach(function(btn) {
       activeTab = btn.dataset.tab;
     });
     if (activeTab && typeof switchTab === 'function') {

@@ -35,7 +35,7 @@ function _wsRenderCopyCommand(command) {
   const id = 'cmd-' + Math.random().toString(36).substring(2, 9);
   return `<div class="command-block">
     <code id="${id}">${_wsEscape(command)}</code>
-    <button class="btn btn-sm" onclick="_wsCopyCommand('${id}', this)">${t('buttons.copy')}</button>
+    <button class="btn xs" onclick="_wsCopyCommand('${id}', this)">${t('buttons.copy')}</button>
   </div>`;
 }
 
@@ -68,7 +68,7 @@ function _wsShowError(containerId, message) {
   const container = document.getElementById(containerId);
   if (container) {
     container.textContent = message;
-    container.style.color = 'var(--danger)';
+    container.style.color = 'var(--bad)';
     container.style.fontSize = '0.78rem';
     container.style.marginTop = '8px';
   }
@@ -459,7 +459,7 @@ async function createWorkspace(projectId) {
       <span class="ws-result-value">${_wsEscape(result.working_dir)}</span>
     </div>`;
   }
-  resultHtml += `<button class="btn btn-primary" style="margin-top: 12px; width: 100%; justify-content: center;" onclick="openWorkspace('${_wsEscape(projectId)}', '${_wsEscape(branch)}')">${t('buttons.openWorkspace')}</button>`;
+  resultHtml += `<button class="btn pri" style="margin-top: 12px; width: 100%; justify-content: center;" onclick="openWorkspace('${_wsEscape(projectId)}', '${_wsEscape(branch)}')">${t('buttons.openWorkspace')}</button>`;
   resultHtml += '</div>';
 
   resultEl.innerHTML = resultHtml;

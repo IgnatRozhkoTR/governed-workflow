@@ -15,7 +15,7 @@ async function renderNetworkMode() {
     info = await apiGetNetworkMode();
   } catch (e) {
     host.innerHTML = _networkModeSubsectionTitle() +
-      '<div style="color: var(--text-muted); font-size: 0.82rem;">' +
+      '<div style="color: var(--dim); font-size: 0.82rem;">' +
       escapeHtml(t('networkMode.unavailable')) + '</div>';
     return;
   }
@@ -34,11 +34,11 @@ async function renderNetworkMode() {
       '<input type="checkbox" id="networkModeToggle"' + (enabled ? ' checked' : '') + '>' +
       '<span style="font-size: 0.85rem;">' + escapeHtml(t('networkMode.allowAccess')) + '</span>' +
     '</label>' +
-    '<p style="margin: 10px 0 0; color: var(--text-muted); font-size: 0.78rem;">' +
+    '<p style="margin: 10px 0 0; color: var(--dim); font-size: 0.78rem;">' +
       escapeHtml(t('networkMode.explain')) +
     '</p>' +
     (enabled
-      ? '<p style="margin: 10px 0 0; color: var(--text-muted); font-size: 0.78rem;">' +
+      ? '<p style="margin: 10px 0 0; color: var(--dim); font-size: 0.78rem;">' +
         escapeHtml(t('networkMode.reach')) + ' ' + lanList + '</p>'
       : '');
 

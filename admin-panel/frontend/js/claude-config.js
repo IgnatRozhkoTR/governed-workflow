@@ -69,16 +69,16 @@ function renderWorkflowModeCard() {
   if (!body) return;
 
   var isFast = LOCK_DATA.workflow_mode === 'fast';
-  var badgeHtml = isFast
-    ? '<span class="badge badge-warning">' + escapeHtml(t('badges.fastMode')) + '</span>'
-    : '<span class="badge" style="background:var(--bg-raised);color:var(--text-secondary);">' + escapeHtml(t('badges.standardMode')) + '</span>';
-  var toggleLabel = isFast ? t('buttons.switchToStandard') : t('buttons.switchToFast');
-
   body.innerHTML =
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' + badgeHtml + '</div>' +
-    '<p style="margin:0 0 10px;color:var(--text-muted);font-size:0.78rem;">' + escapeHtml(t('config.workflowModeHint')) + '</p>' +
-    '<div style="display:flex;justify-content:flex-end;">' +
-      '<button class="btn btn-sm" id="workflowModeToggleBtn" onclick="onWorkflowModeToggleClick()">' + escapeHtml(toggleLabel) + '</button>' +
+    '<div class="settings-row">' +
+      '<div>' +
+        '<div class="settings-row-label">' + escapeHtml(t('config.workflowModeLabel')) + '</div>' +
+        '<div class="settings-row-desc">' + escapeHtml(t('config.workflowModeHint')) + '</div>' +
+      '</div>' +
+      '<div class="settings-row-control"><div class="seg" id="workflowModeSeg">' +
+        _workflowModeOption('standard', t('header.modeStandard'), !isFast) +
+        _workflowModeOption('fast', t('header.modeFast'), isFast) +
+      '</div></div>' +
     '</div>';
 
   if (headerBadge) {
@@ -87,26 +87,30 @@ function renderWorkflowModeCard() {
   }
 }
 
-async function onWorkflowModeToggleClick() {
-  var ctx = getWorkspaceContext();
-  if (!ctx) return;
+function _workflowModeOption(mode, label, isActive) {
+  return '<button type="button"' + (isActive ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') +
+    ' onclick="onWorkflowModeOptionClick(\'' + mode + '\')">' + escapeHtml(label) + '</button>';
+}
 
-  var nextMode = LOCK_DATA.workflow_mode === 'fast' ? 'standard' : 'fast';
+async function onWorkflowModeOptionClick(nextMode) {
+  var ctx = getWorkspaceContext();
+  var currentMode = LOCK_DATA.workflow_mode === 'fast' ? 'fast' : 'standard';
+  if (!ctx || nextMode === currentMode) return;
+
   var confirmMessage = nextMode === 'fast' ? t('config.fastModeConfirm') : t('config.standardModeConfirm');
   if (!confirm(confirmMessage)) return;
 
-  var btn = document.getElementById('workflowModeToggleBtn');
-  if (btn) btn.disabled = true;
+  var seg = document.getElementById('workflowModeSeg');
+  if (seg) seg.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
 
   try {
     await apiSetWorkflowMode(ctx.projectId, ctx.branch, nextMode);
     await refreshState();
-    renderWorkflowModeCard();
     showToast(t(nextMode === 'fast' ? 'messages.fastModeEnabled' : 'messages.fastModeDisabled'));
   } catch (e) {
     showToast(t('messages.failedToUpdate', {error: e.message}));
   } finally {
-    if (btn) btn.disabled = false;
+    renderWorkflowModeCard();
   }
 }
 
@@ -140,7 +144,7 @@ async function loadModulesCard() {
       var checked = enabledSet[mod.id] ? 'checked' : '';
       return '<div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">'
         + '<input type="checkbox" id="module-' + escapeHtml(mod.id) + '" data-module-id="' + escapeHtml(mod.id) + '" ' + checked + ' onchange="saveModuleToggle()">'
-        + '<label for="module-' + escapeHtml(mod.id) + '" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;">' + escapeHtml(mod.name) + '</label>'
+        + '<label for="module-' + escapeHtml(mod.id) + '" style="font-size: 0.82rem; color: var(--tx); cursor: pointer;">' + escapeHtml(mod.name) + '</label>'
         + '</div>';
     }).join('');
 

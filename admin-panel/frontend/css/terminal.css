@@ -531,3 +531,5 @@
 [data-theme="dark"] .xterm-rows .xterm-bg-235 {
   background-color: #1a1a2e !important;
 }
+
+.term-esc-btn { font-size: 12px; font-weight: 600; }

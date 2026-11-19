@@ -55,30 +55,30 @@ function _updateApprovalUI(badgeId, approveBtnId, rejectBtnId, setStatus, status
 
   if (status === 'approved') {
     badge.textContent = t('badges.approved');
-    badge.className = 'badge badge-success';
+    badge.className = 'pill ok';
     approveBtn.textContent = t('buttons.revokeApproval');
-    approveBtn.className = 'btn btn-sm btn-outline';
+    approveBtn.className = 'btn xs';
     approveBtn.onclick = function() { setStatus('pending'); };
     rejectBtn.textContent = t('buttons.reject');
-    rejectBtn.className = 'btn btn-sm btn-danger-outline';
+    rejectBtn.className = 'btn xs danger';
     rejectBtn.onclick = function() { setStatus('rejected'); };
   } else if (status === 'rejected') {
     badge.textContent = t('badges.rejected');
-    badge.className = 'badge badge-danger';
+    badge.className = 'pill bad';
     approveBtn.textContent = t('buttons.approve');
-    approveBtn.className = 'btn btn-sm btn-primary';
+    approveBtn.className = 'btn xs pri';
     approveBtn.onclick = function() { setStatus('approved'); };
     rejectBtn.textContent = t('buttons.revokeRejection');
-    rejectBtn.className = 'btn btn-sm btn-outline';
+    rejectBtn.className = 'btn xs';
     rejectBtn.onclick = function() { setStatus('pending'); };
   } else {
     badge.textContent = t('badges.pending');
-    badge.className = 'badge badge-warning';
+    badge.className = 'pill warn';
     approveBtn.textContent = t('buttons.approve');
-    approveBtn.className = 'btn btn-sm btn-primary';
+    approveBtn.className = 'btn xs pri';
     approveBtn.onclick = function() { setStatus('approved'); };
     rejectBtn.textContent = t('buttons.reject');
-    rejectBtn.className = 'btn btn-sm btn-danger-outline';
+    rejectBtn.className = 'btn xs danger';
     rejectBtn.onclick = function() { setStatus('rejected'); };
   }
 }

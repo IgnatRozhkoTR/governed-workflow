@@ -70,7 +70,7 @@ function _uploadPastedImage(file, ws) {
       }
     })
     .catch(function(err) {
-      if (typeof showToast === 'function') showToast('Image paste failed: ' + err.message);
+      if (typeof showToast === 'function') showToast(t('terminal.imagePasteFailed', {error: err.message}));
     });
 }
 
@@ -395,7 +395,7 @@ function initTerminal() {
     }
   });
 
-  term.writeln('Terminal ready. Click Connect or use Start/Resume.');
+  term.writeln(t('terminal.ready'));
 }
 
 function connectTerminal() {
@@ -406,7 +406,7 @@ function connectTerminal() {
 
   var ctx = getWorkspaceContext();
   if (!ctx) {
-    if (term) term.writeln('\r\n\x1b[31mNo workspace selected.\x1b[0m');
+    if (term) term.writeln('\r\n\x1b[31m' + t('errors.workspaceNotSelected') + '\x1b[0m');
     return;
   }
 
@@ -417,7 +417,7 @@ function connectTerminal() {
   var wsUrl = _buildTerminalWsUrl(ctx.projectId, ctx.branch);
 
   updateTerminalStatus('connecting');
-  if (term) term.writeln('\r\nConnecting to tmux session...');
+  if (term) term.writeln('\r\n' + t('terminal.connectingSession'));
 
   terminalWs = _connectTerminal(term, fitAddon, wsUrl, {
     focusOnOpen: true,
@@ -428,12 +428,12 @@ function connectTerminal() {
     onDisconnected: function() {
       terminalConnected = false;
       updateTerminalStatus('disconnected');
-      if (term) term.writeln('\r\n\x1b[33mDisconnected from terminal.\x1b[0m');
+      if (term) term.writeln('\r\n\x1b[33m' + t('terminal.disconnectedFromTerminal') + '\x1b[0m');
     },
     onError: function() {
       terminalConnected = false;
       updateTerminalStatus('error');
-      if (term) term.writeln('\r\n\x1b[31mWebSocket error. Is the tmux session running?\x1b[0m');
+      if (term) term.writeln('\r\n\x1b[31m' + t('terminal.socketError') + '\x1b[0m');
     }
   });
 }
@@ -457,11 +457,11 @@ function killTerminalSession() {
     kind: _getActiveTerminalKind()
   })
   .then(function() {
-    if (term) term.writeln('\r\n\x1b[33mSession killed.\x1b[0m');
+    if (term) term.writeln('\r\n\x1b[33m' + t('terminal.sessionKilled') + '\x1b[0m');
     loadTerminalSessions();
   })
   .catch(function(e) {
-    if (term) term.writeln('\r\n\x1b[31mKill failed: ' + e.message + '\x1b[0m');
+    if (term) term.writeln('\r\n\x1b[31m' + t('terminal.killFailed') + ': ' + e.message + '\x1b[0m');
   });
 }
 

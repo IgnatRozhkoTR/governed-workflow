@@ -196,7 +196,7 @@
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: var(--bg-base);
+  background: var(--bg);
   display: flex;
   align-items: safe center;
   justify-content: center;
@@ -220,22 +220,9 @@
 
 .selector-subtitle {
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--dim);
   text-align: center;
   margin-bottom: 32px;
-}
-
-.selector-section {
-  margin-bottom: 24px;
-}
-
-.selector-section-title {
-  font-size: 0.78rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin-bottom: 12px;
 }
 
 .project-card {
@@ -243,61 +230,14 @@
   align-items: center;
   gap: 14px;
   padding: 14px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-raised);
+  border: 1px solid var(--ln);
+  border-radius: var(--r-lg);
+  background: var(--sf2);
   margin-bottom: 8px;
   transition: var(--transition);
 }
 
-.project-card:hover { border-color: var(--border-active); }
-
-.project-card-info { flex: 1; min-width: 0; }
-
-.project-card-name {
-  font-weight: 600;
-  font-size: 0.9rem;
-  margin-bottom: 2px;
-}
-
-.project-card-path {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.project-card-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.register-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.register-form input {
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-input);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 0.85rem;
-}
-
-.register-form input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-dim);
-}
-
-.register-form .btn { align-self: flex-start; }
+.project-card:hover { border-color: var(--dim); }
 
 /* Workspace view within selector */
 .workspace-view { display: none; }
@@ -305,132 +245,29 @@
 .project-list-view.active { display: block; }
 .project-list-view { display: block; }
 
-.ws-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 0.82rem;
-  padding: 4px 0;
-  margin-bottom: 16px;
-  transition: var(--transition);
-}
-
-.ws-back-btn:hover { color: var(--accent); }
-
-.ws-project-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 20px;
-}
-
-.ws-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-raised);
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.ws-card:hover {
-  border-color: var(--accent);
-  background: var(--bg-hover);
-}
-
-.ws-card-info { flex: 1; }
-
-.ws-card-branch {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 0.88rem;
-  margin-bottom: 2px;
-}
-
-.ws-card-meta {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  display: flex;
-  gap: 12px;
-}
-
-.create-ws-form {
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-raised);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.create-ws-form label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.create-ws-form input[type="text"],
-.create-ws-form select {
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-input);
-  color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-}
-
-.create-ws-form input[type="text"]:focus,
-.create-ws-form select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-dim);
-}
-
-.create-ws-form .checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.82rem;
-}
-
-.create-ws-form .checkbox-row input[type="checkbox"] {
-  accent-color: var(--accent);
-}
-
 .command-block {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-base);
+  border: 1px solid var(--ln);
+  border-radius: var(--r-sm);
+  background: var(--bg);
   margin-top: 8px;
 }
 
 .command-block code {
   flex: 1;
-  font-family: var(--font-mono);
+  font-family: var(--f-mono);
   font-size: 0.78rem;
-  color: var(--accent);
+  color: var(--pr);
   word-break: break-all;
 }
 
 .command-block .copy-btn {
   background: none;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
+  border: 1px solid var(--ln);
+  color: var(--dim);
   cursor: pointer;
   padding: 4px 10px;
   border-radius: 4px;
@@ -440,45 +277,12 @@
 }
 
 .command-block .copy-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--pr);
+  color: var(--pr);
 }
 
 .command-block .copy-btn.copied {
-  border-color: var(--success);
-  color: var(--success);
+  border-color: var(--ok);
+  color: var(--ok);
 }
 
-.ws-result-card {
-  padding: 18px;
-  border: 1px solid var(--success);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--success) 5%, var(--bg-raised));
-  margin-top: 16px;
-}
-
-.ws-result-card h4 {
-  font-size: 0.88rem;
-  margin-bottom: 8px;
-  color: var(--success);
-}
-
-.ws-result-card .ws-result-path {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-}
-
-.inline-error {
-  font-size: 0.78rem;
-  color: var(--danger);
-  margin-top: 6px;
-}
-
-.no-items-msg {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  font-style: italic;
-  padding: 12px 16px;
-}

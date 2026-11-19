@@ -203,7 +203,7 @@ function renderSetupLanguages(profiles) {
       + '<label class="ws-checkbox-label" style="flex: 1;">'
       + '<input type="checkbox" class="setup-language-checkbox" data-profile-id="' + id + '">'
       + '<span>' + name + '</span>'
-      + (language ? '<span style="color: var(--text-muted); font-size: 0.78rem;">(' + language + ')</span>' : '')
+      + (language ? '<span style="color: var(--dim); font-size: 0.78rem;">(' + language + ')</span>' : '')
       + '</label>'
       + '<button class="btn xs danger" onclick="deleteVerificationProfile(' + id + ')">&times;</button>'
       + '</div>';
@@ -212,8 +212,8 @@ function renderSetupLanguages(profiles) {
   var customHtml = _setupCustomProfiles.map(function(cp, index) {
     return '<div class="setup-lang-item" style="display: flex; align-items: center; gap: 8px;">'
       + '<span style="font-size: 0.82rem;">' + _wsEscape(cp.name) + '</span>'
-      + (cp.config ? '<span style="color: var(--text-muted); font-size: 0.78rem;">(' + _wsEscape(cp.config) + ')</span>' : '')
-      + '<span class="badge setup-custom-badge">custom</span>'
+      + (cp.config ? '<span style="color: var(--dim); font-size: 0.78rem;">(' + _wsEscape(cp.config) + ')</span>' : '')
+      + '<span class="pill info">custom</span>'
       + '<button class="btn xs ml-auto" onclick="removeCustomProfile(' + index + ')">' + t('setup.removeToolBtn') + '</button>'
       + '</div>';
   }).join('');

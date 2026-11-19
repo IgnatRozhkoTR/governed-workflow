@@ -119,7 +119,7 @@ async function renderAdvanceModeSection(container, projectId) {
     + _amRenderRows(container)
     + '</div>'
     + '<div class="advance-modes__footer">'
-    + '<button class="btn btn-primary advance-modes__save-btn" disabled onclick="_amSave(this.closest(\'.advance-modes__container\'))">'
+    + '<button class="btn pri advance-modes__save-btn" disabled onclick="_amSave(this.closest(\'.advance-modes__container\'))">'
     + (typeof t === 'function' ? t('buttons.save') : 'Save')
     + '</button>'
     + '</div>';

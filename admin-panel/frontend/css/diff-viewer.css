@@ -37,14 +37,21 @@
   background: transparent;
 }
 
-.diff-controls .badge { margin-left: auto; }
+.md-toggle { margin-left: 12px; }
 
-.toggle-group {
-  display: inline-flex;
-  padding: 3px;
-  gap: 2px;
-  border-radius: 999px;
-  background: var(--sf2);
+.explorer-search { flex: 1; max-width: 300px; }
+
+@media (min-width: 601px) {
+  #panel-changes .diff-controls { gap: 8px; }
+  #diffSourceToggle { order: 1; }
+  #diffModeToggle { order: 2; }
+  #diffBaseSelect { order: 3; width: 150px; }
+  #diffRepoSelect { order: 4; width: 150px; }
+  #diffFileSearch { order: 5; width: 150px; }
+  #viewModeToggle { order: 6; }
+  #historyToggleBtn { order: 7; margin-left: auto; }
+  #viewFileBtn { order: 8; }
+  #diffFileCount { display: none; }
 }
 
 .diff-controls input.ws-input {
@@ -93,16 +100,16 @@
   z-index: 50;
   max-height: 300px;
   overflow-y: auto;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
+  background: var(--bg);
+  border: 1px solid var(--ln);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shpop);
 }
 
 .filter-select-option {
   padding: 6px 10px;
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--dim);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -111,43 +118,23 @@
 
 .filter-select-option:hover,
 .filter-select-option.highlighted {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--sf3);
+  color: var(--tx);
 }
 
 .filter-select-option.selected {
-  color: var(--accent);
+  color: var(--pr);
   font-weight: 600;
 }
 
 .filter-select-option.no-matches {
   cursor: default;
-  color: var(--text-muted);
+  color: var(--dim);
 }
 
 .filter-select-option.no-matches:hover {
   background: none;
-  color: var(--text-muted);
-}
-
-.toggle-opt {
-  height: 28px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
   color: var(--dim);
-  font-family: var(--f-ui);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.toggle-opt.active {
-  background: var(--sf);
-  color: var(--tx);
-  box-shadow: var(--sh);
 }
 
 .diff-layout {
@@ -343,34 +330,6 @@
   height: calc(100% - 49px);
 }
 
-.explorer-code-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
-
-.explorer-line-num {
-  width: 1px;
-  padding: 0 12px;
-  text-align: right;
-  color: var(--text-muted);
-  user-select: none;
-  white-space: nowrap;
-  vertical-align: top;
-  opacity: 0.5;
-}
-
-.explorer-line-code {
-  padding: 0 16px;
-  white-space: pre;
-}
-
-.explorer-code-table tr:hover {
-  background: var(--bg-hover);
-}
-
 .monaco-body {
   overflow: hidden;
 }
@@ -384,45 +343,12 @@
   overflow: hidden;
 }
 
-.explorer-markdown {
-  padding: 16px 24px;
-  font-size: 0.85rem;
-  line-height: 1.6;
-  color: var(--text-secondary);
-}
-
-.explorer-markdown h1, .explorer-markdown h2, .explorer-markdown h3 {
-  color: var(--text-primary);
-  margin-top: 1em;
-}
-
-.explorer-markdown code {
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  background: var(--bg-raised);
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-
-.explorer-markdown pre {
-  background: var(--bg-raised);
-  padding: 12px;
-  border-radius: var(--radius-sm);
-  overflow-x: auto;
-}
-
-.explorer-markdown pre code {
-  background: none;
-  padding: 0;
-}
-
-
 .diff-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--text-muted);
+  color: var(--dim);
   font-size: 0.88rem;
 }
 
@@ -517,7 +443,7 @@ td.d2h-code-side-linenumber:hover {
   padding: 16px 24px;
   font-size: 0.88rem;
   line-height: 1.6;
-  color: var(--text-primary);
+  color: var(--tx);
 }
 
 .md-preview:focus {
@@ -530,16 +456,16 @@ td.d2h-code-side-linenumber:hover {
 }
 
 .md-preview code {
-  background: var(--bg-raised);
+  background: var(--sf2);
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 0.84rem;
 }
 
 .md-preview pre {
-  background: var(--bg-raised);
+  background: var(--sf2);
   padding: 12px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
   overflow-x: auto;
 }
 
@@ -555,19 +481,19 @@ td.d2h-code-side-linenumber:hover {
 }
 
 .md-preview th, .md-preview td {
-  border: 1px solid var(--border);
+  border: 1px solid var(--ln);
   padding: 6px 10px;
 }
 
 .md-preview th {
-  background: var(--bg-input);
+  background: var(--bg);
 }
 
 .md-preview blockquote {
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--pr);
   margin: 8px 0;
   padding: 4px 12px;
-  color: var(--text-secondary);
+  color: var(--dim);
 }
 
 .md-preview ul, .md-preview ol {
@@ -579,7 +505,7 @@ td.d2h-code-side-linenumber:hover {
 }
 
 .md-preview a {
-  color: var(--accent);
+  color: var(--pr);
 }
 
 .md-mermaid {
@@ -828,11 +754,11 @@ td.ann-gutter-stale { box-shadow: inset 3px 0 0 var(--dim); }
   #panel-changes .diff-controls #diffModeToggle,
   #panel-changes .diff-controls #viewModeToggle,
   #panel-changes .diff-controls #viewFileBtn { display: none !important; }
-  #panel-changes .diff-controls .badge { margin-left: auto; }
-  #panel-changes .filter-select-input.ws-input { height: 44px; border-radius: var(--r-md); font-size: 14px; }
-  #panel-changes #diffFileSearch { height: 44px; font-size: 14px; }
-  #panel-changes .toggle-opt { height: 36px; padding: 0 14px; }
-  #panel-changes .toggle-group { max-width: 100%; }
+  #panel-changes .md-toggle { margin-left: 12px; }
+  #panel-changes .filter-select-input.ws-input { height: 44px; border-radius: var(--r-md); font-size: 16px; }
+  #panel-changes #diffFileSearch { height: 44px; font-size: 16px; }
+  #panel-changes .seg button { height: 44px; padding: 0 14px; }
+  #panel-changes .seg { max-width: 100%; flex-wrap: wrap; }
 
   #panel-changes .diff-layout { flex-direction: column; overflow: visible; }
   #panel-changes .diff-file-list {
@@ -874,7 +800,7 @@ td.ann-gutter-stale { box-shadow: inset 3px 0 0 var(--dim); }
   .ann-block { margin: 8px; }
 
   #panel-files .files-view { height: auto; overflow: visible; }
-  #panel-files .diff-controls input.ws-input { flex: 1 1 100%; max-width: 100% !important; height: 44px !important; font-size: 14px !important; }
+  #panel-files .diff-controls input.ws-input { flex: 1 1 100%; max-width: 100% !important; height: 44px !important; font-size: 16px !important; }
   #panel-files .diff-layout { flex-direction: column; overflow: visible; }
   #panel-files .diff-file-list {
     width: 100%;
@@ -896,3 +822,7 @@ td.ann-gutter-stale { box-shadow: inset 3px 0 0 var(--dim); }
   #panel-changes .diff-file-list .file-dir.collapsed + .dir-children { display: none; }
   #panel-files #fileExplorerSearch { flex: 1 1 100% !important; max-width: 100% !important; }
 }
+
+.history-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+.explorer-dir-status { padding: 6px 14px; font-size: 12px; color: var(--dim); }
+.explorer-dir-status.bad { color: var(--bad); }

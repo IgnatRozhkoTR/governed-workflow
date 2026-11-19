@@ -1,7 +1,7 @@
 /* ═══ VERIFICATION PROFILES ═══ */
 .verification-profile-card {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border: 1px solid var(--ln);
+    border-radius: var(--r-sm);
     margin-bottom: 8px;
     overflow: hidden;
 }
@@ -11,21 +11,21 @@
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
-    background: var(--bg-raised);
-    border-bottom: 1px solid var(--border);
+    background: var(--sf2);
+    border-bottom: 1px solid var(--ln);
 }
 
 .verification-profile-name {
     font-size: 0.82rem;
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--tx);
 }
 
 .subpath-badge {
     font-size: 0.7rem;
     font-weight: 400;
-    color: var(--text-muted);
-    background: var(--bg-primary);
+    color: var(--dim);
+    background: var(--bg);
     padding: 1px 5px;
     border-radius: 3px;
     margin-left: 6px;
@@ -53,12 +53,12 @@
 }
 .step-toggle input { margin: 0; }
 
-.step-name { color: var(--text-primary); }
+.step-name { color: var(--tx); }
 
 .step-command {
     font-size: 0.72rem;
-    color: var(--text-muted);
-    background: var(--bg-primary);
+    color: var(--dim);
+    background: var(--bg);
     padding: 1px 5px;
     border-radius: 3px;
     overflow: hidden;
@@ -87,22 +87,16 @@
     margin-top: 8px;
 }
 .verification-assign-row select, .verification-assign-row input {
-    font-size: 0.8rem;
-    padding: 6px 10px;
-    background: var(--bg-raised);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    height: 36px;
+    font-size: 14px;
+    padding: 0 12px;
+    background: var(--bg);
+    color: var(--tx);
+    border: 1px solid var(--ln);
+    border-radius: var(--r-md);
 }
 .verification-assign-row select { min-width: 220px; }
 .verification-assign-row input { width: 160px; }
-
-/* Match the Assign button's height to the select/input's 6px vertical
-   padding + 0.8rem font so the row doesn't look like a short button next
-   to tall controls. */
-.verification-assign-row .btn-sm {
-    padding: 7px 14px;
-}
 
 /* Results */
 .verification-run { display: flex; flex-direction: column; gap: 10px; }

@@ -13,15 +13,15 @@ function _phaseLabel(phaseObj) {
 function _phaseBadges(phaseObj) {
   var badges = '';
   if (phaseObj.always_on) {
-    badges += '<span class="badge phase-settings__badge phase-settings__badge--always-on">'
+    badges += '<span class="pill phase-settings__badge phase-settings__badge--always-on">'
       + _t('labels.alwaysOn') + '</span>';
   }
   if (phaseObj.is_user_gate) {
-    badges += '<span class="badge phase-settings__badge phase-settings__badge--user-gate">'
+    badges += '<span class="pill phase-settings__badge phase-settings__badge--user-gate">'
       + _t('labels.userGate') + '</span>';
   }
   if (phaseObj.templated) {
-    badges += '<span class="badge phase-settings__badge phase-settings__badge--per-sub-phase">'
+    badges += '<span class="pill phase-settings__badge phase-settings__badge--per-sub-phase">'
       + _t('labels.perSubPhase') + '</span>';
   }
   return badges;
@@ -29,7 +29,7 @@ function _phaseBadges(phaseObj) {
 
 function _renderPhaseRows(phases, enabledMap, endpointBase, scope, pendingSettings) {
   if (phases.length === 0) {
-    return '<div class="phase-settings__empty">No phases available.</div>';
+    return '<div class="phase-settings__empty">' + escapeHtml(t('phaseSettings.noPhases')) + '</div>';
   }
 
   return phases.map(function(phase) {

@@ -59,7 +59,7 @@ function _buildResearchFindingHtml(entry, finding, index) {
     (proofHtml ? '<div class="finding-proof">' + proofHtml + '</div>' : '') +
     (proof.snippet ? '<div class="finding-snippet" id="' + snippetId + '"><code>' + escapeHtml(proof.snippet) + '</code></div>' :
      (proof.snippet_start && proof.snippet_end ? '<div class="finding-snippet" id="' + snippetId + '"><code>' + t('research.loading') + '</code></div>' : '')) +
-    (proofType === 'web' && proof.quote ? '<div class="finding-snippet visible" style="border-left-color: var(--warning);"><code>' + escapeHtml(proof.quote) + '</code></div>' : '') +
+    (proofType === 'web' && proof.quote ? '<div class="finding-snippet visible" style="border-left-color: var(--warn);"><code>' + escapeHtml(proof.quote) + '</code></div>' : '') +
     (details ? '<div class="finding-evidence">' + escapeHtml(details) + '</div>' : '') +
     '<div class="finding-comment">' + renderCommentIcon('research', commentTarget) + '</div>' +
     '</div>';
@@ -168,7 +168,7 @@ function _ensureFilePreviewModal() {
 
 function _buildFilePreviewLine(lineNum, lineContent, highlightStart, highlightEnd, filePath) {
   var isHl = highlightStart && highlightEnd && lineNum >= highlightStart && lineNum <= highlightEnd;
-  var cls = isHl ? ' style="background: var(--accent-dim);"' : '';
+  var cls = isHl ? ' style="background: var(--prbg);"' : '';
   var lineComments = getLineComments('file', filePath, lineNum);
   var indicatorHtml = lineComments.length > 0 ? '<span class="line-comment-indicator" data-line="' + lineNum + '">' + lineComments.length + '</span>' : '';
   var hasCommentCls = lineComments.length > 0 ? ' line-has-comment' : '';

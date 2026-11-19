@@ -7,9 +7,20 @@
 
 @media (min-width: 601px) {
   .phone-only { display: none !important; }
+  .ws-head__top { flex-wrap: wrap; }
+  .ws-head__id { flex: 1 1 360px; }
+  .ws-head__actions { margin-left: auto; }
 }
 @media (max-width: 600px) {
   .desktop-only { display: none !important; }
+}
+@media (min-width: 601px) and (max-width: 1199px) {
+  :root { --side-w: 244px; }
+  .ws-head { padding-left: 24px; padding-right: 24px; }
+  #splitMain { padding-left: 24px; padding-right: 24px; }
+  .split-active #splitMain { padding-right: 16px; }
+  #wsTabs { gap: 0; }
+  #wsTabs .tab { padding: 0 8px; }
 }
 
 .app-shell {
@@ -23,7 +34,7 @@
   width: var(--side-w);
   flex: none;
   height: 100vh;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 20px 12px;
   display: flex;
   flex-direction: column;
@@ -33,6 +44,7 @@
 }
 .side-scrim { display: none; }
 
+.brandrow, .side-picker, .side-new, .sidefoot { flex: none; }
 .brandrow {
   display: flex;
   align-items: center;
@@ -48,7 +60,7 @@
 .side-picker__btn { width: 100%; justify-content: flex-start; text-align: left; color: var(--tx); }
 .side-picker__menu { left: 0; right: 0; top: calc(100% - 2px); flex-direction: column; }
 
-.side-groups { display: flex; flex-direction: column; gap: 2px; }
+.side-groups { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0 -12px; padding: 0 12px; }
 .grp {
   font-size: 12px;
   font-weight: 600;

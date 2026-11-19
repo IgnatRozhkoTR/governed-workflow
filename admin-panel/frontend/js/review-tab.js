@@ -40,7 +40,7 @@ function renderReviewTab() {
 
     if (roots.length === 0) {
         var empty = document.createElement('div');
-        empty.className = 'no-items-msg';
+        empty.className = 'empty';
         empty.textContent = t('review.noComments');
         container.appendChild(empty);
         return;

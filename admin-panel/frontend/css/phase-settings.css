@@ -124,34 +124,6 @@
   cursor: default;
 }
 
-.project-defaults__row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--ln);
-}
-
-.project-defaults__label {
-  font-size: 14px;
-  color: var(--tx);
-  cursor: pointer;
-}
-
-.project-defaults__desc {
-  font-size: 13px;
-  color: var(--dim);
-  margin-top: 6px;
-  line-height: 1.4;
-}
-
-.advance-modes__section-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dim);
-  margin: 16px 0 6px;
-}
-
 .advance-modes__row {
   display: flex;
   align-items: center;

@@ -68,7 +68,7 @@ function getActiveTabId() {
 }
 
 function _syncTabChrome(tabId) {
-  document.querySelectorAll('.tab-btn, .bnav button[data-tab]').forEach(function(b) {
+  document.querySelectorAll('#wsTabs .tab, .bnav button[data-tab]').forEach(function(b) {
     b.classList.toggle('active', b.dataset.tab === tabId);
     b.classList.toggle('on', b.dataset.tab === tabId);
   });
@@ -80,7 +80,7 @@ function _syncTabChrome(tabId) {
   var splitMain = document.getElementById('splitMain');
   if (splitMain) splitMain.classList.toggle('no-padding', FULL_BLEED_TABS.indexOf(tabId) !== -1);
 
-  var activeTabBtn = document.querySelector('.tab-btn.active');
+  var activeTabBtn = document.querySelector('#wsTabs .tab.active');
   if (activeTabBtn) activeTabBtn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
   if (typeof renderGateBar === 'function') renderGateBar();
@@ -205,7 +205,7 @@ function _activateTabHooks(tabId) {
   }
 }
 
-document.querySelectorAll('.tab-btn').forEach(btn => {
+document.querySelectorAll('#wsTabs .tab').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 

@@ -174,7 +174,7 @@ function _rpRenderRunButton(container, state) {
 
   var btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'btn btn-sm';
+  btn.className = 'btn xs';
   btn.id = 'reviewPipelineRunBtn';
   btn.textContent = t('reviewPipeline.runButton');
   btn.onclick = function() { _rpHandleRunClick(container, workspaceId); };

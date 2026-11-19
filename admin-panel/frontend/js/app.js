@@ -113,6 +113,7 @@ async function initApp() {
   renderPhaseActions();
   renderContext();
   loadVerificationData();
+  loadVerificationResults();
   loadCriteria();
   loadGitConfig();
   loadGitRules();
@@ -123,14 +124,14 @@ async function initApp() {
   if (typeof renderNetworkMode === 'function') renderNetworkMode();
 
   // Restore diff toggle states from localStorage
-  document.querySelectorAll('#viewModeToggle .toggle-opt').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.mode === state.fileView);
+  document.querySelectorAll('#viewModeToggle button').forEach(function(b) {
+    b.classList.toggle('on', b.dataset.mode === state.fileView);
   });
-  document.querySelectorAll('#diffModeToggle .toggle-opt').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.mode === state.diffMode);
+  document.querySelectorAll('#diffModeToggle button').forEach(function(b) {
+    b.classList.toggle('on', b.dataset.mode === state.diffMode);
   });
-  document.querySelectorAll('#diffSourceToggle .toggle-opt').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.mode === state.diffSource);
+  document.querySelectorAll('#diffSourceToggle button').forEach(function(b) {
+    b.classList.toggle('on', b.dataset.mode === state.diffSource);
   });
   hideProjectSelector();
   setupCollapsibleCards();

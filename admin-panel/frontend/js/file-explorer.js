@@ -48,7 +48,7 @@ async function expandExplorerDir(dirPath, dirEl) {
       return;
     }
     dirEl.dataset.loading = 'true';
-    childrenEl.innerHTML = '<div style="padding: 6px 14px; font-size: 0.72rem; color: var(--text-muted);">Loading...</div>';
+    childrenEl.innerHTML = '<div class="explorer-dir-status">' + escapeHtml(t('explorer.loading')) + '</div>';
     childrenEl.style.display = '';
     try {
       var data = await apiGet(explorerApiUrl(ctx, 'path=' + encodeURIComponent(dirPath)));
@@ -56,7 +56,7 @@ async function expandExplorerDir(dirPath, dirEl) {
       childrenEl.innerHTML = '';
       renderExplorerEntries(data.entries || [], childrenEl, dirPath);
     } catch (e) {
-      childrenEl.innerHTML = '<div style="padding: 6px 14px; font-size: 0.72rem; color: var(--danger);">Failed to load</div>';
+      childrenEl.innerHTML = '<div class="explorer-dir-status bad">' + escapeHtml(t('explorer.dirLoadFailed')) + '</div>';
     }
     delete dirEl.dataset.loading;
   } else {
@@ -104,8 +104,6 @@ function renderExplorerLazy() {
 
   var countEl = document.getElementById('explorerCount');
   if (countEl) countEl.textContent = explorerState.totalFiles;
-  var badgeEl = document.getElementById('explorerFileCount');
-  if (badgeEl) badgeEl.textContent = explorerState.totalFiles + ' files';
 
   var entries = explorerState.dirCache[''] || [];
   renderExplorerEntries(entries, container, '');
@@ -135,8 +133,6 @@ async function filterExplorerFiles(query) {
       var entries = data.entries || [];
       var countEl = document.getElementById('explorerCount');
       if (countEl) countEl.textContent = entries.length;
-      var badgeEl = document.getElementById('explorerFileCount');
-      if (badgeEl) badgeEl.textContent = entries.length + ' results';
 
       entries.forEach(function(entry) {
         var div = document.createElement('div');
@@ -199,17 +195,16 @@ function renderExplorerContent(path, lines, lineNumber) {
 
   if (isMd && typeof marked !== 'undefined') {
     var toggle = document.createElement('div');
-    toggle.className = 'toggle-group md-toggle';
-    toggle.style.marginLeft = '12px';
+    toggle.className = 'seg md-toggle';
 
     var srcBtn = document.createElement('button');
-    srcBtn.className = 'toggle-opt' + (explorerState.mdMode === 'source' ? ' active' : '');
+    srcBtn.className = (explorerState.mdMode === 'source' ? 'on' : '');
     srcBtn.dataset.mode = 'source';
     srcBtn.textContent = t('buttons.source');
     srcBtn.onclick = function() { setExplorerMdMode('source'); };
 
     var prevBtn = document.createElement('button');
-    prevBtn.className = 'toggle-opt' + (explorerState.mdMode === 'preview' ? ' active' : '');
+    prevBtn.className = (explorerState.mdMode === 'preview' ? 'on' : '');
     prevBtn.dataset.mode = 'preview';
     prevBtn.textContent = t('buttons.preview');
     prevBtn.onclick = function() { setExplorerMdMode('preview'); };
@@ -325,8 +320,8 @@ function setExplorerMdMode(mode) {
   if (_explorerFileLines.length > 0 && explorerState.selectedFile) {
     renderExplorerContent(explorerState.selectedFile, _explorerFileLines);
   }
-  document.querySelectorAll('.md-toggle .toggle-opt').forEach(function(btn) {
-    btn.classList.toggle('active', btn.dataset.mode === mode);
+  document.querySelectorAll('.md-toggle button').forEach(function(btn) {
+    btn.classList.toggle('on', btn.dataset.mode === mode);
   });
 }
 

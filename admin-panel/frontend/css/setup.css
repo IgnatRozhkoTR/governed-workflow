@@ -121,14 +121,6 @@
   color: var(--tx);
 }
 
-.setup-custom-badge {
-  font-size: 12px;
-  padding: 1px 6px;
-  background: var(--pr);
-  color: var(--prink);
-  border-radius: 3px;
-  margin-left: 4px;
-}
 
 /* ─── Custom language form ────────────────────── */
 
