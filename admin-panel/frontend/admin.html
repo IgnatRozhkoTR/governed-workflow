@@ -50,7 +50,7 @@
       noteBkgColor: c.warnbg, noteBorderColor: c.warn, noteTextColor: c.tx
     } };
   }
-  function getMermaidInit() { var t = getMermaidTheme(); var vars = Object.assign({}, t.themeVariables || {}, {fontSize: '12px'}); var varsStr = Object.keys(vars).map(function(k) { return "'" + k + "': '" + vars[k] + "'"; }).join(', '); return "%%{init: {'theme': '" + t.theme + "', 'themeVariables': {" + varsStr + "}, 'flowchart': {'nodeSpacing': 25, 'rankSpacing': 45, 'padding': 10, 'useMaxWidth': false}, 'classDiagram': {'useMaxWidth': false}}}%%"; }
+  function getMermaidInit() { var t = getMermaidTheme(); var vars = Object.assign({}, t.themeVariables || {}, {fontSize: '12px'}); var varsStr = Object.keys(vars).map(function(k) { return "'" + k + "': '" + vars[k] + "'"; }).join(', '); return "%%{init: {'theme': '" + t.theme + "', 'themeVariables': {" + varsStr + "}, 'flowchart': {'nodeSpacing': 25, 'rankSpacing': 45, 'padding': 10, 'useMaxWidth': false, 'htmlLabels': true, 'subGraphTitleMargin': {'top': 16, 'bottom': 16}}, 'classDiagram': {'useMaxWidth': false}}}%%"; }
   mermaid.initialize(Object.assign({ startOnLoad: false }, getMermaidTheme()));
 </script>
 <link rel="stylesheet" href="css/fonts.css?v=1">
@@ -217,7 +217,8 @@
         <section class="card">
           <div class="ch">
             <h3 class="grow" data-i18n="overview.verification">Verification</h3>
-            <button class="btn" id="runVerificationBtn" onclick="runVerificationManual()" data-i18n="verification.run">Run</button>
+            <span class="sm dim" id="verificationMeta"></span>
+            <button class="btn" id="runVerificationBtn" onclick="runVerificationManual()" data-icon="play"><span data-i18n="verification.run">Run</span></button>
           </div>
           <div class="cb" id="verificationResults"></div>
         </section>
@@ -608,176 +609,163 @@
   <!-- ─── PRE-PLANNING ─── -->
   <div class="tab-panel" id="panel-preplanning">
 
-    <!-- Research Summaries -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title" data-i18n="preplanning.researchSummaries">Research Summaries</span>
-      </div>
-      <div class="card-body" id="ppResearchList"></div>
-    </div>
-
-    <!-- Impact Analysis -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title" data-i18n="preplanning.impactAnalysis">Impact Analysis</span>
-      </div>
-      <div class="card-body" id="ppImpactContent"></div>
-    </div>
-
-    <!-- Discussions -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title" data-i18n="preplanning.discussions">Discussions</span>
-        <div style="display: flex; gap: 6px; align-items: center;">
-          <span class="badge badge-danger" id="ppResearchDiscBadge" style="display:none;"></span>
-          <span class="badge badge-info" id="ppDiscussionsBadge">0</span>
-          <button class="btn btn-sm btn-outline" id="ppToggleResolved" onclick="togglePPResolved()" style="font-size:0.65rem;padding:1px 6px;">Show resolved</button>
-          <button class="btn btn-sm btn-outline" id="ppToggleProven" onclick="togglePPProven()" style="font-size:0.65rem;padding:1px 6px;">Show proven</button>
-        </div>
-      </div>
-      <div class="card-body">
-        <div id="ppDiscussionsList"></div>
-        <div class="qa-add-form">
-          <select id="ppNewDiscussionType" class="phase-select" style="width:auto;min-width:90px;font-size:0.75rem;padding:4px 6px;">
-            <option value="general" data-i18n="discussionType.general">General</option>
-            <option value="research" data-i18n="discussionType.research">Research</option>
-          </select>
-          <input type="text" class="context-input" id="ppNewDiscussionInput" placeholder="Raise a discussion point..." data-i18n-placeholder="placeholders.raiseDiscussion" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addPPDiscussion();}">
-          <button class="btn btn-sm" onclick="addPPDiscussion()" data-i18n="buttons.add">Add</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Gate Actions (visible only at phase 1.4) -->
     <div id="ppGateActions"></div>
+
+    <div class="cols">
+      <div class="wide vs g20">
+        <section class="card">
+          <div class="ch">
+            <h3 class="grow" data-i18n="preplanning.researchSummaries">Research Summaries</h3>
+            <span class="sm dim" id="ppResearchTally"></span>
+          </div>
+          <div class="cb flush" id="ppResearchList"></div>
+        </section>
+
+        <section class="card">
+          <div class="ch"><h3 data-i18n="preplanning.impactAnalysis">Impact Analysis</h3></div>
+          <div class="cb" id="ppImpactContent"></div>
+        </section>
+      </div>
+
+      <div class="narrow">
+        <section class="card">
+          <div class="ch">
+            <h3 class="grow" data-i18n="preplanning.discussions">Discussions</h3>
+            <span class="pill bad" id="ppResearchDiscBadge" style="display:none;"></span>
+            <span class="pill info" id="ppDiscussionsBadge">0</span>
+          </div>
+          <div class="cb">
+            <div class="hs wrap">
+              <button class="btn xs" id="ppToggleResolved" onclick="togglePPResolved()" data-i18n="discussions.showResolved">Show resolved</button>
+              <button class="btn xs" id="ppToggleProven" onclick="togglePPProven()" data-i18n="discussions.showProven">Show proven</button>
+            </div>
+            <div class="vs g12" id="ppDiscussionsList"></div>
+            <div class="vs">
+              <select id="ppNewDiscussionType" class="sel">
+                <option value="general" data-i18n="discussionType.general">General</option>
+                <option value="research" data-i18n="discussionType.research">Research</option>
+              </select>
+              <textarea class="ta" id="ppNewDiscussionInput" placeholder="Raise a discussion point..." data-i18n-placeholder="placeholders.raiseDiscussion"></textarea>
+              <div><button class="btn pri" onclick="addPPDiscussion()" data-i18n="buttons.add">Add</button></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
 
   </div>
 
   <!-- ─── PLAN REVIEW ─── -->
   <div class="tab-panel" id="panel-plan">
-    <div class="card" style="margin-bottom: 16px;">
-      <div class="card-header">
-        <span class="card-title" data-i18n="cards.systemArchitecture">System Architecture</span>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="comment-icon-header" onclick="toggleCommentThread('architecture', 'System Diagram', event)" title="Comments" data-i18n-title="comments.title">💬</span>
+    <div id="planGate"></div>
+    <div id="planDescription"></div>
+
+    <div class="vs g12 plan-folds">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title grow" data-i18n="cards.systemArchitecture">System Architecture</span>
+          <button class="btn ic xs comment-icon-header" onclick="toggleCommentThread('architecture', 'System Diagram', event)" title="Comments" data-i18n-title="comments.title" data-icon="comment" data-icon-size="14"></button>
           <div class="diagram-zoom-controls">
-            <button class="diagram-zoom-btn" onclick="zoomSystemDiagram(-0.15)" title="Zoom out">−</button>
+            <button class="diagram-zoom-btn" onclick="zoomSystemDiagram(-0.15)" title="Zoom out" data-i18n-title="plan.zoomOut">−</button>
             <span class="diagram-zoom-level" id="systemDiagramZoomLevel">100%</span>
-            <button class="diagram-zoom-btn" onclick="zoomSystemDiagram(0.15)" title="Zoom in">+</button>
+            <button class="diagram-zoom-btn" onclick="zoomSystemDiagram(0.15)" title="Zoom in" data-i18n-title="plan.zoomIn">+</button>
           </div>
-          <button class="diagram-expand-btn" onclick="expandDiagram('systemDiagram')" title="Expand">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <polyline points="9 21 3 21 3 15"></polyline>
-              <line x1="21" y1="3" x2="14" y2="10"></line>
-              <line x1="3" y1="21" x2="10" y2="14"></line>
-            </svg>
-          </button>
+          <button class="btn ic xs" onclick="expandDiagram('systemDiagram')" title="Expand" data-i18n-title="plan.expand" data-icon="expand" data-icon-size="14"></button>
+        </div>
+        <div class="card-body">
+          <div id="systemDiagram"></div>
         </div>
       </div>
-      <div class="card-body">
-        <div id="systemDiagram"></div>
-      </div>
-    </div>
 
-    <div class="card" style="margin-bottom: 16px;">
-      <div class="card-header">
-        <span class="card-title" data-i18n="cards.executionFlow">Execution Flow</span>
-        <div style="display: flex; align-items: center; gap: 8px;">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title grow" data-i18n="cards.executionFlow">Execution Flow</span>
           <div class="diagram-zoom-controls">
-            <button class="diagram-zoom-btn" onclick="zoomDiagram(-0.15)" title="Zoom out">−</button>
+            <button class="diagram-zoom-btn" onclick="zoomDiagram(-0.15)" title="Zoom out" data-i18n-title="plan.zoomOut">−</button>
             <span class="diagram-zoom-level" id="diagramZoomLevel">100%</span>
-            <button class="diagram-zoom-btn" onclick="zoomDiagram(0.15)" title="Zoom in">+</button>
+            <button class="diagram-zoom-btn" onclick="zoomDiagram(0.15)" title="Zoom in" data-i18n-title="plan.zoomIn">+</button>
           </div>
-          <button class="diagram-expand-btn" onclick="expandDiagram('planDiagram')" title="Expand">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <polyline points="9 21 3 21 3 15"></polyline>
-              <line x1="21" y1="3" x2="14" y2="10"></line>
-              <line x1="3" y1="21" x2="10" y2="14"></line>
-            </svg>
-          </button>
+          <button class="btn ic xs" onclick="expandDiagram('planDiagram')" title="Expand" data-i18n-title="plan.expand" data-icon="expand" data-icon-size="14"></button>
+        </div>
+        <div class="card-body">
+          <div id="planDiagram"></div>
         </div>
       </div>
-      <div class="card-body">
-        <div id="planDiagram"></div>
-      </div>
-    </div>
 
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title" id="scopeTitle" data-i18n="cards.scopeContract">Scope Contract</span>
-      </div>
-      <div class="card-body">
-        <div id="scopeSubTabs" style="display: none; margin-bottom: 14px;"></div>
-        <div class="scope-section">
-          <div class="scope-heading">
-            <span style="color: var(--warning);">◆</span> <span data-i18n="scope.mustModify">Must Modify</span>
-            <button class="scope-add-btn" onclick="addScopeEntry('must')" title="Add entry">+</button>
-          </div>
-          <ul class="scope-list" id="scopeMust"></ul>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title grow" id="scopeTitle" data-i18n="cards.scopeContract">Scope Contract</span>
+          <span class="pill info" id="scopeMustCount"></span>
+          <span class="pill" id="scopeMayCount"></span>
         </div>
-        <div class="scope-section">
-          <div class="scope-heading">
-            <span style="color: var(--info);">◇</span> <span data-i18n="scope.mayModify">May Modify</span>
-            <button class="scope-add-btn" onclick="addScopeEntry('may')" title="Add entry">+</button>
-          </div>
-          <ul class="scope-list" id="scopeMay"></ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="card card-primary">
-      <div class="card-header">
-        <span class="card-title" data-i18n="cards.executionPlan">Execution Plan</span>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <span id="planStatusBadge" class="badge badge-warning" data-i18n="badges.pending">Pending</span>
-          <button class="btn btn-sm btn-primary" id="planApproveBtn" data-i18n="buttons.approve">Approve</button>
-          <button class="btn btn-sm btn-danger-outline" id="planRejectBtn" data-i18n="buttons.reject">Reject</button>
-        </div>
-      </div>
-      <div class="card-body" id="planContent"></div>
-    </div>
-
-    <!-- Acceptance Criteria -->
-    <div class="card collapsed" id="criteriaCard">
-      <div class="card-header" style="cursor: pointer;" onclick="this.closest('.card').classList.toggle('collapsed')">
-        <span class="card-title" data-i18n="cards.acceptanceCriteria">Acceptance Criteria</span>
-        <span class="card-collapse-chevron">&#9660;</span>
-      </div>
-      <div class="card-body" id="criteriaBody">
-        <div class="criteria-add-form" style="margin-bottom: 12px;">
-          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-            <select id="criteriaType" class="context-input" style="flex: 0 0 180px;">
-              <option value="unit_test" data-i18n="criteria.unitTest">Unit Test</option>
-              <option value="integration_test" data-i18n="criteria.integrationTest">Integration Test</option>
-              <option value="bdd_scenario" data-i18n="criteria.bddScenario">BDD Scenario</option>
-              <option value="custom" data-i18n="criteria.custom">Custom</option>
-            </select>
-            <input type="text" id="criteriaDesc" class="context-input" placeholder="Description..." data-i18n-placeholder="placeholders.description" style="flex: 1;">
-            <button class="btn btn-sm" onclick="addCriterion()" data-i18n="buttons.add">Add</button>
-          </div>
-          <div id="criteriaDetailsForm" style="display: none; margin-bottom: 8px;">
-            <div class="criteria-detail-fields">
-              <input type="text" id="criteriaFile" class="context-input" placeholder="File path (e.g. src/test/UserServiceTest.java)" data-i18n-placeholder="placeholders.filePath" style="margin-bottom: 4px;">
-              <input type="text" id="criteriaTestNames" class="context-input" placeholder="Test/scenario names (comma-separated)" data-i18n-placeholder="placeholders.testNames">
+        <div class="card-body">
+          <div id="scopeSubTabs" style="display: none; margin-bottom: 14px;"></div>
+          <div class="scope-section">
+            <div class="scope-heading">
+              <span style="color: var(--warn);">◆</span> <span data-i18n="scope.mustModify">Must Modify</span>
+              <button class="scope-add-btn" onclick="addScopeEntry('must')" title="Add entry">+</button>
             </div>
+            <ul class="scope-list" id="scopeMust"></ul>
+          </div>
+          <div class="scope-section">
+            <div class="scope-heading">
+              <span style="color: var(--pr);">◇</span> <span data-i18n="scope.mayModify">May Modify</span>
+              <button class="scope-add-btn" onclick="addScopeEntry('may')" title="Add entry">+</button>
+            </div>
+            <ul class="scope-list" id="scopeMay"></ul>
           </div>
         </div>
-        <div id="criteriaList"></div>
+      </div>
+    </div>
+
+    <div class="cols plan-main">
+      <div class="wide">
+        <section class="card">
+          <div class="ch">
+            <h3 class="grow" data-i18n="cards.executionPlan">Execution Plan</h3>
+            <span id="planStatusBadge" class="badge badge-warning" data-i18n="badges.pending">Pending</span>
+            <button class="btn xs pri" id="planApproveBtn" data-i18n="buttons.approve">Approve</button>
+            <button class="btn xs danger" id="planRejectBtn" data-i18n="buttons.reject">Reject</button>
+          </div>
+          <div class="cb" id="planContent"></div>
+        </section>
+      </div>
+
+      <div class="narrow">
+        <section class="card" id="criteriaCard">
+          <div class="ch">
+            <h3 class="grow" data-i18n="cards.acceptanceCriteria">Acceptance Criteria</h3>
+            <span class="sm dim" id="criteriaTally"></span>
+          </div>
+          <div class="cb flush" id="criteriaList"></div>
+          <div class="cb criteria-add-form" id="criteriaBody">
+            <div class="hs">
+              <select id="criteriaType" class="sel">
+                <option value="unit_test" data-i18n="criteria.unitTest">Unit Test</option>
+                <option value="integration_test" data-i18n="criteria.integrationTest">Integration Test</option>
+                <option value="bdd_scenario" data-i18n="criteria.bddScenario">BDD Scenario</option>
+                <option value="custom" data-i18n="criteria.custom">Custom</option>
+              </select>
+            </div>
+            <input type="text" id="criteriaDesc" class="inp" placeholder="Description..." data-i18n-placeholder="placeholders.description">
+            <div id="criteriaDetailsForm" class="vs" style="display: none;">
+              <input type="text" id="criteriaFile" class="inp mono" placeholder="File path (e.g. src/test/UserServiceTest.java)" data-i18n-placeholder="placeholders.filePath">
+              <input type="text" id="criteriaTestNames" class="inp mono" placeholder="Test/scenario names (comma-separated)" data-i18n-placeholder="placeholders.testNames">
+            </div>
+            <div><button class="btn" onclick="addCriterion()" data-i18n="buttons.add">Add</button></div>
+          </div>
+        </section>
       </div>
     </div>
   </div>
 
   <!-- ─── RESEARCH ─── -->
   <div class="tab-panel" id="panel-research">
-    <div class="card card-primary" id="researchCard">
-      <div class="card-header">
-        <span class="card-title" data-i18n="cards.researchFindings">Research Findings</span>
-        <span class="badge badge-warning" id="researchStatus"></span>
-      </div>
-      <div class="card-body" id="researchFindings"></div>
+    <div class="hs wrap research-head">
+      <h2 class="grow" data-i18n="cards.researchFindings">Research Findings</h2>
+      <span class="pill" id="researchStatus"></span>
     </div>
+    <div class="vs g12" id="researchFindings"></div>
   </div>
 
   <!-- ─── CODE CHANGES ─── -->
@@ -810,18 +798,6 @@
         <button class="btn btn-sm" id="viewFileBtn" style="display: none;" onclick="openSelectedFile()" data-i18n="buttons.viewFile">View File</button>
         <span class="badge badge-info" id="diffFileCount">3 files changed</span>
       </div>
-      <div class="diff-layout">
-        <div class="diff-file-list" id="diffFileList">
-          <div class="diff-file-list-header">
-            <span data-i18n="diff.changedFiles">Changed Files</span>
-            <span style="font-family: var(--font-mono);" id="fileCount">3</span>
-          </div>
-        </div>
-        <div class="diff-resize-handle" id="diffResizeHandle"></div>
-        <div class="diff-content" id="diffContent">
-          <div class="diff-placeholder" data-i18n="diff.selectFile">Select a file to view changes</div>
-        </div>
-      </div>
       <div id="diffHistoryPanel" class="diff-history-panel" style="display: none;">
         <div class="diff-history-body">
           <div class="diff-history-branches" id="diffBranchList"></div>
@@ -832,14 +808,26 @@
               <span id="diffHistoryBranchLabel" class="diff-history-branch-label"></span>
               <span id="diffHistorySelectionCount" class="badge badge-info" style="display: none;"></span>
               <div class="diff-history-panel-actions">
-                <button id="historyRenameBtn" class="btn btn-sm" onclick="historyRename()" disabled title="Rename is only available for the latest local unpushed commit" data-i18n="history.rename">Rename</button>
-                <button id="historyUndoBtn" class="btn btn-sm" onclick="historyUndo()" disabled title="Undo is only available for the latest local unpushed commit" data-i18n="history.undo">Undo</button>
-                <button id="historySquashBtn" class="btn btn-sm" onclick="historySquash()" disabled title="Squash requires a contiguous selection of 2+ local unpushed commits" data-i18n="history.squash">Squash</button>
+                <button id="historyRenameBtn" class="btn xs" onclick="historyRename()" disabled title="Rename is only available for the latest local unpushed commit" data-i18n="history.rename">Rename</button>
+                <button id="historyUndoBtn" class="btn xs" onclick="historyUndo()" disabled title="Undo is only available for the latest local unpushed commit" data-i18n="history.undo">Undo</button>
+                <button id="historySquashBtn" class="btn xs" onclick="historySquash()" disabled title="Squash requires a contiguous selection of 2+ local unpushed commits" data-i18n="history.squash">Squash</button>
               </div>
-              <button class="btn btn-sm" onclick="closeHistoryPanel()" data-i18n="buttons.close">Close</button>
+              <button class="btn xs ghost" onclick="closeHistoryPanel()" data-i18n="buttons.close">Close</button>
             </div>
             <div id="diffHistoryList" class="diff-history-list"></div>
           </div>
+        </div>
+      </div>
+      <div class="diff-layout">
+        <div class="diff-file-list" id="diffFileList">
+          <div class="diff-file-list-header">
+            <span data-i18n="diff.changedFiles">Changed Files</span>
+            <span style="font-family: var(--font-mono);" id="fileCount">3</span>
+          </div>
+        </div>
+        <div class="diff-resize-handle" id="diffResizeHandle"></div>
+        <div class="diff-content" id="diffContent">
+          <div class="diff-placeholder" data-i18n="diff.selectFile">Select a file to view changes</div>
         </div>
       </div>
     </div>
@@ -892,16 +880,20 @@
 
   <!-- ─── REVIEW ─── -->
   <div class="tab-panel" id="panel-review">
-    <div class="card">
-      <div class="card-header">
-        <span data-i18n="tabs.review">Review</span>
-        <div class="card-header__actions">
-          <button class="btn btn-sm" id="reviewShowResolvedBtn" onclick="toggleReviewResolved()" data-i18n="review.showResolved">Show resolved</button>
-          <button class="btn btn-sm" id="reviewResolveAllBtn" onclick="resolveAllOpenReviewIssues(0)" style="display:none;"></button>
-        </div>
+    <section class="card">
+      <div class="ch"><h3 class="grow" data-i18n="cards.reviewPipeline">Review Pipeline</h3></div>
+      <div class="cb" id="reviewPipelineCard"></div>
+    </section>
+    <section class="card">
+      <div class="ch">
+        <h3 data-i18n="review.issuesTitle">Review issues</h3>
+        <span class="pill warn" id="reviewOpenPill" style="display:none;"></span>
+        <span class="grow"></span>
+        <button class="btn xs" id="reviewShowResolvedBtn" onclick="toggleReviewResolved()" data-i18n="review.showResolved">Show resolved</button>
+        <button class="btn xs" id="reviewResolveAllBtn" onclick="resolveAllOpenReviewIssues(0)" style="display:none;"></button>
       </div>
-      <div id="reviewCommentsList"></div>
-    </div>
+      <div class="cb flush" id="reviewCommentsList"></div>
+    </section>
   </div>
 
   <!-- ─── REFLECTION ─── -->
@@ -920,31 +912,42 @@
   <!-- ─── TERMINAL ─── -->
   <div class="tab-panel" id="panel-terminal">
     <div class="terminal-container">
-      <div class="terminal-toolbar">
-        <span class="terminal-status" id="terminalStatus">Disconnected</span>
+      <aside class="term-sessions">
+        <div class="term-sessions__head cap" data-i18n="terminal.sessions">Sessions</div>
         <div id="terminalSessionList" class="terminal-session-list"></div>
-        <div class="terminal-actions">
-          <button class="btn btn-sm" id="terminalConnectBtn" onclick="connectTerminal()">Connect</button>
-          <button class="btn btn-sm btn-outline" id="terminalDisconnectBtn" onclick="disconnectTerminal()" style="display:none;">Disconnect</button>
-          <button class="btn btn-sm btn-outline" id="terminalKillBtn" onclick="killTerminalSession()" style="display:none;" data-i18n="terminal.kill">Kill</button>
+      </aside>
+      <div class="term">
+        <div class="terminal-toolbar">
+          <span class="terminal-status" id="terminalStatus">Disconnected</span>
+          <span class="grow"></span>
+          <div class="terminal-actions">
+            <button class="btn xs" id="terminalConnectBtn" onclick="connectTerminal()">Connect</button>
+            <button class="btn xs" onclick="toggleSplitTerminal()" data-i18n="terminal.sidePanel">Side panel</button>
+            <button class="btn xs" id="terminalDisconnectBtn" onclick="disconnectTerminal()" style="display:none;" data-i18n="terminal.disconnect">Disconnect</button>
+            <button class="btn xs danger" id="terminalKillBtn" onclick="killTerminalSession()" style="display:none;" data-i18n="terminal.kill">Kill</button>
+          </div>
         </div>
+        <div class="gatestrip" id="terminalGateStrip" hidden></div>
+        <div id="terminalContainer"></div>
       </div>
-      <div id="terminalContainer"></div>
     </div>
   </div>
 
 </div><!-- /split-main -->
 <div class="split-handle" id="splitHandle"></div>
 <div class="split-terminal" id="splitTerminal">
-  <div class="split-terminal-toolbar">
-    <span class="terminal-status" id="splitTerminalStatus">Disconnected</span>
-    <div class="terminal-actions">
-      <button class="btn btn-sm" id="splitConnectBtn" onclick="connectSplitTerminal()">Connect</button>
-      <button class="btn btn-sm btn-outline" id="splitDisconnectBtn" onclick="disconnectSplitTerminal()" style="display:none;">Disconnect</button>
-      <button class="btn btn-sm btn-outline" onclick="toggleSplitTerminal()" title="Close" style="padding: 2px 6px; font-size: 0.7rem;">✕</button>
+  <div class="term">
+    <div class="split-terminal-toolbar">
+      <span class="terminal-status" id="splitTerminalStatus">Disconnected</span>
+      <span class="grow"></span>
+      <div class="terminal-actions">
+        <button class="btn xs" id="splitConnectBtn" onclick="connectSplitTerminal()">Connect</button>
+        <button class="btn xs" id="splitDisconnectBtn" onclick="disconnectSplitTerminal()" style="display:none;" data-i18n="terminal.disconnect">Disconnect</button>
+        <button class="btn ic xs" onclick="toggleSplitTerminal()" title="Close" aria-label="Close" data-i18n-title="buttons.close">&times;</button>
+      </div>
     </div>
+    <div id="splitTerminalContainer"></div>
   </div>
-  <div id="splitTerminalContainer"></div>
 </div>
 </div><!-- /split-container -->
 

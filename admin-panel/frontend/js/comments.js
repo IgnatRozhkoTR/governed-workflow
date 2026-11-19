@@ -119,7 +119,7 @@ function renderCommentIcon(scope, target) {
   var hasClass = count > 0 ? ' has-comments' : '';
   var badge = count > 0 ? '<span class="comment-count">' + count + '</span>' : '';
   return '<span class="comment-icon' + hasClass + '" onclick="toggleCommentThread(\'' + escapeAttr(scope) + '\', \'' + escapeAttr(target || '') + '\', event)" title="' + t('comments.title') + '">' +
-    '\u{1F4AC}' + badge + '</span>';
+    cpIcon('comment', 14) + badge + '</span>';
 }
 
 function toggleCommentThread(scope, target, event) {

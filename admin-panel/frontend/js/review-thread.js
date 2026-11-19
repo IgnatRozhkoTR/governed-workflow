@@ -27,52 +27,77 @@ function reviewAuthorLabel(author) {
     .join(' ');
 }
 
+function buildReviewAvatar(author) {
+  var avatar = document.createElement('span');
+  var role = author === 'user' ? '' : (author === 'agent' ? ' ag' : ' rv');
+  avatar.className = 'av' + role;
+  avatar.textContent = reviewAuthorLabel(author).charAt(0).toUpperCase();
+  return avatar;
+}
+
+function buildReviewAuthorLine(author, metaParts) {
+  var line = document.createElement('div');
+  var name = document.createElement('b');
+  name.className = 'review-author review-author-' + author;
+  name.textContent = reviewAuthorLabel(author);
+  line.appendChild(name);
+  metaParts.forEach(function(part) {
+    line.appendChild(document.createTextNode(' '));
+    line.appendChild(part);
+  });
+  return line;
+}
+
+function buildReviewMetaPart(text, className) {
+  var part = document.createElement('span');
+  part.className = className || 'review-meta';
+  part.textContent = text;
+  return part;
+}
+
+function buildReviewMessage(author, metaParts, text) {
+  var message = document.createElement('div');
+  message.className = 'cmt';
+  message.appendChild(buildReviewAvatar(author));
+  var body = document.createElement('div');
+  body.className = 'cmt-body';
+  body.appendChild(buildReviewAuthorLine(author, metaParts));
+  var textEl = document.createElement('div');
+  textEl.className = 'review-thread-text';
+  textEl.textContent = text;
+  body.appendChild(textEl);
+  message.appendChild(body);
+  return message;
+}
+
 function renderReviewThread(comment, options) {
   var opts = options || {};
-
   var thread = document.createElement('div');
   thread.className = 'review-thread' + (comment.resolved ? ' review-thread-resolved' : '');
 
-  thread.appendChild(buildReviewThreadHeader(comment, opts));
-  thread.appendChild(buildReviewThreadText(comment));
-  thread.appendChild(buildReviewThreadReplies(comment));
-  thread.appendChild(buildReviewReplyForm(comment, opts));
-
+  var root = buildReviewMessage(comment.author || 'user', buildReviewRootMeta(comment, opts), comment.text);
+  var rootBody = root.querySelector('.cmt-body');
+  var replyForm = buildReviewReplyForm(comment, opts);
+  rootBody.appendChild(buildReviewActions(comment, opts, replyForm));
+  rootBody.appendChild(replyForm);
+  thread.appendChild(root);
+  (comment.replies || []).forEach(function(reply) {
+    thread.appendChild(buildReviewReply(reply));
+  });
   return thread;
 }
 
-function buildReviewThreadHeader(comment, opts) {
-  var header = document.createElement('div');
-  header.className = 'review-thread-header';
-
-  var author = comment.author || 'user';
-  var authorBadge = document.createElement('span');
-  authorBadge.className = 'review-author review-author-' + author;
-  authorBadge.textContent = reviewAuthorLabel(author);
-  header.appendChild(authorBadge);
-
-  if (opts.showFileInfo && comment.file_path) {
-    var fileBadge = buildReviewFileBadge(comment, opts);
-    header.appendChild(fileBadge);
-  }
-
+function buildReviewRootMeta(comment, opts) {
+  var parts = [];
+  if (opts.showFileInfo && comment.file_path) parts.push(buildReviewFileBadge(comment, opts));
+  if (comment.created_at) parts.push(buildReviewMetaPart(formatRelativeDate(comment.created_at)));
   if (comment.resolution && comment.resolution !== 'open') {
-    var resBadge = document.createElement('span');
-    resBadge.className = 'review-resolution review-resolution-' + comment.resolution;
-    resBadge.textContent = t('review.resolution.' + comment.resolution);
-    header.appendChild(resBadge);
+    parts.push(buildReviewMetaPart(t('review.resolution.' + comment.resolution), 'review-resolution review-resolution-' + comment.resolution));
   }
-
-  var resolveBtn = buildReviewResolveButton(comment, opts);
-  header.appendChild(resolveBtn);
-
-  return header;
+  return parts;
 }
 
 function buildReviewFileBadge(comment, opts) {
-  var badge = document.createElement('span');
-  badge.className = 'review-file-badge';
-
   var label = comment.file_path;
   if (comment.line_start) {
     label += ':' + comment.line_start;
@@ -80,20 +105,34 @@ function buildReviewFileBadge(comment, opts) {
       label += '-' + comment.line_end;
     }
   }
-  badge.textContent = label;
-
+  var badge = buildReviewMetaPart(label, 'review-file-badge');
   if (typeof opts.onFileClick === 'function') {
     badge.addEventListener('click', function() {
       opts.onFileClick(comment.file_path, comment.line_start, comment.line_end);
     });
   }
-
   return badge;
+}
+
+function buildReviewActions(comment, opts, replyForm) {
+  var actions = document.createElement('div');
+  actions.className = 'cmt-actions';
+
+  var replyBtn = document.createElement('button');
+  replyBtn.className = 'btn xs review-reply-toggle';
+  replyBtn.textContent = t('buttons.reply');
+  replyBtn.addEventListener('click', function() {
+    replyForm.hidden = !replyForm.hidden;
+    if (!replyForm.hidden) replyForm.querySelector('input').focus();
+  });
+  actions.appendChild(replyBtn);
+  actions.appendChild(buildReviewResolveButton(comment, opts));
+  return actions;
 }
 
 function buildReviewResolveButton(comment, opts) {
   var btn = document.createElement('button');
-  btn.className = 'review-resolve-btn';
+  btn.className = 'btn xs review-resolve-btn';
   btn.textContent = comment.resolved ? t('comments.unresolve') : t('buttons.resolve');
 
   if (typeof opts.onResolve === 'function') {
@@ -105,58 +144,17 @@ function buildReviewResolveButton(comment, opts) {
   return btn;
 }
 
-function buildReviewThreadText(comment) {
-  var textEl = document.createElement('div');
-  textEl.className = 'review-thread-text';
-  textEl.textContent = comment.text;
-  return textEl;
-}
-
-function buildReviewThreadReplies(comment) {
-  var repliesEl = document.createElement('div');
-  repliesEl.className = 'review-thread-replies';
-
-  var replies = comment.replies || [];
-  replies.forEach(function(reply) {
-    repliesEl.appendChild(buildReviewReply(reply));
-  });
-
-  return repliesEl;
-}
-
 function buildReviewReply(reply) {
-  var replyEl = document.createElement('div');
-  replyEl.className = 'review-reply';
-
-  var meta = document.createElement('div');
-  meta.className = 'review-reply-meta';
-
-  var author = reply.author || 'user';
-  var authorBadge = document.createElement('span');
-  authorBadge.className = 'review-author review-author-' + author;
-  authorBadge.textContent = reviewAuthorLabel(author);
-  meta.appendChild(authorBadge);
-
-  if (reply.created_at) {
-    var timeSpan = document.createElement('span');
-    timeSpan.style.marginLeft = '6px';
-    timeSpan.textContent = formatRelativeDate(reply.created_at);
-    meta.appendChild(timeSpan);
-  }
-
-  replyEl.appendChild(meta);
-
-  var textEl = document.createElement('div');
-  textEl.className = 'review-reply-text';
-  textEl.textContent = reply.text;
-  replyEl.appendChild(textEl);
-
+  var metaParts = reply.created_at ? [buildReviewMetaPart(formatRelativeDate(reply.created_at))] : [];
+  var replyEl = buildReviewMessage(reply.author || 'user', metaParts, reply.text);
+  replyEl.classList.add('review-reply');
   return replyEl;
 }
 
 function buildReviewReplyForm(comment, opts) {
   var form = document.createElement('div');
   form.className = 'review-reply-form';
+  form.hidden = true;
 
   var input = document.createElement('input');
   input.type = 'text';
@@ -164,7 +162,7 @@ function buildReviewReplyForm(comment, opts) {
   input.placeholder = t('placeholders.replyDots');
 
   var btn = document.createElement('button');
-  btn.className = 'review-reply-btn';
+  btn.className = 'btn xs pri review-reply-btn';
   btn.textContent = t('buttons.reply');
 
   function submitReply() {

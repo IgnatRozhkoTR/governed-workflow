@@ -242,7 +242,7 @@ function renderFileList() {
       div.dataset.path = f.path;
       div.onclick = (e) => { if (!e.target.closest('.comment-icon, .go-to-file-btn')) selectFile(f.path); };
       var unresolvedDot = fileHasUnresolvedComments(f.path) ? '<span class="file-unresolved-dot" title="Has unresolved comments"></span>' : '';
-      var goToBtn = '<button class="btn btn-sm go-to-file-btn" data-filepath="' + escapeHtml(f.path) + '" title="' + t('buttons.goToFileViewer') + '" style="padding: 0 4px; font-size: 0.7rem; line-height: 1; flex-shrink: 0;">&#128196;</button>';
+      var goToBtn = '<button class="go-to-file-btn" data-filepath="' + escapeHtml(f.path) + '" title="' + t('buttons.goToFileViewer') + '">' + cpIcon('expand', 14) + '</button>';
       var displayName = f.path.split('/').pop();
       if (f.old_path && f.old_path !== f.path) {
         displayName = f.path.split('/').pop() + ' ← ' + f.old_path.split('/').pop();
@@ -258,7 +258,7 @@ function renderFileList() {
       onClick: function(e, val) { if (!e.target.closest('.comment-icon, .go-to-file-btn')) selectFile(val.path); },
       renderFileContent: function(val, key) {
         var unresolvedDot = fileHasUnresolvedComments(val.path) ? '<span class="file-unresolved-dot" title="Has unresolved comments"></span>' : '';
-        var goToBtn = '<button class="btn btn-sm go-to-file-btn" data-filepath="' + escapeHtml(val.path) + '" title="' + t('buttons.goToFileViewer') + '" style="padding: 0 4px; font-size: 0.7rem; line-height: 1; flex-shrink: 0;">&#128196;</button>';
+        var goToBtn = '<button class="go-to-file-btn" data-filepath="' + escapeHtml(val.path) + '" title="' + t('buttons.goToFileViewer') + '">' + cpIcon('expand', 14) + '</button>';
         var displayKey = key;
         if (val.old_path && val.old_path !== val.path) {
           var oldName = val.old_path.split('/').pop();
@@ -291,6 +291,15 @@ function selectFile(path) {
   renderDiff(path);
   var btn = document.getElementById('viewFileBtn');
   if (btn) btn.style.display = path ? '' : 'none';
+  document.getElementById('panel-changes').classList.toggle('diff-file-open', !!path);
+}
+
+function closeDiffFile() {
+  state.selectedFile = null;
+  document.getElementById('panel-changes').classList.remove('diff-file-open');
+  document.querySelectorAll('#diffFileList .file-item.active').forEach(function(el) { el.classList.remove('active'); });
+  var btn = document.getElementById('viewFileBtn');
+  if (btn) btn.style.display = 'none';
 }
 
 
@@ -306,25 +315,27 @@ function renderDiff(path) {
 
   const pathHeader = document.createElement('div');
   pathHeader.className = 'diff-path-header';
-  pathHeader.style.cssText = 'padding: 6px 12px; font-size: 0.8rem; font-family: var(--font-mono); color: var(--text-secondary); background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;';
-
-  var pathText = escapeHtml(path);
+  var backBtn = document.createElement('button');
+  backBtn.className = 'btn ic diff-back';
+  backBtn.setAttribute('aria-label', t('buttons.back'));
+  backBtn.innerHTML = cpIcon('back', 18);
+  backBtn.onclick = closeDiffFile;
+  pathHeader.appendChild(backBtn);
+  var pathText = '<span class="diff-path-name">' + escapeHtml(path) + '</span>';
   if (file.old_path && file.old_path !== path) {
-    pathText = '<span style="color: var(--text-muted);">' + escapeHtml(file.old_path) + '</span> <span style="color: var(--text-secondary); font-size: 0.75rem;">\u2192</span> ' + escapeHtml(path);
+    pathText = '<span class="diff-path-old">' + escapeHtml(file.old_path) + '</span><span class="diff-path-arrow">\u2192</span>' + pathText;
   }
-  pathHeader.innerHTML = '<span style="opacity: 0.6;">\uD83D\uDCC4</span> ' + pathText + ' <span style="font-size: 0.75rem; color: var(--text-muted);">+' + file.additions + ' \u2212' + file.deletions + '</span>';
+  pathHeader.insertAdjacentHTML('beforeend', '<span class="diff-path">' + pathText + '</span><span class="diff-path-stat"><span class="file-stat-add">+' + file.additions + '</span> <span class="file-stat-del">\u2212' + file.deletions + '</span></span>');
 
   var goToFileViewerBtn = document.createElement('button');
-  goToFileViewerBtn.className = 'btn btn-sm';
-  goToFileViewerBtn.style.cssText = 'margin-left: auto; font-size: 0.7rem;';
+  goToFileViewerBtn.className = 'btn xs diff-path-view';
   goToFileViewerBtn.title = t('buttons.goToFileViewer');
-  goToFileViewerBtn.innerHTML = '&#128196; ' + t('buttons.goToFileViewer');
+  goToFileViewerBtn.textContent = t('buttons.goToFileViewer');
   goToFileViewerBtn.onclick = function() { goToFileViewer(path); };
   pathHeader.appendChild(goToFileViewerBtn);
 
   var showResolvedBtn = document.createElement('button');
-  showResolvedBtn.className = 'btn btn-sm';
-  showResolvedBtn.style.cssText = 'font-size: 0.7rem;';
+  showResolvedBtn.className = 'btn xs';
   showResolvedBtn.textContent = _showResolved ? t('review.hideResolved') : t('review.showResolved');
   showResolvedBtn.onclick = function() {
     _showResolved = !_showResolved;
@@ -340,7 +351,7 @@ function renderDiff(path) {
     drawFileList: false,
     matching: 'words',
     renderNothingWhenEmpty: true,
-    outputFormat: state.diffMode,
+    outputFormat: PHONE_LAYOUT_QUERY.matches ? 'line-by-line' : state.diffMode,
     highlight: true,
     synchronisedScroll: true,
     stickyFileHeaders: false
@@ -644,7 +655,7 @@ async function setDiffRepo(path) {
   state.diffRepo = path;
   state.activeCommit = null;
   state.historyCommits = [];
-  state.selectedFile = null;
+  closeDiffFile();
 
   await loadDiffBases();
   await setDiffSource(state.diffSource);

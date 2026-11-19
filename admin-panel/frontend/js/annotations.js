@@ -67,7 +67,7 @@ function _renderAnnotationMarkdown(text) {
 function _annotationButton(label, className, onClick) {
   var btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'btn btn-sm ' + className;
+  btn.className = 'btn xs ' + className;
   btn.textContent = label;
   btn.addEventListener('click', function(e) {
     e.stopPropagation();
@@ -96,6 +96,14 @@ function _buildAnnotationMeta(ann) {
   return meta;
 }
 
+function _buildAnnotationHeading() {
+  var heading = document.createElement('div');
+  heading.className = 'k';
+  heading.innerHTML = cpIcon('flag', 14);
+  heading.appendChild(document.createTextNode(t('annotation.agentNote')));
+  return heading;
+}
+
 function _buildAnnotationEditor(ann, handlers) {
   var wrap = document.createElement('div');
   var area = document.createElement('textarea');
@@ -122,11 +130,12 @@ function _buildAnnotationEditor(ann, handlers) {
 function buildAnnotationBlock(ann, onChanged, onLayout) {
   var ctx = getWorkspaceContext();
   var block = document.createElement('div');
-  block.className = 'ann-block' + (ann.stale ? ' ann-stale' : '');
+  block.className = 'ann-block note' + (ann.stale ? ' ann-stale' : '');
   block.dataset.annotationId = ann.id;
 
   function showView() {
     block.textContent = '';
+    block.appendChild(_buildAnnotationHeading());
     var body = document.createElement('div');
     body.className = 'ann-body';
     body.innerHTML = _renderAnnotationMarkdown(ann.text || '');
@@ -142,6 +151,7 @@ function buildAnnotationBlock(ann, onChanged, onLayout) {
 
   function showEdit() {
     block.textContent = '';
+    block.appendChild(_buildAnnotationHeading());
     block.appendChild(_buildAnnotationEditor(ann, {
       onSave: function(text) {
         _runAnnotationRequest(function() {

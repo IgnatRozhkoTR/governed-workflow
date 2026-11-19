@@ -182,8 +182,7 @@
 #panel-files.active { display: flex; flex-direction: column; height: 100%; }
 .files-switch {
   flex: none;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--ln);
+  padding: 0 0 12px;
 }
 #panel-files > .files-view { flex: 1; min-height: 0; }
 
