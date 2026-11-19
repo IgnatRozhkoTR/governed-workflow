@@ -197,7 +197,7 @@ function renderScratchpadContent() {
   header.appendChild(toggle);
 
   var copyBtn = document.createElement('button');
-  copyBtn.className = 'btn btn-sm';
+  copyBtn.className = 'btn xs';
   copyBtn.textContent = t('buttons.copy');
   copyBtn.onclick = function() {
     var text = currentScratchpadText();
@@ -208,7 +208,7 @@ function renderScratchpadContent() {
   header.appendChild(copyBtn);
 
   var downloadBtn = document.createElement('button');
-  downloadBtn.className = 'btn btn-sm';
+  downloadBtn.className = 'btn xs';
   downloadBtn.textContent = t('buttons.download');
   downloadBtn.onclick = function() {
     var text = currentScratchpadText();
@@ -228,7 +228,7 @@ function renderScratchpadContent() {
 
   if (spState.mode === 'source') {
     var saveBtn = document.createElement('button');
-    saveBtn.className = 'btn btn-sm';
+    saveBtn.className = 'btn xs pri';
     saveBtn.textContent = t('buttons.save');
     saveBtn.disabled = true;
     saveBtn.onclick = function() { saveScratchpad(); };

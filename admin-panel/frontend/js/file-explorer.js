@@ -219,7 +219,7 @@ function renderExplorerContent(path, lines, lineNumber) {
     header.appendChild(toggle);
 
     var copyBtn = document.createElement('button');
-    copyBtn.className = 'btn btn-sm';
+    copyBtn.className = 'btn xs';
     copyBtn.textContent = t('buttons.copy');
     copyBtn.onclick = function() {
       safeCopyToClipboard(lines.join('\n')).then(function() {
@@ -230,7 +230,7 @@ function renderExplorerContent(path, lines, lineNumber) {
 
     if (explorerState.mdMode === 'source') {
       var saveBtn = document.createElement('button');
-      saveBtn.className = 'btn btn-sm';
+      saveBtn.className = 'btn xs pri';
       saveBtn.textContent = t('buttons.save');
       saveBtn.disabled = true;
       saveBtn.onclick = function() { saveExplorerFile(); };

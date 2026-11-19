@@ -102,6 +102,52 @@ function initMonaco() {
   });
 }
 
+function _themeColor(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function _themeRule(token, name, fontStyle) {
+  var rule = { token: token, foreground: _themeColor(name).replace('#', '') };
+  if (fontStyle) rule.fontStyle = fontStyle;
+  return rule;
+}
+
+function defineCheckpointTheme(theme) {
+  var name = theme === 'dark' ? 'checkpoint-dark' : 'checkpoint-light';
+  monaco.editor.defineTheme(name, {
+    base: theme === 'dark' ? 'vs-dark' : 'vs',
+    inherit: true,
+    rules: [
+      _themeRule('', '--tx'),
+      _themeRule('comment', '--dim', 'italic'),
+      _themeRule('keyword', '--pr'),
+      _themeRule('string', '--ok'),
+      _themeRule('number', '--warn'),
+      _themeRule('type', '--prtx'),
+      _themeRule('delimiter', '--dim'),
+      _themeRule('tag', '--pr'),
+      _themeRule('attribute.name', '--prtx'),
+      _themeRule('attribute.value', '--ok')
+    ],
+    colors: {
+      'editor.background': _themeColor('--sf'),
+      'editor.foreground': _themeColor('--tx'),
+      'editorLineNumber.foreground': _themeColor('--dim'),
+      'editorLineNumber.activeForeground': _themeColor('--tx'),
+      'editor.lineHighlightBackground': _themeColor('--sf2'),
+      'editor.selectionBackground': _themeColor('--prbg'),
+      'editorCursor.foreground': _themeColor('--pr'),
+      'editorIndentGuide.background1': _themeColor('--ln'),
+      'editorWidget.background': _themeColor('--sf2'),
+      'editorWidget.border': _themeColor('--ln'),
+      'minimap.background': _themeColor('--sf'),
+      'scrollbarSlider.background': _themeColor('--sf3'),
+      'editorGutter.background': _themeColor('--sf')
+    }
+  });
+  return name;
+}
+
 function createEditor(container, content, language, filePath, readOnly) {
   if (readOnly === undefined) readOnly = true;
   return window._monacoReady.then(function() {
@@ -114,9 +160,9 @@ function createEditor(container, content, language, filePath, readOnly) {
       value: content,
       language: language,
       readOnly: readOnly,
-      theme: state.theme === 'dark' ? 'vs-dark' : 'vs',
+      theme: defineCheckpointTheme(state.theme),
       automaticLayout: true,
-      minimap: { enabled: true },
+      minimap: { enabled: !PHONE_LAYOUT_QUERY.matches },
       scrollBeyondLastLine: false,
       fontSize: 13,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
@@ -141,7 +187,7 @@ function disposeEditor() {
 
 function updateEditorTheme(theme) {
   if (typeof monaco !== 'undefined') {
-    monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
+    monaco.editor.setTheme(defineCheckpointTheme(theme));
   }
 }
 

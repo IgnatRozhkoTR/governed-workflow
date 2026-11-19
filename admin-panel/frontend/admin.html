@@ -63,10 +63,10 @@
 <link rel="stylesheet" href="css/research.css?v=11">
 <link rel="stylesheet" href="css/plan.css?v=11">
 <link rel="stylesheet" href="css/cards.css?v=13">
-<link rel="stylesheet" href="css/comments-ui.css?v=12">
-<link rel="stylesheet" href="css/modals.css?v=11">
+<link rel="stylesheet" href="css/comments-ui.css?v=13">
+<link rel="stylesheet" href="css/modals.css?v=12">
 <link rel="stylesheet" href="css/context.css?v=13">
-<link rel="stylesheet" href="css/diff-viewer.css?v=20">
+<link rel="stylesheet" href="css/diff-viewer.css?v=21">
 <link rel="stylesheet" href="css/preplanning.css?v=11">
 <link rel="stylesheet" href="css/terminal.css?v=17">
 <link rel="stylesheet" href="css/verification.css?v=13">
@@ -76,7 +76,7 @@
 <link rel="stylesheet" href="css/phase-settings.css?v=1">
 <link rel="stylesheet" href="css/proposals.css?v=1">
 <link rel="stylesheet" href="css/settings.css?v=5">
-<link rel="stylesheet" href="css/scratchpads.css?v=2">
+<link rel="stylesheet" href="css/scratchpads.css?v=3">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
@@ -464,8 +464,8 @@
           <p class="settings-section-desc" data-i18n="settings.section.rules.desc">Project-specific rules enforced during implementation and review.</p>
 
           <div id="rulesList"></div>
-          <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-            <button class="btn btn-sm btn-primary" onclick="openRuleModal()" data-i18n="buttons.newRule">New rule</button>
+          <div class="settings-actions" style="margin-top: 10px;">
+            <button class="btn pri" onclick="openRuleModal()" data-i18n="buttons.newRule">New rule</button>
           </div>
         </section>
 
@@ -556,31 +556,26 @@
           </div>
           <p class="settings-section-desc" data-i18n="settings.section.claude.desc">Control how the Claude CLI is launched for this workspace.</p>
 
-          <div style="display: flex; flex-direction: column; gap: 10px;">
-            <div>
-              <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.commandLabel">Command</label>
-              <input type="text" class="context-input" id="claudeCommandInput" placeholder="claude" style="width: 100%;">
-            </div>
-            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" id="skipPermissionsCheck" checked>
-                <label for="skipPermissionsCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.skipPermissions">Include --dangerously-skip-permissions flag</label>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" id="restrictToWorkspaceCheck" checked>
-                <label for="restrictToWorkspaceCheck" style="font-size: 0.82rem; color: var(--text-primary); cursor: pointer;" data-i18n="config.restrictToWorkspace">Restrict file modifications to workspace directory</label>
-              </div>
-            </div>
-            <div style="margin-top: 8px;">
-              <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.externalPaths">Allowed external paths (comma-separated)</label>
-              <input type="text" class="context-input" id="allowedExternalPathsInput" placeholder="/tmp/, /var/log/" style="width: 100%;">
-            </div>
-            <div style="margin-top: 8px;">
-              <label style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 4px; display: block;" data-i18n="config.envVars">Environment variables (KEY=VALUE per line)</label>
-              <textarea class="context-input" id="envVarsInput" rows="4" placeholder="API_KEY=sk-...&#10;DEBUG=1" style="width: 100%; font-family: var(--font-mono); resize: vertical;"></textarea>
-            </div>
-            <div style="display: flex; gap: 6px; justify-content: flex-end;">
-              <button class="btn btn-sm" onclick="saveClaudeCommand()" data-i18n="buttons.save">Save</button>
+          <div class="settings-form">
+            <label class="lbl"><span data-i18n="config.commandLabel">Command</span>
+              <input type="text" class="inp mono" id="claudeCommandInput" placeholder="claude">
+            </label>
+            <label class="settings-check">
+              <input type="checkbox" id="skipPermissionsCheck" checked>
+              <span data-i18n="config.skipPermissions">Include --dangerously-skip-permissions flag</span>
+            </label>
+            <label class="settings-check">
+              <input type="checkbox" id="restrictToWorkspaceCheck" checked>
+              <span data-i18n="config.restrictToWorkspace">Restrict file modifications to workspace directory</span>
+            </label>
+            <label class="lbl"><span data-i18n="config.externalPaths">Allowed external paths (comma-separated)</span>
+              <input type="text" class="inp mono" id="allowedExternalPathsInput" placeholder="/tmp/, /var/log/">
+            </label>
+            <label class="lbl"><span data-i18n="config.envVars">Environment variables (KEY=VALUE per line)</span>
+              <textarea class="ta mono" id="envVarsInput" rows="4" placeholder="API_KEY=sk-...&#10;DEBUG=1"></textarea>
+            </label>
+            <div class="settings-actions">
+              <button class="btn pri" onclick="saveClaudeCommand()" data-i18n="buttons.save">Save</button>
             </div>
           </div>
         </section>
@@ -899,10 +894,10 @@
   <!-- ─── REFLECTION ─── -->
   <div class="tab-panel" id="panel-reflection">
     <div class="card">
-      <div class="card-header">
-        <span data-i18n="tabs.reflection">Reflection</span>
+      <div class="ch">
+        <h3 class="grow" data-i18n="tabs.reflection">Reflection</h3>
         <div class="card-header__actions">
-          <button class="btn btn-sm" id="proposalsShowResolvedBtn" onclick="toggleProposalsResolved()" data-i18n="proposals.showResolved">Show resolved</button>
+          <button class="btn xs" id="proposalsShowResolvedBtn" onclick="toggleProposalsResolved()" data-i18n="proposals.showResolved">Show resolved</button>
         </div>
       </div>
       <div id="proposalsList"></div>
@@ -983,10 +978,10 @@
 <script src="js/toast.js?v=10"></script>
 <script src="js/state.js?v=14"></script>
 <script src="js/submit-key.js?v=1"></script>
-<script src="js/review-thread.js?v=11"></script>
+<script src="js/review-thread.js?v=12"></script>
 <script src="js/review-tab.js?v=10"></script>
 <script src="js/proposals.js?v=2"></script>
-<script src="js/comments.js?v=11"></script>
+<script src="js/comments.js?v=12"></script>
 <script src="js/theme.js?v=11"></script>
 <script src="js/terminal.js?v=24"></script>
 <script src="js/tabs.js?v=18"></script>
@@ -995,13 +990,13 @@
 <script src="js/scope.js?v=10"></script>
 <script src="js/tree-utils.js?v=12"></script>
 <script src="js/research.js?v=11"></script>
-<script src="js/diff-viewer.js?v=18"></script>
-<script src="js/annotations.js?v=2"></script>
-<script src="js/monaco-editor.js?v=11"></script>
-<script src="js/file-explorer.js?v=14"></script>
+<script src="js/diff-viewer.js?v=19"></script>
+<script src="js/annotations.js?v=3"></script>
+<script src="js/monaco-editor.js?v=12"></script>
+<script src="js/file-explorer.js?v=15"></script>
 <script src="js/git-config.js?v=11"></script>
 <script src="js/git-cockpit.js?v=1"></script>
-<script src="js/scratchpads.js?v=5"></script>
+<script src="js/scratchpads.js?v=6"></script>
 <script src="js/rules.js?v=2"></script>
 <script src="js/claude-config.js?v=13"></script>
 <script src="js/network-mode.js?v=12"></script>

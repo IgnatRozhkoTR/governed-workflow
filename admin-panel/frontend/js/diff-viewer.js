@@ -453,9 +453,9 @@ function renderDiffLineCommentIndicators(container, filePath) {
       var hasUnresolved = comments.some(function(c) { return !c.resolved; });
       var indicator = document.createElement('span');
       indicator.className = 'line-comment-indicator';
-      indicator.innerHTML = '&#x1F4AC;';
+      indicator.innerHTML = cpIcon('comment', 14);
       if (count > 1) {
-        indicator.innerHTML += '<span class="line-comment-count">' + count + '</span>';
+        indicator.insertAdjacentHTML('beforeend', '<span class="line-comment-count">' + count + '</span>');
       }
       indicator.title = count + ' comment' + (count > 1 ? 's' : '');
       td.insertBefore(indicator, td.firstChild);

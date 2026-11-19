@@ -233,6 +233,7 @@
   line-height: 1;
   cursor: pointer;
   opacity: 0.9;
+  color: var(--dim);
   z-index: 1;
   display: inline-flex;
   align-items: center;
@@ -250,9 +251,7 @@
 }
 
 .line-has-unresolved .line-comment-indicator {
-  color: var(--accent);
-  font-weight: bold;
-  font-size: 16px;
+  color: var(--pr);
 }
 
 .line-comment-count {
@@ -337,7 +336,13 @@
 }
 
 .line-has-comment {
-  background: var(--accent-dim) !important;
+  background: var(--prbg) !important;
+}
+
+.line-comment-row > td {
+  padding: 8px 16px !important;
+  background: var(--sf) !important;
+  white-space: normal;
 }
 
 .line-comment-row .comment-thread {

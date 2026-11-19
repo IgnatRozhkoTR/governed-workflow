@@ -3,12 +3,10 @@
    ═══════════════════════════════════════════════ */
 
 .sp-section-header {
-  padding: 8px 14px 4px;
-  font-size: 0.68rem;
+  padding: 8px 12px 4px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
+  color: var(--dim);
 }
 
 .sp-file-item {
@@ -18,23 +16,21 @@
 }
 
 .sp-file-title {
-  color: var(--text-secondary);
-}
-
-.sp-file-item.active .sp-file-title {
-  color: var(--text-primary);
+  color: var(--tx);
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .sp-file-meta {
-  font-size: 0.66rem;
-  color: var(--text-muted);
+  font-family: var(--f-ui);
+  font-size: 12px;
+  color: var(--dim);
 }
 
 .sp-empty-section {
-  padding: 6px 14px 14px;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  font-style: italic;
+  padding: 6px 12px 14px;
+  font-size: 14px;
+  color: var(--dim);
 }
 
 .sp-source-editor {
@@ -53,13 +49,13 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  padding: 2px 8px;
-  font-size: 0.7rem;
-  font-family: var(--font-sans);
-  color: var(--text-secondary);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  padding: 2px 10px;
+  font-size: 12px;
+  font-family: var(--f-ui);
+  color: var(--dim);
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  border-radius: 999px;
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--transition), color var(--transition);
@@ -71,12 +67,12 @@
 }
 
 .code-copy-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
+  color: var(--tx);
+  background: var(--sf2);
 }
 
 .code-copy-btn.copied {
   opacity: 1;
-  color: var(--success);
-  border-color: var(--success);
+  color: var(--ok);
+  border-color: var(--ok);
 }

@@ -71,17 +71,17 @@
 }
 
 .file-preview-code {
-  font-family: var(--font-mono);
+  font-family: var(--f-mono);
   font-size: 0.78rem;
   line-height: 1.6;
-  color: var(--text-secondary);
+  color: var(--dim);
   margin: 0;
   white-space: pre;
   background: transparent;
 }
 
 .file-preview-code .line-num {
-  color: var(--text-muted);
+  color: var(--dim);
   display: inline-block;
   width: 4ch;
   text-align: right;
@@ -94,10 +94,10 @@
 
 /* Markdown rendered view */
 .file-preview-markdown {
-  font-family: var(--font-sans);
+  font-family: var(--f-ui);
   font-size: 0.88rem;
   line-height: 1.7;
-  color: var(--text-primary);
+  color: var(--tx);
 }
 
 .file-preview-markdown h1,
@@ -106,11 +106,11 @@
 .file-preview-markdown h4 {
   margin: 1.2em 0 0.5em;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--tx);
 }
 
-.file-preview-markdown h1 { font-size: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
-.file-preview-markdown h2 { font-size: 1.2rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.file-preview-markdown h1 { font-size: 1.5rem; border-bottom: 1px solid var(--ln); padding-bottom: 6px; }
+.file-preview-markdown h2 { font-size: 1.2rem; border-bottom: 1px solid var(--ln); padding-bottom: 4px; }
 .file-preview-markdown h3 { font-size: 1rem; }
 
 .file-preview-markdown p { margin: 0.6em 0; }
@@ -124,17 +124,17 @@
 .file-preview-markdown li { margin: 0.3em 0; }
 
 .file-preview-markdown code {
-  font-family: var(--font-mono);
+  font-family: var(--f-mono);
   font-size: 0.82rem;
-  background: var(--bg-input);
+  background: var(--bg);
   padding: 2px 6px;
   border-radius: 4px;
 }
 
 .file-preview-markdown pre {
-  background: var(--bg-input);
+  background: var(--bg);
   padding: 12px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
   overflow-x: auto;
   margin: 0.8em 0;
 }
@@ -147,12 +147,12 @@
 }
 
 .file-preview-markdown blockquote {
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--pr);
   padding: 4px 12px;
   margin: 0.6em 0;
-  color: var(--text-secondary);
-  background: var(--bg-input);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--dim);
+  background: var(--bg);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
 
 .file-preview-markdown table {
@@ -163,19 +163,19 @@
 
 .file-preview-markdown th,
 .file-preview-markdown td {
-  border: 1px solid var(--border);
+  border: 1px solid var(--ln);
   padding: 6px 10px;
   font-size: 0.82rem;
 }
 
 .file-preview-markdown th {
-  background: var(--bg-input);
+  background: var(--bg);
   font-weight: 600;
   text-align: left;
 }
 
 .file-preview-markdown a {
-  color: var(--accent);
+  color: var(--pr);
   text-decoration: none;
 }
 
@@ -183,11 +183,11 @@
 
 .file-preview-markdown hr {
   border: none;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--ln);
   margin: 1em 0;
 }
 
-.file-preview-markdown img { max-width: 100%; border-radius: var(--radius-sm); }
+.file-preview-markdown img { max-width: 100%; border-radius: var(--r-sm); }
 
 /* ═══════════════════════════════════════════════ */
 /*  PROJECT SELECTOR                               */

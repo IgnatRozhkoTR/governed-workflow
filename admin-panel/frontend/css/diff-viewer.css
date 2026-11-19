@@ -47,6 +47,16 @@
   background: var(--sf2);
 }
 
+.diff-controls input.ws-input {
+  background: var(--bg);
+  border: 1px solid var(--ln);
+  border-radius: var(--r-md);
+  color: var(--tx);
+  font-family: var(--f-ui);
+}
+
+.diff-controls input.ws-input:focus { outline: none; border-color: var(--pr); }
+
 .filter-select {
   position: relative;
   width: 160px;
@@ -64,7 +74,8 @@
   cursor: pointer;
 }
 
-#diffFileSearch {
+#diffFileSearch,
+#fileExplorerSearch {
   flex: 0 0 auto;
   width: 170px;
   height: 28px;
@@ -293,31 +304,33 @@
   overflow: hidden;
 }
 
+#fileExplorerSearch { flex: 0 1 260px !important; max-width: 260px; }
+
 /* ═══ File Explorer Content ═══ */
 .explorer-file-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 16px;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--text-primary);
-  background: var(--bg-raised);
-  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  color: var(--tx);
+  background: var(--sf);
+  border-bottom: 1px solid var(--ln);
   position: sticky;
   top: 0;
   z-index: 1;
 }
 
 .explorer-line-count {
-  font-size: 0.7rem;
-  color: var(--text-muted);
+  font-size: 12px;
+  color: var(--dim);
   margin-left: auto;
 }
 
 .explorer-file-body {
   overflow: auto;
-  height: calc(100% - 36px);
+  height: calc(100% - 49px);
 }
 
 .explorer-code-table {
@@ -849,4 +862,27 @@ td.ann-gutter-stale { box-shadow: inset 3px 0 0 var(--dim); }
   .diff-history-row .commit-author { display: none; }
   .diff-history-row .commit-date { grid-column: 2; text-align: left; }
   .ann-block { margin: 8px; }
+
+  #panel-files .files-view { height: auto; overflow: visible; }
+  #panel-files .diff-controls input.ws-input { flex: 1 1 100%; max-width: 100% !important; height: 44px !important; font-size: 14px !important; }
+  #panel-files .diff-layout { flex-direction: column; overflow: visible; }
+  #panel-files .diff-file-list {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 260px;
+    border: 1px solid var(--ln);
+    border-radius: var(--r-lg);
+    background: var(--sf);
+    overflow: auto;
+  }
+  #panel-files .diff-file-list > *:not(.diff-file-list-header) { display: flex; }
+  #panel-files .diff-file-list > .dir-children, #panel-files .diff-file-list .dir-children { display: block; }
+  #panel-files .diff-file-list .file-item { min-height: 44px; }
+  #panel-files .diff-file-list-header { background: var(--sf); }
+  #panel-files .diff-file-list-header::after { content: none; }
+  #panel-files .diff-content { min-height: 420px; margin-top: 12px; }
+  #panel-files .diff-file-list .file-dir.collapsed + .dir-children,
+  #panel-changes .diff-file-list .file-dir.collapsed + .dir-children { display: none; }
+  #panel-files #fileExplorerSearch { flex: 1 1 100% !important; max-width: 100% !important; }
 }
