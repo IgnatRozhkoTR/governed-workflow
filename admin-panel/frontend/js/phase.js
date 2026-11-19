@@ -1,27 +1,31 @@
 // ═══════════════════════════════════════════════
 //  PHASE HISTORY LOG
 // ═══════════════════════════════════════════════
+var PHASE_HISTORY_VISIBLE = 8;
+
 function renderPhaseHistory() {
   var container = document.getElementById('phaseHistoryLog');
   if (!container) return;
 
   var history = AppState.phaseHistory || [];
   if (history.length === 0) {
-    container.innerHTML = '<div class="phase-history-empty">' + t('phase.noChangesRecorded') + '</div>';
+    container.innerHTML = '<span>' + escapeHtml(t('phase.noChangesRecorded')) + '</span>';
     return;
   }
 
   container.innerHTML = history
-    .slice()
+    .slice(-PHASE_HISTORY_VISIBLE)
     .reverse()
     .map(function(entry) {
-      return '<div class="phase-history-entry">' + escapeHtml(entry.from) + ' → ' + escapeHtml(entry.to) + ' — ' + escapeHtml(entry.time) + '</div>';
+      return '<span title="' + escapeHtml(entry.time) + '">' + escapeHtml(t('overview.historyEntry', {
+        from: entry.from, to: entry.to, when: formatRelativeDate(entry.time)
+      })) + '</span>';
     })
     .join('');
 }
 
 // ═══════════════════════════════════════════════
-//  PHASE BAR
+//  PHASE SEQUENCE
 // ═══════════════════════════════════════════════
 
 function getPhaseSequenceForBar() {
@@ -49,91 +53,6 @@ function getPhaseSequenceForBar() {
   return fixedBefore.concat(execPhases).concat(fixedAfter);
 }
 
-function getPhaseBarSegments() {
-  var seq = getPhaseSequenceForBar();
-  var segments = [];
-  var groups = {};
-
-  seq.forEach(function(p) {
-    var match = p.match(/^3\.(\d+)\.(\d+)$/);
-    if (match) {
-      var n = match[1];
-      if (!groups[n]) {
-        groups[n] = { phases: [], startIndex: segments.length };
-        var plan = PLAN_DATA || {};
-        var execution = plan.execution || [];
-        var sub = execution.find(function(e) { return e.id === "3." + n; });
-        segments.push({
-          type: "group",
-          label: sub ? sub.name : "3." + n,
-          id: "3." + n,
-          phases: [],
-          gate: true
-        });
-      }
-      segments[groups[n].startIndex].phases.push(p);
-    } else {
-      segments.push({
-        type: "single",
-        phase: p,
-        label: getPhaseName(p),
-        gate: isUserGate(p)
-      });
-    }
-  });
-
-  return segments;
-}
-
-function renderPhaseBar(barId, labelsId) {
-  var bar = document.getElementById(barId);
-  var labels = document.getElementById(labelsId);
-  if (!bar || !labels) return;
-  bar.innerHTML = '';
-  labels.innerHTML = '';
-
-  var segments = getPhaseBarSegments();
-  var seq = getPhaseSequenceForBar();
-  var currentIdx = seq.indexOf(state.phase);
-
-  segments.forEach(function(seg) {
-    var div = document.createElement('div');
-    div.className = 'phase-segment';
-
-    if (seg.type === "single") {
-      var idx = seq.indexOf(seg.phase);
-      if (idx < currentIdx) div.classList.add('filled');
-      if (seg.phase === state.phase) div.classList.add('current');
-      div.title = getPhaseName(seg.phase);
-    } else {
-      var groupPhases = seg.phases;
-      var firstIdx = seq.indexOf(groupPhases[0]);
-      var lastIdx = seq.indexOf(groupPhases[groupPhases.length - 1]);
-      if (lastIdx < currentIdx) div.classList.add('filled');
-      if (groupPhases.indexOf(state.phase) !== -1) div.classList.add('current');
-      div.title = seg.label;
-      div.style.flex = Math.max(1, groupPhases.length * 0.6) + '';
-    }
-
-    bar.appendChild(div);
-
-    var lbl = document.createElement('div');
-    lbl.className = 'phase-label';
-    var isActive = seg.type === "single" ? seg.phase === state.phase : seg.phases.indexOf(state.phase) !== -1;
-    if (isActive) lbl.classList.add('active');
-    var labelText = seg.type === "single"
-      ? (seg.label.length > 8 ? seg.label.substring(0, 7) + '…' : seg.label)
-      : seg.id;
-    if (isActive) {
-      lbl.innerHTML = labelText + ' <span class="phase-edit-btn" onclick="manualSetPhase()" title="' + t('phase.overrideTitle') + '" style="font-size:1.4rem;cursor:pointer;margin-left:6px;vertical-align:middle;color:var(--accent)">✎</span>';
-    } else {
-      lbl.textContent = labelText;
-    }
-    if (seg.gate) lbl.classList.add('phase-gate');
-    labels.appendChild(lbl);
-  });
-}
-
 // ═══════════════════════════════════════════════
 //  MANUAL PHASE OVERRIDE
 // ═══════════════════════════════════════════════
@@ -151,121 +70,231 @@ async function manualSetPhase() {
 }
 
 // ═══════════════════════════════════════════════
-//  APPROVAL STATUS
-// ═══════════════════════════════════════════════
-function renderApprovalStatus() {
-  var container = document.getElementById('approvalStatusPanel');
-  if (!container) return;
-
-  function badgeForStatus(status) {
-    if (status === 'approved') {
-      return '<span class="badge badge-success">' + t('status.approved') + '</span>';
-    }
-    if (status === 'pending') {
-      return '<span class="badge badge-warning">' + t('status.pending') + '</span>';
-    }
-    return '<span class="badge">' + t('status.notSet') + '</span>';
-  }
-
-  var planStatus = LOCK_DATA.plan_status || null;
-
-  container.innerHTML =
-    '<div style="display: flex; align-items: center; gap: 12px;">' +
-      '<span style="min-width: 60px; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);">' + t('phase.planStatus') + '</span>' +
-      badgeForStatus(planStatus) +
-      '<button class="btn btn-sm" onclick="switchTab(\'plan\'); setTimeout(function(){ var el = document.getElementById(\'planContent\'); if(el) el.scrollIntoView({behavior:\'smooth\'}); }, 300);">' + t('buttons.viewPlan') + '</button>' +
-    '</div>';
-}
-
-// ═══════════════════════════════════════════════
-//  PHASE ACTIONS (USER GATES)
+//  PENDING GATE MODEL
+//  A gate is either a phase the backend marks as a user gate
+//  (pending_gate) or the plan sitting at 2.0 awaiting approval.
 // ═══════════════════════════════════════════════
 
 var _PHASE_GATE_CONFIGS = [
   {
     matches: function(p) { return p === '1.4'; },
-    titleKey: 'phaseAction.preplanningReview',
+    nameKey: 'gate.name.preplanning',
+    questionKey: 'gate.question.preplanning',
     descKey: 'phaseAction.preplanningReviewDesc',
     approveKey: 'preplanning.approvePreplanning',
     rejectKey: 'preplanning.rejectPreplanning',
-    showCommitInput: false
+    decidingTab: 'preplanning'
   },
   {
-    matches: function(p) { return p === '2.1'; },
-    titleKey: 'phaseAction.planReview',
+    matches: function(p) { return p === '2.0' || p === '2.1'; },
+    nameKey: 'gate.name.plan',
+    questionKey: 'gate.question.plan',
     descKey: 'phaseAction.planReviewDesc',
     approveKey: 'buttons.approvePlan',
     rejectKey: 'buttons.requestChanges',
-    showCommitInput: false
+    decidingTab: 'plan'
   },
   {
     matches: function(p) { return /^3\.\d+\.3$/.test(p); },
-    titleKey: 'phaseAction.codeReview',
+    nameKey: 'gate.name.commit',
+    questionKey: 'gate.question.commit',
     descKey: 'phaseAction.codeReviewDesc',
     approveKey: 'buttons.approveChanges',
     rejectKey: 'buttons.requestChanges',
-    showCommitInput: true
+    decidingTab: 'overview'
   },
   {
     matches: function(p) { return p === '4.2'; },
-    titleKey: 'phaseAction.finalApproval',
+    nameKey: 'gate.name.final',
+    questionKey: 'gate.question.final',
     descKey: 'phaseAction.finalApprovalDesc',
     approveKey: 'buttons.approveFinish',
     rejectKey: 'buttons.requestChanges',
-    showCommitInput: false
+    decidingTab: 'overview'
   }
 ];
 
-function _renderGateHtml(config, phase) {
-  var titleText = config.titleKey === 'phaseAction.codeReview'
-    ? t(config.titleKey, {phase: getPhaseName(phase)})
-    : t(config.titleKey);
-  var feedbackTopMargin = config.showCommitInput ? '6px' : '8px';
-  var commitInput = config.showCommitInput
-    ? '<input type="text" id="commitMessageInput" class="ws-input" placeholder="' + t('placeholders.commitMessage') + '" style="margin-top: 8px;">'
-    : '';
-  return '<div class="phase-action-title">' + titleText + '</div>' +
-    '<div class="phase-action-desc">' + t(config.descKey) + '</div>' +
-    commitInput +
-    '<textarea id="rejectFeedbackInput" class="ws-input" placeholder="' + t('placeholders.feedbackForChanges') + '" style="margin-top: ' + feedbackTopMargin + '; min-height: 50px; resize: vertical;"></textarea>' +
-    '<div style="display: flex; gap: 8px; margin-top: 8px;">' +
-    '<button class="btn btn-primary" onclick="handleApprove()">' + t(config.approveKey) + '</button>' +
-    '<button class="btn btn-danger" onclick="handleRejectWithInput()">' + t(config.rejectKey) + '</button>' +
-    '</div>';
+var _GENERIC_GATE_CONFIG = {
+  nameKey: 'gate.name.generic',
+  questionKey: 'gate.question.generic',
+  descKey: null,
+  approveKey: 'buttons.approve',
+  rejectKey: 'buttons.requestChanges',
+  decidingTab: 'overview'
+};
+
+function findGateConfig(phase) {
+  for (var i = 0; i < _PHASE_GATE_CONFIGS.length; i++) {
+    if (_PHASE_GATE_CONFIGS[i].matches(phase)) return _PHASE_GATE_CONFIGS[i];
+  }
+  return _GENERIC_GATE_CONFIG;
 }
+
+function isPlanAwaitingApproval(stateData) {
+  var execution = stateData.plan && stateData.plan.execution;
+  return stateData.phase === '2.0' && stateData.plan_status === 'pending' && !!(execution && execution.length);
+}
+
+// Builds the gate descriptor from a raw /state payload, so the sidebar can
+// evaluate other workspaces with the same rules as the open one.
+function describePendingGate(stateData) {
+  var history = stateData.phaseHistory || [];
+  if (stateData.pending_gate) {
+    return _gateDescriptor(stateData.pending_gate.phase, 'phase', !!stateData.pending_gate.accepts_commit_message, history);
+  }
+  if (isPlanAwaitingApproval(stateData)) return _gateDescriptor('2.0', 'plan', false, history);
+  return null;
+}
+
+function _gateDescriptor(phase, kind, acceptsCommitMessage, history) {
+  var config = findGateConfig(phase);
+  return {
+    phase: phase,
+    kind: kind,
+    acceptsCommitMessage: acceptsCommitMessage,
+    config: config,
+    decidingTab: config.decidingTab,
+    since: _phaseEnteredAt(phase, history)
+  };
+}
+
+function getPendingGate() {
+  return describePendingGate({
+    phase: LOCK_DATA.phase,
+    pending_gate: LOCK_DATA.pending_gate,
+    plan_status: LOCK_DATA.plan_status,
+    plan: LOCK_DATA.plan,
+    phaseHistory: AppState.phaseHistory
+  });
+}
+
+function _phaseEnteredAt(phase, history) {
+  for (var i = history.length - 1; i >= 0; i--) {
+    if (history[i].to === phase) {
+      var entered = new Date(history[i].time);
+      return isNaN(entered.getTime()) ? null : entered;
+    }
+  }
+  return null;
+}
+
+function formatWaitDuration(since) {
+  if (!since) return '';
+  var minutes = Math.max(0, Math.floor((Date.now() - since.getTime()) / 60000));
+  if (minutes < 60) return t('time.waitMin', {n: minutes});
+  var hours = Math.floor(minutes / 60);
+  if (hours < 24) return t('time.waitHours', {n: hours});
+  return t('time.waitDays', {n: Math.floor(hours / 24)});
+}
+
+function describeGateHold(gate) {
+  return gate.since
+    ? t('gate.holding', {phase: gate.phase, wait: formatWaitDuration(gate.since)})
+    : t('gate.holdingNoWait', {phase: gate.phase});
+}
+
+// ═══════════════════════════════════════════════
+//  GATE CARD (Overview)
+// ═══════════════════════════════════════════════
 
 function renderPhaseActions() {
   var container = document.getElementById('phaseActions');
   if (!container) return;
-  container.innerHTML = '';
 
-  var phase = state.phase;
-  if (!isUserGate(phase)) {
-    container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.82rem; padding: 8px 0;">' + t('phase.noActionRequired', {phase: phase, name: getPhaseName(phase)}) + '</div>';
+  var gate = getPendingGate();
+  if (!gate) {
+    container.innerHTML = '';
+    container.dataset.gateKey = '';
     return;
   }
 
-  var config = null;
-  for (var i = 0; i < _PHASE_GATE_CONFIGS.length; i++) {
-    if (_PHASE_GATE_CONFIGS[i].matches(phase)) {
-      config = _PHASE_GATE_CONFIGS[i];
-      break;
-    }
+  // Rebuild only when the gate itself changes, so a state refresh never wipes
+  // a commit message or feedback the user is typing.
+  var gateKey = gate.kind + ':' + gate.phase;
+  if (container.dataset.gateKey !== gateKey) {
+    container.dataset.gateKey = gateKey;
+    container.innerHTML = gate.kind === 'plan' ? _renderPlanGateCard(gate) : _renderPhaseGateCard(gate);
+    var feedbackInput = container.querySelector('#rejectFeedbackInput');
+    if (feedbackInput) attachSubmitKey(feedbackInput, handleRejectWithInput);
   }
-  if (!config) return;
+  _refreshGateCardFacts(container, gate);
+}
 
-  var div = document.createElement('div');
-  div.className = 'phase-action';
-  div.innerHTML = _renderGateHtml(config, phase);
-  container.appendChild(div);
-  var feedbackInput = div.querySelector('#rejectFeedbackInput');
-  if (feedbackInput) attachSubmitKey(feedbackInput, handleRejectWithInput);
+function _renderGateCardHead(gate) {
+  return '<span class="gateico">' + cpGateIcon(20) + '</span>' +
+    '<div class="grow gatecard__head">' +
+      '<div class="k" data-gate-hold></div>' +
+      '<h2>' + escapeHtml(t(gate.config.questionKey)) + '</h2>' +
+      '<div class="d brk" data-gate-facts></div>' +
+    '</div>';
+}
+
+function _renderPhaseGateCard(gate) {
+  var commitField = gate.acceptsCommitMessage
+    ? '<div class="narrow"><label class="lbl">' + escapeHtml(t('gate.commitMessageLabel')) +
+        '<input class="inp" type="text" id="commitMessageInput" placeholder="' + escapeHtml(t('placeholders.commitMessage')) + '"></label></div>'
+    : '';
+  return '<section class="gatecard" aria-label="' + escapeHtml(t('gate.pending')) + '">' +
+    _renderGateCardHead(gate) +
+    '<div class="hs wrap gatecard__actions">' +
+      '<button class="btn onGate lg" onclick="handleRejectWithInput()">' + escapeHtml(t(gate.config.rejectKey)) + '</button>' +
+      '<button class="btn pri lg" onclick="handleApprove()">' + cpIcon('check') + escapeHtml(t(gate.config.approveKey)) + '</button>' +
+    '</div>' +
+    '<div class="cols gatecard__inputs">' + commitField +
+      '<div class="wide"><label class="lbl">' + escapeHtml(t('gate.feedbackLabel')) +
+        '<input class="inp" type="text" id="rejectFeedbackInput" placeholder="' + escapeHtml(t('gate.feedbackPlaceholder')) + '"></label></div>' +
+    '</div>' +
+  '</section>';
+}
+
+function _renderPlanGateCard(gate) {
+  return '<section class="gatecard" aria-label="' + escapeHtml(t('gate.pending')) + '">' +
+    _renderGateCardHead(gate) +
+    '<div class="hs wrap gatecard__actions">' +
+      '<button class="btn pri lg" onclick="switchTab(\'plan\')">' + escapeHtml(t('gate.reviewPlan')) + '</button>' +
+    '</div>' +
+  '</section>';
+}
+
+function _refreshGateCardFacts(container, gate) {
+  var hold = container.querySelector('[data-gate-hold]');
+  var facts = container.querySelector('[data-gate-facts]');
+  if (hold) hold.textContent = describeGateHold(gate);
+  if (facts) facts.textContent = describeGateFacts(gate);
+}
+
+function describeGateFacts(gate) {
+  if (gate.kind === 'plan') {
+    var execution = (PLAN_DATA && PLAN_DATA.execution) || [];
+    var taskCount = execution.reduce(function(sum, item) { return sum + ((item.tasks || []).length); }, 0);
+    return t('gate.facts.plan', {subPhases: execution.length, tasks: taskCount});
+  }
+  if (/^3\.\d+\.3$/.test(gate.phase)) return _describeCommitFacts(gate.phase);
+  return gate.config.descKey ? t(gate.config.descKey) : '';
+}
+
+function _describeCommitFacts(phase) {
+  var subPhaseId = phase.split('.').slice(0, 2).join('.');
+  var subPhase = ((PLAN_DATA && PLAN_DATA.execution) || []).find(function(e) { return e.id === subPhaseId; });
+  var totals = summarizeDiffFiles(DIFF_DATA.files || []);
+  return t('gate.facts.commit', {
+    id: subPhaseId,
+    name: subPhase ? subPhase.name : '',
+    files: totals.files,
+    additions: totals.additions,
+    deletions: totals.deletions
+  });
+}
+
+function summarizeDiffFiles(files) {
+  return files.reduce(function(sum, f) {
+    sum.additions += f.additions || 0;
+    sum.deletions += f.deletions || 0;
+    return sum;
+  }, { files: files.length, additions: 0, deletions: 0 });
 }
 
 EventBus.on('state:refreshed', function() {
-  renderPhaseBar('phaseBarControl', 'phaseLabelsControl');
   renderPhaseActions();
   renderPhaseHistory();
 });
-
-EventBus.on('approval:changed', renderApprovalStatus);

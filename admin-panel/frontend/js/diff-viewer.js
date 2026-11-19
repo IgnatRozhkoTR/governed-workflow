@@ -574,6 +574,7 @@ async function _loadDiff(mode, commitSha) {
     if (diffData) {
       AppState.diff = diffData;
       DIFF_DATA = AppState.diff;
+      EventBus.emit('diff:refreshed', diffData);
     }
   } catch (e) {
     console.warn('Diff API unavailable:', e.message);

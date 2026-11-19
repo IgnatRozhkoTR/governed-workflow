@@ -2,22 +2,18 @@
 /*  DIFF VIEWER                                    */
 /* ═══════════════════════════════════════════════ */
 #panel-changes > .card,
-#panel-files > .card,
-#panel-scratchpads > .card {
+#panel-files > .card {
   border: none !important;
   border-radius: 0 !important;
   margin-bottom: 0 !important;
 }
 
-#panel-changes,
-#panel-files,
-#panel-scratchpads {
+#panel-changes {
   height: 100%;
 }
 
 #panel-changes > .card,
-#panel-files > .card,
-#panel-scratchpads > .card {
+#panel-files > .card {
   display: flex;
   flex-direction: column;
   overflow: hidden;

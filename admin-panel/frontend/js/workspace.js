@@ -15,7 +15,7 @@ function showProjectSelector() {
 
 function hideProjectSelector() {
   document.getElementById('project-selector').style.display = 'none';
-  document.getElementById('app-content').style.display = 'block';
+  document.getElementById('app-content').style.display = '';
 }
 
 function _wsSwitchView(view) {
@@ -561,8 +561,8 @@ function _wsInitSelector() {
     var toolbar = document.createElement('div');
     toolbar.id = 'selector-toolbar';
     toolbar.style.cssText = 'position: absolute; top: 16px; right: 24px; display: flex; gap: 8px; align-items: center; z-index: 10;';
-    toolbar.innerHTML = '<select class="locale-select" id="selectorLocaleSelect" onchange="onSelectorLocaleChange(this.value)"><option value="en">EN</option><option value="ru">RU</option></select>'
-      + '<button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="selectorThemeBtn">&#9788;</button>';
+    toolbar.innerHTML = '<select class="btn locale-select" id="selectorLocaleSelect" onchange="onSelectorLocaleChange(this.value)"><option value="en">EN</option><option value="ru">RU</option></select>'
+      + '<button class="btn ic" onclick="toggleTheme()" title="' + escapeHtml(t('shell.switchTheme')) + '" aria-label="' + escapeHtml(t('shell.switchTheme')) + '" id="selectorThemeBtn"></button>';
     selector.appendChild(toolbar);
   }
 

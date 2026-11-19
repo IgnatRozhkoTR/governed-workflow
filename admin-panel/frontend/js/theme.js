@@ -2,11 +2,11 @@
 //  THEME
 // ═══════════════════════════════════════════════
 function _updateThemeButtons(theme) {
-  var icon = theme === 'dark' ? '☀' : '☾';
-  var headerBtn = document.getElementById('themeBtn');
-  if (headerBtn) headerBtn.textContent = icon;
-  var selectorBtn = document.getElementById('selectorThemeBtn');
-  if (selectorBtn) selectorBtn.textContent = icon;
+  var icon = cpIcon(theme === 'dark' ? 'moon' : 'sun');
+  ['themeBtn', 'selectorThemeBtn', 'phoneThemeBtn'].forEach(function(id) {
+    var btn = document.getElementById(id);
+    if (btn) btn.innerHTML = icon;
+  });
 }
 
 function toggleTheme() {
@@ -44,4 +44,5 @@ function toggleTheme() {
         : 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css';
     }
   }
+  _updateThemeButtons(state.theme);
 })();

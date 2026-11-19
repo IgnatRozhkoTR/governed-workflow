@@ -129,6 +129,7 @@ function applyStateData(stateData) {
   LOCK_DATA.workflow_mode = stateData.workflow_mode || "standard";
   LOCK_DATA.review_mode = stateData.review_mode || "files_integration";
   LOCK_DATA.enabled_phases = stateData.enabled_phases || [];
+  LOCK_DATA.pending_gate = stateData.pending_gate || null;
 
   // Plan — single source is AppState.plan; keep LOCK_DATA.plan as alias
   if (stateData.plan) {
@@ -180,6 +181,7 @@ function resetAppState() {
   LOCK_DATA.workflow_mode = "standard";
   LOCK_DATA.review_mode = "files_integration";
   LOCK_DATA.enabled_phases = [];
+  LOCK_DATA.pending_gate = null;
 
   // Reset plan
   PLAN_DATA.description = "";

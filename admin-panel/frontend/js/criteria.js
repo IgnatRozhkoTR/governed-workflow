@@ -12,6 +12,7 @@ function loadCriteria() {
         AppState.criteria = data.criteria;
         CRITERIA_DATA = AppState.criteria;
         renderCriteria();
+        EventBus.emit('criteria:changed', data.criteria);
       }
     });
 }

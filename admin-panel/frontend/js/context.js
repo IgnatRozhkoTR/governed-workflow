@@ -242,11 +242,7 @@ function toggleHiddenDiscussions() {
 }
 
 function goToResearch(discussionId) {
-  // Switch to Research tab in sidebar
-  var sidebarBtns = document.querySelectorAll('.sidebar-btn');
-  // Find Research tab button (index varies, use title)
-  var researchTab = Array.from(document.querySelectorAll('.tab-btn')).find(function(b) { return b.textContent.trim() === 'Research'; });
-  if (researchTab) researchTab.click();
+  switchTab('research');
   // Highlight the linked research
   setTimeout(function() {
     var researchGroups = document.querySelectorAll('.research-group');
@@ -271,6 +267,7 @@ function refreshContext() {
         AppState.context = data;
         CONTEXT_DATA = AppState.context;
         renderContext();
+        EventBus.emit('context:refreshed', data);
       }
     });
 }

@@ -24,6 +24,9 @@ function applyI18nToDOM() {
   document.querySelectorAll('[data-i18n-title]').forEach(function(el) {
     el.title = t(el.getAttribute('data-i18n-title'));
   });
+  document.querySelectorAll('[data-i18n-aria-label]').forEach(function(el) {
+    el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
+  });
 }
 
 function loadI18n(locale) {
@@ -62,9 +65,7 @@ function setLocale(locale) {
     if (activeTab && typeof switchTab === 'function') {
       switchTab(activeTab);
     }
-    if (typeof renderPhaseBar === 'function') {
-      renderPhaseBar('phaseBarControl', 'phaseLabelsControl');
-    }
+    if (typeof renderShell === 'function') renderShell();
     // Update header phase label
     var phaseLabel = document.getElementById('phaseLabel');
     if (phaseLabel && typeof LOCK_DATA !== 'undefined' && LOCK_DATA.phase) {

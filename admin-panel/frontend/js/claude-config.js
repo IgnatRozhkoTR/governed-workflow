@@ -82,12 +82,8 @@ function renderWorkflowModeCard() {
     '</div>';
 
   if (headerBadge) {
-    if (isFast) {
-      headerBadge.textContent = t('badges.fastMode');
-      headerBadge.style.display = '';
-    } else {
-      headerBadge.style.display = 'none';
-    }
+    headerBadge.textContent = isFast ? t('header.modeFast') : t('header.modeStandard');
+    headerBadge.className = isFast ? 'pill warn' : 'pill line';
   }
 }
 

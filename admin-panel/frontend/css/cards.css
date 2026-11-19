@@ -14,10 +14,14 @@
 }
 
 .card-header .card-collapse-chevron {
-  font-size: 10px;
-  color: var(--text-muted);
+  display: inline-flex;
+  flex: none;
+  color: var(--dim);
   transition: transform var(--transition);
-  margin-right: 6px;
+}
+
+.card.collapsed > .card-header {
+  border-bottom: 0;
 }
 
 .card.collapsed .card-collapse-chevron {

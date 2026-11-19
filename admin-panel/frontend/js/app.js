@@ -84,9 +84,9 @@ async function initApp() {
 
   // Update browser tab title with branch name
   if (LOCK_DATA.branch) {
-    document.title = LOCK_DATA.branch + ' — Workspace Control';
+    document.title = LOCK_DATA.branch + ' — Governed Workflow';
   } else {
-    document.title = 'Workspace Control';
+    document.title = 'Governed Workflow';
   }
 
   var localeSelect = document.getElementById('localeSelect');
@@ -97,17 +97,12 @@ async function initApp() {
   var yoloCheck = document.getElementById('yoloCheck');
   if (yoloCheck) yoloCheck.checked = !!LOCK_DATA.yolo_mode;
 
-  if (LOCK_DATA.session_id) {
-    var sessionBlock = document.getElementById('sessionBlock');
-    if (sessionBlock) {
-      sessionBlock.style.display = 'contents';
-    }
-  }
 
   loadReviewComments();
   loadProposals();
 
-  renderPhaseBar('phaseBarControl', 'phaseLabelsControl');
+  renderShell();
+  startSidebarPolling();
   renderPhaseHistory();
   renderPlan();
   renderScope();
@@ -116,7 +111,6 @@ async function initApp() {
   renderPreplanning();
   renderFileList();
   renderPhaseActions();
-  renderApprovalStatus();
   renderContext();
   loadVerificationData();
   loadCriteria();
@@ -142,8 +136,12 @@ async function initApp() {
   setupCollapsibleCards();
   _initialLoad = false;
 
-  setInterval(refreshState, 10000);
+  // initApp also runs on every in-page workspace switch; keep a single poller.
+  if (_statePollTimer) clearInterval(_statePollTimer);
+  _statePollTimer = setInterval(refreshState, 10000);
 }
+
+var _statePollTimer = null;
 
 // ═══════════════════════════════════════════════
 //  CLIPBOARD HELPERS
@@ -326,7 +324,7 @@ function setupCollapsibleCards() {
 
     var chevron = document.createElement('span');
     chevron.className = 'card-collapse-chevron';
-    chevron.textContent = '\u25BC';
+    chevron.innerHTML = cpIcon('chevronDown', 14);
     header.insertBefore(chevron, header.firstChild);
 
     header.addEventListener('click', function(e) {
