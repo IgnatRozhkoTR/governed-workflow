@@ -148,7 +148,16 @@ var TERMINAL_THEMES = {
 
 function getTerminalTheme() {
   var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  return isDark ? TERMINAL_THEMES.dark : TERMINAL_THEMES.light;
+  var palette = isDark ? TERMINAL_THEMES.dark : TERMINAL_THEMES.light;
+  var styles = getComputedStyle(document.documentElement);
+  var background = styles.getPropertyValue('--term').trim();
+  var foreground = styles.getPropertyValue('--termtx').trim();
+  return Object.assign({}, palette, {
+    background: background || palette.background,
+    foreground: foreground || palette.foreground,
+    cursor: foreground || palette.cursor,
+    cursorAccent: background || palette.cursorAccent
+  });
 }
 
 function _createTerminal(containerId, wsRef) {
@@ -175,7 +184,7 @@ function _createTerminal(containerId, wsRef) {
   var terminal = new Terminal({
     cursorBlink: true,
     fontSize: 13,
-    fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
+    fontFamily: "'JetBrains Mono', 'SF Mono', Menlo, monospace",
     theme: getTerminalTheme(),
     allowProposedApi: true,
     scrollback: 5000,
@@ -485,6 +494,16 @@ function updateTerminalStatus(status) {
   if (connectBtn) connectBtn.style.display = (status === 'connected') ? 'none' : '';
   if (disconnectBtn) disconnectBtn.style.display = (status === 'connected') ? '' : 'none';
   if (killBtn) killBtn.style.display = (status === 'connected') ? '' : 'none';
+}
+
+function renderTerminalGateStrip(gate) {
+  var strip = document.getElementById('terminalGateStrip');
+  if (!strip) return;
+  strip.hidden = !gate;
+  if (!gate) return;
+  strip.innerHTML = '<span class="dot gate"></span><span class="grow brk">' +
+    escapeHtml(t('terminal.gateNeedsYou', {phase: gate.phase})) + '</span>' +
+    '<button class="btn pri xs" onclick="switchTab(\'' + gate.decidingTab + '\')">' + escapeHtml(t('gate.openGate')) + '</button>';
 }
 
 function updateTerminalTheme() {

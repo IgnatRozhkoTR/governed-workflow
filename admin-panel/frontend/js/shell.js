@@ -214,10 +214,11 @@ function renderGateBar() {
   if (!bar) return;
   var gate = getPendingGate();
   var activeTab = typeof getActiveTabId === 'function' ? getActiveTabId() : 'overview';
-  var isDecidingView = activeTab === 'overview' || (gate && activeTab === gate.decidingTab);
+  var isDecidingView = activeTab === 'overview' || activeTab === 'terminal' || (gate && activeTab === gate.decidingTab);
   bar.hidden = !gate || isDecidingView;
   if (!bar.hidden) bar.innerHTML = _gateBarHtml(gate);
   renderPhoneGateFoot(gate, activeTab);
+  if (typeof renderTerminalGateStrip === 'function') renderTerminalGateStrip(gate);
 }
 
 function _gateBarHtml(gate) {
@@ -323,7 +324,7 @@ function renderOverviewChanges() {
   var files = DIFF_DATA.files || [];
   var inBuild = /^3\./.test(LOCK_DATA.phase || '');
   _setText('ovChangesTitle', t(inBuild ? 'overview.changesInCommit' : 'overview.changes'));
-  _setText('ovChangesMeta', files.length ? t('overview.filesCount', {n: files.length}) : '');
+  _setText('ovChangesMeta', files.length ? tn('overview.filesCount', files.length) : '');
 
   if (!files.length) {
     list.innerHTML = '<div class="empty">' + escapeHtml(t('overview.noChanges')) + '</div>';

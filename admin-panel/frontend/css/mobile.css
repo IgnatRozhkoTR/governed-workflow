@@ -232,18 +232,6 @@
     margin-right: 0;
   }
 
-  .terminal-toolbar {
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 6px 8px;
-  }
-
-  .terminal-session-list {
-    order: 3;
-    width: 100%;
-    padding: 0;
-  }
-
   .term-scroll-controls {
     display: flex;
     flex-direction: column;
@@ -362,6 +350,3 @@
   .toggle-group { flex-wrap: wrap; }
 }
 
-@media (max-width: 600px) {
-  #selector-toolbar { position: static !important; justify-content: flex-end; margin-bottom: 12px; }
-}
