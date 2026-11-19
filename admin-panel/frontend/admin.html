@@ -54,10 +54,10 @@
   mermaid.initialize(Object.assign({ startOnLoad: false }, getMermaidTheme()));
 </script>
 <link rel="stylesheet" href="css/fonts.css?v=1">
-<link rel="stylesheet" href="css/variables.css?v=13">
+<link rel="stylesheet" href="css/variables.css?v=14">
 <link rel="stylesheet" href="css/base.css?v=15">
 <link rel="stylesheet" href="css/components.css?v=2">
-<link rel="stylesheet" href="css/layout.css?v=13">
+<link rel="stylesheet" href="css/layout.css?v=14">
 <link rel="stylesheet" href="css/phase.css?v=12">
 <link rel="stylesheet" href="css/scope.css?v=11">
 <link rel="stylesheet" href="css/research.css?v=11">
@@ -68,7 +68,7 @@
 <link rel="stylesheet" href="css/context.css?v=13">
 <link rel="stylesheet" href="css/diff-viewer.css?v=22">
 <link rel="stylesheet" href="css/preplanning.css?v=11">
-<link rel="stylesheet" href="css/terminal.css?v=18">
+<link rel="stylesheet" href="css/terminal.css?v=19">
 <link rel="stylesheet" href="css/verification.css?v=14">
 <link rel="stylesheet" href="css/setup.css?v=13">
 <link rel="stylesheet" href="css/workspace.css?v=12">
@@ -107,8 +107,10 @@
 <nav class="side" id="sidebar" aria-label="Workspaces" data-i18n-aria-label="shell.workspaces">
   <div class="brandrow">
     <img src="/img/logo-28.png" alt="" width="28" height="28">
-    <span data-i18n="shell.brand">Governed Workflow</span>
+    <span class="grow trunc" data-i18n="shell.brand">Governed Workflow</span>
+    <button class="btn ic xs desktop-only collapse-toggle" id="sideCollapseToggle" onclick="toggleSidebarCollapsed()" aria-controls="sidebar" data-icon="panelLeft"></button>
   </div>
+  <button class="btn ic side-rail-gates desktop-only" id="sideRailGates" onclick="toggleSidebarCollapsed()" hidden><span class="cnt gate" id="sideRailGatesCount"></span></button>
   <div class="side-picker">
     <button class="chip side-picker__btn" id="sideProjectBtn" onclick="toggleSidebarProjectMenu()" aria-haspopup="true">
       <span data-icon="folder"></span>
@@ -119,14 +121,14 @@
   </div>
   <div class="side-groups" id="sideGroups"></div>
   <div class="side-new">
-    <button class="btn block" onclick="openNewWorkspace()" data-icon="plus"><span data-i18n="shell.newWorkspace">New workspace</span></button>
+    <button class="btn block" onclick="openNewWorkspace()" data-icon="plus" title="New workspace" data-i18n-title="shell.newWorkspace" aria-label="New workspace" data-i18n-aria-label="shell.newWorkspace"><span data-i18n="shell.newWorkspace">New workspace</span></button>
   </div>
   <div class="sidefoot">
     <button class="btn ic" onclick="showProjectSelector()" id="switchProjectBtn" data-icon="servers" title="Projects" data-i18n-title="shell.projects" aria-label="Projects"></button>
     <button class="btn ic" onclick="showSetupPage()" data-icon="setup" title="Setup" data-i18n-title="setup.openSetupBtn" aria-label="Setup"></button>
     <button class="btn ic" id="splitTerminalBtn" onclick="toggleSplitTerminal()" data-icon="split" title="Split Terminal" data-i18n-title="tabs.splitTerminal" aria-label="Split terminal"></button>
     <button class="btn ic" onclick="toggleTheme()" id="themeBtn" title="Toggle theme" data-i18n-title="shell.switchTheme" aria-label="Switch theme"></button>
-    <select id="localeSelect" class="btn locale-select" onchange="onLocaleChange(this.value)" aria-label="Language">
+    <select id="localeSelect" class="btn locale-select" onchange="onLocaleChange(this.value)" aria-label="Language" title="Language" data-i18n-title="shell.language" data-i18n-aria-label="shell.language">
       <option value="en">EN</option>
       <option value="ru">RU</option>
     </select>
@@ -913,9 +915,15 @@
 
   <!-- ─── TERMINAL ─── -->
   <div class="tab-panel" id="panel-terminal">
-    <div class="terminal-container">
-      <aside class="term-sessions">
-        <div class="term-sessions__head cap" data-i18n="terminal.sessions">Sessions</div>
+    <div class="terminal-container" id="terminalLayout">
+      <aside class="term-sessions" id="termSessions">
+        <div class="term-sessions__head">
+          <span class="cap grow" data-i18n="terminal.sessions">Sessions</span>
+          <button class="btn ic xs desktop-only collapse-toggle" id="termSessionsToggle" onclick="toggleTermSessionsCollapsed()" aria-controls="termSessions" data-icon="panelLeft"></button>
+        </div>
+        <button class="term-sessions__peek desktop-only" id="termSessionsPeek" onclick="toggleTermSessionsCollapsed()">
+          <span class="session-status-dot" id="termSessionsPeekDot"></span>
+        </button>
         <div id="terminalSessionList" class="terminal-session-list"></div>
       </aside>
       <div class="term">
@@ -923,10 +931,9 @@
           <span class="terminal-status" id="terminalStatus" data-i18n="terminal.disconnected">Disconnected</span>
           <span class="grow"></span>
           <div class="terminal-actions">
-            <button class="btn xs" id="terminalConnectBtn" onclick="connectTerminal()" data-i18n="terminal.connect">Connect</button>
-            <button class="btn xs" onclick="toggleSplitTerminal()" data-i18n="terminal.sidePanel">Side panel</button>
-            <button class="btn xs" id="terminalDisconnectBtn" onclick="disconnectTerminal()" style="display:none;" data-i18n="terminal.disconnect">Disconnect</button>
-            <button class="btn xs danger" id="terminalKillBtn" onclick="killTerminalSession()" style="display:none;" data-i18n="terminal.kill">Kill</button>
+            <button class="btn xs" id="terminalConnectBtn" onclick="connectSelectedTerminal()" data-i18n="terminal.connect">Connect</button>
+            <button class="btn xs" id="terminalDisconnectBtn" onclick="disconnectSelectedTerminal()" style="display:none;" data-i18n="terminal.disconnect">Disconnect</button>
+            <button class="btn xs danger" id="terminalKillBtn" onclick="killSelectedTerminal()" style="display:none;" data-i18n="terminal.kill">Kill</button>
           </div>
         </div>
         <div class="gatestrip" id="terminalGateStrip" hidden></div>
@@ -978,20 +985,21 @@
 </script>
 <script src="js/vendor/idiomorph.min.js?v=10"></script>
 <script src="js/event-bus.js?v=10"></script>
-<script src="js/icons.js?v=1"></script>
+<script src="js/icons.js?v=2"></script>
 <script src="js/i18n.js?v=12"></script>
-<script src="js/api.js?v=15"></script>
+<script src="js/api.js?v=16"></script>
 <script src="js/auth.js?v=11"></script>
 <script src="js/toast.js?v=10"></script>
 <script src="js/state.js?v=14"></script>
+<script src="js/collapse.js?v=1"></script>
 <script src="js/submit-key.js?v=1"></script>
 <script src="js/review-thread.js?v=12"></script>
 <script src="js/review-tab.js?v=10"></script>
 <script src="js/proposals.js?v=2"></script>
 <script src="js/comments.js?v=12"></script>
 <script src="js/theme.js?v=11"></script>
-<script src="js/terminal.js?v=25"></script>
-<script src="js/tabs.js?v=18"></script>
+<script src="js/terminal.js?v=26"></script>
+<script src="js/tabs.js?v=19"></script>
 <script src="js/phase.js?v=13"></script>
 <script src="js/plan.js?v=11"></script>
 <script src="js/scope.js?v=10"></script>
@@ -1011,15 +1019,15 @@
 <script src="js/criteria.js?v=11"></script>
 <script src="js/preplanning.js?v=12"></script>
 <script src="js/verification.js?v=11"></script>
-<script src="js/setup.js?v=14"></script>
+<script src="js/setup.js?v=15"></script>
 <script src="js/phase-settings.js?v=10"></script>
 <script src="js/advance-modes.js?v=1"></script>
 <script src="js/review-pipeline.js?v=2"></script>
 <script src="js/actions.js?v=10"></script>
 <script src="js/settings.js?v=5"></script>
 <script src="js/app.js?v=15"></script>
-<script src="js/shell.js?v=1"></script>
-<script src="js/workspace.js?v=16"></script>
+<script src="js/shell.js?v=2"></script>
+<script src="js/workspace.js?v=17"></script>
 
 <div id="diagramOverlay" class="diagram-overlay" style="display:none" onclick="closeDiagramOverlay(event)">
   <div class="diagram-overlay-content" onclick="event.stopPropagation()">

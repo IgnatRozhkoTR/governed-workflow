@@ -48,8 +48,8 @@
 .brandrow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 10px 12px;
+  gap: 8px;
+  padding: 0 0 12px 10px;
   font-family: var(--f-head);
   font-weight: 700;
   font-size: 16px;
@@ -100,6 +100,28 @@
   gap: 6px;
   padding: 12px 4px 0;
 }
+/* ─── Sidebar folded to an icon rail (desktop only; phones use the drawer) ─── */
+.side-rail-gates { display: none; }
+@media (min-width: 601px) {
+  .side { transition: width var(--transition), padding var(--transition); }
+  .side-collapsed .side { width: var(--side-rail-w); padding: 16px 10px; align-items: center; gap: 8px; }
+  .side-collapsed .brandrow { padding: 0; }
+  .side-collapsed .brandrow > :not(.collapse-toggle),
+  .side-collapsed .side-picker,
+  .side-collapsed .side-groups { display: none; }
+  .side-collapsed .side-rail-gates { display: inline-flex; }
+  .side-collapsed .side-new { padding: 0; }
+  .side-collapsed .side-new .btn { width: 36px; padding: 0; }
+  .side-collapsed .side-new .btn > span { display: none; }
+  .side-collapsed .sidefoot { flex-direction: column; padding: 12px 0 0; }
+  .side-collapsed .locale-select { min-width: 0; width: 36px; padding: 0; }
+}
+@media (min-width: 601px) and (max-width: 1199px) {
+  .brandrow { font-size: 15px; padding-left: 4px; }
+}
+.collapse-toggle { flex: none; border-color: transparent; background: none; color: var(--dim); }
+.collapse-toggle:hover { color: var(--tx); }
+
 .locale-select {
   appearance: none;
   -webkit-appearance: none;

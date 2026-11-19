@@ -2,8 +2,6 @@
 //  SETUP PAGE
 // ═══════════════════════════════════════════════
 
-var _navigatingBack = false;
-
 var _setupTerm = null;
 var _setupFitAddon = null;
 var _setupTermWs = null;
@@ -13,32 +11,37 @@ var _setupCachedProfiles = [];
 
 // ─── Navigation ───
 
+// Setup is a view of the selector overlay, so it opens the same way from the
+// project list and from inside a workspace, which stays loaded underneath.
 function showSetupPage() {
+  showSelectorOverlay();
   var listView = document.getElementById('ws-project-list-view');
   var workspaceView = document.getElementById('ws-workspace-view');
-  var setupView = document.getElementById('ws-setup-view');
   if (listView) listView.style.display = 'none';
   if (workspaceView) workspaceView.style.display = 'none';
+  var setupView = document.getElementById('ws-setup-view');
   if (setupView) {
     setupView.style.display = 'block';
   } else {
     _setupInjectView();
   }
-  if (!_navigatingBack) {
-    history.pushState({ view: 'setup' }, '', '?view=setup');
-  }
+  if (!isSetupRoute()) pushRoute('?view=setup');
   loadSetupData();
 }
 
 function hideSetupPage() {
-  var setupView = document.getElementById('ws-setup-view');
-  var listView = document.getElementById('ws-project-list-view');
-  if (setupView) setupView.style.display = 'none';
-  if (listView) listView.style.display = 'block';
-  disconnectSetupTerminal();
-  if (!_navigatingBack) {
-    history.pushState({ view: 'projects' }, '', '/');
+  if (getWorkspaceContext()) {
+    returnToLoadedWorkspace();
+  } else {
+    showProjectSelector();
   }
+}
+
+function closeSetupPage() {
+  var setupView = document.getElementById('ws-setup-view');
+  if (!setupView || setupView.style.display === 'none') return;
+  setupView.style.display = 'none';
+  disconnectSetupTerminal();
 }
 
 // ─── View injection ───
@@ -112,7 +115,7 @@ async function loadSetupData() {
 
 function renderSetupPage() {
   return '<div class="setup-container">'
-    + '<button class="btn" onclick="hideSetupPage()" data-icon="back">' + t('setup.backToProjects') + '</button>'
+    + '<button class="btn" onclick="hideSetupPage()" data-icon="back">' + t(getWorkspaceContext() ? 'setup.backToWorkspace' : 'setup.backToProjects') + '</button>'
     + '<div class="setup-header">'
     + '<div class="setup-title">' + t('setup.title') + '</div>'
     + '<div class="setup-subtitle">' + t('setup.subtitle') + '</div>'
@@ -411,19 +414,3 @@ function _setupUpdateTerminalStatus(status) {
     disconnectBtn.style.display = (status === 'connected') ? '' : 'none';
   }
 }
-
-// ─── Browser history navigation ───
-
-window.addEventListener('popstate', function(event) {
-  _navigatingBack = true;
-  var state = event.state;
-  if (state && state.view === 'setup') {
-    showSetupPage();
-  } else {
-    var setupView = document.getElementById('ws-setup-view');
-    var listView = document.getElementById('ws-project-list-view');
-    if (setupView) setupView.style.display = 'none';
-    if (listView) listView.style.display = 'block';
-  }
-  _navigatingBack = false;
-});

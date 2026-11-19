@@ -549,6 +549,7 @@ function renderSidebar() {
   var container = document.getElementById('sideGroups');
   if (!container) return;
   var groups = _sidebarGroups();
+  _renderSidebarRailGates(groups.needs.length);
   if (!_sidebar.workspaces.length) {
     container.innerHTML = '<div class="empty sm">' + escapeHtml(t('shell.noWorkspaces')) + '</div>';
     return;
@@ -559,6 +560,18 @@ function renderSidebar() {
     _sidebarGroupHtml('shell.agentWorking', groups.working, groups.working.length, false) +
     _sidebarGroupHtml('shell.done', done, groups.done.length, false) +
     _sidebarDoneToggle(groups.done.length);
+}
+
+// Folded to a rail, the sidebar still shows how many workspaces wait on a
+// human, so gates never go unnoticed.
+function _renderSidebarRailGates(waitingCount) {
+  var badge = document.getElementById('sideRailGates');
+  if (!badge) return;
+  badge.hidden = waitingCount === 0;
+  var label = tn('shell.workspacesNeedYou', waitingCount);
+  _setText('sideRailGatesCount', waitingCount);
+  badge.title = label;
+  badge.setAttribute('aria-label', label);
 }
 
 function _sidebarGroupHtml(labelKey, entries, total, isGateGroup) {
@@ -636,6 +649,24 @@ function openNewWorkspace() {
   showProjectSelector();
   if (ctx) openProject(ctx.projectId);
 }
+
+// The sidebar is needed rarely, so it starts folded to an icon rail.
+var SIDEBAR_PANEL = {
+  storageKey: 'ui_sidebar_collapsed',
+  collapsedByDefault: true,
+  hostId: 'app-content',
+  hostClass: 'side-collapsed',
+  toggleId: 'sideCollapseToggle',
+  expandKey: 'shell.expandSidebar',
+  collapseKey: 'shell.collapseSidebar',
+  onSettled: refitVisibleTerminals
+};
+
+function toggleSidebarCollapsed() {
+  togglePanelCollapsed(SIDEBAR_PANEL);
+}
+
+initCollapsiblePanel(SIDEBAR_PANEL);
 
 document.addEventListener('click', function(e) {
   var menu = document.getElementById('sideProjectMenu');

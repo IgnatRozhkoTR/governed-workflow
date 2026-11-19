@@ -6,20 +6,28 @@ let _wsFastModeDefaultPrior = false;
 let _wsSelectedProjectType = 'single';
 
 function showProjectSelector() {
-  resetUrlToSelector();
-  document.getElementById('project-selector').style.display = 'flex';
-  document.getElementById('app-content').style.display = 'none';
+  clearWorkspaceContext();
+  showSelectorOverlay();
   _wsSwitchView('project-list');
   loadProjects();
 }
 
+// The project selector, project workspaces list and Setup all live in this
+// full-screen overlay; the loaded workspace app stays mounted underneath.
+function showSelectorOverlay() {
+  document.getElementById('project-selector').style.display = 'flex';
+  document.getElementById('app-content').style.display = 'none';
+}
+
 function hideProjectSelector() {
+  closeSetupPage();
   document.getElementById('project-selector').style.display = 'none';
   document.getElementById('app-content').style.display = '';
 }
 
 function _wsSwitchView(view) {
   _wsCurrentView = view;
+  closeSetupPage();
   const listView = document.getElementById('ws-project-list-view');
   const workspaceView = document.getElementById('ws-workspace-view');
   if (view === 'project-list') {
@@ -518,6 +526,33 @@ async function _wsArchiveWorkspace(projectId, branch, event) {
   }
 }
 
+// Brings back the workspace that stayed loaded behind the overlay (after
+// Setup), without reloading its state.
+function returnToLoadedWorkspace() {
+  pushRoute(workspaceRoute(getWorkspaceContext()) + '#' + getActiveTabId());
+  hideProjectSelector();
+}
+
+// Back/Forward: render whatever the restored URL names.
+function showRouteFromUrl() {
+  if (isSetupRoute()) {
+    showSetupPage();
+    return;
+  }
+  var target = readWorkspaceFromUrl();
+  if (!target) {
+    showProjectSelector();
+  } else if (isLoadedWorkspace(target)) {
+    hideProjectSelector();
+  } else {
+    openWorkspace(target.projectId, target.branch);
+  }
+}
+
+window.addEventListener('popstate', function() {
+  restoreRoute(showRouteFromUrl);
+});
+
 function openWorkspace(projectId, branch) {
   setWorkspaceContext(projectId, branch);
   hideProjectSelector();
@@ -670,14 +705,15 @@ async function _wsLoadProjectDefaults(projectId) {
 
   function _wsBoot() {
     _wsInitSelector();
-    if (ctx) {
+    if (isSetupRoute()) {
+      restoreRoute(showSetupPage);
+    } else if (ctx) {
       hideProjectSelector();
       if (typeof initApp === 'function') {
         initApp();
       }
     } else {
-      showProjectSelector();
-      loadProjects();
+      restoreRoute(showProjectSelector);
     }
   }
 

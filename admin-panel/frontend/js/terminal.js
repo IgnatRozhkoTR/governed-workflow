@@ -376,15 +376,7 @@ function initTerminal() {
   term = result.terminal;
   fitAddon = result.fitAddon;
 
-  window.addEventListener('resize', function() {
-    if (document.getElementById('panel-terminal').classList.contains('active')) {
-      _fitAndPushSize(_activeTerminalTarget());
-    }
-    if (splitFitAddon && document.getElementById('splitContainer') &&
-        document.getElementById('splitContainer').classList.contains('split-active')) {
-      splitFitAddon.fit();
-    }
-  });
+  window.addEventListener('resize', refitVisibleTerminals);
 
   term.writeln(t('terminal.ready'));
 }
@@ -456,7 +448,67 @@ function killTerminalSession() {
   });
 }
 
+// Layout changes that are not window resizes (sidebar or sessions list
+// collapsing) call this once their width transition has settled.
+function refitVisibleTerminals() {
+  var panel = document.getElementById('panel-terminal');
+  if (panel && panel.classList.contains('active')) {
+    _fitAndPushSize(_activeTerminalTarget());
+  }
+  var splitContainer = document.getElementById('splitContainer');
+  if (splitFitAddon && splitContainer && splitContainer.classList.contains('split-active')) {
+    splitFitAddon.fit();
+  }
+}
+
+var _workspaceTerminalStatus = 'disconnected';
+
 function updateTerminalStatus(status) {
+  _workspaceTerminalStatus = status;
+  renderTerminalToolbar();
+}
+
+// The toolbar describes and acts on the terminal shown beneath it: the
+// workspace terminal, or the tmux session picked in the sessions list. The
+// session's target is its own name, so it never depends on the workspace.
+function _selectedSessionTab() {
+  return _activeSessionTabName ? (_sessionTabs[_activeSessionTabName] || null) : null;
+}
+
+function connectSelectedTerminal() {
+  var tab = _selectedSessionTab();
+  if (tab) {
+    openSessionTab(tab.name);
+  } else {
+    connectTerminal();
+  }
+}
+
+function disconnectSelectedTerminal() {
+  var tab = _selectedSessionTab();
+  if (tab) {
+    if (tab.ws) tab.ws.close();
+  } else {
+    disconnectTerminal();
+  }
+}
+
+function killSelectedTerminal() {
+  var tab = _selectedSessionTab();
+  if (tab) {
+    killSessionByName(tab.name);
+  } else {
+    killTerminalSession();
+  }
+}
+
+function renderTerminalToolbar() {
+  var tab = _selectedSessionTab();
+  _renderTerminalToolbarStatus(tab ? tab.status : _workspaceTerminalStatus);
+  renderSessionsRailDot();
+}
+
+function _renderTerminalToolbarStatus(status) {
   var el = document.getElementById('terminalStatus');
   var connectBtn = document.getElementById('terminalConnectBtn');
   var disconnectBtn = document.getElementById('terminalDisconnectBtn');
@@ -590,6 +642,7 @@ function renderSessionList(sessions) {
     }
 
     _updateSessionChipStates();
+    renderSessionsRailDot();
   } catch (e) {
     console.error('[chips] render failed', e);
     _sessionListSignature = null;
@@ -706,6 +759,48 @@ function killSessionByName(name) {
     });
 }
 
+// ─── Sessions list collapse ───
+// Switching sessions is rare, so the list starts folded to a strip that keeps
+// the selected terminal's tmux status dot in view.
+var TERM_SESSIONS_PANEL = {
+  storageKey: 'ui_term_sessions_collapsed',
+  collapsedByDefault: true,
+  hostId: 'terminalLayout',
+  hostClass: 'sessions-collapsed',
+  toggleId: 'termSessionsToggle',
+  expandKey: 'terminal.expandSessions',
+  collapseKey: 'terminal.collapseSessions',
+  onSettled: refitVisibleTerminals
+};
+
+function toggleTermSessionsCollapsed() {
+  togglePanelCollapsed(TERM_SESSIONS_PANEL);
+}
+
+function renderSessionsRailDot() {
+  var peek = document.getElementById('termSessionsPeek');
+  var dot = document.getElementById('termSessionsPeekDot');
+  if (!peek || !dot) return;
+  var sessionName = _activeSessionTabName || _workspaceSessionName;
+  var session = _lastSessionListPayload.find(function(s) { return s.name === sessionName; });
+  var isAttached = !!(session && session.attached);
+  dot.className = 'session-status-dot ' + (isAttached ? 'session-attached' : 'session-detached');
+  var description = (_activeSessionTabName || t('terminal.workspaceSession')) + ' · ' +
+    t(isAttached ? 'terminal.attached' : 'terminal.detached');
+  peek.title = description;
+  peek.setAttribute('aria-label', t('terminal.expandSessions') + ': ' + description);
+}
+
+// Docking the terminal beside itself would only squeeze the Terminal tab.
+function syncSplitTerminalButton(tabId) {
+  var btn = document.getElementById('splitTerminalBtn');
+  if (!btn) return;
+  var labelKey = tabId === 'terminal' ? 'tabs.splitTerminalUnavailable' : 'tabs.splitTerminal';
+  btn.disabled = tabId === 'terminal';
+  btn.dataset.i18nTitle = labelKey;
+  btn.title = t(labelKey);
+}
+
 function startSessionListPolling() {
   loadTerminalSessions();
   if (_sessionListInterval) clearInterval(_sessionListInterval);
@@ -759,24 +854,33 @@ function _createSessionTabView(name) {
   view.id = 'sessionTerminalView' + _sessionViewCounter;
   container.appendChild(view);
 
-  var tab = { name: name, viewId: view.id, viewEl: view, terminal: null, fitAddon: null, ws: null };
+  var tab = { name: name, viewId: view.id, viewEl: view, terminal: null, fitAddon: null, ws: null, status: 'disconnected' };
   _sessionTabs[name] = tab;
   return tab;
 }
 
 function _connectSessionTab(tab) {
+  _setSessionTabStatus(tab, 'connecting');
   tab.ws = _connectTerminal(tab.terminal, tab.fitAddon, _buildSessionTerminalWsUrl(tab.name), {
     focusOnOpen: _activeSessionTabName === tab.name,
-    onConnected: _updateSessionChipStates,
+    onConnected: function() {
+      _setSessionTabStatus(tab, 'connected');
+    },
     onDisconnected: function() {
       if (tab.terminal) tab.terminal.writeln('\r\n\x1b[33m' + t('terminal.sessionClosed') + '\x1b[0m');
-      _updateSessionChipStates();
+      _setSessionTabStatus(tab, 'disconnected');
     },
     onError: function() {
       if (tab.terminal) tab.terminal.writeln('\r\n\x1b[31m' + t('terminal.sessionError') + '\x1b[0m');
-      _updateSessionChipStates();
+      _setSessionTabStatus(tab, 'error');
     }
   });
+}
+
+function _setSessionTabStatus(tab, status) {
+  tab.status = status;
+  _updateSessionChipStates();
+  renderTerminalToolbar();
 }
 
 function closeSessionTab(name) {
@@ -837,6 +941,7 @@ function _showTerminalView(name) {
   });
 
   _updateSessionChipStates();
+  renderTerminalToolbar();
 }
 
 function _activeTerminalTarget() {
@@ -1027,3 +1132,5 @@ document.addEventListener('workspace-reset', function() {
   if (typeof splitTerm !== 'undefined' && splitTerm) { splitTerm.clear(); splitTerm.dispose(); splitTerm = null; splitFitAddon = null; }
   terminalConnected = false;
 });
+
+initCollapsiblePanel(TERM_SESSIONS_PANEL);

@@ -19,6 +19,7 @@ var CP_ICON_PATHS = {
   moon: 'M15.5 11.5A6 6 0 0 1 8.5 4.5a6 6 0 1 0 7 7z',
   more: 'M10 4.5h.01M10 10h.01M10 15.5h.01',
   overview: 'M4 4h5v5H4zM11 4h5v5h-5zM4 11h5v5H4zM11 11h5v5h-5z',
+  panelLeft: 'M3.5 4.5h13v11h-13zM8 4.5v11',
   play: 'M6.5 4.5v11l9-5.5z',
   plus: 'M10 4v12M4 10h12',
   servers: 'M4 4.5h12v4.5H4zM4 11h12v4.5H4zM6.5 6.8h.01M6.5 13.3h.01',

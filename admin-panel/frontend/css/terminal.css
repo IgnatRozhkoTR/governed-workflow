@@ -21,7 +21,54 @@
 }
 
 .term-sessions__head {
-  padding: 4px 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 0 12px;
+}
+
+.term-sessions__peek {
+  display: none;
+}
+
+/* Sessions list folded to a strip: toggle plus the selected session's dot */
+@media (min-width: 601px) {
+  .terminal-container {
+    transition: grid-template-columns var(--transition);
+  }
+
+  .terminal-container.sessions-collapsed {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .sessions-collapsed .term-sessions {
+    align-items: center;
+  }
+
+  .sessions-collapsed .term-sessions__head {
+    padding: 0;
+  }
+
+  .sessions-collapsed .term-sessions__head .cap,
+  .sessions-collapsed .terminal-session-list {
+    display: none;
+  }
+
+  .sessions-collapsed .term-sessions__peek {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+  }
+
+  .sessions-collapsed .term-sessions__peek:hover {
+    background: var(--sf2);
+  }
 }
 
 .term {
@@ -296,6 +343,10 @@
 .main.terminal-active .split-handle,
 .main.terminal-active .split-terminal {
   display: none !important;
+}
+
+.main.terminal-active #splitMain {
+  padding: 0;
 }
 
 #splitTerminalBtn.active {

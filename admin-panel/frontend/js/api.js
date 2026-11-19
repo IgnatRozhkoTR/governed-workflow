@@ -40,39 +40,68 @@ function _appendTokenToWsUrl(url) {
   return url + sep + 'token=' + encodeURIComponent(token);
 }
 
-// ─── URL-based workspace context ───
+// ─── Workspace context and routes ───
 
-function getWorkspaceContext() {
-  const params = new URLSearchParams(window.location.search);
-  const ws = params.get('ws');
-  if (!ws) return null;
+// The workspace the app has loaded. The URL only mirrors it: other views
+// (Setup, the project selector) rewrite the query string while the workspace
+// stays loaded behind them, so readers must never re-derive it from location.
+let _loadedWorkspace = readWorkspaceFromUrl();
+let _isRestoringRoute = false;
 
-  const slashIdx = ws.indexOf('/');
-  if (slashIdx === -1) return null;
-
+function readWorkspaceFromUrl() {
+  const ws = new URLSearchParams(window.location.search).get('ws');
+  const slashIdx = ws ? ws.indexOf('/') : -1;
+  if (slashIdx <= 0) return null;
   return {
     projectId: ws.substring(0, slashIdx),
     branch: ws.substring(slashIdx + 1)
   };
 }
 
+function isSetupRoute() {
+  return new URLSearchParams(window.location.search).get('view') === 'setup';
+}
+
+function getWorkspaceContext() {
+  if (!_loadedWorkspace) return null;
+  return { projectId: _loadedWorkspace.projectId, branch: _loadedWorkspace.branch };
+}
+
+function isLoadedWorkspace(ctx) {
+  return !!(ctx && _loadedWorkspace &&
+    ctx.projectId === _loadedWorkspace.projectId && ctx.branch === _loadedWorkspace.branch);
+}
+
+function workspaceRoute(ctx) {
+  return '/?' + new URLSearchParams({ ws: ctx.projectId + '/' + ctx.branch });
+}
+
 function setWorkspaceContext(projectId, branch) {
-  const url = new URL(window.location);
-  url.searchParams.set('ws', projectId + '/' + branch);
-  window.history.pushState({}, '', url);
+  _loadedWorkspace = { projectId: projectId, branch: branch };
+  pushRoute(workspaceRoute(_loadedWorkspace));
 }
 
+// Leaves the workspace for the project selector. The bare "/" keeps a
+// refresh on the selector from redirecting back into the workspace.
 function clearWorkspaceContext() {
-  const url = new URL(window.location);
-  url.searchParams.delete('ws');
-  window.history.pushState({}, '', url);
+  _loadedWorkspace = null;
+  pushRoute('/');
 }
 
-// Reset URL to the canonical project-selector state: path "/", no query,
-// no hash. Used when the user clicks "Switch" in the header so that a
-// refresh on the selector doesn't auto-redirect back into the workspace.
-function resetUrlToSelector() {
-  window.history.pushState({}, '', '/');
+// Records a navigation in browser history, except while a Back/Forward step
+// is being replayed: that entry already exists and must not be duplicated.
+function pushRoute(url) {
+  if (_isRestoringRoute) return;
+  window.history.pushState(null, '', url);
+}
+
+function restoreRoute(render) {
+  _isRestoringRoute = true;
+  try {
+    render();
+  } finally {
+    _isRestoringRoute = false;
+  }
 }
 
 // ─── Generic fetch helpers ───

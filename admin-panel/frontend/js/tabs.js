@@ -83,6 +83,7 @@ function _syncTabChrome(tabId) {
   var activeTabBtn = document.querySelector('#wsTabs .tab.active');
   if (activeTabBtn) activeTabBtn.scrollIntoView({ block: 'nearest', inline: 'center' });
 
+  syncSplitTerminalButton(tabId);
   if (typeof renderGateBar === 'function') renderGateBar();
 }
 
