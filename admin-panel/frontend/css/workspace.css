@@ -9,16 +9,6 @@
   overflow-y: auto;
 }
 
-#project-selector::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 60% 50% at 20% 0%, var(--accent-dim) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 60% at 85% 100%, var(--info-dim) 0%, transparent 70%);
-}
-
 .ws-selector-container {
   position: relative;
   width: 100%;
@@ -110,21 +100,21 @@
 
 .ws-input {
   width: 100%;
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
   background: var(--bg-input);
   color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-family: var(--f-ui);
+  font-size: 14px;
   transition: border-color var(--transition);
 }
 
 .ws-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-dim);
-}
+  }
 
 .ws-input::placeholder {
   color: var(--text-muted);
@@ -133,13 +123,14 @@
 
 .ws-select {
   width: 100%;
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
   background: var(--bg-input);
   color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-family: var(--f-ui);
+  font-size: 14px;
   cursor: pointer;
   transition: border-color var(--transition);
   appearance: none;
@@ -152,8 +143,7 @@
 .ws-select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-dim);
-}
+  }
 
 .ws-select option {
   background: var(--bg-raised);

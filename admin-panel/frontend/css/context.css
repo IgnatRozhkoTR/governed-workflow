@@ -23,27 +23,26 @@
 }
 
 .context-label {
-  font-size: 0.72rem;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
+  color: var(--dim);
 }
 
 .context-input {
-  font-family: var(--font-mono);
-  font-size: 0.84rem;
-  padding: 9px 13px;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  font-family: var(--f-ui);
+  font-size: 14px;
+  min-height: 40px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--ln);
+  border-radius: var(--r-md);
   color: var(--text-primary);
   outline: none;
   transition: var(--transition);
 }
 
 .context-input:focus {
-  border-color: var(--border-active);
+  border-color: var(--pr);
 }
 
 .context-input[readonly] {
@@ -52,12 +51,12 @@
 }
 
 .context-textarea {
-  font-family: var(--font-mono);
-  font-size: 0.84rem;
-  padding: 13px;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  font-family: var(--f-mono);
+  font-size: 13px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--ln);
+  border-radius: var(--r-md);
   color: var(--text-primary);
   outline: none;
   resize: vertical;
@@ -67,7 +66,7 @@
 }
 
 .context-textarea:focus {
-  border-color: var(--border-active);
+  border-color: var(--pr);
 }
 
 .context-raw {
@@ -242,25 +241,3 @@
   color: var(--danger);
 }
 
-/* Toast */
-.toast {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  background: var(--bg-raised);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  padding: 10px 20px;
-  border-radius: var(--radius);
-  font-size: 0.82rem;
-  z-index: 10000;
-  opacity: 0;
-  transition: all 0.3s ease;
-  pointer-events: none;
-}
-
-.toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
