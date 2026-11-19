@@ -29,26 +29,60 @@ function _renderAuthScreen(configured) {
   var subtitleKey = configured ? 'auth.subtitleConfigured' : 'auth.subtitleUnconfigured';
   var cmd = escapeHtml(_setupCommand);
   return (
-    '<div class="selector-container">' +
-      '<div class="selector-title">' + t('auth.title') + '</div>' +
-      '<div class="selector-subtitle">' + t(subtitleKey) + '</div>' +
-      '<div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 12px;">' +
-        t('auth.commandLabel') +
+    '<div class="ws-auth">' +
+      '<div class="ws-brand">' +
+        '<img src="/img/logo.png" alt="" width="40" height="40">' +
+        '<h1 class="ws-selector-title">' + t('shell.brand') + '</h1>' +
       '</div>' +
-      '<div class="command-block">' +
-        '<code>' + cmd + '</code>' +
-        '<button class="copy-btn" id="auth-copy-btn" type="button">' + t('auth.copy') + '</button>' +
-      '</div>' +
-      '<div style="margin-top: 10px; color: var(--text-muted); font-size: 0.78rem;">' +
-        t('auth.commandHint') +
-      '</div>' +
-      '<input type="password" id="auth-token-input" class="ws-input" ' +
-             'placeholder="' + t('auth.placeholder') + '" style="margin-top: 20px;">' +
-      '<div id="auth-error" style="display:none; margin-top: 8px; color: var(--danger); font-size: 0.82rem;"></div>' +
-      '<button class="btn btn-primary" id="auth-submit-btn" ' +
-              'style="margin-top: 12px;">' + t('auth.submit') + '</button>' +
+      '<section class="card">' +
+        '<div class="ch"><h3>' + t('auth.title') + '</h3></div>' +
+        '<div class="cb">' +
+          '<p class="dim">' + t(subtitleKey) + '</p>' +
+          '<div class="lbl">' + t('auth.commandLabel') +
+            '<div class="command-block">' +
+              '<code>' + cmd + '</code>' +
+              '<button class="btn xs" id="auth-copy-btn" type="button">' + t('auth.copy') + '</button>' +
+            '</div>' +
+          '</div>' +
+          '<p class="dim sm">' + t('auth.commandHint') + '</p>' +
+          '<label class="lbl">' + t('auth.tokenLabel') +
+            '<input type="password" id="auth-token-input" class="inp mono" placeholder="' + t('auth.placeholder') + '">' +
+          '</label>' +
+          '<div id="auth-error" class="auth-error" style="display:none;"></div>' +
+          '<div><button class="btn pri lg" id="auth-submit-btn">' + t('auth.submit') + '</button></div>' +
+        '</div>' +
+      '</section>' +
+      _renderAuthToolbar() +
     '</div>'
   );
+}
+
+function _renderAuthToolbar() {
+  var themeIcon = cpIcon(state.theme === 'dark' ? 'moon' : 'sun');
+  return '<div class="auth-toolbar">' +
+    '<select class="btn locale-select" id="authLocaleSelect" aria-label="Language">' +
+      '<option value="en">EN</option><option value="ru">RU</option></select>' +
+    '<button class="btn ic" id="authThemeBtn" type="button" aria-label="' + escapeHtml(t('shell.switchTheme')) + '">' + themeIcon + '</button>' +
+  '</div>';
+}
+
+function _wireAuthToolbar() {
+  var localeSelect = document.getElementById('authLocaleSelect');
+  if (localeSelect) {
+    localeSelect.value = I18N_LOCALE;
+    localeSelect.addEventListener('change', function() {
+      localStorage.setItem('admin-panel-locale', localeSelect.value);
+      I18N_LOCALE = localeSelect.value;
+      loadI18n(localeSelect.value).then(showAuthScreen);
+    });
+  }
+  var themeBtn = document.getElementById('authThemeBtn');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', function() {
+      toggleTheme();
+      themeBtn.innerHTML = cpIcon(state.theme === 'dark' ? 'moon' : 'sun');
+    });
+  }
 }
 
 async function showAuthScreen() {
@@ -63,10 +97,10 @@ async function showAuthScreen() {
   if (!screen) {
     screen = document.createElement('div');
     screen.id = 'auth-screen';
-    screen.className = 'project-selector';
     document.body.appendChild(screen);
   }
   screen.innerHTML = _renderAuthScreen(configured);
+  _wireAuthToolbar();
   screen.style.display = '';
 
   var submitBtn = document.getElementById('auth-submit-btn');

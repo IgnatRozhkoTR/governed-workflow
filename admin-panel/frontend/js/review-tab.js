@@ -20,6 +20,7 @@ async function loadReviewComments() {
 
         renderReviewTab();
         updateReviewBadge();
+        refreshReviewPipeline(false);
     } catch(e) {
         console.warn('Failed to load review comments:', e.message);
     }
@@ -58,11 +59,27 @@ function renderReviewTab() {
     });
 }
 
+function refreshReviewPipeline(force) {
+    var card = document.getElementById('reviewPipelineCard');
+    var workspaceId = LOCK_DATA && LOCK_DATA.workspace_id;
+    if (!card || !workspaceId || typeof renderReviewPipelineCard !== 'function') return;
+    if (!force && card.dataset.workspaceId === String(workspaceId)) return;
+    renderReviewPipelineCard(card, workspaceId, { phase: LOCK_DATA.phase });
+}
+
+function updateReviewOpenPill(openCount) {
+    var pill = document.getElementById('reviewOpenPill');
+    if (!pill) return;
+    pill.style.display = openCount > 0 ? '' : 'none';
+    pill.textContent = t('review.openCount', { count: openCount });
+}
+
 function updateReviewResolveAllButton(allReview) {
     var btn = document.getElementById('reviewResolveAllBtn');
     if (!btn) return;
 
     var openCount = allReview.filter(function(c) { return !c.parent_id && !c.resolved; }).length;
+    updateReviewOpenPill(openCount);
     if (openCount === 0) {
         btn.style.display = 'none';
         return;

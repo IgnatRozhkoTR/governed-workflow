@@ -193,6 +193,7 @@ function _activateTabHooks(tabId) {
     if (typeof renderFileList === 'function') renderFileList();
   } else if (tabId === 'review') {
     if (typeof loadReviewComments === 'function') loadReviewComments();
+    if (typeof refreshReviewPipeline === 'function') refreshReviewPipeline(true);
   } else if (tabId === 'reflection') {
     if (typeof loadProposals === 'function') loadProposals();
   } else if (tabId === 'files') {

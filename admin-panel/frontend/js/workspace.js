@@ -76,32 +76,131 @@ function _wsShowError(containerId, message) {
 
 async function loadProjects() {
   const listEl = document.getElementById('ws-project-cards');
-  listEl.innerHTML = '<div style="color: var(--text-muted); padding: 12px;">' + t('workspace.loadingProjects') + '</div>';
+  listEl.innerHTML = '<div class="empty sm">' + t('workspace.loadingProjects') + '</div>';
   _wsClearError('ws-project-list-error');
 
   try {
     const data = await apiListProjects();
     const projects = data.projects || [];
     if (projects.length === 0) {
-      listEl.innerHTML = '<div style="color: var(--text-muted); padding: 12px; font-style: italic;">' + t('workspace.noProjectsRegistered') + '</div>';
+      listEl.innerHTML = '<div class="empty sm">' + t('workspace.noProjectsRegistered') + '</div>';
+      _wsRenderGateSummary([]);
       return;
     }
-
-    listEl.innerHTML = projects.map(p => `
-      <div class="ws-project-card">
-        <div class="ws-project-card-info">
-          <div class="ws-project-card-name">${_wsEscape(p.name)}</div>
-          <div class="ws-project-card-path">${_wsEscape(p.path)}</div>
-        </div>
-        <div class="ws-project-card-actions">
-          <button class="btn btn-primary btn-sm" onclick="openProject('${_wsEscape(p.id)}')">${t('buttons.open')}</button>
-          <button class="btn btn-danger btn-sm" onclick="_wsRemoveProject('${_wsEscape(p.id)}')">${t('buttons.remove')}</button>
-        </div>
-      </div>
-    `).join('');
+    listEl.innerHTML = projects.map(function(p) { return _wsProjectRowHtml(p, null); }).join('');
+    _wsLoadProjectActivity(projects);
   } catch (err) {
     _wsShowError('ws-project-list-error', err.message);
   }
+}
+
+function _wsProjectRowHtml(project, activity) {
+  const id = _wsEscape(project.id);
+  const badge = activity ? _wsProjectBadgeHtml(project, activity) : _wsProjectTypeBadge(project);
+  return '<div class="row ws-project-row">' +
+    '<div class="grow"><div class="ti brk">' + _wsEscape(project.name) + '</div>' +
+    '<div class="mono dim brk">' + _wsEscape(project.path) + '</div></div>' +
+    badge +
+    '<button class="btn pri" onclick="openProject(\'' + id + '\')">' + t('buttons.open') + '</button>' +
+    '<div class="btn-dropdown">' +
+      '<button class="btn ic" data-icon="more" aria-label="' + _wsEscape(t('workspace.projectActions')) + '" onclick="_wsToggleProjectMenu(this, event)"></button>' +
+      '<div class="btn-dropdown-menu" style="display:none;">' +
+        '<button class="btn-dropdown-item" onclick="_wsRemoveProject(\'' + id + '\')">' + t('buttons.remove') + '</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function _wsProjectTypeBadge(project) {
+  return project.project_type === 'multi' ? '<span class="pill line">' + t('workspace.multiRepo') + '</span>' : '';
+}
+
+function _wsProjectBadgeHtml(project, activity) {
+  if (activity.gates.length) {
+    return '<span class="pill gate"><span class="dot gate"></span>' + t('workspace.gatesBadge', {count: activity.gates.length}) + '</span>';
+  }
+  if (activity.running) {
+    return '<span class="pill info">' + t('workspace.runningBadge', {count: activity.running}) + '</span>';
+  }
+  return _wsProjectTypeBadge(project);
+}
+
+function _wsToggleProjectMenu(button, event) {
+  event.stopPropagation();
+  const menu = button.nextElementSibling;
+  const wasOpen = menu.style.display !== 'none';
+  document.querySelectorAll('#ws-project-cards .btn-dropdown-menu').forEach(function(m) { m.style.display = 'none'; });
+  menu.style.display = wasOpen ? 'none' : '';
+}
+
+document.addEventListener('click', function() {
+  document.querySelectorAll('#ws-project-cards .btn-dropdown-menu').forEach(function(m) { m.style.display = 'none'; });
+});
+
+async function _wsFetchWorkspaceGates(projectId, workspaces) {
+  const gates = {};
+  const candidates = workspaces.filter(function(ws) {
+    return ws.status !== 'archived' && _mayHoldGate(ws.phase);
+  });
+  await Promise.all(candidates.map(async function(ws) {
+    try {
+      const response = await apiGetState(projectId, ws.branch);
+      gates[ws.branch] = describePendingGate(response.data);
+    } catch (err) {
+      gates[ws.branch] = null;
+    }
+  }));
+  return gates;
+}
+
+async function _wsLoadProjectActivity(projects) {
+  const activities = await Promise.all(projects.map(async function(project) {
+    try {
+      const data = await apiListWorkspaces(project.id);
+      const workspaces = (data.workspaces || []).filter(function(ws) { return ws.status !== 'archived'; });
+      const gateByBranch = await _wsFetchWorkspaceGates(project.id, workspaces);
+      const gates = workspaces.filter(function(ws) { return gateByBranch[ws.branch]; })
+        .map(function(ws) { return { project: project, ws: ws, gate: gateByBranch[ws.branch] }; });
+      const running = workspaces.filter(function(ws) {
+        return !gateByBranch[ws.branch] && ws.phase !== '0' && ws.phase !== '6' && (ws.sessions || []).length > 0;
+      }).length;
+      return { project: project, gates: gates, running: running };
+    } catch (err) {
+      return { project: project, gates: [], running: 0 };
+    }
+  }));
+  const listEl = document.getElementById('ws-project-cards');
+  if (!listEl || _wsCurrentView !== 'project-list') return;
+  listEl.innerHTML = activities.map(function(a) { return _wsProjectRowHtml(a.project, a); }).join('');
+  hydrateStaticIcons(listEl);
+  _wsRenderGateSummary(activities);
+}
+
+function _wsRenderGateSummary(activities) {
+  const el = document.getElementById('ws-gate-summary');
+  if (!el) return;
+  const gates = [].concat.apply([], activities.map(function(a) { return a.gates; }));
+  if (!gates.length) {
+    el.innerHTML = '';
+    return;
+  }
+  gates.sort(function(x, y) { return _wsGateAge(y.gate) - _wsGateAge(x.gate); });
+  const projectCount = activities.filter(function(a) { return a.gates.length; }).length;
+  const detail = activities.filter(function(a) { return a.gates.length; }).map(function(a) {
+    return a.project.name + ': ' + a.gates.map(function(g) { return t(g.gate.config.nameKey).toLowerCase(); }).join(', ');
+  }).join(' · ');
+  const oldest = gates[0];
+  el.innerHTML = '<div class="gatecard">' +
+    '<span class="gateico">' + cpGateIcon(22) + '</span>' +
+    '<div class="grow"><div class="k">' + _wsEscape(t('workspace.gateSummary', {gates: gates.length, projects: projectCount})) + '</div>' +
+    '<h2 class="ws-gate-title">' + _wsEscape(t('workspace.agentsWaiting')) + '</h2>' +
+    '<div class="d brk">' + _wsEscape(detail) + '</div></div>' +
+    '<button class="btn pri lg" onclick="openWorkspace(\'' + _wsEscape(oldest.project.id) + '\', \'' + _wsEscape(oldest.ws.branch) + '\')">' + t('workspace.reviewOldest') + '</button>' +
+  '</div>';
+}
+
+function _wsGateAge(gate) {
+  return gate.since ? Date.now() - gate.since.getTime() : 0;
 }
 
 async function _wsRemoveProject(projectId) {
@@ -137,55 +236,72 @@ async function _wsRegisterProject() {
   }
 }
 
-function _wsRenderWorkspaceCards(projectId, workspaces) {
-  var active = workspaces.filter(function(ws) { return ws.status !== 'archived'; });
+function _wsRenderWorkspaceCards(projectId, workspaces, gateByBranch) {
+  var gates = gateByBranch || {};
   var archived = workspaces.filter(function(ws) { return ws.status === 'archived'; });
-  var visible = _wsShowArchived ? workspaces : active;
+  var visible = _wsShowArchived ? workspaces : workspaces.filter(function(ws) { return ws.status !== 'archived'; });
 
   if (visible.length === 0) {
     var msg = workspaces.length > 0
-      ? t('workspace.allArchived') + ' <a href="#" onclick="_wsToggleArchived(event)" style="color:var(--accent)">' + t('workspace.showArchived', {count: archived.length}) + '</a>'
+      ? t('workspace.allArchived') + ' <a href="#" onclick="_wsToggleArchived(event)">' + t('workspace.showArchived', {count: archived.length}) + '</a>'
       : t('workspace.noWorkspacesYet');
-    return '<div style="color: var(--text-muted); padding: 12px; font-style: italic;">' + msg + '</div>';
+    return '<div class="empty sm">' + msg + '</div>';
   }
 
   var toggleHtml = '';
   if (archived.length > 0) {
     var label = _wsShowArchived ? t('workspace.hideArchived', {count: archived.length}) : t('workspace.showArchived', {count: archived.length});
-    toggleHtml = '<div style="margin-bottom:8px;text-align:right;"><a href="#" onclick="_wsToggleArchived(event)" style="font-size:0.78rem;color:var(--text-muted)">' + label + '</a></div>';
+    toggleHtml = '<div class="ws-archived-toggle"><a href="#" onclick="_wsToggleArchived(event)">' + label + '</a></div>';
   }
 
-  return toggleHtml + visible.map(function(ws) {
-    var isArchived = ws.status === 'archived';
-    var sessions = ws.sessions || [];
+  var needs = visible.filter(function(ws) { return gates[ws.branch]; });
+  needs.sort(function(a, b) { return _wsGateAge(gates[b.branch]) - _wsGateAge(gates[a.branch]); });
+  var others = visible.filter(function(ws) { return !gates[ws.branch]; });
 
-    var actionHtml = isArchived
-      ? '<span class="badge" style="background:var(--text-muted);color:var(--bg-base);opacity:0.7">' + t('badges.archived') + '</span>'
-      : '<button class="btn btn-danger btn-sm" onclick="_wsArchiveWorkspace(\'' + _wsEscape(projectId) + '\', \'' + _wsEscape(ws.branch) + '\', event)">' + t('buttons.archive') + '</button>';
+  return toggleHtml +
+    _wsWorkspaceGroupHtml(projectId, needs, gates, needs.length && others.length ? t('shell.needsYou') : '') +
+    _wsWorkspaceGroupHtml(projectId, others, gates, needs.length && others.length ? t('workspace.otherWorkspaces') : '');
+}
 
-    var branchLabel = _wsEscape(ws.branch);
-    if (isArchived && ws.created) {
-      var d = new Date(ws.created);
-      var dateStr = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) +
-        ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-      branchLabel += ' <span style="color:var(--text-muted);font-weight:400;font-size:0.75rem">(' + dateStr + ')</span>';
-    }
+function _wsWorkspaceGroupHtml(projectId, group, gates, caption) {
+  if (!group.length) return '';
+  var head = caption ? '<div class="cap ws-group-cap">' + _wsEscape(caption) + '</div>' : '';
+  return head + group.map(function(ws) { return _wsWorkspaceRowHtml(projectId, ws, gates[ws.branch]); }).join('');
+}
 
-    var cardClass = 'ws-workspace-card' + (isArchived ? ' ws-workspace-card--archived' : '');
-    var onclick = isArchived ? '' : ' onclick="openWorkspace(\'' + _wsEscape(projectId) + '\', \'' + _wsEscape(ws.branch) + '\')"';
+function _wsWorkspaceStatusHtml(ws, gate) {
+  if (ws.status === 'archived') return '<span class="pill">' + t('badges.archived') + '</span>';
+  if (gate) {
+    var wait = formatWaitDuration(gate.since);
+    return '<span class="pill gate"><span class="dot gate"></span>' + _wsEscape(t(gate.config.nameKey) + (wait ? ' · ' + wait : '')) + '</span>';
+  }
+  if (ws.phase === '6') return '<span class="pill ok">' + t('shell.done') + '</span>';
+  if (ws.phase === '0') return '<span class="pill">' + t('workspace.notStarted') + '</span>';
+  return '<span class="pill info">' + t('shell.agentWorking') + '</span>';
+}
 
-    return '<div class="' + cardClass + '"' + onclick + '>' +
-      '<div class="ws-workspace-card-info">' +
-        '<div class="ws-workspace-card-branch">' + branchLabel + '</div>' +
-        '<div class="ws-workspace-card-meta">' +
-          (ws.phase != null ? '<span class="badge badge-warning">' + t('badges.phase', {phase: ws.phase}) + '</span>' : '') +
-          (ws.workflow_mode === 'fast' ? '<span class="badge badge-warning">' + t('badges.fastMode') + '</span>' : '') +
-          (sessions.length > 0 && !isArchived ? '<span class="badge badge-info">' + t('badges.sessionActive') + '</span>' : '') +
-          actionHtml +
-        '</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
+function _wsWorkspaceRowHtml(projectId, ws, gate) {
+  var isArchived = ws.status === 'archived';
+  var branchLabel = _wsEscape(ws.branch);
+  if (isArchived && ws.created) {
+    var d = new Date(ws.created);
+    var dateStr = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) +
+      ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    branchLabel += ' <span class="dim sm">(' + dateStr + ')</span>';
+  }
+  var pid = _wsEscape(projectId);
+  var branch = _wsEscape(ws.branch);
+  var actions = isArchived ? '' :
+    '<button class="btn pri" onclick="openWorkspace(\'' + pid + '\', \'' + branch + '\')">' + t('buttons.open') + '</button>' +
+    '<button class="btn danger" onclick="_wsArchiveWorkspace(\'' + pid + '\', \'' + branch + '\', event)">' + t('buttons.archive') + '</button>';
+  return '<div class="row ws-workspace-row' + (isArchived ? ' is-archived' : '') + '">' +
+    '<div class="grow mono brk ws-branch">' + branchLabel + '</div>' +
+    _wsWorkspaceStatusHtml(ws, gate) +
+    (ws.phase != null ? '<span class="tag">' + t('badges.phase', {phase: ws.phase}) + '</span>' : '') +
+    (ws.workflow_mode === 'fast' ? '<span class="pill warn">' + t('badges.fastMode') + '</span>' : '') +
+    (!isArchived && (ws.sessions || []).length > 0 ? '<span class="pill line">' + t('badges.sessionActive') + '</span>' : '') +
+    actions +
+  '</div>';
 }
 
 function _wsToggleArchived(event) {
@@ -199,10 +315,12 @@ async function openProject(projectId) {
   _wsSwitchView('workspace');
 
   const headerEl = document.getElementById('ws-workspace-project-name');
+  const pathEl = document.getElementById('ws-workspace-project-path');
   headerEl.textContent = t('research.loading');
+  pathEl.textContent = '';
 
   const workspaceListEl = document.getElementById('ws-workspace-cards');
-  workspaceListEl.innerHTML = '<div style="color: var(--text-muted); padding: 12px;">' + t('workspace.loadingWorkspaces') + '</div>';
+  workspaceListEl.innerHTML = '<div class="empty sm">' + t('workspace.loadingWorkspaces') + '</div>';
   _wsClearError('ws-workspace-error');
 
   try {
@@ -211,52 +329,24 @@ async function openProject(projectId) {
     const project = projects.find(p => p.id === projectId);
     _wsSelectedProjectName = project ? project.name : projectId;
     headerEl.textContent = _wsSelectedProjectName;
+    pathEl.textContent = project ? project.path : '';
     await _wsApplyProjectTypeToCreateForm(project);
   } catch (err) {
     headerEl.textContent = projectId;
     await _wsApplyProjectTypeToCreateForm(null);
   }
 
-  var activeWorkspaceNumericId = null;
-  var activeWorkspacePhase = null;
   try {
     const wsData = await apiListWorkspaces(projectId);
     const workspaces = wsData.workspaces || [];
-    workspaceListEl.innerHTML = _wsRenderWorkspaceCards(projectId, workspaces);
-    var activeWs = workspaces.find(function(ws) { return ws.status === 'active'; });
-    if (activeWs && activeWs.workspace_id != null) {
-      activeWorkspaceNumericId = activeWs.workspace_id;
-      activeWorkspacePhase = activeWs.phase || null;
-    }
+    const gates = await _wsFetchWorkspaceGates(projectId, workspaces);
+    workspaceListEl.innerHTML = _wsRenderWorkspaceCards(projectId, workspaces, gates);
   } catch (err) {
     _wsShowError('ws-workspace-error', err.message);
   }
 
   await loadBranches(projectId);
-
-  var projectCard = document.getElementById('phaseSettingsProjectCard');
-  var projectBody = document.getElementById('phaseSettingsProjectBody');
-  if (projectCard && projectBody && typeof renderPhaseToggleCard === 'function') {
-    projectCard.style.display = '';
-    renderPhaseToggleCard(
-      projectBody,
-      'project',
-      '/api/projects/' + encodeURIComponent(projectId) + '/phase-settings',
-      { batchSave: true }
-    );
-  }
-
   _wsLoadProjectDefaults(projectId);
-
-  var advanceModesBody = document.getElementById('advanceModesProjectBody');
-  if (advanceModesBody && typeof renderAdvanceModeSection === 'function') {
-    renderAdvanceModeSection(advanceModesBody, projectId);
-  }
-
-  var reviewPipelineCard = document.getElementById('reviewPipelineCard');
-  if (reviewPipelineCard && typeof renderReviewPipelineCard === 'function' && activeWorkspaceNumericId) {
-    renderReviewPipelineCard(reviewPipelineCard, activeWorkspaceNumericId, { phase: activeWorkspacePhase });
-  }
 }
 
 async function loadBranches(projectId) {
@@ -382,7 +472,8 @@ async function createWorkspace(projectId) {
     const workspaceListEl = document.getElementById('ws-workspace-cards');
     const wsData2 = await apiListWorkspaces(projectId);
     const workspaces = wsData2.workspaces || [];
-    workspaceListEl.innerHTML = _wsRenderWorkspaceCards(projectId, workspaces);
+    const gates = await _wsFetchWorkspaceGates(projectId, workspaces);
+    workspaceListEl.innerHTML = _wsRenderWorkspaceCards(projectId, workspaces, gates);
   } catch (err) {
     _wsShowError('ws-workspace-error', err.message);
   }
@@ -445,122 +536,90 @@ function _wsInitSelector() {
 
   selector.innerHTML = `
     <div class="ws-selector-container">
-      <div class="ws-selector-header">
-        <h1 class="ws-selector-title">${t('workspace.workspaceControl')}</h1>
-        <p class="ws-selector-subtitle">${t('workspace.selectProject')}</p>
+      <div class="ws-brand">
+        <img src="/img/logo.png" alt="" width="40" height="40">
+        <h1 class="ws-selector-title">${t('shell.brand')}</h1>
       </div>
 
       <div id="ws-project-list-view">
-        <div class="ws-section">
-          <div class="ws-section-title">${t('workspace.registeredProjects')}</div>
-          <div id="ws-project-cards"></div>
-          <div id="ws-project-list-error"></div>
-        </div>
+        <div id="ws-gate-summary"></div>
 
-        <div class="ws-section">
-          <div class="ws-section-title">${t('workspace.registerNewProject')}</div>
-          <div class="ws-register-form">
-            <input type="text" id="ws-register-path" class="ws-input"
-              placeholder="${t('placeholders.projectPath')}">
-            <input type="text" id="ws-register-name" class="ws-input"
-              placeholder="${t('placeholders.projectName')}">
-            <button class="btn btn-primary" onclick="_wsRegisterProject()">${t('buttons.register')}</button>
+        <section class="card">
+          <div class="ch">
+            <h3 class="grow">${t('workspace.registeredProjects')}</h3>
+            <button class="btn" data-icon="setup" onclick="showSetupPage()">${t('setup.openSetupBtn')}</button>
           </div>
-          <div id="ws-register-error"></div>
-        </div>
+          <div class="cb flush" id="ws-project-cards"></div>
+          <div id="ws-project-list-error"></div>
+        </section>
 
-        <div class="ws-section" style="border-top: 1px solid var(--border); padding-top: 16px;">
-          <button class="btn btn-sm btn-outline" onclick="showSetupPage()" style="width: 100%; justify-content: center;">
-            ${t('setup.openSetupBtn')}
-          </button>
-        </div>
+        <section class="card">
+          <div class="ch"><h3>${t('workspace.registerNewProject')}</h3></div>
+          <div class="cb">
+            <label class="lbl">${t('workspace.projectRoot')}
+              <input type="text" id="ws-register-path" class="inp mono" placeholder="${t('placeholders.projectPath')}">
+            </label>
+            <label class="lbl">${t('workspace.projectNameOptional')}
+              <input type="text" id="ws-register-name" class="inp" placeholder="${t('placeholders.projectName')}">
+            </label>
+            <div><button class="btn pri" data-icon="plus" onclick="_wsRegisterProject()">${t('buttons.register')}</button></div>
+            <div id="ws-register-error"></div>
+          </div>
+        </section>
       </div>
 
       <div id="ws-workspace-view" style="display: none;">
-        <button class="ws-back-btn" onclick="_wsBackToProjects()">
-          <span class="ws-back-arrow">&larr;</span> ${t('buttons.backToProjects')}
-        </button>
+        <div class="ws-titlebar">
+          <button class="btn" data-icon="back" onclick="_wsBackToProjects()">${t('shell.projects')}</button>
+          <h2 id="ws-workspace-project-name"></h2>
+          <span class="grow"></span>
+          <span class="mono dim brk" id="ws-workspace-project-path"></span>
+        </div>
 
-        <div class="ws-section">
-          <div class="ws-section-title" id="ws-workspace-project-name"></div>
-          <div id="ws-workspace-cards"></div>
+        <section class="card">
+          <div class="ch"><h3 class="grow">${t('workspace.workspacesTitle')}</h3></div>
+          <div class="cb flush" id="ws-workspace-cards"></div>
           <div id="ws-workspace-error"></div>
-        </div>
+        </section>
 
-        <div class="ws-section" id="phaseSettingsProjectCard" style="display: none;">
-          <div class="ws-section-title">${t('cards.phaseSettings')}</div>
-          <div id="phaseSettingsProjectBody"></div>
-        </div>
-
-        <div class="ws-section" id="projectDefaultsCard" style="display: none;">
-          <div class="ws-section-title">${t('settings.section.workflow.projectDefaultsTitle')}</div>
-          <div id="projectDefaultsBody">
-            <div class="project-defaults__row">
-              <input type="checkbox" class="phase-settings__checkbox" id="fastModeDefaultCheck">
-              <label for="fastModeDefaultCheck" class="project-defaults__label">${t('config.fastModeDefault')}</label>
-            </div>
-            <div class="project-defaults__desc">${t('config.fastModeDefaultDesc')}</div>
-          </div>
-        </div>
-
-        <div class="ws-section" id="advanceModesProjectCard">
-          <div class="ws-section-title">${t('cards.advanceModes')}</div>
-          <div id="advanceModesProjectBody"></div>
-        </div>
-
-        <div class="ws-section">
-          <div class="ws-section-title">${t('cards.reviewPipeline')}</div>
-          <div id="reviewPipelineCard"></div>
-        </div>
-
-        <div class="ws-section">
-          <div class="ws-section-title">${t('workspace.createNewWorkspace')}</div>
-          <div class="ws-create-form">
-            <input type="text" id="ws-new-branch" class="ws-input"
-              placeholder="${t('placeholders.featureBranch')}" required>
-            <div class="ws-form-row">
-              <label class="ws-label">${t('labels.sourceBranch')}</label>
-              <select id="ws-source-branch" class="ws-select">
-                <option value="">${t('research.loading')}</option>
-              </select>
-            </div>
-            <div class="ws-form-row">
-              <label class="ws-checkbox-label">
-                <input type="checkbox" id="ws-worktree" checked>
-                ${t('labels.createAsGitWorktree')}
-              </label>
-            </div>
-            <div class="ws-form-row" id="wsWorktreeForcedNote" style="display:none;">
+        <section class="card">
+          <div class="ch"><h3>${t('workspace.createNewWorkspace')}</h3></div>
+          <div class="cb">
+            <label class="lbl">${t('workspace.branchLabel')}
+              <input type="text" id="ws-new-branch" class="inp mono" placeholder="${t('placeholders.featureBranch')}" required>
+            </label>
+            <label class="lbl">${t('labels.sourceBranch')}
+              <select id="ws-source-branch" class="sel"><option value="">${t('research.loading')}</option></select>
+            </label>
+            <label class="ws-checkbox-label">
+              <input type="checkbox" id="ws-worktree" checked>
+              ${t('labels.createAsGitWorktree')}
+            </label>
+            <div id="wsWorktreeForcedNote" style="display:none;">
               <span class="gc-hint-text">${t('gitCockpit.create.worktreeForced')}</span>
             </div>
-            <div class="ws-form-row">
-              <label class="ws-checkbox-label">
-                <input type="checkbox" id="ws-fast-mode">
-                ${t('labels.fastMode')}
-              </label>
-            </div>
-            <div class="ws-form-row" id="wsRepoAttachRow" style="display:none;">
-              <label class="ws-label">${t('gitCockpit.create.attachRepos')}</label>
+            <label class="ws-checkbox-label">
+              <input type="checkbox" id="ws-fast-mode">
+              ${t('labels.fastMode')}
+            </label>
+            <div class="vs" id="wsRepoAttachRow" style="display:none;">
+              <span class="cap">${t('gitCockpit.create.attachRepos')}</span>
               <div id="wsRepoAttachList" class="gc-checklist-rows gc-checklist-rows--compact"></div>
             </div>
-            <button class="btn btn-primary" onclick="createWorkspace(_wsSelectedProjectId)">${t('buttons.createWorkspace')}</button>
+            <div><button class="btn pri" data-icon="plus" onclick="createWorkspace(_wsSelectedProjectId)">${t('buttons.createWorkspace')}</button></div>
+            <div id="ws-create-error"></div>
+            <div id="ws-create-result"></div>
           </div>
-          <div id="ws-create-error"></div>
-          <div id="ws-create-result"></div>
-        </div>
+        </section>
       </div>
     </div>
   `;
-
-  var fastModeDefaultCheck = document.getElementById('fastModeDefaultCheck');
-  if (fastModeDefaultCheck) {
-    fastModeDefaultCheck.onchange = _wsOnFastModeDefaultChange;
-  }
+  hydrateStaticIcons(selector);
 
   if (!document.getElementById('selector-toolbar')) {
     var toolbar = document.createElement('div');
     toolbar.id = 'selector-toolbar';
-    toolbar.style.cssText = 'position: absolute; top: 16px; right: 24px; display: flex; gap: 8px; align-items: center; z-index: 10;';
+    toolbar.style.cssText = 'position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; align-items: center; z-index: 10;';
     toolbar.innerHTML = '<select class="btn locale-select" id="selectorLocaleSelect" onchange="onSelectorLocaleChange(this.value)"><option value="en">EN</option><option value="ru">RU</option></select>'
       + '<button class="btn ic" onclick="toggleTheme()" title="' + escapeHtml(t('shell.switchTheme')) + '" aria-label="' + escapeHtml(t('shell.switchTheme')) + '" id="selectorThemeBtn"></button>';
     selector.appendChild(toolbar);
@@ -594,49 +653,14 @@ function _wsBackToProjects() {
 }
 
 async function _wsLoadProjectDefaults(projectId) {
-  var card = document.getElementById('projectDefaultsCard');
-  var fastModeDefaultCheckbox = document.getElementById('fastModeDefaultCheck');
   var createFastModeCheckbox = document.getElementById('ws-fast-mode');
-  if (!card) return;
-
+  if (!createFastModeCheckbox) return;
   try {
     var data = await apiGet('/api/projects/' + encodeURIComponent(projectId) + '/settings');
     _wsFastModeDefaultPrior = !!data.fast_mode_default;
-    if (fastModeDefaultCheckbox) fastModeDefaultCheckbox.checked = _wsFastModeDefaultPrior;
-    if (createFastModeCheckbox) createFastModeCheckbox.checked = _wsFastModeDefaultPrior;
-    card.style.display = '';
+    createFastModeCheckbox.checked = _wsFastModeDefaultPrior;
   } catch (err) {
-    card.style.display = 'none';
-  }
-}
-
-async function _wsOnFastModeDefaultChange() {
-  var checkbox = document.getElementById('fastModeDefaultCheck');
-  if (!checkbox || !_wsSelectedProjectId) return;
-
-  var newValue = checkbox.checked;
-  checkbox.disabled = true;
-
-  try {
-    var result = await apiPut(
-      '/api/projects/' + encodeURIComponent(_wsSelectedProjectId) + '/settings',
-      { fast_mode_default: newValue }
-    );
-    _wsFastModeDefaultPrior = newValue;
-    var createFastModeCheckbox = document.getElementById('ws-fast-mode');
-    if (createFastModeCheckbox) createFastModeCheckbox.checked = newValue;
-    showToast(t('messages.phaseSettingsSaved'));
-    var warnings = result.configurator_warnings;
-    if (warnings && warnings.length > 0) {
-      warnings.forEach(function(w) {
-        showToast(w.reason || w.action);
-      });
-    }
-  } catch (err) {
-    checkbox.checked = _wsFastModeDefaultPrior;
-    showToast(t('messages.phaseSettingsSaveFailed').replace('{error}', err.message));
-  } finally {
-    checkbox.disabled = false;
+    createFastModeCheckbox.checked = false;
   }
 }
 
