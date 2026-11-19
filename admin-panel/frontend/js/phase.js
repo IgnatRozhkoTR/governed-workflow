@@ -315,19 +315,19 @@ function describeGateFacts(gate) {
 function _describePlanFacts() {
   var execution = (PLAN_DATA && PLAN_DATA.execution) || [];
   var taskCount = execution.reduce(function(sum, item) { return sum + ((item.tasks || []).length); }, 0);
-  var facts = [t('gate.facts.plan', {subPhases: execution.length, tasks: taskCount})];
+  var facts = [tn('gate.facts.subPhases', execution.length), tn('gate.facts.tasks', taskCount)];
   var proposed = (AppState.criteria || []).filter(function(c) { return c.status === 'proposed'; }).length;
-  if (proposed) facts.push(t('gate.facts.proposedCriteria', {n: proposed}));
+  if (proposed) facts.push(tn('gate.facts.proposedCriteria', proposed));
   var openComments = _countOpenComments();
-  if (openComments) facts.push(t('gate.facts.openComments', {n: openComments}));
+  if (openComments) facts.push(tn('gate.facts.openComments', openComments));
   return facts.join(' · ');
 }
 
 function _describePreplanningFacts() {
-  var facts = [t('gate.facts.researchTopics', {n: (RESEARCH_DATA || []).length})];
+  var facts = [tn('gate.facts.researchTopics', (RESEARCH_DATA || []).length)];
   if (AppState.impactAnalysis) facts.push(t('gate.facts.impactRecorded'));
   var openDiscussions = ((CONTEXT_DATA && CONTEXT_DATA.discussions) || []).filter(function(d) { return d.status === 'open'; }).length;
-  facts.push(t('gate.facts.openDiscussions', {n: openDiscussions}));
+  facts.push(tn('gate.facts.openDiscussions', openDiscussions));
   return facts.join(' · ');
 }
 
@@ -338,7 +338,7 @@ function _describeCommitFacts(phase) {
   return t('gate.facts.commit', {
     id: subPhaseId,
     name: subPhase ? subPhase.name : '',
-    files: totals.files,
+    files: tn('gate.facts.files', totals.files),
     additions: totals.additions,
     deletions: totals.deletions
   });

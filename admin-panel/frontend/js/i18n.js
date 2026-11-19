@@ -14,6 +14,12 @@ function t(key, params) {
   });
 }
 
+function tn(key, count, params) {
+  var form = new Intl.PluralRules(I18N_LOCALE).select(count);
+  var pluralKey = I18N_MESSAGES[key + '.' + form] !== undefined ? key + '.' + form : key + '.other';
+  return t(pluralKey, Object.assign({n: count, count: count}, params));
+}
+
 function applyI18nToDOM() {
   document.querySelectorAll('[data-i18n]').forEach(function(el) {
     el.textContent = t(el.getAttribute('data-i18n'));

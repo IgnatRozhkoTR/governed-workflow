@@ -69,10 +69,16 @@
 .diagram-subtitle { font-size: 13px; font-weight: 600; color: var(--dim); margin: 12px 0 8px; }
 .diagram-error { color: var(--dim); font-family: var(--f-mono); font-size: 12px; white-space: pre-wrap; }
 
-#planDiagram svg .cluster-label .nodeLabel,
-#systemDiagram svg .cluster-label .nodeLabel,
-.diagram-overlay-body svg .cluster-label .nodeLabel {
+.cluster-label .nodeLabel {
   display: block;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cluster-label .nodeLabel p {
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

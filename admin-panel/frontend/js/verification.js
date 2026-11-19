@@ -130,6 +130,7 @@ function _renderVerificationMeta(run) {
 function renderVerificationResults() {
     var container = document.getElementById('verificationResults');
     if (!container) return;
+    renderOverviewVerificationSummary();
 
     if (!VERIFICATION_RESULTS || !VERIFICATION_RESULTS.steps) {
         _renderVerificationMeta(null);

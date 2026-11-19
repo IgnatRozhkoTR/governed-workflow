@@ -59,7 +59,7 @@ function renderDiscussions() {
     if (d.type === 'research' && typeof RESEARCH_DATA !== 'undefined') {
       var linked = RESEARCH_DATA.filter(function(r) { return r.discussion_id === d.id; });
       if (linked.length > 0) {
-        researchLink = '<button class="btn btn-sm" style="font-size:0.6rem;padding:1px 6px;margin-left:4px;" onclick="goToResearch(' + d.id + ')" title="' + t('research.viewLinked') + '">' + t('research.findingCount', {count: linked.length}) + '</button>';
+        researchLink = '<button class="btn btn-sm" style="font-size:0.6rem;padding:1px 6px;margin-left:4px;" onclick="goToResearch(' + d.id + ')" title="' + t('research.viewLinked') + '">' + tn('research.findingCount', linked.length) + '</button>';
       }
     }
 

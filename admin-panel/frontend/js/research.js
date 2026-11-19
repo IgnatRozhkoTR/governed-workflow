@@ -91,7 +91,7 @@ function _buildResearchGroupHtml(entry) {
   var headerHtml = '<div class="research-group-header" onclick="toggleResearchGroup(this)">' +
     '<span class="research-group-title">' + escapeHtml(topicName) + '</span>' +
     discussionBadge +
-    '<span class="research-group-count">' + t('research.findingCount', {count: findings.length}) + '</span>' +
+    '<span class="research-group-count">' + tn('research.findingCount', findings.length) + '</span>' +
     '<span class="' + badgeClass + '">' + badgeText + '</span>' +
     '<span class="research-actions">' + proveBtn + rejectBtn + deleteBtn + '</span>' +
     '</div>';

@@ -177,6 +177,10 @@
 .ov-del { color: var(--deltx); }
 #phaseHistoryLog { font-size: 12.5px; }
 #ovTasksList, #ovOpenItems { gap: 0; }
+.ov-summary__row { width: 100%; min-height: 64px; background: none; border: 0; border-bottom: 1px solid var(--ln); color: var(--tx); text-align: left; cursor: pointer; }
+.ov-summary__row:last-child { border-bottom: 0; }
+.ov-summary__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ov-summary__title { font-size: 16px; font-weight: 500; }
 
 /* ─── Files: project files / scratchpads ─── */
 #panel-files.active { display: flex; flex-direction: column; height: 100%; }

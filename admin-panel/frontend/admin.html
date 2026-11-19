@@ -37,7 +37,7 @@
     var c = t === 'light'
       ? { sf: '#FFFFFF', sf2: '#E9EBE6', ln: '#D5D9D2', tx: '#141922', dim: '#566070', bg: '#F3F4F1', warnbg: '#FBF1D0', warn: '#7A5B00' }
       : { sf: '#151B24', sf2: '#1C2430', ln: '#2A3442', tx: '#E6EAF0', dim: '#9BA6B5', bg: '#0D1117', warnbg: '#2A2413', warn: '#E5C07B' };
-    return { theme: 'base', themeVariables: {
+    return { theme: 'base', suppressErrorRendering: true, themeVariables: {
       fontFamily: 'JetBrains Mono, ui-monospace, monospace',
       primaryColor: c.sf2, primaryTextColor: c.tx, primaryBorderColor: c.ln, lineColor: c.dim,
       secondaryColor: c.sf, tertiaryColor: c.bg, background: c.sf,
@@ -194,6 +194,17 @@
     <div id="phaseActions"></div>
     <div class="phone-only ov-phone">
       <section class="card"><div class="cb"><div class="steps" id="phaseSteps"></div></div></section>
+      <section class="card ov-summary">
+        <button class="row ov-summary__row" onclick="switchTab('changes')">
+          <span class="grow ov-summary__text"><span class="ov-summary__title" id="ovSumChangesTitle"></span><span class="sm dim" id="ovSumChangesMeta"></span></span>
+          <span data-icon="chevronRight" data-icon-size="18"></span>
+        </button>
+        <button class="row ov-summary__row" id="ovSumVerificationRow" onclick="toggleOverviewVerification()" aria-expanded="false">
+          <span class="grow ov-summary__text"><span class="ov-summary__title" data-i18n="overview.verification">Verification</span><span class="sm dim" id="ovSumVerificationMeta"></span></span>
+          <span class="pill" id="ovSumVerificationPill"></span>
+          <span data-icon="chevronRight" data-icon-size="18"></span>
+        </button>
+      </section>
       <div class="chips" id="overviewChips">
         <button class="chip" onclick="switchTab('plan')" data-i18n="tabs.plan">Plan</button>
         <button class="chip" onclick="switchTab('preplanning')" data-i18n="tabs.preplanning">Pre-planning</button>
@@ -206,7 +217,7 @@
     </div>
     <div class="cols">
       <div class="wide vs g20">
-        <section class="card">
+        <section class="card ov-desktop-only">
           <div class="ch">
             <h3 class="grow" id="ovChangesTitle" data-i18n="overview.changesInCommit">Changes in this commit</h3>
             <span class="sm dim" id="ovChangesMeta"></span>
@@ -214,7 +225,7 @@
           </div>
           <div class="cb flush" id="ovChangesList"></div>
         </section>
-        <section class="card">
+        <section class="card ov-fold" id="ovVerificationCard">
           <div class="ch">
             <h3 class="grow" data-i18n="overview.verification">Verification</h3>
             <span class="sm dim" id="verificationMeta"></span>

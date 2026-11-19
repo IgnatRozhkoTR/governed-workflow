@@ -235,17 +235,26 @@ function _gateDecisionButtons(gate, size) {
     '<button class="btn pri ' + size + '" onclick="handleApprove()">' + escapeHtml(t(gate.config.approveKey)) + '</button>';
 }
 
+var PHONE_DECISION_CALLS = {
+  plan: {reject: "setPlanStatus('rejected')", approve: "setPlanStatus('approved')"},
+  other: {reject: 'requestGateChanges()', approve: 'handleApprove()'}
+};
+
 function renderPhoneGateFoot(gate, activeTab) {
   var foot = document.getElementById('phoneGateFoot');
   if (!foot) return;
-  foot.hidden = !gate || activeTab !== 'overview';
+  var isDecidingView = !!gate && activeTab === gate.decidingTab;
+  foot.hidden = !gate || (activeTab !== 'overview' && !isDecidingView);
   if (foot.hidden) return;
-  if (gate.decidingTab !== 'overview') {
+  if (gate.decidingTab !== 'overview' && !isDecidingView) {
     foot.innerHTML = '<span class="grow"></span><button class="btn pri lg" onclick="switchTab(\'' + gate.decidingTab + '\')">' + escapeHtml(t('gate.openGate')) + '</button>';
     return;
   }
-  foot.innerHTML = '<button class="btn lg" onclick="requestGateChanges()">' + escapeHtml(t('gate.reject')) + '</button>' +
-    '<span class="grow"></span><button class="btn pri lg" onclick="handleApprove()">' + escapeHtml(t('buttons.approve')) + '</button>';
+  var calls = PHONE_DECISION_CALLS[gate.kind === 'plan' ? 'plan' : 'other'];
+  var rejectLabel = isDecidingView && gate.decidingTab !== 'overview' ? t(gate.config.rejectKey) : t('gate.reject');
+  var approveLabel = gate.kind === 'plan' ? t(gate.config.approveKey) : t('buttons.approve');
+  foot.innerHTML = '<button class="btn lg" onclick="' + calls.reject + '">' + escapeHtml(rejectLabel) + '</button>' +
+    '<span class="grow"></span><button class="btn pri lg" onclick="' + calls.approve + '">' + escapeHtml(approveLabel) + '</button>';
 }
 
 function requestGateChanges() {
@@ -314,6 +323,7 @@ var OVERVIEW_MAX_FILES = 12;
 
 function renderOverview() {
   renderOverviewChanges();
+  renderOverviewSummary();
   renderOverviewTasks();
   renderOpenItems();
 }
@@ -335,6 +345,44 @@ function renderOverviewChanges() {
     rows.push('<div class="row ov-file"><span class="sm dim">' + escapeHtml(t('overview.moreFiles', {n: files.length - OVERVIEW_MAX_FILES})) + '</span></div>');
   }
   list.innerHTML = rows.join('');
+}
+
+function renderOverviewSummary() {
+  var files = DIFF_DATA.files || [];
+  var totals = summarizeDiffFiles(files);
+  var inBuild = /^3\./.test(LOCK_DATA.phase || '');
+  _setText('ovSumChangesTitle', t(inBuild ? 'overview.changesInCommit' : 'overview.changes'));
+  _setText('ovSumChangesMeta', files.length
+    ? tn('overview.filesCount', files.length) + ' · +' + totals.additions + ' -' + totals.deletions
+    : t('overview.noChanges'));
+  renderOverviewVerificationSummary();
+}
+
+function renderOverviewVerificationSummary() {
+  var pill = document.getElementById('ovSumVerificationPill');
+  if (!pill) return;
+  var run = typeof VERIFICATION_RESULTS !== 'undefined' ? VERIFICATION_RESULTS : null;
+  if (!run || !run.steps) {
+    pill.style.display = 'none';
+    _setText('ovSumVerificationMeta', t('verification.noRuns'));
+    return;
+  }
+  var counts = {};
+  run.steps.forEach(function(step) { counts[step.status] = (counts[step.status] || 0) + 1; });
+  _setText('ovSumVerificationMeta', Object.keys(counts).map(function(status) {
+    return counts[status] + ' ' + t('verification.status.' + status);
+  }).join(' · '));
+  pill.style.display = '';
+  pill.className = 'pill ' + (VERIFICATION_STEP_PILLS[run.status] || '');
+  pill.textContent = t('verification.status.' + run.status);
+}
+
+function toggleOverviewVerification() {
+  var card = document.getElementById('ovVerificationCard');
+  var row = document.getElementById('ovSumVerificationRow');
+  var isOpen = card.classList.toggle('open');
+  row.setAttribute('aria-expanded', isOpen);
+  if (isOpen) card.scrollIntoView({behavior: 'smooth', block: 'nearest'});
 }
 
 function _overviewFileRow(file) {

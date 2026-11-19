@@ -71,14 +71,16 @@
   .split-terminal, .split-handle { display: none !important; }
 
   .ov-phone { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
-  #panel-overview .gatecard { padding: 18px; flex-direction: column; align-items: stretch; gap: 8px; border-radius: 20px; }
-  #panel-overview .gatecard h2 { font-size: 22px; }
-  #panel-overview .gatecard__actions,
-  #panel-overview .gatecard__inputs { display: none; }
-  #panel-overview .gatecard__head { flex: none; }
-  #panel-overview .gatecard .gateico { width: 32px; height: 32px; }
+  .ov-desktop-only, .ov-fold:not(.open) { display: none; }
+  .tab-panel .gatecard { padding: 18px; flex-direction: column; align-items: stretch; gap: 8px; border-radius: 20px; }
+  .tab-panel .gatecard h2 { font-size: 22px; }
+  .tab-panel .gatecard__actions,
+  .tab-panel .gatecard__inputs { display: none; }
+  .tab-panel .gatecard__head { flex: none; }
+  .tab-panel .gatecard .gateico { width: 32px; height: 32px; }
   .card { border-radius: 20px; }
 
+  .pfoot .btn { min-width: 0; white-space: nowrap; }
   .pfoot { display: flex; gap: 10px; padding: 10px 16px; background: var(--sf); border-top: 1px solid var(--ln); flex: none; }
   .bnav { display: flex; background: var(--sf); border-top: 1px solid var(--ln); flex: none; padding-bottom: env(safe-area-inset-bottom); }
   .pfoot + .bnav { border-top: 0; }
@@ -195,32 +197,32 @@
     font-size: 0.7rem;
   }
 
-  .research-group-header {
-    padding: 8px 10px;
-  }
+  .research-head { flex-wrap: wrap; gap: 8px; }
+  .research-group-header { flex-wrap: wrap; row-gap: 8px; min-height: 44px; padding: 12px 16px; }
+  .research-group-title { flex: 1 1 calc(100% - 32px); }
+  .research-actions { margin-left: auto; }
+  .research-action-btn.btn.ic.xs { width: 44px; min-height: 44px; }
 
-  .plan-description {
-    padding: 10px 12px;
-    font-size: 0.85rem;
-  }
+  .pp-gate-actions { flex-direction: column; }
 
-  .plan-task-header {
-    padding: 6px 8px;
-  }
-
-  .plan-task-detail {
-    padding: 4px 8px 8px 20px;
-  }
-
-  #planDiagram,
-  #systemDiagram {
-    overflow: auto;
+  .plan-description { padding: 12px 14px; font-size: 14px; }
+  .plan-folds .card-header { flex-wrap: wrap; row-gap: 4px; min-height: 52px; }
+  .plan-folds .card-header .btn.ic { width: 44px; min-height: 44px; }
+  .plan-folds .diagram-zoom-controls { display: none; }
+  #planDiagram, #systemDiagram {
+    max-height: 340px;
+    touch-action: pan-x pan-y;
     -webkit-overflow-scrolling: touch;
   }
-
-  .diagram-zoom-controls {
-    margin-left: 0;
-  }
+  .plan-task-header { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 4px; align-items: center; min-height: 44px; padding: 8px; }
+  .plan-task-header .tag { grid-column: 2; grid-row: 2; justify-self: start; max-width: 100%; overflow-wrap: anywhere; }
+  .plan-task-header .comment-icon { grid-column: 3; grid-row: 1; min-width: 44px; min-height: 44px; justify-content: center; }
+  .plan-task-detail { padding: 2px 8px 10px 42px; }
+  .plan-group-header { flex-wrap: wrap; }
+  .plan-group-name { flex-basis: 0; min-width: 120px; }
+  .diagram-overlay-content { width: 100vw; height: 100dvh; max-width: none; border-radius: 0; border: 0; }
+  .diagram-overlay-controls button { min-width: 44px; min-height: 44px; }
+  .diagram-overlay-close { width: 44px; height: 44px; }
 
   .comment-thread {
     margin-left: 0;
@@ -296,10 +298,6 @@
     align-self: flex-start;
   }
 
-  .pp-gate-actions {
-    flex-direction: column;
-  }
-
   .pp-inline-comment-form {
     flex-direction: column;
     gap: 4px;
@@ -311,14 +309,6 @@
 
   .review-reply-form {
     flex-direction: column;
-  }
-
-  .diagram-overlay-content {
-    width: 98vw;
-    height: 95vh;
-    max-width: none;
-    max-height: none;
-    border-radius: 4px;
   }
 
   .context-label {
