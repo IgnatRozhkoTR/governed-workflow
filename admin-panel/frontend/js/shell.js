@@ -50,16 +50,10 @@ function renderWorkspaceHeader() {
   var title = context.ticket_name ? ticketTitle : branch;
 
   _setText('wsTitle', title);
-  var branchEl = document.getElementById('branchName');
-  if (branchEl) {
-    branchEl.textContent = branch;
-    branchEl.hidden = title === branch;
-  }
   var metaParts = [];
-  if (LOCK_DATA.source_branch) metaParts.push(t('shell.fromBranch', {branch: LOCK_DATA.source_branch}));
+  if (title !== branch) metaParts.push(branch);
   if (/\/worktrees\//.test(LOCK_DATA.working_dir || '')) metaParts.push(t('shell.worktree'));
-  var meta = metaParts.join(' · ');
-  _setText('wsBranchMeta', meta && title !== branch ? ' · ' + meta : meta);
+  _setText('wsBranchLine', metaParts.filter(Boolean).join(' · '));
 }
 
 function _setText(id, text) {

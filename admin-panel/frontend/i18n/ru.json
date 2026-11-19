@@ -773,7 +773,6 @@
   "shell.showAllDone": "Показать все готовые ({count})",
   "shell.showLessDone": "Свернуть",
   "shell.noWorkspaces": "Пока нет рабочих пространств",
-  "shell.fromBranch": "из {branch}",
   "shell.createdAgo": "создано {when}",
   "header.modeStandard": "Стандарт",
   "header.modeFast": "Быстрый",

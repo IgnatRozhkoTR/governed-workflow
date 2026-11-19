@@ -38,6 +38,7 @@
   .ws-head { padding: 8px 12px 0 4px; gap: 8px; }
   .ws-head__top { align-items: center; gap: 4px; position: relative; }
   .ws-head__top .btn.ic { width: 44px; min-height: 44px; border: 0; background: none; }
+  .ws-head__logo { display: none; }
   #wsTitle { font-size: 18px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   #wsBranchLine { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 

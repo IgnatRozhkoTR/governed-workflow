@@ -79,7 +79,6 @@ async function initApp() {
     console.warn('Diff API unavailable, using static data:', e.message);
   }
 
-  document.getElementById('branchName').textContent = LOCK_DATA.branch || ctx.branch;
   document.getElementById('phaseLabel').textContent = t('phase.label', {phase: state.phase, name: getPhaseName(state.phase)});
 
   // Update browser tab title with branch name

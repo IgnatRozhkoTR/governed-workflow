@@ -769,7 +769,6 @@
   "shell.showAllDone": "Show all {count} done",
   "shell.showLessDone": "Show fewer",
   "shell.noWorkspaces": "No workspaces yet",
-  "shell.fromBranch": "from {branch}",
   "shell.createdAgo": "created {when}",
   "header.modeStandard": "Standard",
   "header.modeFast": "Fast",
