@@ -122,6 +122,8 @@ function renderScope() {
   };
   renderList(displayScope.must || [], 'scopeMust', 'must', 'must');
   renderList(displayScope.may || [], 'scopeMay', 'may', 'may');
+  _setScopeCountPill('scopeMustCount', 'scope.mustCount', (displayScope.must || []).length);
+  _setScopeCountPill('scopeMayCount', 'scope.mayCount', (displayScope.may || []).length);
 
   // Hide add buttons in merged view (can't edit merged scope)
   document.querySelectorAll('.scope-add-btn').forEach(function(btn) {
@@ -139,6 +141,13 @@ function renderScope() {
       titleEl.textContent = t('scope.contract');
     }
   }
+}
+
+function _setScopeCountPill(id, key, count) {
+  var pill = document.getElementById(id);
+  if (!pill) return;
+  pill.textContent = t(key, {n: count});
+  pill.hidden = count === 0;
 }
 
 function removeScopeEntry(key, index) {

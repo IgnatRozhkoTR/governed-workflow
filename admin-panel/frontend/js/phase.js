@@ -56,16 +56,59 @@ function getPhaseSequenceForBar() {
 // ═══════════════════════════════════════════════
 //  MANUAL PHASE OVERRIDE
 // ═══════════════════════════════════════════════
-async function manualSetPhase() {
-  var newPhase = prompt(t('dialog.setPhase'), LOCK_DATA.phase || '0');
-  if (newPhase === null || newPhase.trim() === '') return;
+function manualSetPhase() {
+  var current = LOCK_DATA.phase || '0';
+  var rows = getPhaseSequenceForBar().map(function(phase) {
+    return '<label class="row phase-pick-row">' +
+      '<input type="radio" name="setPhaseChoice" value="' + escapeHtml(phase) + '"' + (phase === current ? ' checked' : '') + '>' +
+      '<span class="mono phase-pick-id">' + escapeHtml(phase) + '</span>' +
+      '<span class="grow">' + escapeHtml(getPhaseName(phase)) + '</span>' +
+      (isUserGate(phase) ? '<span class="pill gate">' + escapeHtml(t('phase.gateTag')) + '</span>' : '') +
+    '</label>';
+  }).join('');
+
+  var modal = _ensureSetPhaseModal();
+  modal.querySelector('.file-preview-body').innerHTML =
+    '<div class="note warn-note"><div class="k">' + cpIcon('flag', 14) + escapeHtml(t('dialog.setPhaseWarning')) + '</div></div>' +
+    '<div class="card phase-pick-list"><div class="cb flush">' + rows + '</div></div>' +
+    '<div class="hs"><span class="sm dim grow">' + escapeHtml(t('dialog.setPhaseCurrent', {phase: current})) + '</span>' +
+      '<button class="btn" onclick="closeSetPhaseDialog()">' + escapeHtml(t('buttons.cancel')) + '</button>' +
+      '<button class="btn pri" onclick="submitSetPhase()">' + escapeHtml(t('buttons.setPhase')) + '</button></div>';
+  modal.classList.add('open');
+  var picked = modal.querySelector('input:checked');
+  if (picked) picked.closest('.row').scrollIntoView({ block: 'center' });
+}
+
+function _ensureSetPhaseModal() {
+  var modal = document.getElementById('setPhaseModal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.id = 'setPhaseModal';
+  modal.className = 'file-preview-modal';
+  modal.onclick = function(e) { if (e.target === modal) closeSetPhaseDialog(); };
+  modal.innerHTML = '<div class="file-preview-content" role="dialog" aria-modal="true">' +
+    '<div class="file-preview-header"><h3 class="grow">' + escapeHtml(t('buttons.setPhase')) + '</h3>' +
+    '<button class="btn ic xs" onclick="closeSetPhaseDialog()" aria-label="' + escapeHtml(t('buttons.close')) + '">' + cpIcon('x', 14) + '</button></div>' +
+    '<div class="file-preview-body vs g12"></div></div>';
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function closeSetPhaseDialog() {
+  var modal = document.getElementById('setPhaseModal');
+  if (modal) modal.classList.remove('open');
+}
+
+async function submitSetPhase() {
+  var picked = document.querySelector('#setPhaseModal input[name="setPhaseChoice"]:checked');
   var ctx = getWorkspaceContext();
-  if (!ctx) return;
+  if (!picked || !ctx) return;
   try {
-    await apiSetPhase(ctx.projectId, ctx.branch, newPhase.trim());
+    await apiSetPhase(ctx.projectId, ctx.branch, picked.value);
+    closeSetPhaseDialog();
     await refreshState();
   } catch (err) {
-    alert(t('errors.failedToSetPhase', {error: err.message}));
+    showToast(t('errors.failedToSetPhase', {error: err.message}));
   }
 }
 
@@ -229,31 +272,30 @@ function _renderGateCardHead(gate) {
     '</div>';
 }
 
+function buildGateCardHtml(gate, actionsHtml, inputsHtml) {
+  return '<section class="gatecard" aria-label="' + escapeHtml(t('gate.pending')) + '">' +
+    _renderGateCardHead(gate) +
+    '<div class="hs wrap gatecard__actions">' + actionsHtml + '</div>' +
+    (inputsHtml ? '<div class="cols gatecard__inputs">' + inputsHtml + '</div>' : '') +
+  '</section>';
+}
+
 function _renderPhaseGateCard(gate) {
   var commitField = gate.acceptsCommitMessage
     ? '<div class="narrow"><label class="lbl">' + escapeHtml(t('gate.commitMessageLabel')) +
         '<input class="inp" type="text" id="commitMessageInput" placeholder="' + escapeHtml(t('placeholders.commitMessage')) + '"></label></div>'
     : '';
-  return '<section class="gatecard" aria-label="' + escapeHtml(t('gate.pending')) + '">' +
-    _renderGateCardHead(gate) +
-    '<div class="hs wrap gatecard__actions">' +
-      '<button class="btn onGate lg" onclick="handleRejectWithInput()">' + escapeHtml(t(gate.config.rejectKey)) + '</button>' +
-      '<button class="btn pri lg" onclick="handleApprove()">' + cpIcon('check') + escapeHtml(t(gate.config.approveKey)) + '</button>' +
-    '</div>' +
-    '<div class="cols gatecard__inputs">' + commitField +
+  return buildGateCardHtml(gate,
+    '<button class="btn onGate lg" onclick="handleRejectWithInput()">' + escapeHtml(t(gate.config.rejectKey)) + '</button>' +
+    '<button class="btn pri lg" onclick="handleApprove()">' + cpIcon('check') + escapeHtml(t(gate.config.approveKey)) + '</button>',
+    commitField +
       '<div class="wide"><label class="lbl">' + escapeHtml(t('gate.feedbackLabel')) +
-        '<input class="inp" type="text" id="rejectFeedbackInput" placeholder="' + escapeHtml(t('gate.feedbackPlaceholder')) + '"></label></div>' +
-    '</div>' +
-  '</section>';
+        '<input class="inp" type="text" id="rejectFeedbackInput" placeholder="' + escapeHtml(t('gate.feedbackPlaceholder')) + '"></label></div>');
 }
 
 function _renderPlanGateCard(gate) {
-  return '<section class="gatecard" aria-label="' + escapeHtml(t('gate.pending')) + '">' +
-    _renderGateCardHead(gate) +
-    '<div class="hs wrap gatecard__actions">' +
-      '<button class="btn pri lg" onclick="switchTab(\'plan\')">' + escapeHtml(t('gate.reviewPlan')) + '</button>' +
-    '</div>' +
-  '</section>';
+  return buildGateCardHtml(gate,
+    '<button class="btn pri lg" onclick="switchTab(\'plan\')">' + escapeHtml(t('gate.reviewPlan')) + '</button>', '');
 }
 
 function _refreshGateCardFacts(container, gate) {
@@ -264,13 +306,29 @@ function _refreshGateCardFacts(container, gate) {
 }
 
 function describeGateFacts(gate) {
-  if (gate.kind === 'plan') {
-    var execution = (PLAN_DATA && PLAN_DATA.execution) || [];
-    var taskCount = execution.reduce(function(sum, item) { return sum + ((item.tasks || []).length); }, 0);
-    return t('gate.facts.plan', {subPhases: execution.length, tasks: taskCount});
-  }
+  if (gate.kind === 'plan') return _describePlanFacts();
+  if (gate.phase === '1.4') return _describePreplanningFacts();
   if (/^3\.\d+\.3$/.test(gate.phase)) return _describeCommitFacts(gate.phase);
   return gate.config.descKey ? t(gate.config.descKey) : '';
+}
+
+function _describePlanFacts() {
+  var execution = (PLAN_DATA && PLAN_DATA.execution) || [];
+  var taskCount = execution.reduce(function(sum, item) { return sum + ((item.tasks || []).length); }, 0);
+  var facts = [t('gate.facts.plan', {subPhases: execution.length, tasks: taskCount})];
+  var proposed = (AppState.criteria || []).filter(function(c) { return c.status === 'proposed'; }).length;
+  if (proposed) facts.push(t('gate.facts.proposedCriteria', {n: proposed}));
+  var openComments = _countOpenComments();
+  if (openComments) facts.push(t('gate.facts.openComments', {n: openComments}));
+  return facts.join(' · ');
+}
+
+function _describePreplanningFacts() {
+  var facts = [t('gate.facts.researchTopics', {n: (RESEARCH_DATA || []).length})];
+  if (AppState.impactAnalysis) facts.push(t('gate.facts.impactRecorded'));
+  var openDiscussions = ((CONTEXT_DATA && CONTEXT_DATA.discussions) || []).filter(function(d) { return d.status === 'open'; }).length;
+  facts.push(t('gate.facts.openDiscussions', {n: openDiscussions}));
+  return facts.join(' · ');
 }
 
 function _describeCommitFacts(phase) {

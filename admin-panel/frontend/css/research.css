@@ -1,190 +1,55 @@
 /* ═══════════════════════════════════════════════ */
 /*  RESEARCH FINDINGS                              */
 /* ═══════════════════════════════════════════════ */
-.finding {
-  padding: 10px 14px 6px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  margin-bottom: 6px;
-  transition: var(--transition);
-}
+.research-head { margin: 4px 0 16px; }
+.research-head h2 { font-family: var(--f-head); font-size: 20px; font-weight: 600; }
 
-.finding:hover { border-color: color-mix(in srgb, var(--border-active) 50%, var(--border)); }
-
-.finding-claim {
-  font-size: 0.88rem;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-
-.finding-ref {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--info);
-  background: var(--info-dim);
-  padding: 2px 8px;
-  border-radius: 4px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.finding-ref.clickable { cursor: pointer; }
-.finding-ref.clickable:hover { filter: brightness(1.2); }
-
-.finding-evidence {
-  margin-top: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  line-height: 1.4;
-  color: var(--text-secondary);
-  background: var(--bg-raised);
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  border-left: 2px solid var(--accent);
-}
-
-.finding-status {
-  float: right;
-  margin-top: -2px;
-}
-
-.finding-snippet {
-  margin-top: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  line-height: 1.35;
-  color: var(--text-secondary);
-  background: var(--bg-raised);
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  border-left: 2px solid var(--info);
-  white-space: pre-wrap;
-  word-break: break-word;
-  display: none;
-}
-.finding-snippet.visible { display: block; margin-bottom: 12px; }
-.finding-snippet code {
-  background: transparent;
-  padding: 0;
-  font-family: var(--font-mono);
-  font-size: inherit;
-  line-height: inherit;
-}
-.finding-quote-btn {
-  font-size: 0.7rem;
-  color: var(--info);
-  cursor: pointer;
-  margin-left: 8px;
-  opacity: 0.8;
-}
-.finding-quote-btn:hover { opacity: 1; text-decoration: underline; }
-
-/* ─── Diff proof description ─── */
-.finding-diff-desc {
-  margin-top: 4px;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
-/* ─── Research groups ─── */
-.research-group {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  margin-bottom: 12px;
-  overflow: hidden;
-}
+/* ─── Research groups (one card per topic) ─── */
+.research-group { margin-bottom: 0; }
 .research-group-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--bg-raised);
-  cursor: pointer;
-  user-select: none;
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  border-bottom: 1px solid var(--ln); cursor: pointer; user-select: none;
 }
-.research-group-header:hover { background: var(--bg-secondary); }
-.research-group-title {
-  font-weight: 600;
-  font-size: 0.9rem;
-  flex: 1;
-}
-.research-group-count {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-.research-group-body {
-  padding: 10px 14px;
-}
-.research-group.collapsed .research-group-body { display: none; }
-.research-group-summary {
-  background: var(--bg-secondary);
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius-sm);
-  font-size: 0.88rem;
-  color: var(--text-secondary);
-}
+.research-group.collapsed .research-group-header { border-bottom: 0; }
 .research-group-header::before {
-  content: '▾';
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  transition: transform 0.15s;
+  content: ''; width: 7px; height: 7px; flex: none; margin: 0 4px 3px 2px;
+  border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim);
+  transform: rotate(45deg); transition: transform 0.15s;
 }
-.research-group.collapsed .research-group-header::before {
-  transform: rotate(-90deg);
-}
+.research-group.collapsed .research-group-header::before { transform: rotate(-45deg); margin-bottom: 0; }
+.research-group-title { font-family: var(--f-head); font-weight: 600; font-size: 16px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.research-group-count { font-size: 12px; color: var(--dim); white-space: nowrap; }
+.research-group-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.research-group.collapsed .research-group-body { display: none; }
+.research-group-summary { font-size: 14px; color: var(--tx); }
 
-/* ─── Research action buttons ─── */
-.research-actions {
-  display: inline-flex;
-  gap: 4px;
-  margin-left: 8px;
+/* ─── Findings ─── */
+.finding { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; }
+.finding-claim { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.finding-proof { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.finding-ref {
+  font-family: var(--f-mono); font-size: 12px; color: var(--dim);
+  display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
+  overflow-wrap: anywhere;
 }
-.research-action-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  transition: var(--transition);
+.finding-ref.clickable { cursor: pointer; }
+.finding-ref.clickable:hover { color: var(--pr); text-decoration: underline; }
+.finding-quote-btn { font-size: 12px; color: var(--pr); cursor: pointer; }
+.finding-quote-btn:hover { text-decoration: underline; }
+.finding-evidence { font-size: 13px; line-height: 1.5; color: var(--dim); overflow-wrap: anywhere; }
+.finding-snippet {
+  display: none; font-family: var(--f-mono); font-size: 12.5px; line-height: 1.5; color: var(--tx);
+  white-space: pre-wrap; overflow-wrap: anywhere;
 }
-.research-action-btn:hover:not(:disabled) {
-  border-color: var(--border-active);
-}
-.research-prove-btn:hover:not(:disabled) {
-  color: var(--success);
-  border-color: var(--success);
-}
-.research-reject-btn:hover:not(:disabled) {
-  color: var(--danger);
-  border-color: var(--danger);
-}
-.research-prove-btn.active {
-  color: var(--success);
-  border-color: var(--success);
-  background: var(--success-dim, rgba(34, 197, 94, 0.1));
-  cursor: default;
-}
-.research-reject-btn.active {
-  color: var(--danger);
-  border-color: var(--danger);
-  background: var(--danger-dim, rgba(239, 68, 68, 0.1));
-  cursor: default;
-}
-.research-action-btn:disabled {
-  opacity: 0.8;
-}
+.finding-snippet.visible { display: block; }
+.finding-snippet code { background: transparent; padding: 0; font-family: inherit; font-size: inherit; line-height: inherit; }
+.finding-comment { display: flex; justify-content: flex-start; }
+.finding-diff-desc { font-size: 13px; color: var(--dim); }
+
+/* ─── Action buttons ─── */
+.research-actions { display: inline-flex; gap: 6px; margin-left: 4px; }
+.research-prove-btn:hover:not(:disabled), .research-prove-btn.active { color: var(--oktx); border-color: var(--ok); }
+.research-reject-btn:hover:not(:disabled), .research-reject-btn.active { color: var(--badtx); border-color: var(--bad); }
+.research-prove-btn.active { background: var(--okbg); }
+.research-reject-btn.active { background: var(--badbg); }
+.research-action-btn:disabled { opacity: 1; cursor: default; }

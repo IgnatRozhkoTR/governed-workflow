@@ -2,9 +2,9 @@
 //  RESEARCH RENDER
 // ═══════════════════════════════════════════════
 function proofBadge(proven) {
-  if (proven === 1)  return { className: 'badge badge-success', text: t('badges.verified') };
-  if (proven === -1) return { className: 'badge badge-danger',  text: t('badges.rejected') };
-  return { className: 'badge badge-warning', text: t('badges.pending') };
+  if (proven === 1)  return { className: 'pill ok', text: t('badges.verified') };
+  if (proven === -1) return { className: 'pill bad', text: t('badges.rejected') };
+  return { className: 'pill warn', text: t('badges.pending') };
 }
 
 function _buildResearchFindingHtml(entry, finding, index) {
@@ -21,7 +21,7 @@ function _buildResearchFindingHtml(entry, finding, index) {
     proofHtml = '<span class="finding-ref clickable" title="' + escapeHtml(label) + '" onclick="showFilePreview(\'' +
       proof.file.replace(/'/g, "\\'") + '\', ' +
       (proof.line_start || 0) + ', ' + (proof.line_end || 0) +
-      ')">📄 ' + escapeHtml(label) + '</span>';
+      ')">' + escapeHtml(label) + '</span>';
     var hasSnippetRange = proof.snippet_start && proof.snippet_end;
     var hasLegacySnippet = proof.snippet;
     if (hasSnippetRange || hasLegacySnippet) {
@@ -32,11 +32,11 @@ function _buildResearchFindingHtml(entry, finding, index) {
     }
   } else if (proofType === 'web' && proof.url) {
     proofHtml = '<a class="finding-ref clickable" href="' + escapeHtml(proof.url) +
-      '" target="_blank" rel="noopener">🌐 ' + escapeHtml(proof.title || proof.url) + '</a>';
+      '" target="_blank" rel="noopener">' + escapeHtml(proof.title || proof.url) + '</a>';
   } else if (proofType === 'diff' && proof.commit) {
     var commitShort = proof.commit.substring(0, 7);
     var diffLabel = commitShort + (proof.file ? ' — ' + proof.file : '');
-    proofHtml = '<span class="finding-ref">🔀 ' + escapeHtml(diffLabel) + '</span>';
+    proofHtml = '<span class="finding-ref">' + escapeHtml(diffLabel) + '</span>';
     if (proof.description) {
       proofHtml += '<div class="finding-diff-desc">' + escapeHtml(proof.description) + '</div>';
     }
@@ -46,7 +46,7 @@ function _buildResearchFindingHtml(entry, finding, index) {
     proofHtml = '<span class="finding-ref clickable" title="' + escapeHtml(legacyLabel) + '" onclick="showFilePreview(\'' +
       proof.file.replace(/'/g, "\\'") + '\', ' +
       (proof.line_start || 0) + ', ' + (proof.line_end || 0) +
-      ')">📄 ' + escapeHtml(legacyLabel) + '</span>';
+      ')">' + escapeHtml(legacyLabel) + '</span>';
     if (proof.snippet) {
       proofHtml += '<span class="finding-quote-btn" onclick="toggleSnippet(\'' + snippetId + '\', this)">' + t('research.showQuote') + '</span>';
     }
@@ -54,14 +54,14 @@ function _buildResearchFindingHtml(entry, finding, index) {
 
   var commentTarget = 'Finding: ' + summary.substring(0, 60);
 
-  return '<div class="finding" data-finding-key="' + entry.id + '::' + index + '">' +
+  return '<div class="finding inset" data-finding-key="' + entry.id + '::' + index + '">' +
     '<div class="finding-claim">' + escapeHtml(summary) + '</div>' +
-    (proofHtml ? '<div style="margin-top: 4px;">' + proofHtml + '</div>' : '') +
+    (proofHtml ? '<div class="finding-proof">' + proofHtml + '</div>' : '') +
     (proof.snippet ? '<div class="finding-snippet" id="' + snippetId + '"><code>' + escapeHtml(proof.snippet) + '</code></div>' :
      (proof.snippet_start && proof.snippet_end ? '<div class="finding-snippet" id="' + snippetId + '"><code>' + t('research.loading') + '</code></div>' : '')) +
     (proofType === 'web' && proof.quote ? '<div class="finding-snippet visible" style="border-left-color: var(--warning);"><code>' + escapeHtml(proof.quote) + '</code></div>' : '') +
     (details ? '<div class="finding-evidence">' + escapeHtml(details) + '</div>' : '') +
-    '<div style="margin-top: 4px; text-align: right;">' + renderCommentIcon('research', commentTarget) + '</div>' +
+    '<div class="finding-comment">' + renderCommentIcon('research', commentTarget) + '</div>' +
     '</div>';
 }
 
@@ -75,15 +75,15 @@ function _buildResearchGroupHtml(entry) {
   var groupId = 'research-group-' + entry.id;
 
   var proveBtn = proven !== 1
-    ? '<button class="research-action-btn research-prove-btn" data-id="' + entry.id + '" onclick="toggleResearchProven(' + entry.id + ', true, this); event.stopPropagation();" title="' + t('research.titleMarkVerified') + '">✓</button>'
-    : '<button class="research-action-btn research-prove-btn active" disabled title="' + t('research.titleVerified') + '">✓</button>';
+    ? '<button class="btn ic xs research-action-btn research-prove-btn" data-id="' + entry.id + '" onclick="toggleResearchProven(' + entry.id + ', true, this); event.stopPropagation();" title="' + t('research.titleMarkVerified') + '">' + cpIcon('check', 14) + '</button>'
+    : '<button class="btn ic xs research-action-btn research-prove-btn active" disabled title="' + t('research.titleVerified') + '">' + cpIcon('check', 14) + '</button>';
   var rejectBtn = proven !== -1
-    ? '<button class="research-action-btn research-reject-btn" data-id="' + entry.id + '" onclick="toggleResearchProven(' + entry.id + ', false, this); event.stopPropagation();" title="' + t('research.titleMarkRejected') + '">✗</button>'
-    : '<button class="research-action-btn research-reject-btn active" disabled title="' + t('research.titleRejected') + '">✗</button>';
-  var deleteBtn = '<button class="research-action-btn research-delete-btn" onclick="deleteResearch(' + entry.id + '); event.stopPropagation();" title="' + t('research.titleDeleteEntry') + '">🗑</button>';
+    ? '<button class="btn ic xs research-action-btn research-reject-btn" data-id="' + entry.id + '" onclick="toggleResearchProven(' + entry.id + ', false, this); event.stopPropagation();" title="' + t('research.titleMarkRejected') + '">' + cpIcon('x', 14) + '</button>'
+    : '<button class="btn ic xs research-action-btn research-reject-btn active" disabled title="' + t('research.titleRejected') + '">' + cpIcon('x', 14) + '</button>';
+  var deleteBtn = '<button class="btn ic xs research-action-btn research-delete-btn" onclick="deleteResearch(' + entry.id + '); event.stopPropagation();" title="' + t('research.titleDeleteEntry') + '">' + cpIcon('trash', 14) + '</button>';
 
   var discussionBadge = entry.discussion_id
-    ? '<span class="badge" style="font-size:0.6rem;background:var(--warning-dim);color:var(--warning);margin-left:4px;" title="' + t('research.linkedToDiscussion', {id: entry.discussion_id}) + '">D#' + entry.discussion_id + '</span>'
+    ? '<span class="tag" title="' + t('research.linkedToDiscussion', {id: entry.discussion_id}) + '">D#' + entry.discussion_id + '</span>'
     : '';
 
   var discussionAttr = entry.discussion_id ? ' data-discussion-id="' + entry.discussion_id + '"' : '';
@@ -92,7 +92,7 @@ function _buildResearchGroupHtml(entry) {
     '<span class="research-group-title">' + escapeHtml(topicName) + '</span>' +
     discussionBadge +
     '<span class="research-group-count">' + t('research.findingCount', {count: findings.length}) + '</span>' +
-    '<span class="badge badge-' + badgeClass + '">' + badgeText + '</span>' +
+    '<span class="' + badgeClass + '">' + badgeText + '</span>' +
     '<span class="research-actions">' + proveBtn + rejectBtn + deleteBtn + '</span>' +
     '</div>';
 
@@ -105,7 +105,7 @@ function _buildResearchGroupHtml(entry) {
   });
   bodyHtml += '</div>';
 
-  return '<div class="research-group collapsed" id="' + groupId + '"' + discussionAttr + '>' +
+  return '<div class="card research-group collapsed" id="' + groupId + '"' + discussionAttr + '>' +
     headerHtml + bodyHtml +
     '</div>';
 }
@@ -122,8 +122,8 @@ function renderResearch() {
   var badge = document.getElementById('researchStatus');
 
   if (!RESEARCH_DATA || RESEARCH_DATA.length === 0) {
-    morphInnerHTML(container, '<div class="no-items-msg">' + t('research.noEntries') + '</div>');
-    if (badge) { badge.textContent = ''; badge.className = 'badge'; }
+    morphInnerHTML(container, '<div class="empty">' + t('research.noEntries') + '</div>');
+    if (badge) { badge.textContent = ''; badge.className = 'pill'; }
     return;
   }
 
@@ -133,7 +133,7 @@ function renderResearch() {
   var pending = total - verified - rejected;
   if (badge) {
     badge.textContent = rejected > 0 ? t('research.verifiedRejectedCount', {verified: verified, total: total, rejected: rejected}) : t('research.verifiedCount', {verified: verified, total: total});
-    badge.className = 'badge ' + (pending > 0 ? 'badge-warning' : rejected > 0 ? 'badge-danger' : 'badge-success');
+    badge.className = 'pill ' + (pending > 0 ? 'warn' : rejected > 0 ? 'bad' : 'ok');
   }
 
   var html = RESEARCH_DATA.map(_buildResearchGroupHtml).join('');

@@ -506,6 +506,7 @@
   "history.errors.undoFailed": "Undo failed: {error}",
   "history.errors.squashFailed": "Squash failed: {error}",
   "auth.title": "Admin token required",
+  "auth.tokenLabel": "Admin token",
   "auth.subtitleUnconfigured": "No token is set up on this machine. Generate one using the command below, then paste it here.",
   "auth.subtitleConfigured": "Paste your admin token to unlock the workspace.",
   "auth.commandLabel": "Run this in your terminal on this machine:",

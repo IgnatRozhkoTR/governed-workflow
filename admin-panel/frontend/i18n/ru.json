@@ -506,6 +506,7 @@
   "history.errors.undoFailed": "Ошибка отмены: {error}",
   "history.errors.squashFailed": "Ошибка сжатия: {error}",
   "auth.title": "Требуется токен администратора",
+  "auth.tokenLabel": "Токен администратора",
   "auth.subtitleUnconfigured": "На этом устройстве токен ещё не настроен. Сгенерируйте его командой ниже и вставьте сюда.",
   "auth.subtitleConfigured": "Вставьте токен администратора, чтобы открыть рабочее пространство.",
   "auth.commandLabel": "Выполните в терминале на этой машине:",

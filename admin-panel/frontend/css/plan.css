@@ -3,217 +3,127 @@
 /* ═══════════════════════════════════════════════ */
 
 .plan-description {
+  margin-bottom: 20px;
   padding: 14px 18px;
-  margin-bottom: 18px;
-  background: var(--bg-secondary);
-  border-radius: 6px;
-  border-left: 3px solid var(--accent);
-  font-size: 0.92rem;
-  line-height: 1.6;
-  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.55;
   white-space: pre-wrap;
 }
 
-.plan-group {
-  margin-bottom: 14px;
-}
+.plan-description-comment { margin-left: 10px; white-space: normal; }
+.plan-folds { margin-bottom: 20px; }
+.plan-main { margin-top: 0; }
+.has-gate #planApproveBtn, .has-gate #planRejectBtn { display: none; }
 
-.plan-group-header {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.02em;
-  padding-bottom: 6px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+/* ─── Execution plan: sub-phases and tasks ─── */
+.plan-group { padding-bottom: 8px; border-bottom: 1px solid var(--ln); }
+.plan-group:last-child { border-bottom: 0; padding-bottom: 0; }
 
-.plan-group-progress {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin-left: auto;
-}
+.plan-group-header { display: flex; align-items: center; gap: 10px; padding: 4px 0 8px; }
+.plan-group-name { font-family: var(--f-head); font-size: 16px; font-weight: 600; }
+.plan-group-current { background: var(--prbg); color: var(--prtx); }
+.plan-group-progress { font-family: var(--f-mono); font-size: 12px; color: var(--dim); }
 
-.plan-task {
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  margin-bottom: 2px;
-  transition: var(--transition);
-}
+.plan-group-scope { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 0 0 8px; font-size: 12px; }
+.plan-scope-must { color: var(--warn); }
+.plan-scope-may { color: var(--pr); }
 
-.plan-task.expanded {
-  background: var(--bg-hover);
-  border-color: var(--border);
-  margin-bottom: 4px;
-}
+.plan-task { border-radius: var(--r-md); }
+.plan-task.expanded { background: var(--sf2); }
+.plan-task-header { align-items: center; padding: 7px 8px; border-radius: var(--r-md); cursor: pointer; }
+.plan-task-header:hover { background: var(--sf2); }
+.plan-task-header .bx { margin-top: 0; }
+.plan-task-header.run .bx { background: var(--prbg); }
+.plan-task-title { font-size: 14px; }
+.plan-task-detail { display: none; padding: 2px 10px 10px 34px; }
+.plan-task.expanded .plan-task-detail { display: block; }
+.plan-task-description { font-size: 13px; color: var(--dim); line-height: 1.5; margin-bottom: 4px; }
+.plan-task-files { font-family: var(--f-mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
 
-.plan-task-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: var(--transition);
-}
-
-.plan-task-header:hover {
-  background: var(--bg-hover);
-}
-
-.plan-task-dot {
-  width: 8px;
-  height: 8px;
-  min-width: 8px;
-  border-radius: 50%;
-  border: 2px solid var(--text-muted);
-  flex-shrink: 0;
-}
-
-.plan-task-dot.done {
-  background: var(--success);
-  border-color: var(--success);
-}
-
-.plan-task-dot.in_progress {
-  background: var(--warning);
-  border-color: var(--warning);
-  animation: phasePulse 2s ease-in-out infinite;
-}
-
-.plan-task-dot.pending {
-  background: transparent;
-  border-color: var(--text-muted);
-}
-
-.plan-task-title {
-  font-size: 0.82rem;
-  font-weight: 400;
-}
-
-.plan-task-detail {
-  display: none;
-  padding: 4px 10px 8px 26px;
-}
-
-.plan-task.expanded .plan-task-detail {
-  display: block;
-}
-
-.plan-task-description {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  line-height: 1.4;
-  margin-bottom: 4px;
-}
-
-.plan-task-files {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--text-muted);
-}
-
-/* Mermaid diagram containers */
-#planDiagram {
+/* ─── Diagrams: a pannable, zoomable box ─── */
+#planDiagram, #systemDiagram {
   position: relative;
-  padding: 8px 0;
-  max-height: 400px;
+  max-height: 460px;
+  min-height: 120px;
   overflow: auto;
   cursor: grab;
+  padding: 4px 0;
+  scrollbar-width: thin;
 }
 
-#planDiagram.dragging {
-  cursor: grabbing;
-  user-select: none;
-}
+#planDiagram.dragging, #systemDiagram.dragging { cursor: grabbing; user-select: none; }
 
-#planDiagram svg {
-  display: block;
-  transform-origin: top left;
-  max-width: 100%;
-}
-
-#planDiagram svg .nodeLabel {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
-}
-
-#systemDiagram {
-  position: relative;
-  padding: 8px 0;
-  min-height: 200px;
-  max-height: 60vh;
-  overflow: auto;
-  cursor: grab;
-}
-
-#systemDiagram.dragging {
-  cursor: grabbing;
-  user-select: none;
-}
-
-#systemDiagram svg {
+#planDiagram svg, #systemDiagram svg, .diagram-overlay-body svg {
   display: block;
   transform-origin: top left;
   max-width: none;
   overflow: visible;
 }
 
-#systemDiagram .node rect,
-#systemDiagram .node polygon {
-  rx: 4;
+#planDiagram svg foreignObject, #systemDiagram svg foreignObject, .diagram-overlay-body svg foreignObject { overflow: visible; }
+#planDiagram svg .cluster-label foreignObject, #systemDiagram svg .cluster-label foreignObject, .diagram-overlay-body svg .cluster-label foreignObject { overflow: hidden; }
+#planDiagram svg .cluster-label p, #systemDiagram svg .cluster-label p, .diagram-overlay-body svg .cluster-label p { margin: 0; }
+
+.diagram-section { overflow: visible; margin-bottom: 16px; }
+.diagram-section svg { overflow: visible; }
+.diagram-subtitle { font-size: 13px; font-weight: 600; color: var(--dim); margin: 12px 0 8px; }
+.diagram-error { color: var(--dim); font-family: var(--f-mono); font-size: 12px; white-space: pre-wrap; }
+
+#planDiagram svg .cluster-label .nodeLabel,
+#systemDiagram svg .cluster-label .nodeLabel,
+.diagram-overlay-body svg .cluster-label .nodeLabel {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.diagram-section {
-  overflow: visible;
-  margin-bottom: 16px;
+#planDiagram svg .cluster rect, #systemDiagram svg .cluster rect, .diagram-overlay-body svg .cluster rect {
+  rx: 12; ry: 12; stroke-dasharray: 4 3;
 }
 
-.diagram-section svg {
-  overflow: visible;
-}
+#planDiagram svg .node rect, #planDiagram svg .node polygon,
+#systemDiagram svg .node rect, #systemDiagram svg .node polygon { rx: 8; ry: 8; }
 
-.diagram-zoom-controls {
-  display: flex;
-  gap: 4px;
-  margin-left: auto;
-}
-
+.diagram-zoom-controls { display: inline-flex; align-items: center; padding: 2px; border-radius: 999px; background: var(--sf2); }
 .diagram-zoom-btn {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-family: var(--font-mono);
-  transition: var(--transition);
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%; background: none; color: var(--dim); font-size: 14px; line-height: 1;
 }
+.diagram-zoom-btn:hover { background: var(--sf); color: var(--tx); }
+.diagram-zoom-level { min-width: 44px; text-align: center; font-size: 12px; font-weight: 600; color: var(--tx); }
 
-.diagram-zoom-btn:hover {
-  border-color: var(--border-active);
-  color: var(--accent);
+/* ─── Full screen diagram ─── */
+.diagram-overlay {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  background: var(--scrim);
 }
+.diagram-overlay-content {
+  position: relative; display: flex; flex-direction: column;
+  width: calc(100vw - 32px); height: calc(100vh - 32px); max-width: 1800px;
+  background: var(--sf); border: 1px solid var(--ln); border-radius: 20px; box-shadow: var(--shpop); overflow: hidden;
+}
+.diagram-overlay-close {
+  position: absolute; top: 10px; right: 14px; z-index: 1; width: 32px; height: 32px; border-radius: 50%;
+  border: 0; background: var(--sf2); color: var(--dim); font-size: 20px; line-height: 1;
+}
+.diagram-overlay-close:hover { color: var(--tx); background: var(--sf3); }
+.diagram-overlay-controls { display: flex; align-items: center; gap: 8px; padding: 12px 56px 12px 16px; border-bottom: 1px solid var(--ln); }
+.diagram-overlay-controls button {
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--ln); background: var(--sf);
+  color: var(--tx); font-size: 16px;
+}
+.diagram-overlay-controls span { min-width: 48px; text-align: center; font-size: 13px; font-weight: 600; }
+.diagram-overlay-body {
+  flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; align-items: flex-start; cursor: grab;
+}
+.diagram-overlay-diagram { margin-bottom: 24px; }
 
-.diagram-zoom-level {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-  padding: 0 4px;
-  min-width: 36px;
-  justify-content: center;
-}
+/* ─── Acceptance criteria ─── */
+.criteria-item { padding: 12px 16px; }
+.criteria-details-link { color: var(--pr); font-size: 12px; font-weight: 600; cursor: pointer; flex: none; }
+.criteria-details-link:hover { text-decoration: underline; }
+.criteria-delete { margin-left: auto; }
+.criteria-add-form { border-top: 1px solid var(--ln); }
+.criterion-dialog { max-width: 600px; }
+.criteria-validation { height: auto; min-height: 22px; padding: 3px 9px; white-space: normal; }

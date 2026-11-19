@@ -100,13 +100,13 @@ async function renderSystemDiagram() {
   var raw = PLAN_DATA.systemDiagram;
   if (!raw || (Array.isArray(raw) && raw.length === 0)) {
     if (_lastSystemDiagramSignature !== 'empty') {
-      container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">' + t('plan.noSystemDiagram') + '</p>';
+      container.innerHTML = '<div class="empty">' + t('plan.noSystemDiagram') + '</div>';
       _lastSystemDiagramSignature = 'empty';
     }
     return;
   }
 
-  var signature = _hashString(typeof raw === 'string' ? raw : JSON.stringify(raw));
+  var signature = _hashString((typeof raw === 'string' ? raw : JSON.stringify(raw)) + '|' + _currentThemeName());
   if (signature === _lastSystemDiagramSignature) return;
   _lastSystemDiagramSignature = signature;
 
@@ -116,7 +116,7 @@ async function renderSystemDiagram() {
   } else if (Array.isArray(raw)) {
     diagrams = raw;
   } else {
-    container.innerHTML = '<p style="color:var(--text-muted);padding:16px;">' + t('plan.invalidDiagramFormat') + '</p>';
+    container.innerHTML = '<div class="empty">' + t('plan.invalidDiagramFormat') + '</div>';
     return;
   }
 
@@ -172,12 +172,97 @@ async function renderSystemDiagram() {
     try {
       var renderResult = await mermaid.render('sysDiag_' + idx, themed);
       diagramDiv.innerHTML = renderResult.svg;
+      polishDiagramSvg(diagramDiv.querySelector('svg'));
     } catch (e) {
       console.error('System diagram render failed:', e);
-      diagramDiv.innerHTML = '<pre style="color:var(--text-muted);padding:8px;">Diagram render error: ' + escapeHtml(e.message) + '</pre>';
+      diagramDiv.innerHTML = '<pre class="diagram-error">Diagram render error: ' + escapeHtml(e.message) + '</pre>';
     }
   }
 }
+
+// ═══════════════════════════════════════════════
+//  DIAGRAM THEMING AND LANE POLISH
+// ═══════════════════════════════════════════════
+var MIN_LANE_WIDTH = 150;
+var LANE_TITLE_INSET = 10;
+
+function _currentThemeName() {
+  return localStorage.getItem('admin-panel-theme') || 'dark';
+}
+
+function _readToken(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function getDiagramNodeStyles() {
+  return {
+    done: 'fill:' + _readToken('--okbg') + ',stroke:' + _readToken('--ok') + ',color:' + _readToken('--oktx'),
+    progress: 'fill:' + _readToken('--prbg') + ',stroke:' + _readToken('--pr') + ',color:' + _readToken('--prtx'),
+    pending: 'fill:' + _readToken('--sf2') + ',stroke:' + _readToken('--ln') + ',color:' + _readToken('--tx'),
+    dot: 'fill:' + _readToken('--ln') + ',stroke:' + _readToken('--dim') + ',color:' + _readToken('--ln')
+  };
+}
+
+function polishDiagramSvg(svgEl) {
+  if (!svgEl) return;
+  svgEl.querySelectorAll('g.cluster').forEach(function(cluster) {
+    var label = cluster.querySelector(':scope > .cluster-label');
+    var fullTitle = label ? label.textContent.trim() : '';
+    if (fullTitle && !cluster.querySelector(':scope > title')) {
+      var title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      title.textContent = fullTitle;
+      cluster.insertBefore(title, cluster.firstChild);
+    }
+    var rect = cluster.querySelector(':scope > rect');
+    if (!rect) return;
+    _widenLane(rect);
+    if (label) _fitLaneTitle(label, rect);
+  });
+}
+
+function _widenLane(rect) {
+  var width = parseFloat(rect.getAttribute('width'));
+  if (width >= MIN_LANE_WIDTH) return;
+  rect.setAttribute('x', parseFloat(rect.getAttribute('x')) - (MIN_LANE_WIDTH - width) / 2);
+  rect.setAttribute('width', MIN_LANE_WIDTH);
+}
+
+function _fitLaneTitle(label, rect) {
+  var box = label.querySelector('foreignObject');
+  var text = label.querySelector('.nodeLabel');
+  if (!box || !text) return;
+  var available = parseFloat(rect.getAttribute('width')) - LANE_TITLE_INSET * 2;
+  var width = parseFloat(box.getAttribute('width'));
+  var y = (label.getAttribute('transform').match(/translate\([^,]+,\s*([^)]+)\)/) || [])[1];
+  if (width > available) {
+    box.setAttribute('width', available);
+    var wrapper = text.parentElement;
+    wrapper.style.display = 'block';
+    wrapper.style.width = available + 'px';
+    text.style.display = 'block';
+    text.style.overflow = 'hidden';
+    text.style.textOverflow = 'ellipsis';
+    width = available;
+  }
+  var left = parseFloat(rect.getAttribute('x')) + (parseFloat(rect.getAttribute('width')) - width) / 2;
+  label.setAttribute('transform', 'translate(' + left + ',' + y + ')');
+}
+
+function attachDiagramClickToExpand(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var downAt = null;
+  container.addEventListener('pointerdown', function(e) { downAt = { x: e.clientX, y: e.clientY }; });
+  container.addEventListener('pointerup', function(e) {
+    if (!downAt || e.target.closest('button, .comment-icon, .comment-icon-header, a')) return;
+    var moved = Math.abs(e.clientX - downAt.x) + Math.abs(e.clientY - downAt.y);
+    downAt = null;
+    if (moved < 5 && container.querySelector('svg')) expandDiagram(containerId);
+  });
+}
+
+attachDiagramClickToExpand('planDiagram');
+attachDiagramClickToExpand('systemDiagram');
 
 // ═══════════════════════════════════════════════
 //  PLAN RENDER
@@ -201,17 +286,14 @@ function truncateLabel(text, maxLen) {
 function buildMermaidDiagram(direction) {
   _diagramTooltips = {};
   direction = direction || 'LR';
-  var isDark = (localStorage.getItem('admin-panel-theme') || 'dark') === 'dark';
-  var colors = isDark
-    ? { done: 'fill:#2d4a2d,stroke:#6bc77a,color:#e8e6e1', progress: 'fill:#4a4a2d,stroke:#c7b76b,color:#e8e6e1', pending: 'fill:#2d3250,stroke:#4a5078,color:#f0ede8', dot: 'fill:#4a5078,stroke:#8888a0,color:#4a5078' }
-    : { done: 'fill:#d4edda,stroke:#2e8540,color:#1a1a18', progress: 'fill:#fff3cd,stroke:#b8860b,color:#1a1a18', pending: 'fill:#e8edf3,stroke:#c5cdd8,color:#1a1a18', dot: 'fill:#c5cdd8,stroke:#8b8fa3,color:#c5cdd8' };
+  var colors = getDiagramNodeStyles();
   var items = PLAN_DATA.execution || PLAN_DATA.groups || [];
   if (items.length === 0) return '';
 
   var innerDirection = direction === 'TD' ? 'LR' : 'TB';
 
   var lines = [
-    (typeof getMermaidInit === 'function' ? getMermaidInit() : "%%{init: {'theme': 'dark'}}%%"),
+    getMermaidInit(),
     'graph ' + direction
   ];
 
@@ -354,45 +436,35 @@ async function renderMermaidDiagram() {
     return;
   }
 
-  var signature = _hashString(definition + '|' + (state.phase || ''));
+  var signature = _hashString(definition + '|' + (state.phase || '') + '|' + _currentThemeName());
   if (signature === _lastMermaidDiagramSignature) return;
   _lastMermaidDiagramSignature = signature;
 
   try {
     const { svg } = await mermaid.render('planMermaid', definition);
     container.innerHTML = svg;
-    // Auto-fit: scale to fit container height
     var svgEl = container.querySelector('svg');
+    diagramScale = 1;
     if (svgEl) {
-      var containerHeight = 380; // 400px max-height minus padding
-      var svgHeight = svgEl.getBoundingClientRect().height || svgEl.getAttribute('height') || containerHeight;
-      if (typeof svgHeight === 'string') svgHeight = parseFloat(svgHeight);
-      if (svgHeight > containerHeight) {
-        diagramScale = Math.max(0.3, containerHeight / svgHeight);
-      } else {
-        diagramScale = 1;
-      }
-      svgEl.style.transform = 'scale(' + diagramScale + ')';
-      svgEl.style.transformOrigin = 'top left';
-    }
-    // Inject native SVG <title> tooltips for hover
-    if (svgEl) {
-      Object.keys(_diagramTooltips).forEach(function(nodeId) {
-        var node = svgEl.querySelector('#' + nodeId);
-        if (!node) node = svgEl.querySelector('[id*="' + nodeId + '"]');
-        if (node) {
-          var title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-          title.textContent = _diagramTooltips[nodeId];
-          node.insertBefore(title, node.firstChild);
-        }
-      });
+      _attachNodeTooltips(svgEl);
+      polishDiagramSvg(svgEl);
     }
     var label = document.getElementById('diagramZoomLevel');
-    if (label) label.textContent = Math.round(diagramScale * 100) + '%';
+    if (label) label.textContent = '100%';
   } catch (e) {
     console.error('Mermaid render failed:', e);
-    container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem;">' + t('plan.diagramRenderFailed') + '</div>';
+    container.innerHTML = '<div class="empty">' + t('plan.diagramRenderFailed') + '</div>';
   }
+}
+
+function _attachNodeTooltips(svgEl) {
+  Object.keys(_diagramTooltips).forEach(function(nodeId) {
+    var node = svgEl.querySelector('[id="' + nodeId + '"]') || svgEl.querySelector('[id*="-' + nodeId + '-"]');
+    if (!node || node.querySelector(':scope > title')) return;
+    var title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    title.textContent = _diagramTooltips[nodeId];
+    node.insertBefore(title, node.firstChild);
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -532,15 +604,21 @@ function togglePlanTask(headerEl, e) {
   if (taskDiv) taskDiv.classList.toggle('expanded');
 }
 
+function _taskStateClass(status) {
+  if (status === 'done') return ' done';
+  if (status === 'in_progress') return ' run';
+  return '';
+}
+
 function _buildPlanTaskHtml(item, itemIndex, task, taskIndex) {
   var commentTarget = 'task:' + task.title;
-  var statusCls = (task.status || '').replace(/[^a-z0-9-]/gi, '');
   var taskKey = (item.id || ('group' + itemIndex)) + '::' + taskIndex;
+  var mark = task.status === 'done' ? cpIcon('check', 12) : '';
 
-  var headerHtml = '<div class="plan-task-header" onclick="togglePlanTask(this, event)">' +
-    '<span class="plan-task-dot ' + statusCls + '"></span>' +
-    '<span class="plan-task-title">' + escapeHtml(task.title) + '</span>' +
-    (task.agent ? ' <span class="badge badge-info" style="font-size: 0.65rem;">' + escapeHtml(task.agent) + '</span>' : '') +
+  var headerHtml = '<div class="task plan-task-header' + _taskStateClass(task.status) + '" onclick="togglePlanTask(this, event)">' +
+    '<span class="bx">' + mark + '</span>' +
+    '<span class="grow brk plan-task-title">' + escapeHtml(task.title) + '</span>' +
+    (task.agent ? '<span class="tag">' + escapeHtml(task.agent) + '</span>' : '') +
     renderCommentIcon('plan', commentTarget) +
     '</div>';
 
@@ -549,43 +627,68 @@ function _buildPlanTaskHtml(item, itemIndex, task, taskIndex) {
   if (task.files && task.files.length > 0) detailHtml += '<div class="plan-task-files">' + task.files.map(escapeHtml).join(', ') + '</div>';
   detailHtml += '</div>';
 
-  return '<div class="plan-task" data-task-key="' + escapeHtml(taskKey) + '">' +
-    headerHtml + detailHtml +
-    '</div>';
+  return '<div class="plan-task" data-task-key="' + escapeHtml(taskKey) + '">' + headerHtml + detailHtml + '</div>';
+}
+
+function _buildPlanScopeHtml(item) {
+  var itemScope = (LOCK_DATA.scope || {})[item.id];
+  if (!itemScope) return '';
+  var entries = (itemScope.must || []).map(function(path) { return '<span class="brk"><span class="plan-scope-must">◆</span> ' + escapeHtml(path) + '</span>'; })
+    .concat((itemScope.may || []).map(function(path) { return '<span class="brk"><span class="plan-scope-may">◇</span> ' + escapeHtml(path) + '</span>'; }));
+  return entries.length ? '<div class="mono dim plan-group-scope">' + entries.join('') + '</div>' : '';
 }
 
 function _buildPlanGroupHtml(item, itemIndex) {
   var tasks = item.tasks || [];
   var done = tasks.filter(function(task) { return task.status === 'done'; }).length;
-  var total = tasks.length;
   var groupKey = item.id || ('group-' + itemIndex);
+  var isCurrent = !!(item.id && state.phase && state.phase.startsWith(item.id + '.'));
 
-  var headerHtml = '<div class="plan-group-header">';
-  if (item.id) {
-    var isCurrent = state.phase && state.phase.startsWith(item.id + '.');
-    headerHtml += '<span class="badge badge-' + (isCurrent ? 'warning' : 'info') + '">' + item.id + '</span> ';
-  }
-  headerHtml += '<span>' + escapeHtml(item.name || t('plan.group')) + '</span>';
-  if (item.mode) headerHtml += ' <span class="badge badge-info">' + escapeHtml(item.mode) + '</span>';
-  headerHtml += '<span class="plan-group-progress">' + t('plan.progress', {done: done, total: total}) + '</span>';
-  var subphaseComment = 'subphase:' + (item.id || '');
-  headerHtml += renderCommentIcon('plan', subphaseComment);
-  headerHtml += '</div>';
-
-  var itemScope = (LOCK_DATA.scope || {})[item.id];
-  if (itemScope) {
-    var scopeHtml = '<div style="padding: 4px 12px 8px; font-size: 0.75rem; color: var(--text-muted);">';
-    var must = itemScope.must || [];
-    var may = itemScope.may || [];
-    if (must.length) scopeHtml += must.map(function(s) { return '<span style="color: var(--danger);">◆</span> ' + escapeHtml(s); }).join(' &nbsp; ');
-    if (may.length) scopeHtml += (must.length ? ' &nbsp; ' : '') + may.map(function(s) { return '<span style="color: var(--text-muted);">◇</span> ' + escapeHtml(s); }).join(' &nbsp; ');
-    scopeHtml += '</div>';
-    headerHtml += scopeHtml;
-  }
+  var headerHtml = '<div class="plan-group-header">' +
+    (item.id ? '<span class="tag' + (isCurrent ? ' plan-group-current' : '') + '">' + escapeHtml(item.id) + '</span>' : '') +
+    '<span class="grow brk plan-group-name">' + escapeHtml(item.name || t('plan.group')) + '</span>' +
+    (item.mode ? '<span class="pill info">' + escapeHtml(item.mode) + '</span>' : '') +
+    '<span class="plan-group-progress">' + t('plan.progress', {done: done, total: tasks.length}) + '</span>' +
+    renderCommentIcon('plan', 'subphase:' + (item.id || '')) +
+    '</div>';
 
   var tasksHtml = tasks.map(function(task, idx) { return _buildPlanTaskHtml(item, itemIndex, task, idx); }).join('');
 
-  return '<div class="plan-group" data-group-key="' + escapeHtml(groupKey) + '">' + headerHtml + tasksHtml + '</div>';
+  return '<div class="plan-group' + (isCurrent ? ' current' : '') + '" data-group-key="' + escapeHtml(groupKey) + '">' +
+    headerHtml + _buildPlanScopeHtml(item) + tasksHtml + '</div>';
+}
+
+function renderPlanDescription() {
+  var container = document.getElementById('planDescription');
+  if (!container) return;
+  var hasItems = ((PLAN_DATA.execution || PLAN_DATA.groups || []).length) > 0;
+  var text = PLAN_DATA.description;
+  morphInnerHTML(container, text
+    ? '<div class="inset plan-description">' + escapeHtml(text) + (hasItems ? '<span class="plan-description-comment">' + renderCommentIcon('plan', 'plan') + '</span>' : '') + '</div>'
+    : '');
+}
+
+function renderPlanGate() {
+  var container = document.getElementById('planGate');
+  var panel = document.getElementById('panel-plan');
+  if (!container) return;
+
+  var gate = getPendingGate();
+  var isPlanGate = !!gate && gate.kind === 'plan';
+  if (panel) panel.classList.toggle('has-gate', isPlanGate);
+  if (!isPlanGate) {
+    container.innerHTML = '';
+    container.dataset.gateKey = '';
+    return;
+  }
+
+  if (container.dataset.gateKey !== gate.phase) {
+    container.dataset.gateKey = gate.phase;
+    container.innerHTML = buildGateCardHtml(gate,
+      '<button class="btn onGate lg" onclick="setPlanStatus(\'rejected\')">' + escapeHtml(t(gate.config.rejectKey)) + '</button>' +
+      '<button class="btn pri lg" onclick="setPlanStatus(\'approved\')">' + cpIcon('check') + escapeHtml(t(gate.config.approveKey)) + '</button>', '');
+  }
+  _refreshGateCardFacts(container, gate);
 }
 
 function renderPlan() {
@@ -594,26 +697,17 @@ function renderPlan() {
 
   renderSystemDiagram();
   renderMermaidDiagram();
+  renderPlanGate();
+  renderPlanDescription();
 
   var items = PLAN_DATA.execution || PLAN_DATA.groups || [];
-  var html = '';
-
-  if (PLAN_DATA.description) {
-    html += '<div class="plan-description">' + escapeHtml(PLAN_DATA.description) + '</div>';
-  }
-
-  if (items.length > 0) {
-    html += '<div style="text-align: right; margin-bottom: 8px;">' + renderCommentIcon('plan', 'plan') + '</div>';
-  }
-
-  items.forEach(function(item, itemIndex) {
-    html += _buildPlanGroupHtml(item, itemIndex);
-  });
-
-  morphInnerHTML(container, html);
+  morphInnerHTML(container, items.length
+    ? items.map(function(item, itemIndex) { return _buildPlanGroupHtml(item, itemIndex); }).join('')
+    : '<div class="empty">' + t('plan.noTasks') + '</div>');
 }
 
 EventBus.on('state:refreshed', renderPlan);
+EventBus.on('approval:changed', renderPlanGate);
 
 document.addEventListener('workspace-reset', function() {
   _lastSystemDiagramSignature = null;

@@ -3,10 +3,18 @@
 // ═══════════════════════════════════════════════
 
 function renderPreplanning() {
+  _attachDiscussionSubmitKey();
   renderPPResearchSummaries();
   renderPPImpactAnalysis();
   renderPPDiscussions();
   renderPPGateActions();
+}
+
+function _attachDiscussionSubmitKey() {
+  var input = document.getElementById('ppNewDiscussionInput');
+  if (!input || input.dataset.submitKey) return;
+  input.dataset.submitKey = '1';
+  attachSubmitKey(input, addPPDiscussion);
 }
 
 // ═══════════════════════════════════════════════
@@ -28,7 +36,8 @@ function renderPPResearchSummaries() {
   if (!container) return;
 
   if (!RESEARCH_DATA || RESEARCH_DATA.length === 0) {
-    morphInnerHTML(container, '<div class="no-items-msg">' + t('preplanning.noResearch') + '</div>');
+    morphInnerHTML(container, '<div class="empty">' + t('preplanning.noResearch') + '</div>');
+    _renderPPResearchTally();
     return;
   }
 
@@ -36,25 +45,37 @@ function renderPPResearchSummaries() {
     var topicName = entry.topic || t('research.untitledResearch');
     var summary = entry.summary || '';
     var proven = entry.proven;
-    var badgeClass = proven === 1 ? 'success' : proven === -1 ? 'danger' : 'warning';
+    var badgeClass = proven === 1 ? 'ok' : proven === -1 ? 'bad' : 'warn';
     var badgeText = proven === 1 ? t('badges.verified') : proven === -1 ? t('badges.rejected') : t('badges.pending');
 
-    var bodyHtml = '<div class="pp-research-card-body" onclick="if(!event.target.closest(\'.pp-comment-btn,.pp-inline-comment-form\'))navigateToResearchEntryById(' + entry.id + ')">' +
-      '<div class="pp-research-topic">' + escapeHtml(topicName) + '</div>' +
-      (summary ? '<div class="pp-research-summary">' + escapeHtml(summary) + '</div>' : '') +
+    var bodyHtml = '<div class="grow pp-research-card-body" onclick="if(!event.target.closest(\'.pp-comment-btn,.pp-inline-comment-form\'))navigateToResearchEntryById(' + entry.id + ')">' +
+      '<div class="ti pp-research-topic">' + escapeHtml(topicName) + '</div>' +
+      (summary ? '<div class="sm dim pp-research-summary">' + escapeHtml(summary) + '</div>' : '') +
       '</div>';
 
-    var actionsHtml = '<div class="pp-research-actions">' +
-      '<span class="badge badge-' + badgeClass + '">' + badgeText + '</span>' +
-      '<button class="pp-comment-btn" onclick="event.stopPropagation(); togglePPInlineComment(this, \'research\', ' + entry.id + ')" title="' + t('comments.addComment') + '">\u{1F4AC}</button>' +
+    var actionsHtml = '<div class="hs pp-research-actions">' +
+      '<span class="pill ' + badgeClass + '">' + badgeText + '</span>' +
+      '<button class="btn ic xs pp-comment-btn" onclick="event.stopPropagation(); togglePPInlineComment(this, \'research\', ' + entry.id + ')" title="' + t('comments.addComment') + '">' + cpIcon('comment', 14) + '</button>' +
       '</div>';
 
-    return '<div class="pp-research-card" id="pp-research-card-' + entry.id + '" data-entry-id="' + entry.id + '">' +
+    return '<div class="row top pp-research-card" id="pp-research-card-' + entry.id + '" data-entry-id="' + entry.id + '">' +
       bodyHtml + actionsHtml +
       '</div>';
   }).join('');
 
   morphInnerHTML(container, html);
+  _renderPPResearchTally();
+}
+
+function _renderPPResearchTally() {
+  var tally = document.getElementById('ppResearchTally');
+  if (!tally) return;
+  var total = (RESEARCH_DATA || []).length;
+  var verified = (RESEARCH_DATA || []).filter(function(e) { return e.proven === 1; }).length;
+  var rejected = (RESEARCH_DATA || []).filter(function(e) { return e.proven === -1; }).length;
+  tally.textContent = !total ? '' : rejected > 0
+    ? t('research.verifiedRejectedCount', {verified: verified, total: total, rejected: rejected})
+    : t('research.verifiedCount', {verified: verified, total: total});
 }
 
 async function navigateToResearchEntry(entry) {
@@ -81,7 +102,7 @@ function renderPPImpactAnalysis() {
 
   var data = AppState.impactAnalysis;
   if (!data) {
-    morphInnerHTML(container, '<div class="pp-impact-empty">' + t('preplanning.noImpactAnalysis') + '</div>');
+    morphInnerHTML(container, '<div class="empty">' + t('preplanning.noImpactAnalysis') + '</div>');
     return;
   }
 
@@ -99,10 +120,10 @@ function renderPPImpactAnalysis() {
     var text = data[s.key];
     if (!text) return;
     parts.push(
-      '<div class="pp-impact-section" id="pp-impact-section-' + s.key + '" data-key="' + s.key + '">' +
-        '<div class="pp-impact-label" style="display: flex; justify-content: space-between; align-items: center;">' +
-          '<span>' + s.label + '</span>' +
-          '<button class="pp-comment-btn" onclick="togglePPInlineComment(this, \'impact\', \'' + s.key + '\')" title="' + t('comments.addComment') + '">\u{1F4AC}</button>' +
+      '<div class="inset pp-impact-section" id="pp-impact-section-' + s.key + '" data-key="' + s.key + '">' +
+        '<div class="hs between pp-impact-label">' +
+          '<span class="cap">' + s.label + '</span>' +
+          '<button class="btn ic xs pp-comment-btn" onclick="togglePPInlineComment(this, \'impact\', \'' + s.key + '\')" title="' + t('comments.addComment') + '">' + cpIcon('comment', 14) + '</button>' +
         '</div>' +
         '<div class="pp-impact-text">' + (typeof marked !== 'undefined' ? DOMPurify.sanitize(marked.parse(text, { breaks: true, gfm: true })) : escapeHtml(text)) + '</div>' +
       '</div>'
@@ -110,11 +131,11 @@ function renderPPImpactAnalysis() {
   });
 
   if (parts.length === 0) {
-    morphInnerHTML(container, '<div class="pp-impact-empty">' + t('preplanning.noImpactAnalysis') + '</div>');
+    morphInnerHTML(container, '<div class="empty">' + t('preplanning.noImpactAnalysis') + '</div>');
     return;
   }
 
-  morphInnerHTML(container, parts.join(''));
+  morphInnerHTML(container, '<div class="pp-impact-grid">' + parts.join('') + '</div>');
   renderMermaidBlocks(container);
 }
 
@@ -129,6 +150,7 @@ function togglePPResolved() {
   ppShowResolved = !ppShowResolved;
   var btn = document.getElementById('ppToggleResolved');
   if (btn) btn.textContent = ppShowResolved ? t('discussions.hideResolved') : t('discussions.showResolved');
+  if (btn) btn.classList.toggle('on', ppShowResolved);
   renderPPDiscussions();
 }
 
@@ -136,6 +158,7 @@ function togglePPProven() {
   ppShowProven = !ppShowProven;
   var btn = document.getElementById('ppToggleProven');
   if (btn) btn.textContent = ppShowProven ? t('discussions.hideProven') : t('discussions.showProven');
+  if (btn) btn.classList.toggle('on', ppShowProven);
   renderPPDiscussions();
 }
 
@@ -159,7 +182,7 @@ function renderPPDiscussions() {
   if (badge) {
     var openCount = discussions.filter(function(d) { return d.status === 'open'; }).length;
     badge.textContent = openCount > 0 ? openCount : discussions.length;
-    badge.className = 'badge ' + (openCount > 0 ? 'badge-warning' : 'badge-success');
+    badge.className = 'pill ' + (openCount > 0 ? 'warn' : 'ok');
   }
 
   var researchBadge = document.getElementById('ppResearchDiscBadge');
@@ -174,7 +197,7 @@ function renderPPDiscussions() {
   }
 
   if (discussions.length === 0) {
-    morphInnerHTML(container, '<div class="no-items-msg">' + t('discussions.noItems') + '</div>');
+    morphInnerHTML(container, '<div class="empty">' + t('discussions.noItems') + '</div>');
     return;
   }
 
@@ -194,58 +217,36 @@ function renderPPDiscussions() {
     if (!isResearch && isResolved && !ppShowResolved) return;
 
     var author = d.author || 'user';
-    var authorBadge = '<span class="qa-author qa-author-' + author + '">' + author + '</span>';
-
-    var typeBadge = isResearch
-      ? '<span class="badge" style="font-size:0.6rem;background:var(--warning-dim);color:var(--warning);">' + t('badges.research') + '</span>'
-      : '<span class="badge" style="font-size:0.6rem;background:var(--info-dim);color:var(--info);">' + t('discussionType.general') + '</span>';
-
-    var statusBadge;
-    if (isResearch) {
-      statusBadge = proven
-        ? '<span class="badge badge-success" style="font-size:0.65rem;">' + t('badges.verified') + '</span>'
-        : '<span class="badge badge-warning" style="font-size:0.65rem;">' + t('badges.pending') + '</span>';
-    } else {
-      statusBadge = isResolved
-        ? '<span class="badge badge-success" style="font-size:0.65rem;">' + t('badges.resolved') + '</span>'
-        : '<span class="badge badge-warning" style="font-size:0.65rem;">' + t('badges.open') + '</span>';
-    }
+    var isAgent = author === 'agent';
+    var typeLabel = isResearch ? t('badges.research') : t('discussionType.general');
+    var statusLabel = isResearch ? (proven ? t('badges.verified') : t('badges.pending')) : (isResolved ? t('badges.resolved') : t('badges.open'));
 
     var resolveBtn = isResolved
-      ? '<button class="btn btn-sm" style="font-size:0.65rem;padding:1px 6px" onclick="resolveDiscussion(' + d.id + ', true)">' + t('buttons.unresolve') + '</button>'
-      : '<button class="btn btn-sm" style="font-size:0.65rem;padding:1px 6px" onclick="resolveDiscussion(' + d.id + ')">' + t('buttons.resolve') + '</button>';
+      ? '<button class="btn xs" onclick="resolveDiscussion(' + d.id + ', true)">' + t('buttons.unresolve') + '</button>'
+      : '<button class="btn xs" onclick="resolveDiscussion(' + d.id + ')">' + t('buttons.resolve') + '</button>';
 
-    var repliesHtml = '';
-    if (d.replies && d.replies.length > 0) {
-      repliesHtml = '<div style="margin-top: 6px; padding-left: 16px; border-left: 2px solid var(--border);">';
-      d.replies.forEach(function(reply) {
-        var replyAuthorBadge = reply.author === 'agent'
-          ? '<span class="badge badge-accent" style="font-size: 10px;">' + t('author.agent') + '</span>'
-          : '<span class="badge" style="font-size: 10px;">' + t('author.user') + '</span>';
-        repliesHtml += '<div style="padding: 4px 0; font-size: 13px;">' + replyAuthorBadge + ' ' + escapeHtml(reply.text) + '</div>';
-      });
-      repliesHtml += '</div>';
-    }
+    var repliesHtml = (d.replies || []).map(function(reply) {
+      var replyAuthor = reply.author === 'agent' ? t('author.agent') : t('author.user');
+      return '<div class="pp-reply"><span class="cap">' + escapeHtml(replyAuthor) + '</span> ' + escapeHtml(reply.text) + '</div>';
+    }).join('');
 
-    var replyFormHtml = '';
-    if (d.status !== 'resolved') {
-      replyFormHtml =
-        '<div style="margin-top: 6px; display: flex; gap: 4px;">' +
-          '<input type="text" class="context-input" id="ppReplyInput' + d.id + '" placeholder="' + t('placeholders.reply') + '" style="flex:1; font-size: 0.78rem; padding: 4px 8px;" onkeydown="if(event.key===\'Enter\'){event.preventDefault();ppReplyToDiscussion(' + d.id + ');}">' +
-          '<button class="btn btn-sm" style="font-size:0.65rem;padding:2px 8px;" onclick="ppReplyToDiscussion(' + d.id + ')">' + t('buttons.reply') + '</button>' +
-        '</div>';
-    }
+    var replyFormHtml = isResolved ? '' :
+      '<div class="hs pp-reply-form">' +
+        '<input type="text" class="inp" id="ppReplyInput' + d.id + '" placeholder="' + t('placeholders.reply') + '" onkeydown="if(event.key===\'Enter\'){event.preventDefault();ppReplyToDiscussion(' + d.id + ');}">' +
+        '<button class="btn xs" onclick="ppReplyToDiscussion(' + d.id + ')">' + t('buttons.reply') + '</button>' +
+      '</div>';
 
     parts.push(
-      '<div class="pp-discussion-item' + (isResolved || proven ? ' pp-resolved' : '') + '" id="pp-discussion-' + d.id + '" data-discussion-id="' + d.id + '">' +
-        '<div class="pp-discussion-header">' +
-          '<span class="qa-id">#' + d.id + '</span>' +
-          authorBadge +
-          '<span class="pp-discussion-text">' + escapeHtml(d.text) + '</span>' +
-          '<div class="pp-discussion-meta">' + typeBadge + statusBadge + resolveBtn + '</div>' +
+      '<div class="cmt pp-discussion-item' + (isResolved || proven ? ' pp-resolved' : '') + '" id="pp-discussion-' + d.id + '" data-discussion-id="' + d.id + '">' +
+        '<span class="av ' + (isAgent ? 'ag' : '') + '">' + escapeHtml(isAgent ? 'A' : 'I') + '</span>' +
+        '<div class="grow vs g4">' +
+          '<div class="hs wrap"><b>' + escapeHtml(isAgent ? t('author.agent') : t('author.user')) + '</b>' +
+            '<span class="sm dim">' + escapeHtml(typeLabel) + ' · ' + escapeHtml(statusLabel) + ' · #' + d.id + '</span></div>' +
+          '<div class="brk pp-discussion-text">' + escapeHtml(d.text) + '</div>' +
+          repliesHtml +
+          '<div class="hs wrap">' + resolveBtn + '</div>' +
+          replyFormHtml +
         '</div>' +
-        repliesHtml +
-        replyFormHtml +
       '</div>'
     );
   });
@@ -294,22 +295,23 @@ function renderPPGateActions() {
   var container = document.getElementById('ppGateActions');
   if (!container) return;
 
-  if (state.phase !== '1.4') {
-    container.style.display = 'none';
+  var gate = getPendingGate();
+  if (!gate || gate.phase !== '1.4') {
     container.innerHTML = '';
+    container.dataset.gateKey = '';
     return;
   }
 
-  container.style.display = '';
-  container.innerHTML =
-    '<div class="pp-section-title">' + t('preplanning.preplanningApproval') + '</div>' +
-    '<p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 10px;">' + t('preplanning.approvalDescription') + '</p>' +
-    '<textarea id="ppRejectFeedback" placeholder="' + t('placeholders.feedbackForChanges') + '" style="font-family: var(--font-mono); font-size: 0.82rem; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); outline: none; resize: vertical; min-height: 50px; width: 100%; margin-bottom: 10px;"></textarea>' +
-    '<div class="pp-gate-actions">' +
-      '<button class="btn btn-primary" onclick="ppApprove()">' + t('preplanning.approvePreplanning') + '</button>' +
-      '<button class="btn btn-danger" onclick="ppReject()">' + t('preplanning.rejectPreplanning') + '</button>' +
-    '</div>';
-  attachSubmitKey(container.querySelector('#ppRejectFeedback'), ppReject);
+  if (container.dataset.gateKey !== gate.phase) {
+    container.dataset.gateKey = gate.phase;
+    container.innerHTML = buildGateCardHtml(gate,
+      '<button class="btn onGate lg" onclick="ppReject()">' + escapeHtml(t(gate.config.rejectKey)) + '</button>' +
+      '<button class="btn pri lg" onclick="ppApprove()">' + cpIcon('check') + escapeHtml(t(gate.config.approveKey)) + '</button>',
+      '<div class="wide"><label class="lbl">' + escapeHtml(t('gate.feedbackLabel')) +
+        '<textarea class="ta" id="ppRejectFeedback" placeholder="' + escapeHtml(t('placeholders.feedbackForChanges')) + '"></textarea></label></div>');
+    attachSubmitKey(container.querySelector('#ppRejectFeedback'), ppReject);
+  }
+  _refreshGateCardFacts(container, gate);
 }
 
 async function ppApprove() {

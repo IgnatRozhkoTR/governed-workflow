@@ -105,57 +105,22 @@
 }
 
 /* Results */
-.verification-run { margin-top: 8px; }
-.run-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 0;
-    font-size: 0.78rem;
-}
-.run-status-badge {
-    font-size: 0.68rem;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 3px;
-}
-.run-passed .run-status-badge { background: rgba(76, 175, 80, 0.15); color: #66bb6a; }
-.run-failed .run-status-badge { background: rgba(244, 67, 54, 0.15); color: #ef5350; }
-.run-phase { color: var(--text-secondary); }
-.run-time { color: var(--text-muted); font-size: 0.72rem; margin-left: auto; }
-
-.verification-result-step {
-    padding: 4px 8px;
-    margin: 2px 0;
-    border-radius: var(--radius-sm);
-    font-size: 0.78rem;
-}
-.result-step-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.result-step-status {
-    font-size: 0.65rem;
-    font-weight: 700;
-    min-width: 60px;
-}
-.result-passed .result-step-status { color: #66bb6a; }
-.result-failed .result-step-status { color: #ef5350; }
-.result-warning .result-step-status { color: #ffa726; }
-.result-skipped .result-step-status { color: var(--text-muted); }
-
-.result-step-name { color: var(--text-secondary); }
-
+.verification-run { display: flex; flex-direction: column; gap: 10px; }
+.verification-result-step { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.result-step-header { display: flex; align-items: center; gap: 12px; }
+.result-step-status { flex: none; }
+.result-step-name { color: var(--tx); overflow-wrap: anywhere; }
 .step-output {
-    margin: 4px 0 0 0;
-    padding: 6px 8px;
-    font-size: 0.72rem;
-    background: var(--bg-primary);
-    border-radius: var(--radius-sm);
-    max-height: 150px;
+    margin: 0;
+    padding: 10px 14px;
+    font-family: var(--f-mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    background: var(--sf2);
+    border-radius: var(--r-md);
+    max-height: 160px;
     overflow-y: auto;
     white-space: pre-wrap;
-    word-break: break-all;
-    color: var(--text-muted);
+    overflow-wrap: anywhere;
+    color: var(--dim);
 }

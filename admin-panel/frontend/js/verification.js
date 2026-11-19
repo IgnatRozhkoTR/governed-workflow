@@ -103,38 +103,43 @@ function renderProfileSelector() {
     });
 }
 
+var VERIFICATION_STEP_PILLS = { passed: 'ok', failed: 'bad', error: 'bad', warning: 'warn' };
+
+function _buildVerificationStepHtml(step) {
+    var pillClass = VERIFICATION_STEP_PILLS[step.status] || '';
+    var durationStr = step.duration_ms ? ' (' + (step.duration_ms / 1000).toFixed(1) + 's)' : '';
+    var statusLabel = t('verification.status.' + step.status);
+    var outputHtml = step.output ? '<pre class="step-output">' + escapeHtml(step.output) + '</pre>' : '';
+    return '<div class="verification-result-step result-' + escapeHtml(step.status) + '">'
+        + '<div class="result-step-header">'
+        + '<span class="pill ' + pillClass + ' result-step-status">' + escapeHtml(statusLabel) + '</span>'
+        + '<span class="result-step-name">' + escapeHtml(step.profile_name) + ' / ' + escapeHtml(step.step_name) + durationStr + '</span>'
+        + '</div>'
+        + outputHtml
+        + '</div>';
+}
+
+function _renderVerificationMeta(run) {
+    var meta = document.getElementById('verificationMeta');
+    if (!meta) return;
+    if (!run) { meta.textContent = ''; return; }
+    var when = run.completed_at || run.started_at;
+    meta.textContent = t('verification.runMeta', {phase: run.phase, when: when ? formatRelativeDate(when) : ''}).replace(/ · $/, '');
+}
+
 function renderVerificationResults() {
     var container = document.getElementById('verificationResults');
     if (!container) return;
 
     if (!VERIFICATION_RESULTS || !VERIFICATION_RESULTS.steps) {
-        container.innerHTML = '<div class="no-items-msg">' + t('verification.noRuns') + '</div>';
+        _renderVerificationMeta(null);
+        container.innerHTML = '<div class="empty">' + t('verification.noRuns') + '</div>';
         return;
     }
 
-    var run = VERIFICATION_RESULTS;
-    var statusClass = 'run-' + run.status;
-
-    var stepsHtml = (run.steps || []).map(function(step) {
-        var stepClass = 'result-' + step.status;
-        var outputHtml = step.output ? '<pre class="step-output">' + escapeHtml(step.output) + '</pre>' : '';
-        var durationStr = step.duration_ms ? ' (' + (step.duration_ms / 1000).toFixed(1) + 's)' : '';
-        return '<div class="verification-result-step ' + stepClass + '">'
-            + '<div class="result-step-header">'
-            + '<span class="result-step-status">' + step.status.toUpperCase() + '</span>'
-            + '<span class="result-step-name">' + escapeHtml(step.profile_name) + ' / ' + escapeHtml(step.step_name) + durationStr + '</span>'
-            + '</div>'
-            + outputHtml
-            + '</div>';
-    }).join('');
-
-    container.innerHTML = '<div class="verification-run ' + statusClass + '">'
-        + '<div class="run-header">'
-        + '<span class="run-status-badge">' + run.status.toUpperCase() + '</span>'
-        + '<span class="run-phase">Phase ' + escapeHtml(run.phase) + '</span>'
-        + '<span class="run-time">' + (run.completed_at || run.started_at) + '</span>'
-        + '</div>'
-        + stepsHtml
+    _renderVerificationMeta(VERIFICATION_RESULTS);
+    container.innerHTML = '<div class="verification-run run-' + escapeHtml(VERIFICATION_RESULTS.status) + '">'
+        + (VERIFICATION_RESULTS.steps || []).map(_buildVerificationStepHtml).join('')
         + '</div>';
 }
 
@@ -184,7 +189,7 @@ async function runVerificationManual() {
     var ctx = getWorkspaceContext();
     if (!ctx) return;
     var btn = document.getElementById('runVerificationBtn');
-    if (btn) { btn.disabled = true; btn.textContent = t('verification.running'); }
+    if (btn) { btn.disabled = true; btn.lastElementChild.textContent = t('verification.running'); }
     try {
         var resp = await apiPost('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/verification/run', {});
         VERIFICATION_RESULTS = resp.steps ? resp : null;
@@ -196,6 +201,6 @@ async function runVerificationManual() {
     } catch(e) {
         if (typeof showToast === 'function') showToast(t('verification.runError') + ': ' + e.message);
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = t('verification.run'); }
+        if (btn) { btn.disabled = false; btn.lastElementChild.textContent = t('verification.run'); }
     }
 }
