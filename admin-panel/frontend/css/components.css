@@ -248,3 +248,21 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--pr); }
   opacity: 0; transform: translateX(-50%) translateY(20px); transition: all 0.25s ease; pointer-events: none;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ─── Small layout helpers used by generated markup ─── */
+.inline-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.inline-check--module { padding: 4px 0; }
+.inline-check--module label { font-size: 0.82rem; color: var(--tx); cursor: pointer; }
+.hint-text { color: var(--dim); font-size: 0.78rem; }
+.hint-text--block { margin: 10px 0 0; }
+.hint-text--lg { font-size: 0.82rem; }
+.setup-lang-item { display: flex; align-items: center; gap: 8px; }
+.setup-lang-item > .ws-checkbox-label { flex: 1; }
+.setup-lang-name { font-size: 0.82rem; }
+.commit-list-preview { font-size: 0.75rem; color: var(--dim); background: var(--bg); padding: 8px 10px; border-radius: var(--r-sm); margin: 0; overflow: auto; max-height: 80px; }
+.finding-snippet--web { border-left-color: var(--warn); }
+.file-preview-line.is-highlighted { background: var(--prbg); }
+.btn.block-btn { margin-top: 12px; width: 100%; justify-content: center; }
+.selector-toolbar { position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; align-items: center; z-index: 10; }
+.reconnect-overlay { position: fixed; inset: 0; background: var(--scrim); color: var(--tx); display: flex; align-items: center; justify-content: center; z-index: 9999; font-size: 1rem; padding: 24px; text-align: center; backdrop-filter: blur(4px); }
+.reconnect-overlay__title { margin-bottom: 12px; font-weight: 600; }

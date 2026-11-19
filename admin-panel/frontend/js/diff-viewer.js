@@ -1028,11 +1028,10 @@ function _showHistoryDialog(options) {
     var overlay = document.createElement('div');
     overlay.id = 'historyDialogOverlay';
     overlay.className = 'file-preview-modal open';
-    overlay.style.zIndex = '10100';
+    overlay.classList.add('history-dialog-overlay');
 
     var content = document.createElement('div');
-    content.className = 'file-preview-content';
-    content.style.maxWidth = '480px';
+    content.className = 'file-preview-content history-dialog';
 
     var header = document.createElement('div');
     header.className = 'file-preview-header';
@@ -1043,16 +1042,11 @@ function _showHistoryDialog(options) {
     content.appendChild(header);
 
     var body = document.createElement('div');
-    body.className = 'file-preview-body';
-    body.style.display = 'flex';
-    body.style.flexDirection = 'column';
-    body.style.gap = '10px';
+    body.className = 'file-preview-body history-dialog-body';
 
     if (options.message) {
       var msg = document.createElement('p');
-      msg.style.margin = '0';
-      msg.style.fontSize = '0.85rem';
-      msg.style.color = 'var(--dim)';
+      msg.className = 'history-dialog-message';
       msg.textContent = options.message;
       body.appendChild(msg);
     }
@@ -1066,37 +1060,18 @@ function _showHistoryDialog(options) {
     var inputEl = null;
     if (options.inputLabel) {
       var lbl = document.createElement('label');
-      lbl.style.fontSize = '0.78rem';
-      lbl.style.fontWeight = '600';
-      lbl.style.color = 'var(--dim)';
+      lbl.className = 'history-dialog-label';
       lbl.textContent = options.inputLabel;
       body.appendChild(lbl);
 
       if (options.textarea) {
         inputEl = document.createElement('textarea');
         inputEl.rows = 5;
-        inputEl.style.width = '100%';
-        inputEl.style.boxSizing = 'border-box';
-        inputEl.style.fontFamily = 'var(--f-mono)';
-        inputEl.style.fontSize = '0.8rem';
-        inputEl.style.padding = '8px 10px';
-        inputEl.style.border = '1px solid var(--ln)';
-        inputEl.style.borderRadius = 'var(--r-sm)';
-        inputEl.style.background = 'var(--bg)';
-        inputEl.style.color = 'var(--tx)';
-        inputEl.style.resize = 'vertical';
+        inputEl.className = 'history-dialog-input';
       } else {
         inputEl = document.createElement('input');
         inputEl.type = 'text';
-        inputEl.style.width = '100%';
-        inputEl.style.boxSizing = 'border-box';
-        inputEl.style.fontFamily = 'var(--f-mono)';
-        inputEl.style.fontSize = '0.85rem';
-        inputEl.style.padding = '8px 10px';
-        inputEl.style.border = '1px solid var(--ln)';
-        inputEl.style.borderRadius = 'var(--r-sm)';
-        inputEl.style.background = 'var(--bg)';
-        inputEl.style.color = 'var(--tx)';
+        inputEl.className = 'history-dialog-input';
       }
       if (options.inputValue !== undefined) inputEl.value = options.inputValue;
       body.appendChild(inputEl);
@@ -1229,7 +1204,7 @@ async function historySquash() {
 
   var editedMessage = await _showHistoryDialog({
     title: t('history.dialogs.squashTitle', { count: count }),
-    extraHtml: '<pre style="font-size:0.75rem;color:var(--dim);background:var(--bg);padding:8px 10px;border-radius:var(--r-sm);margin:0;overflow:auto;max-height:80px;">' + commitList + '</pre>',
+    extraHtml: '<pre class="commit-list-preview">' + commitList + '</pre>',
     inputLabel: t('history.dialogs.squashMessage'),
     inputValue: defaultMessage,
     textarea: true,

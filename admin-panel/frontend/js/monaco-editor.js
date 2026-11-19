@@ -165,7 +165,7 @@ function createEditor(container, content, language, filePath, readOnly) {
       minimap: { enabled: !PHONE_LAYOUT_QUERY.matches },
       scrollBeyondLastLine: false,
       fontSize: 13,
-      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+      fontFamily: "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace",
       lineNumbers: 'on',
       renderWhitespace: 'selection',
       wordWrap: 'on'

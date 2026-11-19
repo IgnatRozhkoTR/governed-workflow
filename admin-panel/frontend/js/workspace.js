@@ -459,7 +459,7 @@ async function createWorkspace(projectId) {
       <span class="ws-result-value">${_wsEscape(result.working_dir)}</span>
     </div>`;
   }
-  resultHtml += `<button class="btn pri" style="margin-top: 12px; width: 100%; justify-content: center;" onclick="openWorkspace('${_wsEscape(projectId)}', '${_wsEscape(branch)}')">${t('buttons.openWorkspace')}</button>`;
+  resultHtml += `<button class="btn pri block-btn" onclick="openWorkspace('${_wsEscape(projectId)}', '${_wsEscape(branch)}')">${t('buttons.openWorkspace')}</button>`;
   resultHtml += '</div>';
 
   resultEl.innerHTML = resultHtml;
@@ -619,7 +619,7 @@ function _wsInitSelector() {
   if (!document.getElementById('selector-toolbar')) {
     var toolbar = document.createElement('div');
     toolbar.id = 'selector-toolbar';
-    toolbar.style.cssText = 'position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; align-items: center; z-index: 10;';
+    toolbar.className = 'selector-toolbar';
     toolbar.innerHTML = '<select class="btn locale-select" id="selectorLocaleSelect" onchange="onSelectorLocaleChange(this.value)"><option value="en">EN</option><option value="ru">RU</option></select>'
       + '<button class="btn ic" onclick="toggleTheme()" title="' + escapeHtml(t('shell.switchTheme')) + '" aria-label="' + escapeHtml(t('shell.switchTheme')) + '" id="selectorThemeBtn"></button>';
     selector.appendChild(toolbar);

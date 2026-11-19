@@ -826,3 +826,11 @@ td.ann-gutter-stale { box-shadow: inset 3px 0 0 var(--dim); }
 .history-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
 .explorer-dir-status { padding: 6px 14px; font-size: 12px; color: var(--dim); }
 .explorer-dir-status.bad { color: var(--bad); }
+
+.history-dialog-overlay { z-index: 10100; }
+.history-dialog { max-width: 480px; }
+.history-dialog-body { display: flex; flex-direction: column; gap: 10px; }
+.history-dialog-message { margin: 0; font-size: 0.85rem; color: var(--dim); }
+.history-dialog-label { font-size: 0.78rem; font-weight: 600; color: var(--dim); }
+.history-dialog-input { width: 100%; box-sizing: border-box; font-family: var(--f-mono); font-size: 0.8rem; padding: 8px 10px; border: 1px solid var(--ln); border-radius: var(--r-sm); background: var(--bg); color: var(--tx); }
+textarea.history-dialog-input { resize: vertical; }

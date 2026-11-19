@@ -486,7 +486,6 @@ function expandDiagram(containerId) {
     if (definition) {
       var wrapper = document.createElement('div');
       wrapper.className = 'diagram-overlay-diagram';
-      wrapper.style.cssText = 'width: 100%; overflow: visible; cursor: grab;';
       body.appendChild(wrapper);
 
       // Replace literal \n with <br/> for Mermaid line breaks
@@ -514,7 +513,6 @@ function expandDiagram(containerId) {
       }
       var wrapper = document.createElement('div');
       wrapper.className = 'diagram-overlay-diagram';
-      wrapper.style.cssText = 'width: 100%; overflow: visible; cursor: grab;';
       body.appendChild(wrapper);
 
       // Get the original mermaid source from the section's data attribute or re-extract
@@ -533,7 +531,6 @@ function expandDiagram(containerId) {
     if (svg) {
       var wrapper = document.createElement('div');
       wrapper.className = 'diagram-overlay-diagram';
-      wrapper.style.cssText = 'width: 100%; overflow: visible; cursor: grab;';
       var clone = svg.cloneNode(true);
       _deduplicateSvgIds(clone, 'overlay_' + containerId);
       wrapper.appendChild(clone);

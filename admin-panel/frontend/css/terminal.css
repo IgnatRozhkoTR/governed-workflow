@@ -375,7 +375,7 @@
 [data-theme="light"] #terminalContainer .xterm-fg-231,
 [data-theme="light"] #splitTerminalContainer .xterm-fg-231,
 [data-theme="light"] .xterm-rows .xterm-fg-231 {
-  color: #1a1a18 !important;
+  color: var(--termtx) !important;
 }
 
 /* User message background — green accent matching the app logo */
@@ -427,7 +427,7 @@
 [data-theme="light"] #terminalContainer .xterm-bg-235,
 [data-theme="light"] #splitTerminalContainer .xterm-bg-235,
 [data-theme="light"] .xterm-rows .xterm-bg-235 {
-  background-color: #faf8f5 !important;
+  background-color: var(--term) !important;
 }
 
 /* Deleted line background */
@@ -529,7 +529,7 @@
 [data-theme="dark"] #terminalContainer .xterm-bg-235,
 [data-theme="dark"] #splitTerminalContainer .xterm-bg-235,
 [data-theme="dark"] .xterm-rows .xterm-bg-235 {
-  background-color: #1a1a2e !important;
+  background-color: var(--term) !important;
 }
 
 .term-esc-btn { font-size: 12px; font-weight: 600; }

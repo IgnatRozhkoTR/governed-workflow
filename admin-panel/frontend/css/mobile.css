@@ -138,22 +138,12 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 
-
   .context-row {
     flex-direction: column;
     gap: 8px;
   }
 
   .context-field {
-    width: 100%;
-  }
-
-  .qa-add-form {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .qa-add-form .context-input {
     width: 100%;
   }
 
@@ -237,7 +227,6 @@
   .research-actions { margin-left: auto; }
   .research-action-btn.btn.ic.xs { width: 44px; min-height: 44px; }
 
-  .pp-gate-actions { flex-direction: column; }
   #panel-preplanning .card > .ch { cursor: pointer; min-height: 56px; }
   #panel-preplanning .card > .ch::after { content: ''; flex: none; width: 8px; height: 8px; margin: 0 4px 0 2px; border: solid var(--dim); border-width: 0 2px 2px 0; transform: rotate(-135deg) translate(-2px, -2px); transition: transform var(--transition); }
   #panel-preplanning .card.collapsed > .ch::after { transform: rotate(45deg); }
@@ -295,7 +284,7 @@
     justify-content: center;
     cursor: pointer;
     opacity: 0.85;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shpop);
   }
 
   .term-scroll-btn:active {
@@ -322,27 +311,9 @@
     gap: 10px;
   }
 
-  .project-card-actions {
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .pp-discussion-header {
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .pp-discussion-meta {
-    align-self: flex-start;
-  }
-
   .pp-inline-comment-form {
     flex-direction: column;
     gap: 4px;
-  }
-
-  .review-thread-header {
-    flex-wrap: wrap;
   }
 
   .review-reply-form {

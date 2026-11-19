@@ -99,12 +99,7 @@ function _buildSessionTerminalWsUrl(sessionName) {
 
 var TERMINAL_THEMES = {
   dark: {
-    background: '#1a1a2e',
-    foreground: '#e0e0e0',
-    cursor: '#e0e0e0',
-    cursorAccent: '#1a1a2e',
-    selectionBackground: 'rgba(255, 255, 255, 0.15)',
-    black: '#2a2a3e',
+    black: '#243040',
     red: '#ff6b6b',
     green: '#51cf66',
     yellow: '#ffd43b',
@@ -122,11 +117,6 @@ var TERMINAL_THEMES = {
     brightWhite: '#ffffff'
   },
   light: {
-    background: '#faf8f5',
-    foreground: '#2c2c2c',
-    cursor: '#2c2c2c',
-    cursorAccent: '#faf8f5',
-    selectionBackground: 'rgba(0, 0, 0, 0.1)',
     black: '#2c2c2c',
     red: '#c92a2a',
     green: '#2b8a3e',
@@ -134,7 +124,7 @@ var TERMINAL_THEMES = {
     blue: '#1864ab',
     magenta: '#862e9c',
     cyan: '#0c8599',
-    white: '#faf8f5',
+    white: '#F3F4F1',
     brightBlack: '#868e96',
     brightRed: '#e03131',
     brightGreen: '#37b24d',
@@ -153,10 +143,11 @@ function getTerminalTheme() {
   var background = styles.getPropertyValue('--term').trim();
   var foreground = styles.getPropertyValue('--termtx').trim();
   return Object.assign({}, palette, {
-    background: background || palette.background,
-    foreground: foreground || palette.foreground,
-    cursor: foreground || palette.cursor,
-    cursorAccent: background || palette.cursorAccent
+    background: background,
+    foreground: foreground,
+    cursor: foreground,
+    cursorAccent: background,
+    selectionBackground: styles.getPropertyValue('--sf3').trim()
   });
 }
 

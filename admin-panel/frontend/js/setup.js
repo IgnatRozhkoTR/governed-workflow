@@ -199,20 +199,20 @@ function renderSetupLanguages(profiles) {
     var name = _wsEscape(profile.name || '');
     var language = _wsEscape(profile.language || '');
 
-    return '<div class="setup-lang-item" style="display: flex; align-items: center; gap: 8px;">'
-      + '<label class="ws-checkbox-label" style="flex: 1;">'
+    return '<div class="setup-lang-item">'
+      + '<label class="ws-checkbox-label">'
       + '<input type="checkbox" class="setup-language-checkbox" data-profile-id="' + id + '">'
       + '<span>' + name + '</span>'
-      + (language ? '<span style="color: var(--dim); font-size: 0.78rem;">(' + language + ')</span>' : '')
+      + (language ? '<span class="hint-text">(' + language + ')</span>' : '')
       + '</label>'
       + '<button class="btn xs danger" onclick="deleteVerificationProfile(' + id + ')">&times;</button>'
       + '</div>';
   }).join('');
 
   var customHtml = _setupCustomProfiles.map(function(cp, index) {
-    return '<div class="setup-lang-item" style="display: flex; align-items: center; gap: 8px;">'
-      + '<span style="font-size: 0.82rem;">' + _wsEscape(cp.name) + '</span>'
-      + (cp.config ? '<span style="color: var(--dim); font-size: 0.78rem;">(' + _wsEscape(cp.config) + ')</span>' : '')
+    return '<div class="setup-lang-item">'
+      + '<span class="setup-lang-name">' + _wsEscape(cp.name) + '</span>'
+      + (cp.config ? '<span class="hint-text">(' + _wsEscape(cp.config) + ')</span>' : '')
       + '<span class="pill info">custom</span>'
       + '<button class="btn xs ml-auto" onclick="removeCustomProfile(' + index + ')">' + t('setup.removeToolBtn') + '</button>'
       + '</div>';

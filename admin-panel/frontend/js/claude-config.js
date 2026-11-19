@@ -142,9 +142,9 @@ async function loadModulesCard() {
 
     var html = modules.map(function(mod) {
       var checked = enabledSet[mod.id] ? 'checked' : '';
-      return '<div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">'
+      return '<div class="inline-check inline-check--module">'
         + '<input type="checkbox" id="module-' + escapeHtml(mod.id) + '" data-module-id="' + escapeHtml(mod.id) + '" ' + checked + ' onchange="saveModuleToggle()">'
-        + '<label for="module-' + escapeHtml(mod.id) + '" style="font-size: 0.82rem; color: var(--tx); cursor: pointer;">' + escapeHtml(mod.name) + '</label>'
+        + '<label for="module-' + escapeHtml(mod.id) + '">' + escapeHtml(mod.name) + '</label>'
         + '</div>';
     }).join('');
 

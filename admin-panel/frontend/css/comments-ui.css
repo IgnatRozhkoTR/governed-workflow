@@ -180,7 +180,7 @@
 .comment-resolve-btn.resolved {
   background: var(--ok);
   border-color: var(--ok);
-  color: #fff;
+  color: var(--bg);
 }
 
 .comment-thread-item.comment-resolved .comment-thread-text {

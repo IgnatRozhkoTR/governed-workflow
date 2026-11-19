@@ -76,8 +76,8 @@
     border-radius: 3px;
     white-space: nowrap;
 }
-.severity-blocking { background: rgba(244, 67, 54, 0.15); color: #ef5350; }
-.severity-warning { background: rgba(255, 152, 0, 0.15); color: #ffa726; }
+.severity-blocking { background: var(--badbg); color: var(--badtx); }
+.severity-warning { background: var(--warnbg); color: var(--warntx); }
 
 .verification-assign-row {
     display: flex;

@@ -15,7 +15,7 @@ async function renderNetworkMode() {
     info = await apiGetNetworkMode();
   } catch (e) {
     host.innerHTML = _networkModeSubsectionTitle() +
-      '<div style="color: var(--dim); font-size: 0.82rem;">' +
+      '<div class="hint-text hint-text--lg">' +
       escapeHtml(t('networkMode.unavailable')) + '</div>';
     return;
   }
@@ -30,15 +30,15 @@ async function renderNetworkMode() {
     : '<em>' + escapeHtml(t('networkMode.noLan')) + '</em>';
 
   host.innerHTML = _networkModeSubsectionTitle() +
-    '<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">' +
+    '<label class="inline-check">' +
       '<input type="checkbox" id="networkModeToggle"' + (enabled ? ' checked' : '') + '>' +
-      '<span style="font-size: 0.85rem;">' + escapeHtml(t('networkMode.allowAccess')) + '</span>' +
+      '<span>' + escapeHtml(t('networkMode.allowAccess')) + '</span>' +
     '</label>' +
-    '<p style="margin: 10px 0 0; color: var(--dim); font-size: 0.78rem;">' +
+    '<p class="hint-text hint-text--block">' +
       escapeHtml(t('networkMode.explain')) +
     '</p>' +
     (enabled
-      ? '<p style="margin: 10px 0 0; color: var(--dim); font-size: 0.78rem;">' +
+      ? '<p class="hint-text hint-text--block">' +
         escapeHtml(t('networkMode.reach')) + ' ' + lanList + '</p>'
       : '');
 
@@ -80,14 +80,14 @@ function showReconnectingOverlay(nowNetworkMode) {
 
   var div = document.createElement('div');
   div.id = 'reconnect-overlay';
-  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);color:#fff;display:flex;align-items:center;justify-content:center;z-index:9999;font-size:1rem;padding:24px;text-align:center;';
+  div.className = 'reconnect-overlay';
   var sub = nowNetworkMode
     ? t('networkMode.restartingNetwork')
     : t('networkMode.restartingLocal');
   div.innerHTML =
     '<div>' +
-      '<div style="margin-bottom:12px; font-weight: 600;">' + escapeHtml(t('networkMode.restarting')) + '</div>' +
-      '<div style="color: #bbb; font-size: 0.82rem;">' + escapeHtml(sub) + '</div>' +
+      '<div class="reconnect-overlay__title">' + escapeHtml(t('networkMode.restarting')) + '</div>' +
+      '<div class="hint-text hint-text--lg">' + escapeHtml(sub) + '</div>' +
     '</div>';
   document.body.appendChild(div);
 }
