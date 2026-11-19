@@ -6,6 +6,7 @@ var ANNOTATION_PREVIEW_MAX_CHARS = 120;
 
 var _annotationCache = {};
 var _annotationExpanded = {};
+var _annotationCollapsedOnPhone = {};
 
 function _annotationCacheKey(filePath, repo, ref) {
   return [repo || '', ref || '', filePath].join('\u0000');
@@ -320,6 +321,7 @@ function _collapseDiffAnnotation(ann, row, btn) {
   btn.setAttribute('aria-expanded', 'false');
   btn.setAttribute('aria-label', t('annotation.expand'));
   delete _annotationExpanded[ann.id];
+  _annotationCollapsedOnPhone[ann.id] = true;
 }
 
 function _decorateDiffContainer(container, annotations, redecorate) {
@@ -339,7 +341,7 @@ function _decorateDiffContainer(container, annotations, redecorate) {
       }
     });
     host.appendChild(btn);
-    if (_annotationExpanded[ann.id]) _expandDiffAnnotation(ann, endRow, btn, redecorate);
+    if (_annotationExpanded[ann.id] || (PHONE_LAYOUT_QUERY.matches && !_annotationCollapsedOnPhone[ann.id])) _expandDiffAnnotation(ann, endRow, btn, redecorate);
   });
 }
 
@@ -486,4 +488,5 @@ async function attachEditorAnnotations(editor, filePath) {
 document.addEventListener('workspace-reset', function() {
   invalidateAnnotations();
   _annotationExpanded = {};
+  _annotationCollapsedOnPhone = {};
 });
