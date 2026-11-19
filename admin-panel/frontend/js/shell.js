@@ -46,7 +46,8 @@ function renderShell() {
 function renderWorkspaceHeader() {
   var branch = LOCK_DATA.branch || '';
   var context = AppState.context || {};
-  var ticketTitle = [context.ticket_id, context.ticket_name].filter(Boolean).join(' ');
+  var ticketId = context.ticket_id === branch ? '' : context.ticket_id;
+  var ticketTitle = [ticketId, context.ticket_name].filter(Boolean).join(' ').trim();
   var title = context.ticket_name ? ticketTitle : branch;
 
   _setText('wsTitle', title);
