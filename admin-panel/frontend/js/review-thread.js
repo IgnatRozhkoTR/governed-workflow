@@ -177,7 +177,7 @@ function buildReviewReplyForm(comment, opts) {
   }
 
   input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
+    if (isSubmitKeyEvent(e)) {
       e.preventDefault();
       submitReply();
     }

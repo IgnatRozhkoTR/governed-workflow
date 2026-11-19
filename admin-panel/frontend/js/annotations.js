@@ -106,12 +106,14 @@ function _buildAnnotationEditor(ann, handlers) {
   area.addEventListener('keydown', function(e) { e.stopPropagation(); });
   var actions = document.createElement('div');
   actions.className = 'ann-actions';
-  actions.appendChild(_annotationButton(t('annotation.save'), 'ann-save', function() {
+  var saveBtn = _annotationButton(t('annotation.save'), 'ann-save', function() {
     var text = area.value.trim();
     if (text) handlers.onSave(text);
-  }));
+  });
+  actions.appendChild(saveBtn);
   actions.appendChild(_annotationButton(t('annotation.cancel'), 'ann-cancel', handlers.onCancel));
   wrap.appendChild(area);
+  attachSubmitKey(area, function() { saveBtn.click(); });
   wrap.appendChild(actions);
   setTimeout(function() { area.focus(); }, 0);
   return wrap;

@@ -59,3 +59,9 @@ body::before {
 .btn-danger-outline:hover {
   opacity: 1;
 }
+
+.submit-key-hint {
+  margin-top: 2px;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}

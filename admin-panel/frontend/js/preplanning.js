@@ -309,6 +309,7 @@ function renderPPGateActions() {
       '<button class="btn btn-primary" onclick="ppApprove()">' + t('preplanning.approvePreplanning') + '</button>' +
       '<button class="btn btn-danger" onclick="ppReject()">' + t('preplanning.rejectPreplanning') + '</button>' +
     '</div>';
+  attachSubmitKey(container.querySelector('#ppRejectFeedback'), ppReject);
 }
 
 async function ppApprove() {

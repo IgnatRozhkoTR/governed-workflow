@@ -200,7 +200,7 @@ function onResolveClick(scope, target, commentId, currentResolved, event) {
 }
 
 function handleCommentInput(event, scope, target) {
-  if (event.key === 'Enter') {
+  if (isSubmitKeyEvent(event)) {
     event.preventDefault();
     submitComment(scope, target, event.target);
   }
@@ -282,7 +282,9 @@ function openLineCommentForm(scope, target, filePath, lineNum, lineContent, cont
   form.innerHTML = '<textarea placeholder="' + t('comments.addCommentOnLine', {line: lineNum}) + '"></textarea>' +
     '<button onclick="submitLineComment(\'' + escapeAttr(scope) + '\', \'' + escapeAttr(target) + '\', \'' + escapeAttr(filePath) + '\', ' + lineNum + ', \'' + escapeAttr(lHash) + '\', this)">' + t('comments.comment') + '</button>';
   containerEl.appendChild(form);
-  form.querySelector('textarea').focus();
+  var textarea = form.querySelector('textarea');
+  attachSubmitKey(textarea, function() { form.querySelector('button').click(); });
+  textarea.focus();
 }
 
 function submitLineComment(scope, target, filePath, lineNum, lHash, btn) {

@@ -128,6 +128,7 @@
   "placeholders.testNames": "Названия тестов/сценариев (через запятую)",
   "placeholders.commitMessage": "Сообщение коммита (необязательно)",
   "placeholders.feedbackForChanges": "Обратная связь по изменениям (используется при отклонении)...",
+  "hints.submitKey": "Enter — отправить · Shift+Enter — новая строка",
   "placeholders.replyDots": "Ответ...",
   "placeholders.reply": "Ответ...",
   "placeholders.addComment": "Добавить комментарий...",

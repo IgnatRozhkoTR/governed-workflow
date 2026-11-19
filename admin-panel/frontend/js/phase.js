@@ -258,6 +258,8 @@ function renderPhaseActions() {
   div.className = 'phase-action';
   div.innerHTML = _renderGateHtml(config, phase);
   container.appendChild(div);
+  var feedbackInput = div.querySelector('#rejectFeedbackInput');
+  if (feedbackInput) attachSubmitKey(feedbackInput, handleRejectWithInput);
 }
 
 EventBus.on('state:refreshed', function() {
