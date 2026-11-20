@@ -18,6 +18,7 @@ from core.i18n import t
 from core.terminal import notify_workspace
 from services import plan_service
 from services import progress_service
+from services import repo_service
 from services import research_service
 from services import review_mode_service
 from services import scope_service
@@ -60,6 +61,13 @@ def normalize_phase(phase):
     return None
 
 bp = Blueprint("state", __name__)
+
+
+def _repo_base_branches(db, ws, project):
+    """Map each attached repo's rel_path to its configured base branch (multi-repo projects only)."""
+    if project["project_type"] != "multi":
+        return {}
+    return {row["rel_path"]: row["base_branch"] for row in repo_service.list_attached(db, ws["id"])}
 
 
 def _pending_gate(ws):
@@ -123,6 +131,7 @@ def get_workspace_state(db, ws, project):
         "working_dir": ws["working_dir"],
         "branch": ws["branch"],
         "source_branch": ws["source_branch"],
+        "repo_base_branches": _repo_base_branches(db, ws, project),
         "project_type": project["project_type"],
         "claude_command": ws["claude_command"] or "claude",
         "skip_permissions": bool(ws["skip_permissions"]),

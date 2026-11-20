@@ -326,6 +326,7 @@
   "diff.repository": "Repository",
   "diff.diffAgainst": "Diff against",
   "diff.baseDefault": "Default base",
+  "diff.baseDefaultNamed": "Default base ({base})",
   "diff.baseNotFound": "Base branch not found in this repository",
   "diff.repoRequired": "Select a repository to view its diff",
   "diff.loadFailed": "Failed to load diff",

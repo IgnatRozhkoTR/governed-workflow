@@ -90,6 +90,24 @@ def _resolve_repo_dir(db, ws, project, repo_param: str) -> tuple[str | None, str
     return _resolve_single_repo_dir(ws["working_dir"], project["path"], repo_param)
 
 
+def _workspace_base(ws) -> str:
+    return ws["source_branch"] or DEFAULT_SOURCE_BRANCH
+
+
+def _resolve_repo_base(db, ws, project, repo_param: str) -> str:
+    """Return the base branch a repo's branch diff and history compare against.
+
+    Multi-repo projects configure a base per registered repo (Settings > Git >
+    Repositories); single-repo projects and their inner repositories share the
+    workspace's source branch.
+    """
+    if project["project_type"] != "multi":
+        return _workspace_base(ws)
+    attached = repo_service.list_attached(db, ws["id"])
+    match = next((row for row in attached if row["rel_path"] == repo_param), None)
+    return (match["base_branch"] if match is not None else None) or _workspace_base(ws)
+
+
 @bp.route("/api/ws/<project_id>/<path:branch>/file", methods=["GET"])
 @with_workspace
 def read_file(db, ws, project):
@@ -346,12 +364,17 @@ def get_repos(db, ws, project):
     """
     if project["project_type"] == "multi":
         attached = repo_service.list_attached(db, ws["id"])
-        repos = [{"path": row["rel_path"], "name": row["name"] or row["rel_path"]} for row in attached]
+        repos = [{
+            "path": row["rel_path"],
+            "name": row["name"] or row["rel_path"],
+            "base_branch": row["base_branch"] or _workspace_base(ws),
+        } for row in attached]
         return jsonify({"repos": repos})
 
     root = Path(project["path"])
+    base_branch = _workspace_base(ws)
 
-    repos = [{"path": ".", "name": Path(project["path"]).name}]
+    repos = [{"path": ".", "name": Path(project["path"]).name, "base_branch": base_branch}]
 
     if not root.is_dir():
         return jsonify({"repos": repos})
@@ -370,7 +393,7 @@ def get_repos(db, ws, project):
         return jsonify({"repos": repos})
 
     for name in sorted(subdirs):
-        repos.append({"path": name, "name": name})
+        repos.append({"path": name, "name": name, "base_branch": base_branch})
 
     return jsonify({"repos": repos})
 
@@ -453,7 +476,7 @@ def get_history(db, ws, project):
         commits = _parse_log(raw, set())
         return jsonify({"commits": commits, "source_branch": ref_param, "browsing": True})
 
-    source_branch = ws["source_branch"] or DEFAULT_SOURCE_BRANCH
+    source_branch = _resolve_repo_base(db, ws, project, repo)
     raw, ahead = _try_history_refs(working_dir, source_branch, _LOG_FORMAT)
     commits = _parse_log(raw, ahead)
     return jsonify({"commits": commits, "source_branch": source_branch})
@@ -601,7 +624,6 @@ def _untracked_files_diff(working_dir, mode, tracked_paths):
 @with_workspace
 def get_diff(db, ws, project):
     working_dir = ws["working_dir"]
-    source_branch = ws["source_branch"] or DEFAULT_SOURCE_BRANCH
 
     mode = request.args.get("mode", "branch")
     if mode not in ("branch", "uncommitted", "commit"):
@@ -618,6 +640,7 @@ def get_diff(db, ws, project):
     if err:
         return jsonify({"error": err}), 400
 
+    source_branch = _resolve_repo_base(db, ws, project, repo)
     base = request.args.get("base", "").strip()
 
     try:

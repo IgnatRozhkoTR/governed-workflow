@@ -623,12 +623,21 @@ async function _loadDiff(mode, commitSha) {
   }
 }
 
+var _diffRepoBaseBranches = {};
+
+function _defaultBaseLabel() {
+  var baseBranch = _diffRepoBaseBranches[state.diffRepo];
+  return baseBranch ? t('diff.baseDefaultNamed', { base: baseBranch }) : t('diff.baseDefault');
+}
+
 async function loadDiffRepos() {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
   try {
     var data = await apiGetRepos(ctx.projectId, ctx.branch);
     var repos = data.repos || [];
+    _diffRepoBaseBranches = {};
+    repos.forEach(function(repo) { _diffRepoBaseBranches[repo.path] = repo.base_branch; });
     var options = repos.map(function(repo) { return { value: repo.path, label: repo.name }; });
 
     var validPaths = repos.map(function(repo) { return repo.path; });
@@ -652,7 +661,7 @@ async function loadDiffBases() {
   var ctx = getWorkspaceContext();
   if (!ctx) return;
 
-  var options = [{ value: '', label: t('diff.baseDefault') }];
+  var options = [{ value: '', label: _defaultBaseLabel() }];
 
   try {
     var data = await apiGetBranches(ctx.projectId, ctx.branch, state.diffRepo);
