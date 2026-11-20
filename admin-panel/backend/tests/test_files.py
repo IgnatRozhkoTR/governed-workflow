@@ -1,5 +1,6 @@
 """Tests for file read and diff routes."""
 import os
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -986,7 +987,7 @@ def test_get_repos_multi_project_returns_only_attached_repos_no_root_entry(clien
     r_repos = client.get(f"/api/ws/{multi_project['id']}/{branch}/repos")
     assert r_repos.status_code == 200
     repos = r_repos.json["repos"]
-    assert repos == [{"path": "service-a", "name": "service-a"}]
+    assert repos == [{"path": "service-a", "name": "service-a", "base_branch": "develop"}]
 
 
 def test_get_repos_multi_project_no_attached_repos_returns_empty_list(client, multi_project):
@@ -1271,3 +1272,97 @@ def test_diff_uncommitted_mode_ignores_source_branch_movement(client, workspace)
 
     assert r.status_code == 200
     assert [f["path"] for f in r.json["files"]] == ["scratch.py"]
+
+
+# ---------------------------------------------------------------------------
+# multi-repo project: each repo defaults to its own configured base branch
+# ---------------------------------------------------------------------------
+
+def _create_workspace_with_main_based_repo(client, multi_project, branch):
+    """Attach service-a (base develop) and service-b (base main, which carries a main-only commit)."""
+    repo_b = Path(multi_project["path"]) / "service-b"
+    _git(repo_b, "checkout", "-b", "main")
+    _commit_file(repo_b, "main_only.py", "m = 1\n", "Main-only commit")
+    _git(repo_b, "checkout", "develop")
+    repo_b_id = multi_project["repos"]["service-b"]["id"]
+    r_update = client.put(f"/api/projects/{multi_project['id']}/repos/{repo_b_id}", json={"base_branch": "main"})
+    assert r_update.status_code == 200, r_update.json
+
+    repo_ids = [multi_project["repos"]["service-a"]["id"], repo_b_id]
+    r = _create_multi_workspace(client, multi_project, branch, repos=repo_ids)
+    assert r.status_code == 201, r.json
+    worktree_b = next(Path(a["worktree_path"]) for a in r.json["attached_repos"] if a["rel_path"] == "service-b")
+    _commit_file(worktree_b, "feature_b.py", "f = 1\n", "Feature commit")
+    return worktree_b
+
+
+def test_get_repos_multi_project_reports_each_repo_base_branch(client, multi_project):
+    branch = "feature/per-repo-base-repos"
+    _create_workspace_with_main_based_repo(client, multi_project, branch)
+
+    r = client.get(f"/api/ws/{multi_project['id']}/{branch}/repos")
+
+    assert r.status_code == 200
+    assert {repo["path"]: repo["base_branch"] for repo in r.json["repos"]} == {
+        "service-a": "develop",
+        "service-b": "main",
+    }
+
+
+def test_get_repos_single_project_reports_workspace_source_branch_as_base(client, workspace):
+    r = client.get("/api/ws/test-project/feature/test/repos")
+
+    assert r.status_code == 200
+    assert r.json["repos"][0]["base_branch"] == "develop"
+
+
+def test_diff_branch_mode_multi_project_defaults_to_repo_base_branch(client, multi_project):
+    branch = "feature/per-repo-base-diff"
+    _create_workspace_with_main_based_repo(client, multi_project, branch)
+
+    r_b = client.get(f"/api/ws/{multi_project['id']}/{branch}/diff?mode=branch&repo=service-b")
+    r_a = client.get(f"/api/ws/{multi_project['id']}/{branch}/diff?mode=branch&repo=service-a")
+
+    assert r_b.status_code == 200, r_b.json
+    assert r_b.json["base"] == "main"
+    assert [f["path"] for f in r_b.json["files"]] == ["feature_b.py"]
+    assert r_a.status_code == 200, r_a.json
+    assert r_a.json["base"] == "develop"
+
+
+def test_diff_branch_mode_multi_project_explicit_base_overrides_repo_base(client, multi_project):
+    branch = "feature/per-repo-base-override"
+    _create_workspace_with_main_based_repo(client, multi_project, branch)
+
+    r = client.get(f"/api/ws/{multi_project['id']}/{branch}/diff?mode=branch&repo=service-b&base=develop")
+
+    assert r.status_code == 200, r.json
+    assert r.json["base"] == "develop"
+    assert {f["path"] for f in r.json["files"]} == {"main_only.py", "feature_b.py"}
+
+
+def test_history_multi_project_lists_commits_ahead_of_repo_base_branch(client, multi_project):
+    branch = "feature/per-repo-base-history"
+    _create_workspace_with_main_based_repo(client, multi_project, branch)
+
+    r = client.get(f"/api/ws/{multi_project['id']}/{branch}/history?repo=service-b")
+
+    assert r.status_code == 200, r.json
+    assert r.json["source_branch"] == "main"
+    assert [c["subject"] for c in r.json["commits"]] == ["Feature commit"]
+
+
+def test_history_rename_multi_project_treats_commits_on_repo_base_as_published(client, multi_project):
+    branch = "feature/per-repo-base-rename"
+    worktree_b = _create_workspace_with_main_based_repo(client, multi_project, branch)
+    main_only_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD~1"], cwd=worktree_b, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+    r = client.post(
+        f"/api/ws/{multi_project['id']}/{branch}/history/rename",
+        json={"repo": "service-b", "sha": main_only_sha, "message": "Reworded"},
+    )
+
+    assert r.status_code == 400
+    assert "already pushed" in r.json["error"]

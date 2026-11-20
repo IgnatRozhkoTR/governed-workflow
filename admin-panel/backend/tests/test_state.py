@@ -1,7 +1,9 @@
 """Tests for workspace state routes."""
+from pathlib import Path
+
 import pytest
 
-from testing_utils import set_phase, add_research
+from testing_utils import _git, set_phase, add_research
 
 
 def _ws_url(workspace, path):
@@ -26,6 +28,23 @@ def test_get_workspace_state_includes_source_branch_and_project_type(client, wor
     data = response.get_json()
     assert data["source_branch"] == "develop"
     assert data["project_type"] == "single"
+    assert data["repo_base_branches"] == {}
+
+
+def test_get_workspace_state_maps_attached_repos_to_their_base_branches(client, multi_project):
+    repo_b_id = multi_project["repos"]["service-b"]["id"]
+    _git(Path(multi_project["path"]) / "service-b", "branch", "main")
+    client.put(f"/api/projects/{multi_project['id']}/repos/{repo_b_id}", json={"base_branch": "main"})
+    repo_ids = [multi_project["repos"]["service-a"]["id"], repo_b_id]
+    created = client.post(
+        f"/api/projects/{multi_project['id']}/workspaces",
+        json={"branch": "feature/state-bases", "worktree": True, "repos": repo_ids},
+    )
+    assert created.status_code == 201, created.json
+
+    data = client.get(f"/api/ws/{multi_project['id']}/feature/state-bases/state").get_json()
+
+    assert data["repo_base_branches"] == {"service-a": "develop", "service-b": "main"}
 
 
 def test_get_workspace_state_returns_etag(client, workspace):
