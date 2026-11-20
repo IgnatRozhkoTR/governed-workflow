@@ -435,12 +435,12 @@ function _gcConvertChecklistHtml(candidates, mode) {
   var rowsHtml = rows.map(function(row) {
     var checkedAttr = row.checked ? ' checked' : '';
     var relPathHtml = row.rel_path !== row.name
-      ? '<span class="gc-checklist-relpath">' + escapeHtml(row.rel_path) + '</span>'
+      ? '<span class="gc-checklist-relpath" title="' + escapeAttr(row.rel_path) + '">' + escapeHtml(row.rel_path) + '</span>'
       : '';
     return '<div class="gc-checklist-row">' +
       '<label class="gc-checklist-check">' +
         '<input type="checkbox" data-rel-path="' + escapeAttr(row.rel_path) + '"' + checkedAttr + '>' +
-        '<span class="gc-checklist-name">' + escapeHtml(row.name) + '</span>' +
+        '<span class="gc-checklist-name" title="' + escapeAttr(row.name) + '">' + escapeHtml(row.name) + '</span>' +
         relPathHtml +
       '</label>' +
       '<input type="text" class="context-input gc-checklist-base-input" value="' + escapeAttr(row.baseBranch) + '" placeholder="' + t('gitCockpit.repos.baseBranchPlaceholder') + '">' +

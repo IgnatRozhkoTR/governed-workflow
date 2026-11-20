@@ -606,7 +606,7 @@
 .gc-checklist-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   flex-wrap: wrap;
 }
 
@@ -614,24 +614,75 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
-  min-width: 160px;
+  flex: 1 1 260px;
+  min-width: 0;
   font-size: 0.84rem;
   color: var(--tx);
   cursor: pointer;
 }
 
-.gc-checklist-check input[type="checkbox"] {
-  accent-color: var(--pr);
+.gc-checklist-check input[type="checkbox"],
+.ws-repo-attach-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  margin: 0;
+  border: 1px solid var(--ln);
+  border-radius: 4px;
+  background: var(--bg);
+  cursor: pointer;
+  position: relative;
+  transition: var(--transition);
+}
+
+.gc-checklist-check input[type="checkbox"]:checked,
+.ws-repo-attach-check:checked {
+  background: var(--pr);
+  border-color: var(--pr);
+}
+
+.gc-checklist-check input[type="checkbox"]:checked::after,
+.ws-repo-attach-check:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--prink);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.gc-checklist-check input[type="checkbox"]:focus-visible,
+.ws-repo-attach-check:focus-visible {
+  outline: 2px solid var(--pr);
+  outline-offset: 2px;
 }
 
 .gc-checklist-name {
   font-weight: 500;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gc-checklist-check .gc-checklist-relpath {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gc-checklist-base-input {
-  width: 160px;
-  flex-shrink: 0;
+  width: 220px;
+  flex: 0 0 220px;
+  min-width: 0;
 }
 
 .gc-checklist-actions {
@@ -727,6 +778,7 @@
 
   .gc-checklist-base-input {
     width: 100%;
+    flex-basis: 100%;
   }
 }
 
