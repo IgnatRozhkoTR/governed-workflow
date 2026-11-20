@@ -49,6 +49,34 @@ def _max_open_fds():
         return 4096
 
 
+MAX_TERMINAL_DIMENSION = 4096
+
+
+def parse_resize_frame(text):
+    """Return (cols, rows) if text is exactly {"resize": [cols, rows]}, else None.
+
+    Anything else, including other JSON, is user input and must reach the pty.
+    """
+    if not text.startswith('{'):
+        return None
+    try:
+        frame = json.loads(text)
+    except ValueError:
+        return None
+    if not isinstance(frame, dict) or frame.keys() != {'resize'}:
+        return None
+    size = frame['resize']
+    if not isinstance(size, list) or len(size) != 2:
+        return None
+    if not all(_is_valid_dimension(value) for value in size):
+        return None
+    return size[0], size[1]
+
+
+def _is_valid_dimension(value):
+    return type(value) is int and 1 <= value <= MAX_TERMINAL_DIMENSION
+
+
 def run_pty_websocket(ws, tmux_session_name):
     """Attach a PTY to a WebSocket, bridging tmux session I/O to the browser."""
     pid, master_fd = spawn_pty_process(['tmux', 'attach', '-t', tmux_session_name])
@@ -80,17 +108,13 @@ def run_pty_websocket(ws, tmux_session_name):
                 break
 
             if isinstance(msg, str):
-                if msg.startswith('{'):
-                    try:
-                        ctrl = json.loads(msg)
-                        if 'resize' in ctrl:
-                            cols, rows = ctrl['resize']
-                            winsize = struct.pack('HHHH', rows, cols, 0, 0)
-                            fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
-                            os.kill(pid, signal.SIGWINCH)
-                            continue
-                    except (json.JSONDecodeError, KeyError):
-                        pass
+                size = parse_resize_frame(msg)
+                if size is not None:
+                    cols, rows = size
+                    winsize = struct.pack('HHHH', rows, cols, 0, 0)
+                    fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
+                    os.kill(pid, signal.SIGWINCH)
+                    continue
                 os.write(master_fd, msg.encode())
             else:
                 os.write(master_fd, msg)
