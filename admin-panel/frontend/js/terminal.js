@@ -192,6 +192,7 @@ function _createTerminal(containerId, wsRef) {
   addon.fit();
 
   terminal.attachCustomKeyEventHandler(function(e) {
+    if (typeof isBoundShortcutEvent === 'function' && isBoundShortcutEvent(e)) return false;
     if (e.type !== 'keydown') return true;
     if (e.key === 'Enter') {
       _lastTerminalEnterAt = Date.now();
@@ -563,6 +564,7 @@ function updateTerminalTheme() {
 }
 
 function onTerminalTabActivated() {
+  rememberTerminalMode(TERMINAL_MODE_FULL_SCREEN);
   if (!term) {
     initTerminal();
   }
@@ -791,8 +793,14 @@ function renderSessionsRailDot() {
   peek.setAttribute('aria-label', t('terminal.expandSessions') + ': ' + description);
 }
 
-// Docking the terminal beside itself would only squeeze the Terminal tab.
-function syncSplitTerminalButton(tabId) {
+// Docking the terminal beside itself would only squeeze the Terminal tab, so
+// the panel hides there; coming back re-measures it, since a hidden xterm
+// cannot size itself.
+function syncTerminalPanelForTab(tabId) {
+  if (tabId !== 'terminal') {
+    _releaseFocusFrom('panel-terminal');
+    if (isTerminalPanelOpen()) _fitSplitTerminalSoon(false);
+  }
   var btn = document.getElementById('splitTerminalBtn');
   if (!btn) return;
   var labelKey = tabId === 'terminal' ? 'tabs.splitTerminalUnavailable' : 'tabs.splitTerminal';
@@ -944,6 +952,23 @@ function _showTerminalView(name) {
   renderTerminalToolbar();
 }
 
+// A hidden xterm keeps keyboard focus unless told otherwise, and would go on
+// sending every keystroke to the shell nobody can see.
+function _releaseFocusFrom(elementId) {
+  var host = document.getElementById(elementId);
+  var focused = document.activeElement;
+  if (host && focused && host.contains(focused)) focused.blur();
+}
+
+function isActiveTerminalConnected() {
+  var ws = _activeTerminalTarget().ws;
+  return !!(ws && ws.readyState === WebSocket.OPEN);
+}
+
+function focusActiveTerminalSoon() {
+  _fitActiveTerminalSoon(true);
+}
+
 function _activeTerminalTarget() {
   var tab = _activeSessionTabName ? _sessionTabs[_activeSessionTabName] : null;
   if (tab) return tab;
@@ -979,34 +1004,97 @@ var splitFitAddon = null;
 var splitWs = null;
 var splitConnected = false;
 
+var TERMINAL_PANEL_OPEN_KEY = 'ui_terminal_panel_open';
+var TERMINAL_PANEL_WIDTH_KEY = 'ui_terminal_panel_width';
+var TERMINAL_PANEL_MIN_WIDTH = 300;
+var TERMINAL_PANEL_MIN_MAIN_WIDTH = 400;
+
+function isTerminalPanelOpen() {
+  var container = document.getElementById('splitContainer');
+  return !!(container && container.classList.contains('split-active'));
+}
+
 function toggleSplitTerminal() {
+  if (isTerminalPanelOpen()) {
+    closeTerminalPanel();
+  } else {
+    openTerminalPanel();
+  }
+}
+
+// Opening is idempotent: an open panel is just reconnected and focused.
+function openTerminalPanel() {
+  _showTerminalPanel();
+  _storeTerminalPanelOpen(true);
+  rememberTerminalMode(TERMINAL_MODE_PANEL);
+  _fitSplitTerminalSoon(true);
+}
+
+function closeTerminalPanel() {
+  _releaseFocusFrom('splitTerminal');
+  _setTerminalPanelVisible(false);
+  _storeTerminalPanelOpen(false);
+  disconnectSplitTerminal();
+}
+
+// The panel's open state is browser-wide, so every workspace load brings it
+// back without touching the remembered terminal mode.
+function restoreTerminalPanel() {
+  if (!_isTerminalPanelStoredOpen() || PHONE_LAYOUT_QUERY.matches) return;
+  _showTerminalPanel();
+  _fitSplitTerminalSoon(false);
+}
+
+function _showTerminalPanel() {
+  _setTerminalPanelVisible(true);
+  if (!splitTerm) initSplitTerminal();
+  connectSplitTerminal();
+}
+
+function _setTerminalPanelVisible(isVisible) {
   var container = document.getElementById('splitContainer');
   var btn = document.getElementById('splitTerminalBtn');
-  if (!container) return;
+  if (container) container.classList.toggle('split-active', isVisible);
+  if (btn) btn.classList.toggle('active', isVisible);
+}
 
-  var isActive = container.classList.contains('split-active');
+function _fitSplitTerminalSoon(shouldFocus) {
+  setTimeout(function() {
+    if (!splitFitAddon || !isTerminalPanelOpen()) return;
+    splitFitAddon.fit();
+    if (shouldFocus && splitTerm) splitTerm.focus();
+  }, 100);
+}
 
-  if (isActive) {
-    container.classList.remove('split-active');
-    if (btn) btn.classList.remove('active');
-    disconnectSplitTerminal();
-  } else {
-    container.classList.add('split-active');
-    if (btn) btn.classList.add('active');
+function _isTerminalPanelStoredOpen() {
+  try { return localStorage.getItem(TERMINAL_PANEL_OPEN_KEY) === '1'; } catch (e) { return false; }
+}
 
-    if (!splitTerm) {
-      initSplitTerminal();
-    }
+function _storeTerminalPanelOpen(isOpen) {
+  try { localStorage.setItem(TERMINAL_PANEL_OPEN_KEY, isOpen ? '1' : '0'); } catch (e) {}
+}
 
-    if (splitFitAddon) {
-      setTimeout(function() { splitFitAddon.fit(); }, 100);
-      setTimeout(function() {
-        if (splitTerm) splitTerm.focus();
-      }, 150);
-    }
+function _clampTerminalPanelWidth(width) {
+  return Math.max(TERMINAL_PANEL_MIN_WIDTH, Math.min(width, window.innerWidth - TERMINAL_PANEL_MIN_MAIN_WIDTH));
+}
 
-    connectSplitTerminal();
-  }
+function _applyTerminalPanelWidth(width) {
+  var panel = document.getElementById('splitTerminal');
+  if (!panel) return;
+  panel.style.width = _clampTerminalPanelWidth(width) + 'px';
+  panel.style.flex = 'none';
+}
+
+function _restoreTerminalPanelWidth() {
+  var stored;
+  try { stored = parseInt(localStorage.getItem(TERMINAL_PANEL_WIDTH_KEY), 10); } catch (e) { return; }
+  if (stored > 0) _applyTerminalPanelWidth(stored);
+}
+
+function _storeTerminalPanelWidth() {
+  var panel = document.getElementById('splitTerminal');
+  if (!panel) return;
+  try { localStorage.setItem(TERMINAL_PANEL_WIDTH_KEY, String(panel.offsetWidth)); } catch (e) {}
 }
 
 function initSplitTerminal() {
@@ -1030,7 +1118,7 @@ function connectSplitTerminal() {
   updateSplitTerminalStatus('connecting');
 
   splitWs = _connectTerminal(splitTerm, splitFitAddon, wsUrl, {
-    focusOnOpen: true,
+    focusOnOpen: getActiveTabId() !== 'terminal',
     onConnected: function() {
       splitConnected = true;
       updateSplitTerminalStatus('connected');
@@ -1101,19 +1189,14 @@ function updateSplitTerminalStatus(status) {
 
   document.addEventListener('mousemove', function(e) {
     if (!handle) return;
-    var diff = startX - e.clientX;
-    var newWidth = Math.max(300, Math.min(startWidth + diff, window.innerWidth - 400));
-    var splitTermEl = document.getElementById('splitTerminal');
-    if (splitTermEl) {
-      splitTermEl.style.width = newWidth + 'px';
-      splitTermEl.style.flex = 'none';
-    }
+    _applyTerminalPanelWidth(startWidth + startX - e.clientX);
     if (splitFitAddon) splitFitAddon.fit();
     if (fitAddon && document.getElementById('panel-terminal').classList.contains('active')) fitAddon.fit();
   });
 
   document.addEventListener('mouseup', function() {
     if (handle) {
+      _storeTerminalPanelWidth();
       handle.classList.remove('dragging');
       handle = null;
       document.body.style.cursor = '';
@@ -1134,3 +1217,4 @@ document.addEventListener('workspace-reset', function() {
 });
 
 initCollapsiblePanel(TERM_SESSIONS_PANEL);
+_restoreTerminalPanelWidth();

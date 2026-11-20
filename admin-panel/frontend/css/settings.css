@@ -839,3 +839,57 @@
   gap: 8px;
   margin-top: 12px;
 }
+
+/* ─── Keyboard shortcuts ─── */
+.shortcut-row {
+  flex-wrap: wrap;
+}
+
+.shortcut-row-text {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.shortcut-row-control {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shortcut-combo {
+  min-width: 96px;
+  padding: 3px 10px;
+  border: 1px solid var(--ln);
+  border-radius: 6px;
+  background: var(--sf2);
+  color: var(--tx);
+  font-family: var(--f-ui);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.shortcut-combo--unset {
+  color: var(--dim);
+  font-style: italic;
+}
+
+.shortcut-row--recording .shortcut-combo {
+  border-color: var(--pr);
+  background: var(--prbg);
+  color: var(--prtx);
+  font-style: normal;
+}
+
+.shortcut-row-msg {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.shortcut-row-msg--warn {
+  color: var(--warntx);
+}
+
+.shortcut-row-msg--error {
+  color: var(--badtx);
+}

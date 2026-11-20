@@ -74,7 +74,7 @@
 <link rel="stylesheet" href="css/workspace.css?v=12">
 <link rel="stylesheet" href="css/phase-settings.css?v=1">
 <link rel="stylesheet" href="css/proposals.css?v=1">
-<link rel="stylesheet" href="css/settings.css?v=5">
+<link rel="stylesheet" href="css/settings.css?v=7">
 <link rel="stylesheet" href="css/scratchpads.css?v=3">
 <link rel="stylesheet" href="css/mobile.css?v=14">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
@@ -281,6 +281,7 @@
           <button type="button" class="settings-nav-item" data-section="git" data-i18n="settings.nav.git">Git</button>
           <button type="button" class="settings-nav-item" data-section="claude" data-i18n="settings.nav.claude">Claude</button>
           <button type="button" class="settings-nav-item" data-section="system" data-i18n="settings.nav.system">System</button>
+          <button type="button" class="settings-nav-item desktop-only" data-section="shortcuts" data-i18n="settings.nav.shortcuts">Keyboard shortcuts</button>
         </div>
       </nav>
 
@@ -606,6 +607,18 @@
           <div class="settings-subsection" id="modulesCard" style="display: none;">
             <div class="settings-subsection-title" data-i18n="settings.section.system.modulesTitle">Modules</div>
             <div id="modulesCardBody"></div>
+          </div>
+        </section>
+
+        <!-- Keyboard shortcuts -->
+        <section class="settings-section desktop-only" data-section="shortcuts">
+          <div class="settings-section-header">
+            <h2 data-i18n="settings.section.shortcuts.title">Keyboard shortcuts</h2>
+            <span class="settings-scope-badge" data-i18n="settings.scope.browser">Browser</span>
+          </div>
+          <p class="settings-section-desc" data-i18n="settings.section.shortcuts.desc">Shortcuts work anywhere in a workspace, including inside the terminal. They are saved in this browser only.</p>
+          <div class="settings-subsection">
+            <div id="shortcutsSettingsList"></div>
           </div>
         </section>
 
@@ -998,8 +1011,9 @@
 <script src="js/proposals.js?v=2"></script>
 <script src="js/comments.js?v=12"></script>
 <script src="js/theme.js?v=11"></script>
-<script src="js/terminal.js?v=26"></script>
-<script src="js/tabs.js?v=19"></script>
+<script src="js/terminal.js?v=27"></script>
+<script src="js/terminal-mode.js?v=1"></script>
+<script src="js/tabs.js?v=20"></script>
 <script src="js/phase.js?v=13"></script>
 <script src="js/plan.js?v=11"></script>
 <script src="js/scope.js?v=10"></script>
@@ -1024,8 +1038,10 @@
 <script src="js/advance-modes.js?v=1"></script>
 <script src="js/review-pipeline.js?v=2"></script>
 <script src="js/actions.js?v=10"></script>
-<script src="js/settings.js?v=5"></script>
-<script src="js/app.js?v=15"></script>
+<script src="js/shortcuts.js?v=1"></script>
+<script src="js/shortcut-settings.js?v=1"></script>
+<script src="js/settings.js?v=6"></script>
+<script src="js/app.js?v=16"></script>
 <script src="js/shell.js?v=2"></script>
 <script src="js/workspace.js?v=17"></script>
 

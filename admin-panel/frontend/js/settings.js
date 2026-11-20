@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════
 //  SETTINGS PAGE (panel-dashboard)
 // ═══════════════════════════════════════════════
-var SETTINGS_SECTIONS = ['task', 'workflow', 'phases', 'review', 'verification', 'rules', 'git', 'claude', 'system'];
+var SETTINGS_SECTIONS = ['task', 'workflow', 'phases', 'review', 'verification', 'rules', 'git', 'claude', 'system', 'shortcuts'];
 var SETTINGS_DEFAULT_SECTION = 'task';
 
 // ─── Per-workspace "last settings section" persistence ──────────────────
@@ -63,6 +63,8 @@ function _loadSettingsSectionData(section) {
   } else if (section === 'system') {
     if (typeof loadModulesCard === 'function') loadModulesCard();
     if (typeof renderNetworkMode === 'function') renderNetworkMode();
+  } else if (section === 'shortcuts') {
+    renderShortcutsSettings();
   }
 }
 

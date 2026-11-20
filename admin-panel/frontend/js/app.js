@@ -121,6 +121,7 @@ async function initApp() {
   if (typeof renderWorkflowModeCard === 'function') renderWorkflowModeCard();
   loadModulesCard();
   if (typeof renderNetworkMode === 'function') renderNetworkMode();
+  renderShortcutsSettings();
 
   // Restore diff toggle states from localStorage
   document.querySelectorAll('#viewModeToggle button').forEach(function(b) {
@@ -134,6 +135,7 @@ async function initApp() {
   });
   hideProjectSelector();
   setupCollapsibleCards();
+  restoreTerminalPanel();
   _initialLoad = false;
 
   // initApp also runs on every in-page workspace switch; keep a single poller.
@@ -232,12 +234,7 @@ function doTerminalActionWithKind(endpoint, btnId, mode, sessionKind) {
     .then(function(result) {
       ACTIVE_TERMINAL_KIND = result.kind || sessionKind || 'claude';
       if (mode === 'split') {
-        var container = document.getElementById('splitContainer');
-        if (container && !container.classList.contains('split-active')) {
-          toggleSplitTerminal();
-        } else if (container && container.classList.contains('split-active')) {
-          connectSplitTerminal();
-        }
+        openTerminalPanel();
       } else {
         switchTab('terminal');
         setTimeout(function() { connectTerminal(); }, 500);

@@ -52,6 +52,7 @@ async function refreshTabData() {
 var TAB_ALIASES = { phases: 'overview', scratchpads: 'files' };
 var FULL_BLEED_TABS = ['files', 'changes', 'terminal'];
 var DEFAULT_TAB = 'overview';
+var _lastNonTerminalTabId = null;
 
 function resolveTabId(tabId) {
   if (tabId === 'scratchpads') setFilesView('scratchpads', { activate: false });
@@ -65,6 +66,11 @@ function isKnownTab(tabId) {
 function getActiveTabId() {
   var active = document.querySelector('.tab-panel.active');
   return active ? active.id.replace(/^panel-/, '') : DEFAULT_TAB;
+}
+
+// Where leaving the full-screen terminal returns to.
+function getTabBeforeTerminal() {
+  return _lastNonTerminalTabId || DEFAULT_TAB;
 }
 
 function _syncTabChrome(tabId) {
@@ -83,7 +89,8 @@ function _syncTabChrome(tabId) {
   var activeTabBtn = document.querySelector('#wsTabs .tab.active');
   if (activeTabBtn) activeTabBtn.scrollIntoView({ block: 'nearest', inline: 'center' });
 
-  syncSplitTerminalButton(tabId);
+  if (tabId !== 'terminal') _lastNonTerminalTabId = tabId;
+  syncTerminalPanelForTab(tabId);
   if (typeof renderGateBar === 'function') renderGateBar();
 }
 
