@@ -95,7 +95,7 @@
   .settings-nav, .chips { padding-right: 24px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
   .diff-file-list .file-item > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .diff-file-list .file-item .file-stat { flex: none; margin-left: auto; }
-  #splitTerminalBtn, [onclick*="toggleSplitTerminal"], [onclick*="doStart('split')"] { display: none; }
+  #splitTerminalBtn, [onclick*="toggleSplitTerminal"] { display: none; }
   .session-kill-btn { min-width: 44px; min-height: 44px; }
 
   .split-main { padding: 6px 16px 16px; }

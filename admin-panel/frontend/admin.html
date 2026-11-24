@@ -298,13 +298,7 @@
           <div class="settings-row">
             <div class="settings-row-label" data-i18n="labels.claude">Claude</div>
             <div class="settings-row-control settings-task-commands">
-              <div class="btn-dropdown">
-                <button class="btn" id="startBtn" onclick="showTerminalDropdown('start', this)" data-i18n="buttons.start">Start</button>
-                <div class="btn-dropdown-menu" id="startDropdown" style="display:none;">
-                  <button class="btn-dropdown-item" onclick="doStart('fullscreen')" data-i18n="actions.fullscreen">Full screen</button>
-                  <button class="btn-dropdown-item" onclick="doStart('split')" data-i18n="actions.sidePanel">Side panel</button>
-                </div>
-              </div>
+              <button class="btn" id="startBtn" onclick="doStart()" data-i18n="buttons.start">Start</button>
               <button class="btn" onclick="copyWorkspacePath()" id="copyPathBtn" data-i18n="actions.copyPath">Path</button>
             </div>
           </div>

@@ -467,7 +467,7 @@ async function createWorkspace(projectId) {
       <span class="ws-result-value">${_wsEscape(result.working_dir)}</span>
     </div>`;
   }
-  resultHtml += `<button class="btn pri block-btn" onclick="openWorkspace('${_wsEscape(projectId)}', '${_wsEscape(branch)}')">${t('buttons.openWorkspace')}</button>`;
+  resultHtml += `<button class="btn pri block-btn" onclick="openWorkspace('${_wsEscape(projectId)}', '${_wsEscape(branch)}', true)">${t('buttons.openWorkspace')}</button>`;
   resultHtml += '</div>';
 
   resultEl.innerHTML = resultHtml;
@@ -553,8 +553,9 @@ window.addEventListener('popstate', function() {
   restoreRoute(showRouteFromUrl);
 });
 
-function openWorkspace(projectId, branch) {
+function openWorkspace(projectId, branch, isNewWorkspace) {
   setWorkspaceContext(projectId, branch);
+  if (isNewWorkspace && typeof showSettingsTaskFirst === 'function') showSettingsTaskFirst(getWorkspaceContext());
   hideProjectSelector();
   if (typeof applyStoredTabForContext === 'function') {
     var tabId = applyStoredTabForContext(getWorkspaceContext());

@@ -215,13 +215,9 @@ function showTerminalDropdown(type, btn) {
   }, 10);
 }
 
-function doTerminalAction(endpoint, btnId, mode) {
-  doTerminalActionWithKind(endpoint, btnId, mode, 'claude');
-}
-
 var ACTIVE_TERMINAL_KIND = 'claude';
 
-function doTerminalActionWithKind(endpoint, btnId, mode, sessionKind) {
+function doTerminalActionWithKind(endpoint, btnId, sessionKind) {
   document.querySelectorAll('.btn-dropdown-menu').forEach(function(m) { m.style.display = 'none'; });
 
   var ctx = getWorkspaceContext();
@@ -233,12 +229,8 @@ function doTerminalActionWithKind(endpoint, btnId, mode, sessionKind) {
   apiPost('/api/ws/' + encodeURIComponent(ctx.projectId) + '/' + encodeURIComponent(ctx.branch) + '/terminal/' + endpoint, {})
     .then(function(result) {
       ACTIVE_TERMINAL_KIND = result.kind || sessionKind || 'claude';
-      if (mode === 'split') {
-        openTerminalPanel();
-      } else {
-        switchTab('terminal');
-        setTimeout(function() { connectTerminal(); }, 500);
-      }
+      switchTab('terminal');
+      setTimeout(function() { connectTerminal(); }, 500);
 
       if (typeof loadTerminalSessions === 'function') loadTerminalSessions();
 
@@ -255,12 +247,12 @@ function doTerminalActionWithKind(endpoint, btnId, mode, sessionKind) {
     });
 }
 
-function doStart(mode) {
-  doTerminalActionWithKind('start', 'startBtn', mode, 'claude');
+function doStart() {
+  doTerminalActionWithKind('start', 'startBtn', 'claude');
 }
 
 function doResume() {
-  doTerminalActionWithKind('resume', 'resumeBtn', 'fullscreen', 'claude');
+  doTerminalActionWithKind('resume', 'resumeBtn', 'claude');
 }
 
 function doNotify(type) {

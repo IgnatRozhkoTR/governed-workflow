@@ -439,8 +439,6 @@
   "actions.notified": "Отправлено!",
   "actions.notifyComments": "Комментарии к ревью",
   "actions.notifyGo": "Можно продолжать",
-  "actions.fullscreen": "Полный экран",
-  "actions.sidePanel": "Боковая панель",
   "tabs.terminal": "Терминал",
   "tabs.splitTerminal": "Разделённый терминал",
   "tabs.splitTerminalUnavailable": "Боковая панель показывает терминал рядом с другими вкладками",

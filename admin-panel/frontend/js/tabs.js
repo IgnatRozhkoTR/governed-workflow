@@ -160,6 +160,13 @@ function _storeLastTab(tabId) {
   try { localStorage.setItem(_tabStorageKey(ctx), tabId); } catch (e) {}
 }
 
+function showSettingsTaskFirst(ctx) {
+  try {
+    localStorage.setItem(_tabStorageKey(ctx), 'dashboard');
+    localStorage.setItem('ui_last_settings_section:' + ctx.projectId + '/' + ctx.branch, 'task');
+  } catch (e) {}
+}
+
 function _loadLastTab(ctx) {
   if (!ctx) return null;
   try { return localStorage.getItem(_tabStorageKey(ctx)); } catch (e) { return null; }
