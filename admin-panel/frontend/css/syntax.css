@@ -1,30 +1,30 @@
 /* ═══════════════════════════════════════════════ */
 /*  SYNTAX TOKENS (highlight.js)                   */
 /* ═══════════════════════════════════════════════ */
-.hljs-keyword, .hljs-meta .hljs-keyword, .hljs-variable.language_, .hljs-doctag,
-.hljs-template-tag, .hljs-template-variable, .hljs-selector-tag, .hljs-name, .hljs-bullet {
+:root .hljs-keyword, :root .hljs-meta .hljs-keyword, :root .hljs-variable.language_, :root .hljs-doctag,
+:root .hljs-template-tag, :root .hljs-template-variable, :root .hljs-selector-tag, :root .hljs-name, :root .hljs-bullet {
   color: var(--syn-keyword);
 }
-.hljs-title, .hljs-title.function_, .hljs-title.function_.invoke__, .hljs-section {
+:root .hljs-title, :root .hljs-title.function_, :root .hljs-title.function_.invoke__, :root .hljs-section {
   color: var(--syn-function);
 }
-.hljs-title.class_, .hljs-title.class_.inherited__, .hljs-type, .hljs-built_in,
-.hljs-meta, .hljs-selector-class, .hljs-selector-id {
+:root .hljs-title.class_, :root .hljs-title.class_.inherited__, :root .hljs-type, :root .hljs-built_in,
+:root .hljs-meta, :root .hljs-selector-class, :root .hljs-selector-id {
   color: var(--syn-type);
 }
-.hljs-string, .hljs-meta .hljs-string, .hljs-regexp, .hljs-char.escape_, .hljs-link, .hljs-addition {
+:root .hljs-string, :root .hljs-meta .hljs-string, :root .hljs-regexp, :root .hljs-char.escape_, :root .hljs-link, :root .hljs-addition {
   color: var(--syn-string);
 }
-.hljs-number, .hljs-literal, .hljs-symbol, .hljs-variable.constant_ {
+:root .hljs-number, :root .hljs-literal, :root .hljs-symbol, :root .hljs-variable.constant_ {
   color: var(--syn-number);
 }
-.hljs-property, .hljs-attr, .hljs-attribute, .hljs-variable, .hljs-selector-attr, .hljs-selector-pseudo {
+:root .hljs-property, :root .hljs-attr, :root .hljs-attribute, :root .hljs-variable, :root .hljs-selector-attr, :root .hljs-selector-pseudo {
   color: var(--syn-property);
 }
-.hljs-params { color: inherit; font-style: italic; }
-.hljs-comment, .hljs-quote, .hljs-code, .hljs-formula { color: var(--syn-comment); font-style: italic; }
-.hljs-operator, .hljs-punctuation { color: inherit; }
-.hljs-subst { color: var(--tx); }
-.hljs-deletion { color: var(--bad); }
-.hljs-emphasis { font-style: italic; }
-.hljs-strong { font-weight: 700; }
+:root .hljs-params { color: inherit; font-style: italic; }
+:root .hljs-comment, :root .hljs-quote, :root .hljs-code, :root .hljs-formula { color: var(--syn-comment); font-style: italic; }
+:root .hljs-operator, :root .hljs-punctuation { color: inherit; }
+:root .hljs-subst { color: var(--tx); }
+:root .hljs-deletion { color: var(--bad); }
+:root .hljs-emphasis { font-style: italic; }
+:root .hljs-strong { font-weight: 700; }

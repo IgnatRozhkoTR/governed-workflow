@@ -356,6 +356,7 @@ function renderDiff(path) {
     synchronisedScroll: true,
     stickyFileHeaders: false
   });
+  extendKotlinTypeNames(ui.hljs);
   ui.draw();
   ui.highlightCode();
   trimWordHighlightWhitespace(targetEl);
