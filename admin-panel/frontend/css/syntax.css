@@ -1,28 +1,30 @@
 /* ═══════════════════════════════════════════════ */
-/*  SYNTAX TOKENS (highlight.js)                   */
+/*  SYNTAX TOKENS (highlight.js, Shiki diff)       */
 /* ═══════════════════════════════════════════════ */
 :root .hljs-keyword, :root .hljs-meta .hljs-keyword, :root .hljs-variable.language_, :root .hljs-doctag,
-:root .hljs-template-tag, :root .hljs-template-variable, :root .hljs-selector-tag, :root .hljs-name, :root .hljs-bullet {
+:root .hljs-template-tag, :root .hljs-template-variable, :root .hljs-selector-tag, :root .hljs-name, :root .hljs-bullet, :root .syn-keyword {
   color: var(--syn-keyword);
 }
-:root .hljs-title, :root .hljs-title.function_, :root .hljs-title.function_.invoke__, :root .hljs-section {
+:root .hljs-title, :root .hljs-title.function_, :root .hljs-title.function_.invoke__, :root .hljs-section, :root .syn-function {
   color: var(--syn-function);
 }
 :root .hljs-title.class_, :root .hljs-title.class_.inherited__, :root .hljs-type, :root .hljs-built_in,
-:root .hljs-meta, :root .hljs-selector-class, :root .hljs-selector-id {
+:root .hljs-meta, :root .hljs-selector-class, :root .hljs-selector-id, :root .syn-type {
   color: var(--syn-type);
 }
-:root .hljs-string, :root .hljs-meta .hljs-string, :root .hljs-regexp, :root .hljs-char.escape_, :root .hljs-link, :root .hljs-addition {
+:root .hljs-string, :root .hljs-meta .hljs-string, :root .hljs-regexp, :root .hljs-char.escape_, :root .hljs-link, :root .hljs-addition,
+:root .syn-string {
   color: var(--syn-string);
 }
-:root .hljs-number, :root .hljs-literal, :root .hljs-symbol, :root .hljs-variable.constant_ {
+:root .hljs-number, :root .hljs-literal, :root .hljs-symbol, :root .hljs-variable.constant_, :root .syn-number {
   color: var(--syn-number);
 }
-:root .hljs-property, :root .hljs-attr, :root .hljs-attribute, :root .hljs-variable, :root .hljs-selector-attr, :root .hljs-selector-pseudo {
+:root .hljs-property, :root .hljs-attr, :root .hljs-attribute, :root .hljs-variable, :root .hljs-selector-attr, :root .hljs-selector-pseudo,
+:root .syn-property {
   color: var(--syn-property);
 }
-:root .hljs-params { color: inherit; font-style: italic; }
-:root .hljs-comment, :root .hljs-quote, :root .hljs-code, :root .hljs-formula { color: var(--syn-comment); font-style: italic; }
+:root .hljs-params, :root .syn-param { color: inherit; font-style: italic; }
+:root .hljs-comment, :root .hljs-quote, :root .hljs-code, :root .hljs-formula, :root .syn-comment { color: var(--syn-comment); font-style: italic; }
 :root .hljs-operator, :root .hljs-punctuation { color: inherit; }
 :root .hljs-subst { color: var(--tx); }
 :root .hljs-deletion { color: var(--bad); }

@@ -352,14 +352,13 @@ function renderDiff(path) {
     matching: 'words',
     renderNothingWhenEmpty: true,
     outputFormat: PHONE_LAYOUT_QUERY.matches ? 'line-by-line' : state.diffMode,
-    highlight: true,
+    highlight: false,
     synchronisedScroll: true,
     stickyFileHeaders: false
   });
-  extendKotlinTypeNames(ui.hljs);
   ui.draw();
-  ui.highlightCode();
   trimWordHighlightWhitespace(targetEl);
+  highlightDiffSyntax(targetEl, path);
   attachDiffLineClickHandlers(targetEl, path);
   renderDiffLineCommentIndicators(targetEl, path);
   autoExpandUnresolvedThreads(targetEl, path);
