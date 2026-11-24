@@ -13,6 +13,13 @@
   --side-w: 264px;
   --side-rail-w: 56px;
   --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --syn-keyword: var(--bad);
+  --syn-function: var(--pr);
+  --syn-type: var(--warn);
+  --syn-string: var(--ok);
+  --syn-number: var(--prtx);
+  --syn-property: var(--oktx);
+  --syn-comment: var(--dim);
 }
 
 :root, [data-theme="dark"] {

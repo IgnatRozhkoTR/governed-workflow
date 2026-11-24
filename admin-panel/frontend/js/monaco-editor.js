@@ -119,15 +119,17 @@ function defineCheckpointTheme(theme) {
     inherit: true,
     rules: [
       _themeRule('', '--tx'),
-      _themeRule('comment', '--dim', 'italic'),
-      _themeRule('keyword', '--pr'),
-      _themeRule('string', '--ok'),
-      _themeRule('number', '--warn'),
-      _themeRule('type', '--prtx'),
+      _themeRule('comment', '--syn-comment', 'italic'),
+      _themeRule('keyword', '--syn-keyword'),
+      _themeRule('string', '--syn-string'),
+      _themeRule('regexp', '--syn-string'),
+      _themeRule('number', '--syn-number'),
+      _themeRule('type', '--syn-type'),
+      _themeRule('annotation', '--syn-type'),
       _themeRule('delimiter', '--dim'),
-      _themeRule('tag', '--pr'),
-      _themeRule('attribute.name', '--prtx'),
-      _themeRule('attribute.value', '--ok')
+      _themeRule('tag', '--syn-keyword'),
+      _themeRule('attribute.name', '--syn-property'),
+      _themeRule('attribute.value', '--syn-string')
     ],
     colors: {
       'editor.background': _themeColor('--sf'),
