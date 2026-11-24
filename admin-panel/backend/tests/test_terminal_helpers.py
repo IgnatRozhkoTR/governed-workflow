@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 SERVER_DIR = str(Path(__file__).resolve().parent.parent)
 if SERVER_DIR not in sys.path:
     sys.path.insert(0, SERVER_DIR)
@@ -19,6 +21,7 @@ from core.terminal import (
     parse_env_vars,
     send_paste_keystroke,
     send_prompt,
+    session_name,
     write_launch_env_file,
 )
 
@@ -366,3 +369,20 @@ def test_create_session_unbinds_middle_click_paste(monkeypatch):
     unbind_calls = [c for c in calls if c[:2] == ["tmux", "unbind-key"]]
     assert len(unbind_calls) == 1
     assert unbind_calls[0] == ["tmux", "unbind-key", "-T", "root", "MouseDown2Pane"]
+
+
+@pytest.mark.parametrize("branch, expected", [
+    ("qa/fresh", "ws-qa-shop-qa-fresh"),
+    ("feature/a/b", "ws-qa-shop-feature-a-b"),
+    ("release/v1.2", "ws-qa-shop-release-v1-2"),
+])
+def test_session_name_replaces_slashes_and_dots_with_tmux_safe_dashes(branch, expected):
+    assert session_name("qa-shop", branch) == expected
+
+
+def test_session_name_keeps_existing_names_for_plain_branches():
+    assert session_name("flow", "strip") == "ws-flow-strip"
+
+
+def test_session_name_matches_for_raw_and_sanitized_branch():
+    assert session_name("qa-shop", "qa/fresh") == session_name("qa-shop", "qa-fresh")

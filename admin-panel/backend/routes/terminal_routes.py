@@ -45,19 +45,12 @@ def _validate_session_kind(session_kind):
     return None
 
 
-def _terminal_session_name(project, branch, session_kind):
-    kind = _validate_session_kind(session_kind)
-    if kind is None:
-        return None
-    return session_name(project, branch, kind=kind)
-
-
 def _websocket_auth_ok() -> bool:
     with get_db_ctx() as db:
         return websocket_auth_ok(db, request.args.get('token', ''))
 
 
-def _attach_terminal_ws(ws, project, branch, session_kind):
+def _attach_terminal_ws(ws, project, branch):
     if not _websocket_auth_ok():
         ws.send(json.dumps({'error': 'authentication_required'}))
         return
@@ -66,11 +59,7 @@ def _attach_terminal_ws(ws, project, branch, session_kind):
         ws.send(json.dumps({'error': TMUX_NOT_INSTALLED}))
         return
 
-    name = _terminal_session_name(project, branch, session_kind)
-    if not name:
-        ws.send(json.dumps({'error': 'Unsupported terminal session kind'}))
-        return
-
+    name = session_name(project, branch)
     if not session_exists(name):
         ws.send(json.dumps({'error': 'No tmux session. Use Start or Resume first.'}))
         return
@@ -107,11 +96,11 @@ def register_terminal_ws(app):
 
     @sock.route('/ws/terminal/<project>/<path:branch>')
     def terminal_ws(ws, project, branch):
-        _attach_terminal_ws(ws, project, branch, SESSION_KIND_CLAUDE)
+        _attach_terminal_ws(ws, project, branch)
 
-    @sock.route('/ws/terminal/<project>/<path:branch>/<session_kind>')
+    @sock.route(f'/ws/terminal/<project>/<path:branch>/<any({SESSION_KIND_CLAUDE}):session_kind>')
     def terminal_ws_kind(ws, project, branch, session_kind):
-        _attach_terminal_ws(ws, project, branch, session_kind)
+        _attach_terminal_ws(ws, project, branch)
 
     @sock.route('/ws/terminal-session/<name>')
     def terminal_ws_by_name(ws, name):

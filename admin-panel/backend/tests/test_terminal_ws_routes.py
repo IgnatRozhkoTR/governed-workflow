@@ -2,6 +2,7 @@
 import json
 
 import pytest
+from flask import request
 
 import routes.terminal_routes as terminal_routes_module
 
@@ -135,3 +136,53 @@ def test_project_named_session_still_reaches_its_own_workspace_terminal(app):
     )
     assert endpoint == "terminal_ws"
     assert args == {"project": "session", "branch": "some-branch"}
+
+
+
+_WEBSOCKET_UPGRADE_HEADERS = {"Upgrade": "websocket", "Connection": "Upgrade"}
+
+
+def _resolve_ws_route(app, path):
+    """Route ``path`` through a WSGI environ so ``%2F`` is decoded as on the live server."""
+    with app.test_request_context(path, headers=_WEBSOCKET_UPGRADE_HEADERS):
+        return request.url_rule.endpoint, dict(request.view_args)
+
+
+@pytest.mark.parametrize("path, expected_branch", [
+    ("/ws/terminal/qa-shop/qa/fresh", "qa/fresh"),
+    ("/ws/terminal/qa-shop/qa%2Ffresh", "qa/fresh"),
+    ("/ws/terminal/qa-shop/feature/a/b", "feature/a/b"),
+])
+def test_slash_branch_without_kind_resolves_to_full_branch(app, path, expected_branch):
+    endpoint, args = _resolve_ws_route(app, path)
+
+    assert endpoint == "terminal_ws"
+    assert args == {"project": "qa-shop", "branch": expected_branch}
+
+
+@pytest.mark.parametrize("path, expected_branch", [
+    ("/ws/terminal/qa-shop/qa/fresh/claude", "qa/fresh"),
+    ("/ws/terminal/qa-shop/qa%2Ffresh/claude", "qa/fresh"),
+    ("/ws/terminal/qa-shop/feature%2Fclaude/claude", "feature/claude"),
+])
+def test_slash_branch_with_kind_resolves_to_full_branch(app, path, expected_branch):
+    endpoint, args = _resolve_ws_route(app, path)
+
+    assert endpoint == "terminal_ws_kind"
+    assert args == {"project": "qa-shop", "branch": expected_branch, "session_kind": "claude"}
+
+
+def test_slash_branch_attaches_to_its_workspace_session(app, monkeypatch):
+    monkeypatch.setattr(terminal_routes_module, "websocket_auth_ok", lambda db, token: True)
+    monkeypatch.setattr(terminal_routes_module, "tmux_available", lambda: True)
+    monkeypatch.setattr(terminal_routes_module, "session_exists", lambda name: True)
+    attached = []
+    monkeypatch.setattr(terminal_routes_module, "run_pty_websocket", lambda ws, name: attached.append(name))
+    _, args = _resolve_ws_route(app, "/ws/terminal/qa-shop/qa%2Ffresh")
+
+    ws = _FakeWs()
+    with app.test_request_context("/ws/terminal/qa-shop/qa%2Ffresh", query_string={"token": "t"}):
+        terminal_routes_module._attach_terminal_ws(ws, args["project"], args["branch"])
+
+    assert ws.sent == []
+    assert attached == ["ws-qa-shop-qa-fresh"]

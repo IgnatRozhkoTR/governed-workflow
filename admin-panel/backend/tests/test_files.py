@@ -1366,3 +1366,15 @@ def test_history_rename_multi_project_treats_commits_on_repo_base_as_published(c
 
     assert r.status_code == 400
     assert "already pushed" in r.json["error"]
+
+
+@pytest.mark.parametrize("branch_segment", ["feature/test", "feature%2Ftest"])
+def test_list_files_accepts_raw_and_encoded_slash_branch(client, workspace, branch_segment):
+    Path(workspace["working_dir"]).joinpath("hello.py").write_text("print('hi')")
+    _git(workspace["working_dir"], "add", "hello.py")
+    _git(workspace["working_dir"], "commit", "-m", "Add file")
+
+    r = client.get(f"/api/ws/test-project/{branch_segment}/files")
+
+    assert r.status_code == 200
+    assert "hello.py" in [e["name"] for e in r.json["entries"]]

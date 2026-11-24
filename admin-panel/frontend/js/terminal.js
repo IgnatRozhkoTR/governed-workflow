@@ -84,11 +84,10 @@ function _terminalWsOrigin() {
 }
 
 function _buildTerminalWsUrl(projectId, branch) {
-  var base = _terminalWsOrigin() + '/ws/terminal/' +
-             encodeURIComponent(projectId) + '/' + encodeURIComponent(branch);
-  var kind = _getActiveTerminalKind();
-  var withKind = kind && kind !== 'claude' ? base + '/' + encodeURIComponent(kind) : base;
-  return _appendTokenToWsUrl(withKind);
+  return _appendTokenToWsUrl(
+    _terminalWsOrigin() + '/ws/terminal/' + encodeURIComponent(projectId) + '/' +
+    encodeURIComponent(branch) + '/' + encodeURIComponent(_getActiveTerminalKind())
+  );
 }
 
 function _buildSessionTerminalWsUrl(sessionName) {
