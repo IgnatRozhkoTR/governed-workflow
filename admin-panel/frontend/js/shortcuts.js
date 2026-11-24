@@ -8,8 +8,7 @@ var SHORTCUTS_STORAGE_KEY = 'ui_shortcuts';
 var SHORTCUT_MODIFIERS = ['Ctrl', 'Alt', 'Shift', 'Meta'];
 
 var SHORTCUT_ACTIONS = [
-  { id: 'toggleTerminal', labelKey: 'shortcuts.action.toggleTerminal', defaultCombo: 'Ctrl+Alt+Backquote', run: function() { toggleTerminal(); } },
-  { id: 'openTerminal', labelKey: 'shortcuts.action.openTerminal', defaultCombo: 'Ctrl+Alt+KeyT', run: function() { openTerminal(); } },
+  { id: 'toggleTerminal', labelKey: 'shortcuts.action.toggleTerminal', defaultCombo: 'Ctrl+Alt+KeyT', run: function() { toggleTerminal(); } },
   { id: 'switchTerminalMode', labelKey: 'shortcuts.action.switchTerminalMode', defaultCombo: 'Ctrl+Alt+Shift+Enter', run: function() { switchTerminalMode(); } },
   { id: 'openChanges', labelKey: 'shortcuts.action.openChanges', defaultCombo: 'Ctrl+Alt+Shift+KeyC', run: function() { switchTab('changes'); } },
   { id: 'openScratchpads', labelKey: 'shortcuts.action.openScratchpads', defaultCombo: 'Ctrl+Alt+Shift+KeyS', run: function() { switchTab('scratchpads'); } }
@@ -92,11 +91,22 @@ function _readShortcutOverrides() {
   if (!raw) return {};
   try {
     var parsed = JSON.parse(raw);
-    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? _migrateRemovedShortcuts(parsed) : {};
   } catch (e) {
     console.warn('[shortcuts] ignoring unreadable ' + SHORTCUTS_STORAGE_KEY + ':', e.message);
     return {};
   }
+}
+
+// "Open terminal" was merged into "Toggle terminal". Its customised combo
+// carries over unless the user had already customised the toggle combo.
+function _migrateRemovedShortcuts(overrides) {
+  if (!('openTerminal' in overrides)) return overrides;
+  if (typeof overrides.openTerminal === 'string' && typeof overrides.toggleTerminal !== 'string') {
+    overrides.toggleTerminal = overrides.openTerminal;
+  }
+  delete overrides.openTerminal;
+  return overrides;
 }
 
 function _saveShortcutOverrides(overrides) {

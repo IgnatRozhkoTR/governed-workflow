@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════
 // The terminal is shown either full screen (the Terminal tab) or as a panel
 // docked beside the current tab. The mode used last is remembered browser-wide
-// so "open terminal" brings back whichever one the user works in.
+// so "toggle terminal" brings back whichever one the user works in.
 var TERMINAL_MODE_KEY = 'ui_terminal_mode';
 var TERMINAL_MODE_FULL_SCREEN = 'fullscreen';
 var TERMINAL_MODE_PANEL = 'panel';

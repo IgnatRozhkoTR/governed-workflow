@@ -895,7 +895,6 @@
   "settings.section.shortcuts.desc": "Сочетания работают везде в рабочем пространстве, в том числе в терминале. Они хранятся только в этом браузере.",
   "settings.scope.browser": "Браузер",
   "shortcuts.action.toggleTerminal": "Показать или скрыть терминал",
-  "shortcuts.action.openTerminal": "Открыть терминал",
   "shortcuts.action.switchTerminalMode": "Переключить режим терминала (весь экран / панель)",
   "shortcuts.action.openChanges": "Открыть «Изменения»",
   "shortcuts.action.openScratchpads": "Открыть черновики",

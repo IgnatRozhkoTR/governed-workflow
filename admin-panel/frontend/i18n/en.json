@@ -875,7 +875,6 @@
   "settings.section.shortcuts.desc": "Shortcuts work anywhere in a workspace, including inside the terminal. They are saved in this browser only.",
   "settings.scope.browser": "Browser",
   "shortcuts.action.toggleTerminal": "Show or hide the terminal",
-  "shortcuts.action.openTerminal": "Open the terminal",
   "shortcuts.action.switchTerminalMode": "Switch terminal mode (full screen / panel)",
   "shortcuts.action.openChanges": "Open Changes",
   "shortcuts.action.openScratchpads": "Open scratchpads",
