@@ -49,6 +49,7 @@ async function initApp() {
     applyLockSessionFields(stateData);
 
     applyStateData(stateData);
+    if (isLoadedWorkspace(ctx)) openUnstartedWorkspaceOnTask(ctx, LOCK_DATA.phase);
 
     if (LOCK_DATA.locale && LOCK_DATA.locale !== 'en') {
       await loadI18n(LOCK_DATA.locale);

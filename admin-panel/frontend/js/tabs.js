@@ -52,6 +52,7 @@ async function refreshTabData() {
 var TAB_ALIASES = { phases: 'overview', scratchpads: 'files' };
 var FULL_BLEED_TABS = ['files', 'changes', 'terminal'];
 var DEFAULT_TAB = 'overview';
+var UNSTARTED_PHASE = '0';
 var _lastNonTerminalTabId = null;
 
 function resolveTabId(tabId) {
@@ -160,11 +161,29 @@ function _storeLastTab(tabId) {
   try { localStorage.setItem(_tabStorageKey(ctx), tabId); } catch (e) {}
 }
 
-function showSettingsTaskFirst(ctx) {
+function _settingsSectionKey(ctx) {
+  return 'ui_last_settings_section:' + ctx.projectId + '/' + ctx.branch;
+}
+
+// A new workspace inherits nothing from an archived one that used the same branch name.
+function forgetWorkspaceTabs(ctx) {
+  try {
+    localStorage.removeItem(_tabStorageKey(ctx));
+    localStorage.removeItem(_settingsSectionKey(ctx));
+  } catch (e) {}
+}
+
+// A workspace that has not started, and where no tab was picked yet, is a
+// freshly created task: its first step is pasting the ticket context. It
+// opens on Settings > Task whichever path opened it, even over a URL hash.
+// Runs once the state is loaded, since only the state knows the phase.
+function openUnstartedWorkspaceOnTask(ctx, phase) {
+  if (phase !== UNSTARTED_PHASE || isKnownTab(_loadLastTab(ctx))) return;
   try {
     localStorage.setItem(_tabStorageKey(ctx), 'dashboard');
-    localStorage.setItem('ui_last_settings_section:' + ctx.projectId + '/' + ctx.branch, 'task');
+    localStorage.setItem(_settingsSectionKey(ctx), 'task');
   } catch (e) {}
+  _activateTabHooks(applyStoredTabForContext(ctx));
 }
 
 function _loadLastTab(ctx) {
@@ -179,7 +198,7 @@ function _loadLastTab(ctx) {
 function _loadLastSettingsSectionRaw(ctx) {
   if (!ctx) return null;
   var stored;
-  try { stored = localStorage.getItem('ui_last_settings_section:' + ctx.projectId + '/' + ctx.branch); } catch (e) { return null; }
+  try { stored = localStorage.getItem(_settingsSectionKey(ctx)); } catch (e) { return null; }
   return (stored && /^[a-z0-9_-]+$/i.test(stored)) ? stored : null;
 }
 
@@ -265,8 +284,10 @@ function applyStoredTabForContext(ctx) {
 //
 // Resolution order: (a) a URL hash naming a valid panel always wins; (b)
 // else the last tab used in this workspace, if any; (c) else — first ever
-// visit to this workspace — Overview. With no workspace context
-// (project-selector view) and no hash, nothing is restored: the
+// visit to this workspace — Overview, until initApp loads the state and
+// openUnstartedWorkspaceOnTask moves a not-yet-started one to Settings >
+// Task. With no workspace context (project-selector view) and no hash,
+// nothing is restored: the
 // statically-active panel in the HTML stands.
 (function() {
   var ctx = typeof getWorkspaceContext === 'function' ? getWorkspaceContext() : null;
